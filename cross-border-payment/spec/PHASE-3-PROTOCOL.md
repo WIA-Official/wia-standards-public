@@ -5,237 +5,273 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-cross-border-payment (Cross Border Payment).
+This document defines the protocols that govern a
+cross-border payment operator: the FATF Recommendation
+16 travel-rule discipline that ensures the originator's
+and beneficiary's identification fields travel with
+every wire; the correspondent-banking due-diligence
+discipline (FATF Recommendation 13, Wolfsberg CBDDQ);
+the sanctions-screening and OFAC discipline; the
+suspicious-transaction reporting discipline (FATF
+Recommendations 20 / 21); the settlement-finality
+discipline (CPMI PFMI Principle 8); the SWIFT GPI
+tracking discipline; the SEPA / EU-internal-area
+discipline that gates EU-area transfers; and the post-
+incident reconciliation and continuity-of-payments
+discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 20022, ISO 4217, ISO 3166-1, ISO 9362, ISO
+  13616, ISO 17442
+- IETF RFC 5905 (NTPv4), RFC 9421 (HTTP Message
+  Signatures), RFC 9457 (Problem Details)
+- CPMI Principles for Financial Market
+  Infrastructures (PFMI) — Principle 1 legal basis,
+  Principle 7 liquidity risk, Principle 8 settlement
+  finality, Principle 9 money settlement, Principle
+  20 FMI links, Principle 21 efficiency and
+  effectiveness, Principle 22 communication
+  procedures and standards, Principle 23 disclosure
+  of rules
+- CPMI cross-border payments roadmap
+- FATF Recommendations 1, 10, 11, 13, 16, 20, 21,
+  22, 25
+- FATF Methodology (the assessment methodology for
+  Recommendations 16 / 13 / 20)
+- Wolfsberg CBDDQ v1.4 + Wolfsberg AML Principles
+  for Correspondent Banking
+- US BSA + 31 CFR Chapter X (FinCEN)
+- US OFAC SDN + non-SDN programmes; OFAC 50%-rule
+- EU AMLR (Regulation (EU) 2024/1624) Articles 36
+  to 41 (correspondent-relationship CDD), Article
+  46 (record-keeping)
+- EU AMLA Regulation (Regulation (EU) 2024/1620)
+- EU Wire Transfer Regulation (Regulation (EU)
+  2023/1113) Articles 4 to 8
+- EU SEPA Regulation (Regulation (EU) No 260/2012)
+- EU Cross-Border Payments Regulation (Regulation
+  (EU) 2021/1230)
+- KR 특정금융정보법 + KR KoFIU reporting discipline
+- UK MLR 2017 + NCA-UKFIU SAR reporting
+- TARGET2 + T2-T2S settlement finality (Settlement
+  Finality Directive 98/26/EC implementation)
+- CHIPS Rules + Fedwire Operating Circular 6
 
 ---
 
-## §1 Scope
+## §1 Travel-Rule Discipline (FATF Recommendation 16)
 
-This PHASE document is one of four that together define the WIA-cross-border-payment
-standard. It addresses the protocol layer of the standard.
+The travel-rule discipline ensures the originator's
+and beneficiary's identification fields travel with
+the instruction throughout the correspondent chain:
 
-## §2 Manifest
+1. The operator validates that the originator's name,
+   account identifier, address (or, in lieu of
+   address, date-of-birth and unique customer
+   identifier), and the beneficiary's name and
+   account identifier are present at submission.
+2. For EU-side transfers above EUR 1 000 the EU Wire
+   Transfer Regulation 2023/1113 Article 4 mandates
+   the originator's address and the beneficiary's
+   address; the operator validates the additional
+   fields.
+3. For US-side transfers FinCEN's Recordkeeping and
+   Travel Rule (31 CFR 1010.410(e) and (f)) imposes
+   the equivalent discipline.
+4. The wire message persists the travel-rule fields
+   in the canonical pacs.008 / pacs.009 / MT 103 /
+   MT 202 fields; intermediaries forward the fields
+   without alteration.
+5. Inbound messages with missing fields are
+   remediated through the operator's travel-rule
+   completeness procedure (request additional
+   information from the previous correspondent;
+   reject the inbound where remediation is not
+   feasible).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "cross-border-payment"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Correspondent-Banking Due-Diligence Discipline
 
-## §3 Conformance Tiers
+The operator's CBDDQ discipline aligns with FATF
+Recommendation 13:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- For each correspondent the operator collects the
+  Wolfsberg CBDDQ v1.4 questionnaire response and
+  the supporting evidence (the correspondent's AML
+  programme, sanctions programme, ownership
+  structure, regulatory licensing).
+- The operator's compliance officer reviews the
+  CBDDQ and approves the correspondent relationship,
+  approves with conditions (enhanced due diligence
+  or sub-set of services), or declines.
+- The CBDDQ is refreshed on a cadence aligned with
+  the correspondent's risk rating; high-risk
+  correspondents are refreshed annually, lower-risk
+  on the operator's published cadence.
+- Nested correspondent relationships (a third
+  correspondent accessing the operator's services
+  through the operator's direct correspondent) are
+  reviewed under FATF Recommendation 13 and the EU
+  AMLR Article 38 nested-relationships discipline.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Sanctions-Screening Discipline
 
-## §4 Discovery
+The sanctions-screening discipline:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/cross-border-payment`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- Originator and beneficiary names, account
+  identifiers, and address fields are screened
+  against US OFAC SDN and non-SDN programmes; UN
+  consolidated sanctions list; EU FSF; UK HMT; and
+  any jurisdictional sanctions programme that
+  applies.
+- Screening occurs at submission, before settlement,
+  and on the post-settlement reconciliation pass for
+  late-added designations.
+- Potential matches are routed to the operator's
+  compliance review queue; the four-eyes principle
+  applies — the reviewer who clears a potential
+  match cannot be the reviewer who approved the
+  customer at onboarding.
+- Confirmed matches are blocked; the operator
+  preserves the funds per the OFAC blocking
+  discipline (US) or the equivalent jurisdictional
+  freeze and reports to the supervisory authority.
+- The OFAC 50% rule (entities owned 50% or more by
+  designated parties) applies; the operator's
+  ownership-resolution discipline searches for
+  beneficial-ownership data.
 
-## §5 Time and Identity
+## §4 Suspicious-Transaction Reporting Discipline
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The SAR / STR discipline:
 
-## §6 Versioning and Deprecation
+- Front-line staff or the operator's transaction-
+  monitoring system surfaces a suspicious pattern
+  (structuring, unusual geography, unusual
+  beneficiary, unexplained urgency, mismatched
+  identification).
+- The operator's compliance officer reviews and —
+  where suspicion is supported — files the SAR / STR
+  to the FIU (US FinCEN, KR KoFIU, UK NCA-UKFIU,
+  EU AMLA-cross-border).
+- The FATF Recommendation 21 tipping-off discipline
+  applies — the operator does not disclose the SAR
+  / STR to the customer or to a third party.
+- The operator preserves the SAR / STR record and
+  the underlying transaction record for the
+  jurisdictional retention horizon (typically five
+  years from the date of the report).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Settlement-Finality and Liquidity Discipline
 
-## §7 Privacy and Security
+The settlement-finality discipline aligns with CPMI
+PFMI Principle 8:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Settlement on TARGET2, CHIPS, or Fedwire is final
+  and irrevocable on the system's posted finality
+  rules (TARGET2 / Settlement Finality Directive
+  98/26/EC implementation; CHIPS Rules; Fedwire
+  Operating Circular 6).
+- The operator's liquidity-risk discipline (CPMI
+  PFMI Principle 7) ensures sufficient intraday
+  liquidity to meet payment-system obligations.
+- For provisional settlement (correspondent banking
+  with end-of-day net settlement) the operator's
+  reconciliation pass converts provisional to final
+  on the next-day settlement cycle.
 
-## §8 Open Governance
+## §6 SWIFT GPI Tracking Discipline
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `cross-border-payment` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+For SWIFT-connected operators the SWIFT GPI tracking
+discipline applies:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- Every customer credit transfer carries a UETR
+  (Unique End-to-end Transaction Reference, RFC 4122
+  UUIDv4 syntax).
+- Each correspondent updates the GPI tracker with
+  its leg of the transfer (received, processed,
+  forwarded, paid, returned).
+- The originator and the beneficiary can query the
+  end-to-end status through their respective banks'
+  GPI-enabled customer channels.
 
+## §7 EU SEPA and Intra-Area Discipline
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+For euro-denominated EU intra-area transfers:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+- SEPA Regulation (EU) No 260/2012 imposes the
+  IBAN-only and BIC-optional discipline; the
+  operator's SEPA processing path is distinct from
+  the cross-border-outside-SEPA path.
+- EU Cross-Border Payments Regulation (EU) 2021/1230
+  Article 3 mandates that euro cross-border charges
+  to consumers be no higher than equivalent domestic
+  charges.
+- For non-euro SEPA-area currencies the operator's
+  SEPA processing path applies the regulatory
+  pricing transparency disciplines under Articles
+  3a and 3b (currency-conversion charges
+  disclosure).
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 KR / UK / Other Jurisdictional Discipline
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+- KR-jurisdiction operators apply 특정금융정보법 reporting
+  to KoFIU; the FIU's reporting wire format is the
+  operator's outbound channel.
+- UK-jurisdiction operators apply MLR 2017 + NCA-
+  UKFIU SAR reporting and the equivalent screening
+  against UK HMT.
+- Other jurisdictions apply their own AML/CFT primary
+  statute; the operator's compliance procedure
+  documents the per-jurisdiction reporting
+  obligations.
 
-## Annex F — Adoption Roadmap
+## §9 Identity, Time, and Audit Discipline
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+NTPv4 stratum-2 or better is the operator's clock
+baseline. Audit-events are emitted for every
+instruction submission, screening pass, CBDDQ review,
+SAR / STR filing, settlement event, and investigation
+resolution. Audit logs are integrity-protected per
+the operator's tamper-evident mechanism.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §10 Continuity-of-Payments Discipline
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The operator's continuity discipline addresses
+correspondent-bank failure, payment-system outage,
+and cyber-incident scenarios:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+- The operator's RTO / RPO targets for the cross-
+  border payment service align with the operating
+  jurisdiction's supervisory expectations.
+- Alternate correspondent routing is documented and
+  exercised on the operator's drill cadence.
+- Cyber-incident response follows the operator's
+  CSIRT plan and includes notification to the
+  payment system, the operator's correspondents, and
+  the supervisory authority on the published
+  notification timeframes.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §11 Conformance
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Implementations claiming PHASE-3 conformance enforce
+the discipline at every relevant decision point,
+maintain the CBDDQ records on the Wolfsberg cadence,
+file SAR / STR reports within the statutory window,
+exercise the OFAC 50% rule, and preserve the records
+on the FATF Recommendation 11 record-keeping discipline
+(five years from the date of the transaction or the
+date of the relationship's termination, whichever is
+later).
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+---
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+**Document Information:**
 
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-cross-border-payment
+- **Last Updated:** 2026-04-28

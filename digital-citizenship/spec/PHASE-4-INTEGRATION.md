@@ -5,237 +5,311 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-digital-citizenship (Digital Citizenship).
+This document defines how a digital-citizenship
+programme integrates with the systems that surround
+it: the operating jurisdiction's education ministry
+or programme funder; civil-society partner
+organisations; the operating jurisdiction's online-
+safety authority (where the programme operates an
+escalation channel for online-safety incidents); the
+operating jurisdiction's child-protection and
+safeguarding agencies; the parents and guardians of
+minor learners (through the operator's identity-
+verified parent-portal flow); the programme's
+external evaluators; the operating jurisdiction's
+data-protection authority for GDPR-Article-8 / COPPA
+/ Age-Appropriate Design Code privacy regime; the
+contracted accessibility auditor for WCAG 2.2 Level
+AA conformance; and long-term archives.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17021-1:2015 (management-system audit and
+  certification)
+- ISO/IEC 19796-1:2005 (learning, education and
+  training — quality management)
+- ISO 8601 (date and time)
+- W3C Verifiable Credentials Data Model 2.0 (optional)
 
 ---
 
-## §1 Scope
+## §1 Education Ministry / Programme Funder Integration
 
-This PHASE document is one of four that together define the WIA-digital-citizenship
-standard. It addresses the integration layer of the standard.
+The operating jurisdiction's education ministry (for
+public-school programmes) or programme funder (for
+library, NGO, and e-government literacy programmes)
+consumes funder reports and audits programme
+delivery. Integration carries the funder's identifier,
+the per-period reporting endpoint, the per-period
+budget-execution submission, the per-grant audit
+workflow, and the funder's response SLA.
 
-## §2 Manifest
+For EU-jurisdiction programmes funded under the EU
+Digital Education Action Plan 2021-2027, integration
+carries the European Commission's per-grant
+coordinator identifier and the Plan's reporting
+template.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "digital-citizenship"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Civil-Society Partner Organisation Integration
 
-## §3 Conformance Tiers
+Civil-society partner organisations (NGO partners,
+academic-research consortia, library consortia)
+integrate through cohort-delivery agreements.
+Integration carries each partner's identifier, the
+per-cohort responsibility-matrix reference, the per-
+cohort cooperation record, and the per-cycle review
+cadence.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Online-Safety Authority Integration
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+For programmes operating in jurisdictions with an
+online-safety authority (UK Ofcom under the Online
+Safety Act, EU Member State regulators under the
+Digital Services Act, US FTC for COPPA enforcement)
+integration carries the authority's identifier, the
+per-incident escalation endpoint, the per-incident
+acknowledgement workflow, and the per-period
+aggregate-statistics submission.
 
-## §4 Discovery
+## §4 Child-Protection and Safeguarding Agency Integration
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/digital-citizenship`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The operating jurisdiction's child-protection agency
+(US child-protection services per state, UK local-
+authority safeguarding boards, EU Member State child-
+protection agencies, KR child-protection agency)
+consumes safeguarding escalations beyond the
+programme's internal-resolution capacity. Integration
+carries the agency's identifier, the per-escalation
+intake endpoint, the per-case cooperation workflow,
+and the per-case status-update channel.
 
-## §5 Time and Identity
+## §5 Parent-Portal Integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The operator's parent-portal flow gates parents'
+access to the per-learner record:
 
-## §6 Versioning and Deprecation
+- per-parent identity verification (the operator's
+  multi-factor identity-verification flow);
+- per-parent access to the learner's enrolment,
+  module-completion, and pastoral-record subset
+  appropriate for parental review;
+- per-parent withdrawal-of-consent flow (parents may
+  withdraw consent under COPPA / GDPR Article 7(3)
+  / UK Age-Appropriate Design Code at any time);
+- per-parent access to the operator's privacy notice
+  in plain age-appropriate language and in the
+  operating jurisdiction's official languages.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 External Evaluator Integration
 
-## §7 Privacy and Security
+External evaluators commissioned by the funder consume
+audit-trail exports through dedicated client
+certificates. The export carries the API audit logs
+for the audit window, the cohort enrolment and
+completion records (with learner identities anonymised
+per the operator's anonymisation policy), the
+inclusive-access provision use, the online-safety-
+incident aggregate, and the funder-reporting cycle's
+narrative reports.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 Data-Protection Authority Integration
 
-## §8 Open Governance
+The operating jurisdiction's data-protection authority
+(US FTC for COPPA, UK ICO for the Age-Appropriate
+Design Code, EU Member State DPAs for GDPR Article 8,
+KR PIPC for KR-PIPA) integrates through the
+operator's parental-consent and minor-learner-data
+discipline. Integration carries the DPA's identifier,
+the per-inquiry cooperation workflow, the per-
+investigation response workflow, and the per-cycle
+voluntary disclosure channel.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `digital-citizenship` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §8 Accessibility Auditor Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+The contracted accessibility auditor consumes the
+programme's curriculum-module and platform artefacts
+for per-cycle WCAG 2.2 Level AA conformance audit.
+Integration carries the auditor's identifier, the
+per-cycle audit-report archive, the per-finding
+remediation tracker, and the per-cycle scope
+statement.
 
+## §9 Evidence Package Format
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+```
+evidence/
+  manifest.json                — package manifest (signed)
+  programme.json               — programme record
+  curriculum-modules/          — module records with
+                                  WCAG conformance
+                                  evidence
+  cohorts/                     — cohort records
+  learners/                    — learner records (
+                                  anonymised in
+                                  external-evaluator
+                                  bundle, full in
+                                  funder-audit
+                                  bundle per the
+                                  funder's data-
+                                  access agreement)
+  module-completions/          — completion records
+  programme-outcomes/          — aggregate outcome
+                                  reports
+  online-safety-incidents/     — incident records (
+                                  gated to
+                                  safeguarding-lead
+                                  and child-protection-
+                                  agency consumers)
+  e-government-topics/         — topic records (where
+                                  applicable)
+  audit/                       — API audit log excerpts
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+The package is content-addressable; the manifest is
+signed by the programme operator's HTTP-message-
+signature key (RFC 9421) and counter-signed by the
+programme's safeguarding lead when the package
+supports a child-protection-agency submission.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §10 Manifest and Signatures
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Verification tools recompute file digests, compare to
+the manifest, and reject the package on mismatch with
+type `urn:wia:digital-citizenship:evidence-mismatch`.
+Learner-identity-redaction integrity is checked
+separately so that public-shareable bundles do not
+carry per-learner content the operator has not
+authorised for disclosure.
 
-## Annex F — Adoption Roadmap
+## §11 well-known URI Discovery
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+A conformant programme exposes a discovery document
+at `/.well-known/wia-digital-citizenship` that links
+to the API root, the operator's safeguarding-lead
+contact, the funder binding, the operating
+jurisdiction's online-safety-authority binding (where
+applicable), the per-jurisdiction privacy-notice URI,
+and the contracted accessibility auditor.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §12 Long-Term Archive Integration
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Programmes designate a long-term archive that holds
+aggregate outcome reports, funder-reporting history,
+and curriculum-module artefacts beyond the programme's
+primary retention horizon. Quarterly deposits round-
+trip content-addresses; on programme wind-down,
+remaining records transfer to the archive with
+content-addresses preserved subject to the operating
+jurisdiction's records-retention rules.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §13 Verifiable-Credential Re-Issuance (optional)
 
-## Annex G — Test Vectors and Conformance Evidence
+Programmes that wish to expose attestations (WCAG 2.2
+Level AA conformance, ISO/IEC 19796-1 quality-
+management adoption, funder-recognised completion of
+a digital-citizenship cohort) to consumers of W3C
+Verifiable Credentials MAY re-issue the attestations
+as Verifiable Credentials under the Data Model 2.0
+specification. Re-issuance is optional; the canonical
+record remains the JSON evidence-package manifest.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §14 Streaming Heartbeat
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+SSE subscribers receive a heartbeat every 30 seconds
+with `Last-Event-ID` resume support. Subscribers that
+disconnect during cohort delivery windows resume from
+the last seen event identifier without losing
+visibility of priority-1 events (online-safety-incident
+escalation, accessibility-finding remediation
+deadline, parental-consent withdrawal received).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §15 Backwards-Compatibility Guarantee
 
-## Annex H — Versioning and Deprecation Policy
+PHASE-4 minor revisions remain backwards-compatible
+with prior-minor clients. Major revisions go through
+a deprecation window of at least one full funder-
+reporting cycle so that funder, civil-society-partner,
+and external-evaluator integrations have time to
+migrate.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §16 Cross-Standard Linkage
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Programmes that consume adjacent WIA standards (WIA-
+a11y-wiabooks for accessible-content authoring
+discipline, WIA-financial-inclusion for financial-
+literacy module overlap, WIA-gdpr-compliance for the
+privacy overlay across minor-learner records, WIA-
+ai-content-moderation for online-safety-incident
+classification overlap) emit cross-standard linkage
+records.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §17 Reader Tooling
 
-## Annex I — Interoperability Profiles
+Programmes MAY publish supplementary reader tools
+(per-cohort enrolment dashboards, per-module WCAG
+audit consoles, per-cohort inclusive-access provision
+trackers, per-period funder-report drafting wizards)
+alongside the canonical evidence package; the tools
+are non-normative.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §18 Public Catalogue Feed
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Programmes publish a public catalogue feed listing the
+in-force curriculum-module list, the WCAG 2.2
+conformance summary, the operating jurisdiction's
+funder binding, the safeguarding-lead contact, and
+the aggregate enrolled and completed counts. The feed
+enables peer-programme and civil-society discovery of
+the programme's posture.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §19 UNESCO Digital Literacy Framework Integration
+
+Programmes that adopt the UNESCO Digital Literacy
+Global Framework as a community-recognised baseline
+publish a per-cycle alignment statement and consume
+UNESCO publications as inputs to the framework
+adoption. Integration carries the UNESCO Institute
+for Statistics (UIS) coordinator reference where the
+programme submits to the UIS digital-literacy
+indicator collection.
+
+## §20 Public Catalogue Aggregator Integration
+
+Civil-society researchers and academic-research
+consortia consume aggregate enrolment and completion
+statistics for independent analysis. Integration
+carries the consumer's identifier, the per-research-
+purpose data-access agreement, and the programme's
+publication of consumer-attribution in any derivative
+research output. Per-learner records are NOT shared
+through this channel.
+
+## §21 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated
+successfully with the operating jurisdiction's
+education ministry or funder, at least one civil-
+society partner organisation (where applicable), at
+least one accessibility auditor, the operating
+jurisdiction's child-protection-agency referral
+channel, the operating jurisdiction's online-safety-
+authority binding (where applicable), at least one
+external evaluator, and at least one long-term
+archive, and has published at least one externally
+citable evidence package.
+
+Sunsetting an integration is announced via the well-
+known discovery document at least 90 calendar days
+before removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-digital-citizenship
+- **Last Updated:** 2026-04-28

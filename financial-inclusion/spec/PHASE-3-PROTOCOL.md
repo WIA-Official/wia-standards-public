@@ -5,237 +5,401 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-financial-inclusion (Financial Inclusion).
+This document defines the protocols that govern a
+financial-inclusion programme: the operating
+jurisdiction's financial-inclusion strategy
+discipline (alignment to the operating jurisdiction's
+National Financial Inclusion Strategy where one
+exists, plus alignment to the World Bank UFA-2020
+framework and the AFI Maya Declaration where the
+operating jurisdiction is an AFI member); the FATF
+risk-based-approach simplified CDD discipline (FATF
+Recommendation 1 risk-based approach plus
+Recommendation 10 simplified CDD for proven low-risk
+relationships); the operating jurisdiction's
+consumer-protection discipline (US TILA / TISA / Reg
+Z / Reg DD, EU PAD / PSD2 / Consumer Credit
+Directive, KR Banking Act + Specialized Credit
+Finance Business Act + Electronic Financial
+Transactions Act); the fee-transparency discipline;
+the dispute-resolution discipline; the fair-lending
+discipline (US ECOA / FHA / CRA, EU CCD Article 18,
+equivalent national rules); the inclusive-design
+discipline; and the financial-literacy education
+discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 8601 (date and time)
+- ISO 20022 (financial-services messaging)
+- ISO 4217 (currency codes)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 9457 (Problem Details)
+- World Bank UFA-2020 framework
+- World Bank Findex Database methodology
+- G20 Financial Inclusion Action Plan + GPFI High-
+  Level Principles for Digital Financial Inclusion
+- AFI Maya Declaration
+- FATF 40 Recommendations (Recommendation 1 risk-
+  based approach + Recommendation 10 simplified CDD
+  + Recommendation 16 Travel Rule)
+- FATF Guidance on Anti-Money Laundering and
+  Terrorist Financing Measures and Financial
+  Inclusion
+- US BSA + 31 CFR Part 1020 (depository institution
+  AML programme + simplified CDD for low-risk)
+- US Community Reinvestment Act (CRA) + 12 CFR Part
+  25
+- US Equal Credit Opportunity Act (ECOA) +
+  Regulation B (12 CFR Part 1002)
+- US Fair Housing Act (FHA)
+- US Truth in Lending Act (TILA) + Regulation Z (12
+  CFR Part 1026)
+- US Truth in Savings Act (TISA) + Regulation DD (12
+  CFR Part 1030)
+- US Electronic Fund Transfer Act (EFTA) +
+  Regulation E (12 CFR Part 1005)
+- US Consumer Financial Protection Bureau (CFPB)
+  rules
+- EU Payment Accounts Directive 2014/92/EU
+- EU Payment Services Directive 2 (Directive (EU)
+  2015/2366)
+- EU Consumer Credit Directive (Directive (EU)
+  2023/2225)
+- EU Mortgage Credit Directive (Directive 2014/17/EU)
+- EU AML Regulation (EU) 2024/1624 — simplified due
+  diligence under Article 33
+- KR Specific Financial Information Act
+  ("특정금융정보법")
+- KR Banking Act
+- KR Specialized Credit Finance Business Act
+- KR Electronic Financial Transactions Act
+- KR Act on Fair Trade in Subcontracting and Act on
+  the Protection of Financial Consumers (under the
+  Financial Consumer Protection Act consolidated
+  framework)
 
 ---
 
-## §1 Scope
+## §1 National-Strategy Alignment Discipline
 
-This PHASE document is one of four that together define the WIA-financial-inclusion
-standard. It addresses the protocol layer of the standard.
+Where the operating jurisdiction maintains a National
+Financial Inclusion Strategy (NFIS), the programme
+aligns to:
 
-## §2 Manifest
+- per-NFIS goal targets (e.g. percentage-of-adult-
+  population with a transaction account by a target
+  date — typically 60 to 90 percent depending on the
+  NFIS's baseline);
+- per-NFIS sectoral targets (women, youth, rural
+  populations, MSMEs);
+- per-NFIS reporting cadence to the strategy
+  coordinator;
+- per-NFIS reporting alignment to the World Bank
+  Findex Database methodology so that the operating
+  jurisdiction's progress is comparable cross-
+  border.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "financial-inclusion"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 World Bank UFA-2020 + AFI Maya Declaration Discipline
 
-## §3 Conformance Tiers
+For programmes adopting the World Bank UFA-2020
+framework or the AFI Maya Declaration:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- per-programme alignment statement to the
+  framework's outcomes (financial inclusion,
+  financial-consumer-protection, financial-stability,
+  financial-integrity);
+- per-cycle progress reporting to the framework's
+  measurement methodology;
+- per-cycle peer-learning participation through the
+  AFI working groups (where the operating
+  jurisdiction is an AFI member).
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 FATF Risk-Based-Approach Simplified-CDD Discipline
 
-## §4 Discovery
+Per FATF Recommendation 10 simplified CDD applies to
+relationships proven to be lower risk. The discipline:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/financial-inclusion`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- per-relationship low-risk justification (the
+  operator's risk-based-approach assessment showing
+  why simplified CDD is appropriate);
+- per-relationship threshold-limit observance (the
+  simplified-CDD relaxation is paired with caps that
+  the operator enforces — typical caps include per-
+  transaction value, per-month aggregate value,
+  per-balance);
+- per-relationship upgrade pathway when the customer
+  exceeds thresholds (the upgrade triggers full CDD
+  per WIA-anti-money-laundering);
+- per-relationship periodic review against the
+  evolving risk profile;
+- per-jurisdiction simplified-CDD basis declaration
+  in the operator's compliance dossier.
 
-## §5 Time and Identity
+The FATF Guidance on Anti-Money Laundering and
+Terrorist Financing Measures and Financial Inclusion
+provides cross-border baseline practice for
+calibrating the simplified-CDD relaxations against
+the operating jurisdiction's risk profile.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 US Consumer-Protection Discipline
 
-## §6 Versioning and Deprecation
+For US-jurisdiction programmes:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+- US TILA / Regulation Z disclosure for consumer-
+  credit (annual percentage rate, finance charge,
+  amount financed, total of payments, payment
+  schedule);
+- US TISA / Regulation DD disclosure for deposit-
+  account (annual percentage yield, interest-rate
+  computation method, fees, balance information);
+- US EFTA / Regulation E for electronic fund
+  transfers (account-error resolution, unauthorised-
+  transfer liability, change-in-terms notice);
+- US CRA / 12 CFR Part 25 for depository institutions
+  (CRA Public File, branch-distribution-by-low-and-
+  moderate-income census tracts, lending-by-LMI,
+  community-development activity record);
+- US ECOA / Regulation B for credit applications
+  (notice of action taken, statement of specific
+  reasons in adverse-action notice, prohibition on
+  discrimination on race, colour, religion, national
+  origin, sex, marital status, age, receipt of
+  public assistance, exercise of consumer-protection
+  rights).
 
-## §7 Privacy and Security
+## §5 EU Consumer-Protection Discipline
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+For EU-Member-State-jurisdiction programmes:
 
-## §8 Open Governance
+- EU Payment Accounts Directive 2014/92/EU — right
+  of access to a payment account with basic
+  features, fee transparency through the Fee
+  Information Document and the Statement of Fees,
+  account-switching service for customers moving
+  banks within the same Member State;
+- EU PSD2 (Directive (EU) 2015/2366) — payment-
+  service-user rights, unauthorised-transaction
+  liability, dispute-resolution deadlines, strong
+  customer authentication for electronic payments;
+- EU Consumer Credit Directive (Directive (EU)
+  2023/2225) — pre-contractual information sheet
+  (the SECCI), creditworthiness assessment per
+  Article 18, withdrawal right per Article 26, early
+  repayment right;
+- EU Mortgage Credit Directive (Directive 2014/17/EU)
+  for residential-mortgage credit;
+- EU GDPR Articles 7 / 8 / 12-14 transparency cross-
+  walked with WIA-gdpr-compliance.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `financial-inclusion` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 KR Consumer-Protection Discipline
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+For KR-jurisdiction programmes:
 
+- KR Banking Act consumer-protection clauses;
+- KR Specialized Credit Finance Business Act for
+  non-bank consumer-finance companies;
+- KR Electronic Financial Transactions Act for
+  electronic financial services;
+- KR Act on the Protection of Financial Consumers
+  (the consolidated financial-consumer-protection
+  framework) and the operating Financial Services
+  Commission's enforcement guidelines.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §7 Fee-Transparency Discipline
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Per-jurisdiction fee-transparency:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+- per-jurisdiction pre-contractual fee disclosure
+  (the operator presents the fee schedule before
+  the customer commits to the relationship);
+- per-jurisdiction in-relationship fee changes
+  observe the operating jurisdiction's pre-
+  notification deadline (US Reg DD § 1030.5 30-day
+  notice for adverse changes, EU PSD2 Article 54(2)
+  two-month notice for framework-contract changes,
+  KR equivalent);
+- per-jurisdiction fee-glossary publication where
+  the operating jurisdiction prescribes a glossary
+  (EU PAD's standardised fee terminology, EU
+  Member State's transposed terminology);
+- per-jurisdiction fee-schedule plain-language
+  rendering for consumer-comprehension.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 Dispute-Resolution Discipline
 
-## Annex F — Adoption Roadmap
+Per-jurisdiction dispute-resolution:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- per-jurisdiction internal complaint-handling
+  procedure with documented response deadlines
+  (EU PSD2 Article 101 fifteen-business-day rule,
+  US Reg E ten-business-day investigation rule for
+  consumer-asserted electronic-fund-transfer
+  errors);
+- per-jurisdiction external escalation channel (
+  Financial Ombudsman Service in the UK, the FOS-
+  AU in Australia, FIN-NET network ADR bodies in
+  the EU, the CFPB Consumer Response in the US for
+  federal-level consumer-finance issues, the KR
+  Financial Dispute Settlement Committee);
+- per-jurisdiction redress-fund participation where
+  the operating jurisdiction maintains one (e.g.
+  the operating jurisdiction's deposit-protection
+  scheme covers consumer redress for protected-
+  deposit incidents).
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §9 Fair-Lending Discipline
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Per-jurisdiction fair-lending:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+- per-jurisdiction prohibited-basis enumeration
+  (US ECOA prohibited bases; EU CCD Article 6 non-
+  discrimination; equivalent national rules);
+- per-decision adverse-action notice provision per
+  the operating jurisdiction's regime;
+- per-cycle disparate-impact monitoring (the
+  operator's monitoring of decision outcomes by
+  protected characteristic where the operator's
+  data permits the analysis);
+- per-jurisdiction CRA / equivalent community-
+  reinvestment record (US-jurisdiction depository
+  institutions maintain CRA Public File; EU and KR
+  jurisdictions have analogous community-bank
+  outreach records under their respective
+  frameworks).
 
-## Annex G — Test Vectors and Conformance Evidence
+## §10 Inclusive-Design Discipline
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Programmes serving inclusive-design populations:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- per-programme accessible product surface (mobile
+  apps, branch counters, mobile-money-agent
+  interfaces conforming to W3C WCAG 2.2 Level AA
+  where the operating jurisdiction's accessibility
+  law applies);
+- per-programme low-literacy-aware customer
+  journeys (icon-driven interfaces, pictorial
+  receipts, voice prompts in the customer's
+  preferred language);
+- per-programme multilingual support in the
+  operating jurisdiction's recognised languages and
+  in the languages the operator's customer base
+  speaks;
+- per-programme assistive-technology compatibility
+  testing.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §11 Records Retention
 
-## Annex H — Versioning and Deprecation Policy
+Programme records — every basic-account-access
+record, consumer-protection disclosure, fee schedule
+revision, dispute resolution, credit decision, and
+programme-outcome aggregate — retain per the
+operating jurisdiction's records-retention rules.
+FATF Recommendation 11 baseline of five years
+applies, with per-jurisdiction extensions (e.g. US
+TILA / Reg Z record retention of two to five years
+depending on document class, EU PSD2 / GDPR-
+intersection retention).
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Time Synchronisation
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Operator clocks synchronise per RFC 5905 (NTPv4) so
+that fee-change notice deadlines, dispute-resolution
+deadlines, FATF Travel Rule chronology (cross-walked
+with WIA-anti-money-laundering), and consumer-
+protection notice timestamps are consistent across
+the operator's runtime fleet.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Mobile-Money-Specific Discipline
 
-## Annex I — Interoperability Profiles
+Mobile-money-operator programmes follow:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- per-jurisdiction mobile-money licensing regime
+  (KE M-Pesa-style licensing under the Central Bank
+  of Kenya, comparable regimes in the operating
+  jurisdiction);
+- per-jurisdiction tier-based simplified-CDD
+  framework (the operating jurisdiction's tier-1
+  thresholds + per-tier upgrade pathways);
+- per-jurisdiction agent-network discipline
+  (the operating jurisdiction's mobile-money-agent
+  due diligence and supervision rules);
+- per-jurisdiction interoperability with bank
+  accounts (the operating jurisdiction's mobile-
+  money-to-bank account-transfer rails);
+- per-jurisdiction data-protection alignment with
+  the operating jurisdiction's privacy regime
+  (cross-walked with WIA-gdpr-compliance for EU,
+  KR-PIPA, etc.).
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §14 Microfinance-Institution-Specific Discipline
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Microfinance-institution programmes follow:
+
+- per-jurisdiction MFI licensing regime;
+- per-jurisdiction interest-rate-cap discipline
+  where the operating jurisdiction caps
+  microfinance interest rates;
+- per-jurisdiction client-protection discipline
+  (over-indebtedness prevention, transparency,
+  responsible pricing, fair-and-respectful
+  treatment, privacy, complaint resolution — the
+  Smart Campaign Client Protection Principles
+  serve as a community-recognised cross-border
+  baseline);
+- per-jurisdiction over-indebtedness reporting to
+  the operating jurisdiction's credit-bureau
+  network where one operates.
+
+## §15 Financial-Literacy Education Discipline
+
+Financial-literacy education activities:
+
+- per-cohort curriculum aligned to the operating
+  jurisdiction's national financial-literacy
+  framework where one exists (US's MyMoney.gov
+  taxonomy, OECD/INFE Financial Literacy framework
+  used as a community-recognised baseline,
+  operating jurisdiction's financial-literacy
+  curriculum from the central bank or finance
+  ministry);
+- per-cohort delivery in age- and culturally-
+  appropriate format;
+- per-cohort outcome measurement (post-programme
+  knowledge / behaviour / confidence survey).
+
+## §16 Quality Dossier and Conformance
+
+The programme's quality dossier records the governing
+frameworks, the National Financial Inclusion Strategy
+adoption, the simplified-CDD discipline, the
+consumer-protection-disclosure history, the fee-
+schedule history, the dispute-resolution history, the
+fair-lending discipline, the inclusive-design
+adoption, and the financial-literacy education
+delivery. The dossier is reviewed at least annually
+by the programme manager and is provided to the
+operating jurisdiction's financial-inclusion strategy
+coordinator on request.
+
+A programme conformant with WIA-financial-inclusion
+publishes its public privacy notice, its public fee
+schedule (in the formats the operating jurisdiction
+prescribes), its CRA Public File / equivalent
+community-reinvestment file, and the aggregate
+account-opening and active-account counts; and
+answers an annual self-assessment that maps each
+clause of this PHASE to the programme's
+implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-financial-inclusion
+- **Last Updated:** 2026-04-28

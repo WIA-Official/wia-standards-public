@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 코드 구조화 - WIA-RUST-LEARN</title>
+    <style>
+        :root { --rust-orange: #f97316; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-orange); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-orange); }
+        h2 { font-size: 1.5rem; margin: 30px 0 15px; color: var(--text); }
+        h3 { font-size: 1.2rem; margin: 20px 0 10px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-orange); }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--blue); }
+        .tip { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        code { background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+        ul { padding-left: 25px; color: var(--text-muted); margin-bottom: 15px; }
+        li { margin-bottom: 8px; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>5장: 코드 구조화</h1>
+
+        <p>프로그램이 커질수록 코드를 체계적으로 구조화하는 것이 중요해집니다. Rust는 구조체, 열거형, 모듈 등 강력한 조직화 도구를 제공합니다. 이 장에서는 깨끗하고 유지보수 가능한 코드를 작성하는 방법을 배웁니다.</p>
+
+        <h2>5.1 구조체 (Structs) - 데이터 묶기</h2>
+
+        <p>구조체는 관련된 데이터를 하나의 의미 있는 그룹으로 묶습니다. 객체지향 프로그래밍의 클래스와 비슷하지만, 상속 없이 구성(composition)에 집중합니다.</p>
+
+        <h3>기본 구조체 정의</h3>
+        <pre>// 사용자 정보를 담는 구조체
+struct User {
+    username: String,
+    email: String,
+    active: bool,
+    sign_in_count: u64,
+}
+
+fn main() {
+    // 구조체 인스턴스 생성
+    let user1 = User {
+        email: String::from("user@example.com"),
+        username: String::from("rustacean"),
+        active: true,
+        sign_in_count: 1,
+    };
+
+    println!("환영합니다, {}!", user1.username);
+    println!("이메일: {}", user1.email);
+}</pre>
+
+        <h3>가변 구조체</h3>
+        <p>구조체의 필드를 수정하려면 전체 인스턴스를 <code>mut</code>로 선언해야 합니다. Rust는 일부 필드만 가변으로 만들 수 없습니다.</p>
+
+        <pre>fn main() {
+    let mut user = User {
+        email: String::from("user@example.com"),
+        username: String::from("rustacean"),
+        active: true,
+        sign_in_count: 1,
+    };
+
+    // 필드 수정
+    user.email = String::from("new_email@example.com");
+    user.sign_in_count += 1;
+
+    println!("로그인 횟수: {}", user.sign_in_count);
+}</pre>
+
+        <h3>구조체 업데이트 문법</h3>
+        <p>기존 인스턴스의 대부분 값을 재사용하면서 일부만 변경할 수 있습니다.</p>
+
+        <pre>fn main() {
+    let user1 = User {
+        email: String::from("user1@example.com"),
+        username: String::from("user1"),
+        active: true,
+        sign_in_count: 1,
+    };
+
+    // user1의 대부분을 복사하되 email만 변경
+    let user2 = User {
+        email: String::from("user2@example.com"),
+        ..user1  // 나머지는 user1에서 가져옴
+    };
+
+    // 주의: user1의 String 필드가 이동되었음!
+    // println!("{}", user1.username); // 에러!
+    println!("{}", user2.username); // OK
+}</pre>
+
+        <h3>튜플 구조체</h3>
+        <p>필드명 없이 타입만으로 구조체를 정의할 수 있습니다.</p>
+
+        <pre>// RGB 색상을 나타내는 튜플 구조체
+struct Color(i32, i32, i32);
+struct Point(i32, i32, i32);
+
+fn main() {
+    let black = Color(0, 0, 0);
+    let origin = Point(0, 0, 0);
+
+    // Color와 Point는 다른 타입!
+    println!("Red: {}", black.0);
+    println!("X: {}", origin.0);
+}</pre>
+
+        <h3>유닛 구조체</h3>
+        <p>필드가 없는 구조체로, 트레이트를 구현할 때 유용합니다.</p>
+
+        <pre>struct AlwaysEqual;
+
+fn main() {
+    let subject = AlwaysEqual;
+    // 트레이트 구현에 사용
+}</pre>
+
+        <h2>5.2 메서드와 impl 블록</h2>
+
+        <p><code>impl</code> 블록을 사용해 구조체에 동작(behavior)을 추가합니다.</p>
+
+        <h3>메서드 정의</h3>
+        <pre>struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+impl Rectangle {
+    // 메서드: 첫 번째 매개변수가 &self
+    fn area(&self) -> u32 {
+        self.width * self.height
+    }
+
+    // 가변 참조를 받는 메서드
+    fn scale(&mut self, factor: u32) {
+        self.width *= factor;
+        self.height *= factor;
+    }
+
+    // 소유권을 가져가는 메서드 (드물게 사용)
+    fn into_square(self) -> Rectangle {
+        let size = self.width.max(self.height);
+        Rectangle { width: size, height: size }
+    }
+
+    // 다른 인스턴스를 받는 메서드
+    fn can_hold(&self, other: &Rectangle) -> bool {
+        self.width > other.width && self.height > other.height
+    }
+}
+
+fn main() {
+    let rect1 = Rectangle { width: 30, height: 50 };
+    println!("넓이: {}", rect1.area());
+
+    let mut rect2 = Rectangle { width: 10, height: 20 };
+    rect2.scale(2);
+    println!("2배 확대: {}x{}", rect2.width, rect2.height);
+
+    println!("rect1이 rect2를 포함? {}", rect1.can_hold(&rect2));
+}</pre>
+
+        <h3>연관 함수 (Associated Functions)</h3>
+        <p><code>self</code>를 받지 않는 함수로, 주로 생성자로 사용됩니다.</p>
+
+        <pre>impl Rectangle {
+    // 연관 함수 - 생성자
+    fn new(width: u32, height: u32) -> Rectangle {
+        Rectangle { width, height }
+    }
+
+    // 정사각형 생성자
+    fn square(size: u32) -> Rectangle {
+        Rectangle { width: size, height: size }
+    }
+}
+
+fn main() {
+    let rect = Rectangle::new(30, 50);
+    let square = Rectangle::square(10);
+
+    println!("사각형 넓이: {}", rect.area());
+    println!("정사각형 넓이: {}", square.area());
+}</pre>
+
+        <h3>여러 impl 블록</h3>
+        <p>하나의 구조체에 여러 <code>impl</code> 블록을 가질 수 있습니다.</p>
+
+        <pre>impl Rectangle {
+    fn area(&self) -> u32 {
+        self.width * self.height
+    }
+}
+
+impl Rectangle {
+    fn perimeter(&self) -> u32 {
+        2 * (self.width + self.height)
+    }
+}
+
+fn main() {
+    let rect = Rectangle::new(30, 50);
+    println!("넓이: {}, 둘레: {}", rect.area(), rect.perimeter());
+}</pre>
+
+        <h2>5.3 열거형 (Enums) - 여러 가능성 표현</h2>
+
+        <p>열거형은 하나의 값이 여러 가능한 변형(variant) 중 하나일 수 있음을 표현합니다.</p>
+
+        <h3>기본 열거형</h3>
+        <pre>enum IpAddrKind {
+    V4,
+    V6,
+}
+
+fn main() {
+    let four = IpAddrKind::V4;
+    let six = IpAddrKind::V6;
+
+    route(four);
+    route(six);
+}
+
+fn route(ip_kind: IpAddrKind) {
+    // IP 주소 라우팅 로직
+}</pre>
+
+        <h3>데이터를 포함하는 열거형</h3>
+        <p>각 변형이 서로 다른 타입과 양의 데이터를 가질 수 있습니다.</p>
+
+        <pre>enum IpAddr {
+    V4(u8, u8, u8, u8),
+    V6(String),
+}
+
+fn main() {
+    let home = IpAddr::V4(127, 0, 0, 1);
+    let loopback = IpAddr::V6(String::from("::1"));
+}</pre>
+
+        <h3>복잡한 열거형</h3>
+        <pre>enum Message {
+    Quit,                       // 데이터 없음
+    Move { x: i32, y: i32 },    // 익명 구조체
+    Write(String),              // 하나의 String
+    ChangeColor(i32, i32, i32), // 세 개의 i32
+}
+
+impl Message {
+    fn call(&self) {
+        match self {
+            Message::Quit => println!("종료"),
+            Message::Move { x, y } => println!("({}, {})로 이동", x, y),
+            Message::Write(text) => println!("텍스트: {}", text),
+            Message::ChangeColor(r, g, b) => println!("색상: ({}, {}, {})", r, g, b),
+        }
+    }
+}
+
+fn main() {
+    let msg1 = Message::Write(String::from("안녕하세요"));
+    let msg2 = Message::Move { x: 10, y: 20 };
+
+    msg1.call();
+    msg2.call();
+}</pre>
+
+        <div class="highlight">
+            <strong>Option&lt;T&gt; - Null 없는 세상</strong>
+            <p style="margin-top: 10px;">Rust에는 null이 없습니다. 대신 <code>Option&lt;T&gt;</code> 열거형으로 값의 존재/부재를 표현합니다.</p>
+            <pre style="margin-top: 10px;">enum Option&lt;T&gt; {
+    Some(T),
+    None,
+}
+
+fn main() {
+    let some_number = Some(5);
+    let some_string = Some("문자열");
+
+    // 타입을 명시해야 함
+    let absent_number: Option&lt;i32&gt; = None;
+
+    // Option을 사용하는 함수
+    let x: i32 = 5;
+    let y: Option&lt;i32&gt; = Some(5);
+
+    // let sum = x + y; // 에러! i32와 Option&lt;i32&gt;는 다른 타입
+
+    // Option을 처리해야 함
+    let sum = match y {
+        Some(value) => x + value,
+        None => x,
+    };
+
+    println!("합계: {}", sum);
+}</pre>
+        </div>
+
+        <h3>Result&lt;T, E&gt; - 에러 처리</h3>
+        <p>성공 또는 실패를 표현하는 열거형입니다.</p>
+
+        <pre>enum Result&lt;T, E&gt; {
+    Ok(T),
+    Err(E),
+}
+
+use std::fs::File;
+
+fn main() {
+    let file_result = File::open("hello.txt");
+
+    let file = match file_result {
+        Ok(file) => file,
+        Err(error) => {
+            println!("파일 열기 실패: {:?}", error);
+            return;
+        }
+    };
+}</pre>
+
+        <h2>5.4 패턴 매칭</h2>
+
+        <p><code>match</code>는 Rust의 강력한 제어 흐름 연산자로, 패턴에 따라 코드를 실행합니다.</p>
+
+        <h3>기본 매칭</h3>
+        <pre>enum Coin {
+    Penny,
+    Nickel,
+    Dime,
+    Quarter,
+}
+
+fn value_in_cents(coin: Coin) -> u8 {
+    match coin {
+        Coin::Penny => {
+            println!("행운의 페니!");
+            1
+        }
+        Coin::Nickel => 5,
+        Coin::Dime => 10,
+        Coin::Quarter => 25,
+    }
+}
+
+fn main() {
+    let coin = Coin::Penny;
+    println!("가치: {}센트", value_in_cents(coin));
+}</pre>
+
+        <h3>값을 바인딩하는 패턴</h3>
+        <pre>enum UsState {
+    Alabama,
+    Alaska,
+    // ...
+}
+
+enum Coin {
+    Penny,
+    Nickel,
+    Dime,
+    Quarter(UsState),
+}
+
+fn value_in_cents(coin: Coin) -> u8 {
+    match coin {
+        Coin::Penny => 1,
+        Coin::Nickel => 5,
+        Coin::Dime => 10,
+        Coin::Quarter(state) => {
+            println!("주 쿼터 from {:?}!", state);
+            25
+        }
+    }
+}</pre>
+
+        <h3>Option 매칭</h3>
+        <pre>fn plus_one(x: Option&lt;i32&gt;) -> Option&lt;i32&gt; {
+    match x {
+        None => None,
+        Some(i) => Some(i + 1),
+    }
+}
+
+fn main() {
+    let five = Some(5);
+    let six = plus_one(five);
+    let none = plus_one(None);
+
+    match six {
+        Some(value) => println!("값: {}", value),
+        None => println!("값 없음"),
+    }
+}</pre>
+
+        <h3>_ 플레이스홀더</h3>
+        <p>나머지 모든 경우를 처리하는 패턴입니다.</p>
+
+        <pre>fn main() {
+    let dice_roll = 9;
+
+    match dice_roll {
+        3 => add_fancy_hat(),
+        7 => remove_fancy_hat(),
+        _ => reroll(),  // 그 외 모든 값
+    }
+}
+
+fn add_fancy_hat() {}
+fn remove_fancy_hat() {}
+fn reroll() {}</pre>
+
+        <h3>if let - 간결한 매칭</h3>
+        <p>하나의 패턴만 관심 있을 때 사용합니다.</p>
+
+        <pre>fn main() {
+    let config_max = Some(3u8);
+
+    // match 사용
+    match config_max {
+        Some(max) => println!("최댓값: {}", max),
+        _ => (),
+    }
+
+    // if let 사용 (더 간결)
+    if let Some(max) = config_max {
+        println!("최댓값: {}", max);
+    }
+}</pre>
+
+        <h2>5.5 모듈 시스템</h2>
+
+        <p>Rust의 모듈 시스템은 코드를 조직화하고 재사용 가능하게 만듭니다.</p>
+
+        <h3>기본 모듈</h3>
+        <pre>mod front_of_house {
+    pub mod hosting {
+        pub fn add_to_waitlist() {
+            println!("손님을 대기 명단에 추가");
+        }
+
+        fn seat_at_table() {
+            println!("자리에 안내");
+        }
+    }
+
+    mod serving {
+        fn take_order() {}
+        fn serve_order() {}
+        fn take_payment() {}
+    }
+}
+
+pub fn eat_at_restaurant() {
+    // 절대 경로
+    crate::front_of_house::hosting::add_to_waitlist();
+
+    // 상대 경로
+    front_of_house::hosting::add_to_waitlist();
+}
+
+fn main() {
+    eat_at_restaurant();
+}</pre>
+
+        <h3>파일로 분리하기</h3>
+        <p>모듈을 별도 파일로 분리할 수 있습니다.</p>
+
+        <pre>// src/lib.rs
+mod front_of_house;  // front_of_house.rs 파일을 찾음
+
+pub use crate::front_of_house::hosting;
+
+pub fn eat_at_restaurant() {
+    hosting::add_to_waitlist();
+}
+
+// src/front_of_house.rs
+pub mod hosting {
+    pub fn add_to_waitlist() {}
+}
+
+// src/front_of_house/hosting.rs (대안)
+pub fn add_to_waitlist() {}</pre>
+
+        <h3>use 키워드</h3>
+        <p>경로를 스코프로 가져와 더 짧게 만듭니다.</p>
+
+        <pre>use std::collections::HashMap;
+
+fn main() {
+    let mut map = HashMap::new();
+    map.insert("key", "value");
+}
+
+// as로 이름 변경
+use std::io::Result as IoResult;
+
+// 여러 항목 가져오기
+use std::io::{self, Write};
+
+// glob 연산자
+use std::collections::*;</pre>
+
+        <div class="tip">
+            <strong>모듈 베스트 프랙티스</strong>
+            <ul>
+                <li><code>pub use</code>로 편리한 공개 API 제공</li>
+                <li>모듈은 기능별로 논리적으로 구조화</li>
+                <li>파일이 200-300줄 넘으면 분리 고려</li>
+                <li>테스트는 <code>#[cfg(test)]</code> 모듈에 작성</li>
+            </ul>
+        </div>
+
+        <h2>5.6 WIA 표준 구조 예제</h2>
+
+        <p>WIA 표준을 Rust로 구현하는 실전 예제입니다.</p>
+
+        <pre>// WIA-HOME 장치 모델
+mod wia_home {
+    pub enum DeviceType {
+        Light,
+        Thermostat,
+        Camera,
+        Lock,
+    }
+
+    pub struct Device {
+        id: String,
+        device_type: DeviceType,
+        status: DeviceStatus,
+    }
+
+    pub enum DeviceStatus {
+        Online,
+        Offline,
+        Error(String),
+    }
+
+    impl Device {
+        pub fn new(id: String, device_type: DeviceType) -> Self {
+            Device {
+                id,
+                device_type,
+                status: DeviceStatus::Offline,
+            }
+        }
+
+        pub fn connect(&mut self) -> Result&lt;(), String&gt; {
+            match self.status {
+                DeviceStatus::Offline => {
+                    self.status = DeviceStatus::Online;
+                    Ok(())
+                }
+                DeviceStatus::Online => {
+                    Err("이미 연결됨".to_string())
+                }
+                DeviceStatus::Error(ref msg) => {
+                    Err(format!("에러 상태: {}", msg))
+                }
+            }
+        }
+
+        pub fn get_status(&self) -> &DeviceStatus {
+            &self.status
+        }
+    }
+}
+
+fn main() {
+    use wia_home::{Device, DeviceType};
+
+    let mut light = Device::new(
+        String::from("light-001"),
+        DeviceType::Light
+    );
+
+    match light.connect() {
+        Ok(_) => println!("장치 연결 성공"),
+        Err(e) => println!("연결 실패: {}", e),
+    }
+}</pre>
+
+        <h2>5.7 실전 팁</h2>
+
+        <div class="tip">
+            <strong>구조체 vs 열거형 선택 기준</strong>
+            <ul>
+                <li><strong>구조체</strong>: 여러 필드를 묶어 하나의 개체를 표현할 때</li>
+                <li><strong>열거형</strong>: 여러 가능한 변형 중 하나를 표현할 때</li>
+                <li>둘을 조합하면 강력한 타입 시스템 구축 가능</li>
+            </ul>
+        </div>
+
+        <div class="tip">
+            <strong>일반적인 실수</strong>
+            <ul>
+                <li>구조체 전체를 <code>mut</code>로 만들지 않고 필드만 변경하려 함</li>
+                <li><code>match</code>에서 모든 경우를 처리하지 않음</li>
+                <li><code>Option</code>을 직접 사용하려 함 (먼저 unwrap 필요)</li>
+                <li>모듈을 <code>pub</code>로 만들지 않아 외부에서 접근 불가</li>
+            </ul>
+        </div>
+
+        <h2>5.8 고급 패턴</h2>
+
+        <h3>빌더 패턴</h3>
+        <p>복잡한 구조체를 단계적으로 생성하는 패턴입니다.</p>
+
+        <pre>struct Server {
+    host: String,
+    port: u16,
+    timeout: u64,
+    max_connections: u32,
+}
+
+struct ServerBuilder {
+    host: Option&lt;String&gt;,
+    port: Option&lt;u16&gt;,
+    timeout: Option&lt;u64&gt;,
+    max_connections: Option&lt;u32&gt;,
+}
+
+impl ServerBuilder {
+    fn new() -> Self {
+        ServerBuilder {
+            host: None,
+            port: None,
+            timeout: None,
+            max_connections: None,
+        }
+    }
+
+    fn host(mut self, host: &str) -> Self {
+        self.host = Some(host.to_string());
+        self
+    }
+
+    fn port(mut self, port: u16) -> Self {
+        self.port = Some(port);
+        self
+    }
+
+    fn timeout(mut self, timeout: u64) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    fn max_connections(mut self, max: u32) -> Self {
+        self.max_connections = Some(max);
+        self
+    }
+
+    fn build(self) -> Result&lt;Server, String&gt; {
+        Ok(Server {
+            host: self.host.ok_or("host is required")?,
+            port: self.port.unwrap_or(8080),
+            timeout: self.timeout.unwrap_or(30),
+            max_connections: self.max_connections.unwrap_or(100),
+        })
+    }
+}
+
+fn main() {
+    let server = ServerBuilder::new()
+        .host("localhost")
+        .port(3000)
+        .timeout(60)
+        .max_connections(500)
+        .build()
+        .unwrap();
+
+    println!("서버: {}:{}", server.host, server.port);
+}</pre>
+
+        <h3>상태 패턴</h3>
+        <p>열거형으로 상태 머신을 구현할 수 있습니다.</p>
+
+        <pre>enum ConnectionState {
+    Disconnected,
+    Connecting,
+    Connected { session_id: String },
+    Error { message: String },
+}
+
+struct Connection {
+    state: ConnectionState,
+    address: String,
+}
+
+impl Connection {
+    fn new(address: String) -> Self {
+        Connection {
+            state: ConnectionState::Disconnected,
+            address,
+        }
+    }
+
+    fn connect(&mut self) -> Result&lt;(), String&gt; {
+        match self.state {
+            ConnectionState::Disconnected => {
+                self.state = ConnectionState::Connecting;
+                // 연결 시뮬레이션
+                self.state = ConnectionState::Connected {
+                    session_id: "abc123".to_string(),
+                };
+                Ok(())
+            }
+            ConnectionState::Connected { .. } => {
+                Err("이미 연결됨".to_string())
+            }
+            _ => Err("연결할 수 없는 상태".to_string()),
+        }
+    }
+
+    fn get_status(&self) -> String {
+        match &self.state {
+            ConnectionState::Disconnected => "연결 끊김".to_string(),
+            ConnectionState::Connecting => "연결 중...".to_string(),
+            ConnectionState::Connected { session_id } => {
+                format!("연결됨 (세션: {})", session_id)
+            }
+            ConnectionState::Error { message } => {
+                format!("에러: {}", message)
+            }
+        }
+    }
+}
+
+fn main() {
+    let mut conn = Connection::new("localhost:8080".to_string());
+    println!("상태: {}", conn.get_status());
+
+    conn.connect().unwrap();
+    println!("상태: {}", conn.get_status());
+}</pre>
+
+        <h2>5.9 연습 문제</h2>
+
+        <div class="highlight">
+            <strong>도전 과제</strong>
+            <p style="margin-top: 10px;">다음 기능을 구현해보세요:</p>
+            <ol style="padding-left: 25px; margin-top: 10px;">
+                <li><strong>도서관 시스템</strong>: 책(Book), 회원(Member), 대출(Loan) 구조체를 만들고 대출/반납 기능 구현</li>
+                <li><strong>계산기</strong>: 사칙연산을 열거형으로 정의하고 계산 함수 작성</li>
+                <li><strong>색상 믹서</strong>: RGB와 HSL 간 변환을 구조체와 메서드로 구현</li>
+                <li><strong>파일 탐색기</strong>: 파일과 폴더를 열거형으로 표현하고 트리 구조 순회</li>
+                <li><strong>주문 시스템</strong>: 주문 상태를 열거형으로 관리하고 상태 전이 구현</li>
+            </ol>
+        </div>
+
+        <div class="tip">
+            <strong>학습 체크리스트</strong>
+            <ul>
+                <li>✅ 구조체 정의와 인스턴스 생성</li>
+                <li>✅ 메서드와 연관 함수 차이 이해</li>
+                <li>✅ 열거형으로 여러 타입 표현</li>
+                <li>✅ Option과 Result 활용</li>
+                <li>✅ match로 모든 경우 처리</li>
+                <li>✅ 모듈로 코드 구조화</li>
+                <li>✅ pub로 공개 API 정의</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

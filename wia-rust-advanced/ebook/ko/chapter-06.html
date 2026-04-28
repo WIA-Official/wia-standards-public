@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 06: 메모리 할당자 & SIMD - WIA-RUST-ADVANCED</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.8; color: #333; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; }
+        header { background: linear-gradient(135deg, #F39C12 0%, #E67E22 100%); color: white; padding: 40px; }
+        .chapter-label { font-size: 1em; opacity: 0.9; margin-bottom: 10px; }
+        h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .level-badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 8px 20px; border-radius: 20px; font-size: 0.9em; margin-top: 10px; }
+        nav { background: #2c3e50; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; }
+        nav a { color: white; text-decoration: none; padding: 8px 20px; border-radius: 5px; transition: background 0.3s; }
+        nav a:hover { background: rgba(255,255,255,0.1); }
+        .content { padding: 40px; }
+        h2 { color: #F39C12; font-size: 2em; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 3px solid #F39C12; }
+        h3 { color: #E67E22; font-size: 1.5em; margin: 30px 0 15px 0; }
+        p { margin-bottom: 15px; font-size: 1.05em; color: #555; }
+        .info-box { background: #fff3cd; border-left: 4px solid #F39C12; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .warning-box { background: #f8d7da; border-left: 4px solid #dc3545; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .success-box { background: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        pre { background: #2d2d2d; color: #f8f8f2; padding: 20px; border-radius: 10px; overflow-x: auto; margin: 20px 0; border-left: 4px solid #F39C12; }
+        code { font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 0.95em; }
+        .keyword { color: #ff79c6; } .string { color: #f1fa8c; } .comment { color: #6272a4; } .function { color: #50fa7b; } .number { color: #bd93f9; } .type { color: #8be9fd; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; color: #555; }
+        .example-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin: 20px 0; }
+        .example-card { background: #f8f9fa; padding: 20px; border-radius: 10px; border: 2px solid #e0e0e0; }
+        .example-card h4 { color: #F39C12; margin-bottom: 15px; }
+        footer { background: #2c3e50; color: white; padding: 30px; text-align: center; }
+        @media (max-width: 768px) { .content { padding: 20px; } h1 { font-size: 1.8em; } h2 { font-size: 1.5em; } nav { flex-direction: column; gap: 10px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-label">Chapter 06</div>
+            <h1>⚡ 메모리 할당자 & SIMD</h1>
+            <div class="level-badge">Level 6-7: Performance Master</div>
+        </header>
+
+        <div class="content">
+            <h2>📖 학습 목표</h2>
+            <ul>
+                <li>GlobalAlloc 트레잇 구현</li>
+                <li>Bump Allocator 만들기</li>
+                <li>Linked List Allocator 구현</li>
+                <li>메모리 풀(Pool) 할당자</li>
+                <li>SIMD 프로그래밍 기초</li>
+                <li>벡터 연산 최적화</li>
+                <li>portable_simd 사용</li>
+                <li>인라인 어셈블리</li>
+            </ul>
+
+            <h2>🧠 메모리 할당자</h2>
+            <p>
+                메모리 할당자는 프로그램의 성능에 큰 영향을 미칩니다. Rust에서는
+                <code>GlobalAlloc</code> 트레잇을 구현하여 커스텀 할당자를 만들 수 있습니다.
+            </p>
+
+            <h3>GlobalAlloc 트레잇</h3>
+            <pre><code><span class="keyword">use</span> core::alloc::{GlobalAlloc, Layout};
+
+<span class="keyword">pub struct</span> <span class="type">MyAllocator</span>;
+
+<span class="keyword">unsafe impl</span> <span class="type">GlobalAlloc</span> <span class="keyword">for</span> <span class="type">MyAllocator</span> {
+    <span class="keyword">unsafe fn</span> <span class="function">alloc</span>(&<span class="keyword">self</span>, layout: <span class="type">Layout</span>) -> <span class="type">*mut u8</span> {
+        <span class="comment">// 메모리 할당 구현</span>
+    }
+
+    <span class="keyword">unsafe fn</span> <span class="function">dealloc</span>(&<span class="keyword">self</span>, ptr: <span class="type">*mut u8</span>, layout: <span class="type">Layout</span>) {
+        <span class="comment">// 메모리 해제 구현</span>
+    }
+}
+
+<span class="keyword">#[global_allocator]</span>
+<span class="keyword">static</span> ALLOCATOR: <span class="type">MyAllocator</span> = MyAllocator;
+</code></pre>
+
+            <h3>Bump Allocator</h3>
+            <p>
+                가장 단순한 할당자입니다. 포인터를 앞으로만 이동시키며 개별 해제를 지원하지 않습니다.
+            </p>
+
+            <pre><code><span class="keyword">use</span> core::alloc::{GlobalAlloc, Layout};
+<span class="keyword">use</span> core::ptr;
+
+<span class="keyword">pub struct</span> <span class="type">BumpAllocator</span> {
+    heap_start: <span class="type">usize</span>,
+    heap_end: <span class="type">usize</span>,
+    next: <span class="type">AtomicUsize</span>,
+    allocations: <span class="type">AtomicUsize</span>,
+}
+
+<span class="keyword">impl</span> <span class="type">BumpAllocator</span> {
+    <span class="keyword">pub const fn</span> <span class="function">new</span>() -> <span class="type">Self</span> {
+        <span class="type">BumpAllocator</span> {
+            heap_start: <span class="number">0</span>,
+            heap_end: <span class="number">0</span>,
+            next: AtomicUsize::<span class="function">new</span>(<span class="number">0</span>),
+            allocations: AtomicUsize::<span class="function">new</span>(<span class="number">0</span>),
+        }
+    }
+
+    <span class="keyword">pub unsafe fn</span> <span class="function">init</span>(&<span class="keyword">mut self</span>, heap_start: <span class="type">usize</span>, heap_size: <span class="type">usize</span>) {
+        <span class="keyword">self</span>.heap_start = heap_start;
+        <span class="keyword">self</span>.heap_end = heap_start + heap_size;
+        <span class="keyword">self</span>.next.<span class="function">store</span>(heap_start, Ordering::Relaxed);
+    }
+}
+
+<span class="keyword">unsafe impl</span> <span class="type">GlobalAlloc</span> <span class="keyword">for</span> <span class="type">BumpAllocator</span> {
+    <span class="keyword">unsafe fn</span> <span class="function">alloc</span>(&<span class="keyword">self</span>, layout: <span class="type">Layout</span>) -> <span class="type">*mut u8</span> {
+        <span class="keyword">let</span> alloc_start = <span class="function">align_up</span>(
+            <span class="keyword">self</span>.next.<span class="function">load</span>(Ordering::Relaxed),
+            layout.<span class="function">align</span>()
+        );
+        <span class="keyword">let</span> alloc_end = alloc_start + layout.<span class="function">size</span>();
+
+        <span class="keyword">if</span> alloc_end > <span class="keyword">self</span>.heap_end {
+            ptr::<span class="function">null_mut</span>() <span class="comment">// 메모리 부족</span>
+        } <span class="keyword">else</span> {
+            <span class="keyword">self</span>.next.<span class="function">store</span>(alloc_end, Ordering::Relaxed);
+            <span class="keyword">self</span>.allocations.<span class="function">fetch_add</span>(<span class="number">1</span>, Ordering::Relaxed);
+            alloc_start <span class="keyword">as</span> <span class="type">*mut u8</span>
+        }
+    }
+
+    <span class="keyword">unsafe fn</span> <span class="function">dealloc</span>(&<span class="keyword">self</span>, _ptr: <span class="type">*mut u8</span>, _layout: <span class="type">Layout</span>) {
+        <span class="keyword">let</span> allocs = <span class="keyword">self</span>.allocations.<span class="function">fetch_sub</span>(<span class="number">1</span>, Ordering::Relaxed) - <span class="number">1</span>;
+        <span class="keyword">if</span> allocs == <span class="number">0</span> {
+            <span class="comment">// 모든 메모리가 해제됨 - 리셋 가능</span>
+            <span class="keyword">self</span>.next.<span class="function">store</span>(<span class="keyword">self</span>.heap_start, Ordering::Relaxed);
+        }
+    }
+}
+</code></pre>
+
+            <h3>Linked List Allocator</h3>
+            <p>
+                해제된 메모리를 연결 리스트로 관리하는 할당자입니다.
+            </p>
+
+            <pre><code><span class="keyword">struct</span> <span class="type">ListNode</span> {
+    size: <span class="type">usize</span>,
+    next: <span class="type">Option</span><&<span class="type">'static mut</span> <span class="type">ListNode</span>>,
+}
+
+<span class="keyword">impl</span> <span class="type">ListNode</span> {
+    <span class="keyword">const fn</span> <span class="function">new</span>(size: <span class="type">usize</span>) -> <span class="type">Self</span> {
+        <span class="type">ListNode</span> { size, next: <span class="type">None</span> }
+    }
+
+    <span class="keyword">fn</span> <span class="function">start_addr</span>(&<span class="keyword">self</span>) -> <span class="type">usize</span> {
+        <span class="keyword">self as</span> <span class="type">*const Self as usize</span>
+    }
+
+    <span class="keyword">fn</span> <span class="function">end_addr</span>(&<span class="keyword">self</span>) -> <span class="type">usize</span> {
+        <span class="keyword">self</span>.<span class="function">start_addr</span>() + <span class="keyword">self</span>.size
+    }
+}
+
+<span class="keyword">pub struct</span> <span class="type">LinkedListAllocator</span> {
+    head: <span class="type">ListNode</span>,
+}
+
+<span class="keyword">impl</span> <span class="type">LinkedListAllocator</span> {
+    <span class="keyword">pub const fn</span> <span class="function">new</span>() -> <span class="type">Self</span> {
+        <span class="type">LinkedListAllocator</span> {
+            head: ListNode::<span class="function">new</span>(<span class="number">0</span>),
+        }
+    }
+
+    <span class="keyword">pub unsafe fn</span> <span class="function">init</span>(&<span class="keyword">mut self</span>, heap_start: <span class="type">usize</span>, heap_size: <span class="type">usize</span>) {
+        <span class="keyword">self</span>.<span class="function">add_free_region</span>(heap_start, heap_size);
+    }
+
+    <span class="keyword">unsafe fn</span> <span class="function">add_free_region</span>(&<span class="keyword">mut self</span>, addr: <span class="type">usize</span>, size: <span class="type">usize</span>) {
+        <span class="keyword">let</span> <span class="keyword">mut</span> node = ListNode::<span class="function">new</span>(size);
+        node.next = <span class="keyword">self</span>.head.next.<span class="function">take</span>();
+        <span class="keyword">let</span> node_ptr = addr <span class="keyword">as</span> <span class="type">*mut ListNode</span>;
+        node_ptr.<span class="function">write</span>(node);
+        <span class="keyword">self</span>.head.next = <span class="type">Some</span>(&<span class="keyword">mut</span> *node_ptr);
+    }
+}
+</code></pre>
+
+            <h3>메모리 풀 할당자</h3>
+            <p>
+                고정 크기 블록을 효율적으로 관리하는 할당자입니다.
+            </p>
+
+            <pre><code><span class="keyword">pub struct</span> <span class="type">PoolAllocator</span> {
+    block_size: <span class="type">usize</span>,
+    block_count: <span class="type">usize</span>,
+    free_list: <span class="type">Option</span><<span class="type">*mut u8</span>>,
+}
+
+<span class="keyword">impl</span> <span class="type">PoolAllocator</span> {
+    <span class="keyword">pub unsafe fn</span> <span class="function">new</span>(
+        heap_start: <span class="type">*mut u8</span>,
+        block_size: <span class="type">usize</span>,
+        block_count: <span class="type">usize</span>
+    ) -> <span class="type">Self</span> {
+        <span class="keyword">let</span> <span class="keyword">mut</span> allocator = <span class="type">PoolAllocator</span> {
+            block_size,
+            block_count,
+            free_list: <span class="type">None</span>,
+        };
+
+        <span class="comment">// 프리 리스트 초기화</span>
+        <span class="keyword">for</span> i <span class="keyword">in</span> <span class="number">0</span>..block_count {
+            <span class="keyword">let</span> block = heap_start.<span class="function">add</span>(i * block_size);
+            allocator.<span class="function">free_block</span>(block);
+        }
+
+        allocator
+    }
+
+    <span class="keyword">unsafe fn</span> <span class="function">free_block</span>(&<span class="keyword">mut self</span>, block: <span class="type">*mut u8</span>) {
+        *(<span class="type">block</span> <span class="keyword">as</span> <span class="type">*mut Option<*mut u8></span>) = <span class="keyword">self</span>.free_list;
+        <span class="keyword">self</span>.free_list = <span class="type">Some</span>(block);
+    }
+
+    <span class="keyword">unsafe fn</span> <span class="function">alloc_block</span>(&<span class="keyword">mut self</span>) -> <span class="type">Option</span><<span class="type">*mut u8</span>> {
+        <span class="keyword">self</span>.free_list.<span class="function">map</span>(|block| {
+            <span class="keyword">self</span>.free_list = *(<span class="type">block</span> <span class="keyword">as</span> <span class="type">*const Option<*mut u8></span>);
+            block
+        })
+    }
+}
+</code></pre>
+
+            <h2>🚀 SIMD 프로그래밍</h2>
+            <p>
+                <strong>SIMD (Single Instruction Multiple Data)</strong>는 하나의 명령으로
+                여러 데이터를 동시에 처리하는 기술입니다. 벡터 연산에 특히 유용합니다.
+            </p>
+
+            <h3>기본 SIMD 예제</h3>
+            <pre><code><span class="keyword">use</span> std::arch::x86_64::*;
+
+<span class="keyword">#[target_feature(enable = "avx2")]</span>
+<span class="keyword">unsafe fn</span> <span class="function">add_vectors_simd</span>(a: &[<span class="type">f32</span>], b: &[<span class="type">f32</span>], result: &<span class="keyword">mut</span> [<span class="type">f32</span>]) {
+    <span class="keyword">assert!</span>(a.<span class="function">len</span>() == b.<span class="function">len</span>() && b.<span class="function">len</span>() == result.<span class="function">len</span>());
+    <span class="keyword">assert!</span>(a.<span class="function">len</span>() % <span class="number">8</span> == <span class="number">0</span>); <span class="comment">// AVX2는 8개 float 처리</span>
+
+    <span class="keyword">for</span> i <span class="keyword">in</span> (<span class="number">0</span>..a.<span class="function">len</span>()).<span class="function">step_by</span>(<span class="number">8</span>) {
+        <span class="keyword">let</span> va = <span class="function">_mm256_loadu_ps</span>(a.<span class="function">as_ptr</span>().<span class="function">add</span>(i));
+        <span class="keyword">let</span> vb = <span class="function">_mm256_loadu_ps</span>(b.<span class="function">as_ptr</span>().<span class="function">add</span>(i));
+        <span class="keyword">let</span> vr = <span class="function">_mm256_add_ps</span>(va, vb);
+        <span class="function">_mm256_storeu_ps</span>(result.<span class="function">as_mut_ptr</span>().<span class="function">add</span>(i), vr);
+    }
+}
+</code></pre>
+
+            <h3>portable_simd 사용</h3>
+            <p>
+                플랫폼 독립적인 SIMD 코드를 작성할 수 있습니다.
+            </p>
+
+            <pre><code><span class="keyword">#![feature(portable_simd)]</span>
+
+<span class="keyword">use</span> std::simd::*;
+
+<span class="keyword">fn</span> <span class="function">add_vectors</span>(a: &[<span class="type">f32</span>], b: &[<span class="type">f32</span>]) -> <span class="type">Vec</span><<span class="type">f32</span>> {
+    a.<span class="function">chunks_exact</span>(<span class="number">4</span>)
+        .<span class="function">zip</span>(b.<span class="function">chunks_exact</span>(<span class="number">4</span>))
+        .<span class="function">flat_map</span>(|(a_chunk, b_chunk)| {
+            <span class="keyword">let</span> a_simd = <span class="type">f32x4</span>::<span class="function">from_slice</span>(a_chunk);
+            <span class="keyword">let</span> b_simd = <span class="type">f32x4</span>::<span class="function">from_slice</span>(b_chunk);
+            (a_simd + b_simd).<span class="function">to_array</span>()
+        })
+        .<span class="function">collect</span>()
+}
+</code></pre>
+
+            <h3>행렬 곱셈 최적화</h3>
+            <pre><code><span class="keyword">#[target_feature(enable = "avx2")]</span>
+<span class="keyword">unsafe fn</span> <span class="function">matrix_multiply_simd</span>(
+    a: &[<span class="type">f32</span>],
+    b: &[<span class="type">f32</span>],
+    result: &<span class="keyword">mut</span> [<span class="type">f32</span>],
+    n: <span class="type">usize</span>
+) {
+    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="number">0</span>..n {
+        <span class="keyword">for</span> j <span class="keyword">in</span> (<span class="number">0</span>..n).<span class="function">step_by</span>(<span class="number">8</span>) {
+            <span class="keyword">let</span> <span class="keyword">mut</span> sum = <span class="function">_mm256_setzero_ps</span>();
+
+            <span class="keyword">for</span> k <span class="keyword">in</span> <span class="number">0</span>..n {
+                <span class="keyword">let</span> a_val = <span class="function">_mm256_set1_ps</span>(a[i * n + k]);
+                <span class="keyword">let</span> b_val = <span class="function">_mm256_loadu_ps</span>(b.<span class="function">as_ptr</span>().<span class="function">add</span>(k * n + j));
+                sum = <span class="function">_mm256_fmadd_ps</span>(a_val, b_val, sum);
+            }
+
+            <span class="function">_mm256_storeu_ps</span>(result.<span class="function">as_mut_ptr</span>().<span class="function">add</span>(i * n + j), sum);
+        }
+    }
+}
+</code></pre>
+
+            <h2>🔧 인라인 어셈블리</h2>
+            <p>
+                극한의 성능이 필요할 때는 직접 어셈블리를 작성할 수 있습니다.
+            </p>
+
+            <pre><code><span class="keyword">use</span> std::arch::asm;
+
+<span class="keyword">fn</span> <span class="function">add_numbers</span>(a: <span class="type">u64</span>, b: <span class="type">u64</span>) -> <span class="type">u64</span> {
+    <span class="keyword">let</span> result: <span class="type">u64</span>;
+    <span class="keyword">unsafe</span> {
+        <span class="function">asm!</span>(
+            <span class="string">"add {0}, {1}"</span>,
+            <span class="function">inout</span>(reg) a => result,
+            <span class="function">in</span>(reg) b,
+        );
+    }
+    result
+}
+
+<span class="comment">// CPUID 읽기</span>
+<span class="keyword">fn</span> <span class="function">cpuid</span>(leaf: <span class="type">u32</span>) -> [<span class="type">u32</span>; <span class="number">4</span>] {
+    <span class="keyword">let</span> <span class="keyword">mut</span> eax: <span class="type">u32</span>;
+    <span class="keyword">let</span> <span class="keyword">mut</span> ebx: <span class="type">u32</span>;
+    <span class="keyword">let</span> <span class="keyword">mut</span> ecx: <span class="type">u32</span>;
+    <span class="keyword">let</span> <span class="keyword">mut</span> edx: <span class="type">u32</span>;
+
+    <span class="keyword">unsafe</span> {
+        <span class="function">asm!</span>(
+            <span class="string">"cpuid"</span>,
+            <span class="function">inout</span>(<span class="string">"eax"</span>) leaf => eax,
+            <span class="function">out</span>(<span class="string">"ebx"</span>) ebx,
+            <span class="function">out</span>(<span class="string">"ecx"</span>) ecx,
+            <span class="function">out</span>(<span class="string">"edx"</span>) edx,
+        );
+    }
+
+    [eax, ebx, ecx, edx]
+}
+</code></pre>
+
+            <h2>📊 성능 측정</h2>
+
+            <h3>벤치마크</h3>
+            <pre><code><span class="keyword">use</span> criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+<span class="keyword">fn</span> <span class="function">benchmark_add</span>(c: &<span class="keyword">mut</span> <span class="type">Criterion</span>) {
+    <span class="keyword">let</span> a = <span class="function">vec!</span>[<span class="number">1.0f32</span>; <span class="number">1024</span>];
+    <span class="keyword">let</span> b = <span class="function">vec!</span>[<span class="number">2.0f32</span>; <span class="number">1024</span>];
+
+    c.<span class="function">bench_function</span>(<span class="string">"scalar add"</span>, |bencher| {
+        bencher.<span class="function">iter</span>(|| {
+            <span class="keyword">let</span> <span class="keyword">mut</span> result = <span class="function">vec!</span>[<span class="number">0.0f32</span>; <span class="number">1024</span>];
+            <span class="keyword">for</span> i <span class="keyword">in</span> <span class="number">0</span>..<span class="number">1024</span> {
+                result[i] = <span class="function">black_box</span>(a[i]) + <span class="function">black_box</span>(b[i]);
+            }
+            result
+        });
+    });
+
+    c.<span class="function">bench_function</span>(<span class="string">"simd add"</span>, |bencher| {
+        bencher.<span class="function">iter</span>(|| <span class="keyword">unsafe</span> {
+            <span class="keyword">let</span> <span class="keyword">mut</span> result = <span class="function">vec!</span>[<span class="number">0.0f32</span>; <span class="number">1024</span>];
+            <span class="function">add_vectors_simd</span>(
+                <span class="function">black_box</span>(&a),
+                <span class="function">black_box</span>(&b),
+                &<span class="keyword">mut</span> result
+            );
+            result
+        });
+    });
+}
+
+<span class="function">criterion_group!</span>(benches, benchmark_add);
+<span class="function">criterion_main!</span>(benches);
+</code></pre>
+
+            <h2>✅ 모범 사례</h2>
+
+            <div class="success-box">
+                <strong>✅ 최적화 체크리스트</strong>
+                <ol>
+                    <li><strong>측정 먼저:</strong> 프로파일링으로 병목 지점 파악</li>
+                    <li><strong>알고리즘:</strong> 자료구조와 알고리즘 개선이 우선</li>
+                    <li><strong>컴파일러 최적화:</strong> 릴리스 빌드 활용</li>
+                    <li><strong>SIMD 활용:</strong> 벡터 연산에 적용</li>
+                    <li><strong>메모리 패턴:</strong> 캐시 친화적 접근</li>
+                    <li><strong>벤치마크:</strong> criterion으로 성능 검증</li>
+                </ol>
+            </div>
+
+            <h2>🚀 실습 프로젝트</h2>
+
+            <div class="example-grid">
+                <div class="example-card">
+                    <h4>프로젝트 1: 커스텀 Vec</h4>
+                    <p>자체 할당자를 사용하는 Vec 구현</p>
+                </div>
+                <div class="example-card">
+                    <h4>프로젝트 2: 이미지 처리</h4>
+                    <p>SIMD로 이미지 필터 최적화</p>
+                </div>
+                <div class="example-card">
+                    <h4>프로젝트 3: 벡터 라이브러리</h4>
+                    <p>수학 연산을 위한 고성능 벡터 라이브러리</p>
+                </div>
+            </div>
+
+            <h2>📚 추가 학습 자료</h2>
+            <ul>
+                <li><strong>The Rustonomicon:</strong> 메모리 할당 심화</li>
+                <li><strong>packed_simd:</strong> SIMD 라이브러리</li>
+                <li><strong>criterion:</strong> 벤치마킹 프레임워크</li>
+                <li><strong>Intel Intrinsics Guide:</strong> SIMD 명령어 레퍼런스</li>
+            </ul>
+
+            <div class="info-box">
+                <strong>🎓 다음 단계</strong><br>
+                성능 최적화를 마스터했다면, 이제 WebAssembly로 웹에서 Rust를 실행해봅시다!
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

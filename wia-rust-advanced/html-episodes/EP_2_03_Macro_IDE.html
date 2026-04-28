@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 2-03: IDE-friendly Macros | WIA-RUST-ADVANCED</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            position: relative;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .episode-badge {
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 10px 25px;
+            border: 2px solid #F39C12;
+            background: transparent;
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: #F39C12;
+        }
+
+        .title {
+            font-size: 72px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border-radius: 15px;
+            padding: 30px;
+            font-family: 'Consolas', 'D2Coding', monospace;
+            font-size: 24px;
+            line-height: 1.6;
+            border: 2px solid #30363d;
+            width: 100%;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+
+        .code-line.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .keyword { color: #ff7b72; }
+        .function { color: #d2a8ff; }
+        .string { color: #a5d6ff; }
+        .macro { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .type { color: #ffa657; }
+        .number { color: #79c0ff; }
+
+        .concept-box {
+            background: rgba(243, 156, 18, 0.1);
+            border-left: 5px solid #F39C12;
+            padding: 40px;
+            border-radius: 0 20px 20px 0;
+            margin: 20px 0;
+        }
+
+        .concept-box h3 {
+            color: #F39C12;
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .concept-box p {
+            font-size: 28px;
+            line-height: 1.8;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            width: 100%;
+        }
+
+        .comparison-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 40px;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 0.5s;
+        }
+
+        .comparison-item.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .comparison-item h3 {
+            color: #F39C12;
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .comparison-item ul {
+            list-style: none;
+            font-size: 24px;
+        }
+
+        .comparison-item li {
+            margin: 12px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .comparison-item li:before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+            color: #F39C12;
+        }
+
+        .navigation {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(243, 156, 18, 0.8);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: #F39C12;
+            transform: scale(1.05);
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 8px;
+            background: #F39C12;
+            transition: width 0.5s;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 100px;
+            right: 60px;
+            font-size: 24px;
+            color: #888;
+        }
+
+        .subtitle {
+            font-size: 36px;
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .big-emoji {
+            font-size: 150px;
+            margin-bottom: 30px;
+        }
+
+        .channel-info {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid #FF0000;
+            border-radius: 20px;
+            padding: 30px 60px;
+            margin-top: 40px;
+            font-size: 32px;
+        }
+
+        .channel-info a {
+            color: #FF6B6B;
+            text-decoration: none;
+        }
+
+        .highlight-box {
+            background: rgba(243, 156, 18, 0.15);
+            border: 2px solid #F39C12;
+            border-radius: 20px;
+            padding: 50px;
+            margin: 30px 0;
+        }
+
+        .highlight-box h3 {
+            color: #F39C12;
+            font-size: 40px;
+            margin-bottom: 25px;
+        }
+
+        .highlight-box p {
+            font-size: 30px;
+            line-height: 1.8;
+        }
+
+        .list-box {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 40px;
+            font-size: 28px;
+            line-height: 2;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 2-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">💡</div>
+            <h1 class="title">IDE-friendly Macros</h1>
+            <p class="subtitle">
+                <span class="ko">IDE 친화적 매크로 작성법</span>
+                <span class="en" style="display:none;">Writing IDE-friendly Macros</span>
+            </p>
+            <div class="channel-info">
+                📺 YouTube: <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">
+                <span class="ko">시작하기 →</span>
+                <span class="en" style="display:none;">Start →</span>
+            </button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: Why IDE Support Matters -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 2-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">왜 IDE 지원이 중요한가?</span>
+            <span class="en" style="display:none;">Why IDE Support Matters?</span>
+        </h1>
+        <div class="content">
+            <div class="comparison-grid">
+                <div class="comparison-item">
+                    <h3>
+                        <span class="ko">❌ 나쁜 매크로</span>
+                        <span class="en" style="display:none;">❌ Bad Macro</span>
+                    </h3>
+                    <ul>
+                        <li class="ko">자동완성 안됨</li>
+                        <li class="en" style="display:none;">No autocomplete</li>
+                        <li class="ko">타입 힌트 없음</li>
+                        <li class="en" style="display:none;">No type hints</li>
+                        <li class="ko">에러 위치 불명확</li>
+                        <li class="en" style="display:none;">Unclear errors</li>
+                        <li class="ko">디버깅 어려움</li>
+                        <li class="en" style="display:none;">Hard to debug</li>
+                    </ul>
+                </div>
+                <div class="comparison-item">
+                    <h3>
+                        <span class="ko">✅ 좋은 매크로</span>
+                        <span class="en" style="display:none;">✅ Good Macro</span>
+                    </h3>
+                    <ul>
+                        <li class="ko">자동완성 지원</li>
+                        <li class="en" style="display:none;">Autocomplete works</li>
+                        <li class="ko">타입 추론 가능</li>
+                        <li class="en" style="display:none;">Type inference</li>
+                        <li class="ko">정확한 에러 메시지</li>
+                        <li class="en" style="display:none;">Accurate errors</li>
+                        <li class="ko">디버깅 용이</li>
+                        <li class="en" style="display:none;">Easy debugging</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: Span Preservation -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 2-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">스팬 보존 (Span Preservation)</span>
+            <span class="en" style="display:none;">Span Preservation</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="comment">// ❌ 나쁜 방법: 새 식별자 생성</span></div>
+                    <div class="code-line"><span class="keyword">let</span> field_name = <span class="macro">format_ident!</span>(<span class="string">"field"</span>);</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// ✅ 좋은 방법: 원본 스팬 사용</span></div>
+                    <div class="code-line"><span class="keyword">let</span> field_name = &field.ident;</div>
+                    <div class="code-line"><span class="keyword">let</span> setter = <span class="macro">format_ident!</span>(</div>
+                    <div class="code-line">    <span class="string">"set_{}"</span>,</div>
+                    <div class="code-line">    field_name,</div>
+                    <div class="code-line">    span = field_name.<span class="function">span</span>()  <span class="comment">// 스팬 보존!</span></div>
+                    <div class="code-line">);</div>
+                </div>
+                <div class="concept-box">
+                    <h3>
+                        <span class="ko">⚡ 핵심 개념</span>
+                        <span class="en" style="display:none;">⚡ Key Concept</span>
+                    </h3>
+                    <p class="ko">
+                        스팬은 소스 코드의 위치 정보<br>
+                        에러 발생 시 정확한 위치 표시<br>
+                        IDE가 심볼을 추적할 수 있게 함
+                    </p>
+                    <p class="en" style="display:none;">
+                        Span is source code location info<br>
+                        Shows exact error location<br>
+                        Enables IDE symbol tracking
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: Type Hints -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 2-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">타입 힌트 제공</span>
+            <span class="en" style="display:none;">Providing Type Hints</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="comment">// ❌ 타입 정보 없음</span></div>
+                    <div class="code-line"><span class="macro">quote!</span> {</div>
+                    <div class="code-line">    <span class="keyword">pub fn</span> <span class="function">get</span>(&<span class="keyword">self</span>) { <span class="keyword">self</span>.#field }</div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// ✅ 명시적 타입 지정</span></div>
+                    <div class="code-line"><span class="keyword">let</span> field_ty = &field.ty;</div>
+                    <div class="code-line"><span class="macro">quote!</span> {</div>
+                    <div class="code-line">    <span class="keyword">pub fn</span> <span class="function">get</span>(&<span class="keyword">self</span>) -> &#field_ty {</div>
+                    <div class="code-line">        &<span class="keyword">self</span>.#field</div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                </div>
+                <div class="concept-box">
+                    <h3>
+                        <span class="ko">💡 장점</span>
+                        <span class="en" style="display:none;">💡 Benefits</span>
+                    </h3>
+                    <p class="ko">
+                        IDE가 반환 타입 추론 가능<br>
+                        자동완성 및 타입 체크 지원<br>
+                        리팩토링 도구 동작
+                    </p>
+                    <p class="en" style="display:none;">
+                        IDE can infer return types<br>
+                        Autocomplete and type checking<br>
+                        Refactoring tools work
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: Clear Error Messages -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 2-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">명확한 에러 메시지</span>
+            <span class="en" style="display:none;">Clear Error Messages</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">let</span> fields = <span class="keyword">match</span> &input.data {</div>
+                    <div class="code-line">    <span class="type">Data</span>::<span class="type">Struct</span>(<span class="type">DataStruct</span> { fields, .. }) => fields,</div>
+                    <div class="code-line">    _ => {</div>
+                    <div class="code-line">        <span class="keyword">return</span> <span class="type">Error</span>::<span class="function">new</span>(</div>
+                    <div class="code-line">            input.<span class="function">span</span>(),  <span class="comment">// 정확한 위치</span></div>
+                    <div class="code-line">            <span class="string">"Builder can only be derived for structs"</span></div>
+                    <div class="code-line">        ).<span class="function">to_compile_error</span>().<span class="function">into</span>();</div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">};</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">if</span> <span class="keyword">let</span> <span class="type">Fields</span>::<span class="type">Unit</span> = fields {</div>
+                    <div class="code-line">    <span class="keyword">return</span> <span class="type">Error</span>::<span class="function">new</span>(</div>
+                    <div class="code-line">        input.<span class="function">span</span>(),</div>
+                    <div class="code-line">        <span class="string">"Cannot derive Builder for unit structs"</span></div>
+                    <div class="code-line">    ).<span class="function">to_compile_error</span>().<span class="function">into</span>();</div>
+                    <div class="code-line">}</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: Documentation -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 2-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">문서화 및 예제</span>
+            <span class="en" style="display:none;">Documentation & Examples</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="comment">/// Derives a builder pattern for the struct.</span></div>
+                    <div class="code-line"><span class="comment">///</span></div>
+                    <div class="code-line"><span class="comment">/// # Example</span></div>
+                    <div class="code-line"><span class="comment">/// ```</span></div>
+                    <div class="code-line"><span class="comment">/// #[derive(Builder)]</span></div>
+                    <div class="code-line"><span class="comment">/// struct User {</span></div>
+                    <div class="code-line"><span class="comment">///     name: String,</span></div>
+                    <div class="code-line"><span class="comment">///     age: u32,</span></div>
+                    <div class="code-line"><span class="comment">/// }</span></div>
+                    <div class="code-line"><span class="comment">///</span></div>
+                    <div class="code-line"><span class="comment">/// let user = User::builder()</span></div>
+                    <div class="code-line"><span class="comment">///     .name("Alice".to_string())</span></div>
+                    <div class="code-line"><span class="comment">///     .age(30)</span></div>
+                    <div class="code-line"><span class="comment">///     .build();</span></div>
+                    <div class="code-line"><span class="comment">/// ```</span></div>
+                    <div class="code-line">#[<span class="macro">proc_macro_derive</span>(<span class="type">Builder</span>)]</div>
+                    <div class="code-line"><span class="keyword">pub fn</span> <span class="function">derive_builder</span>(...) { ... }</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Testing Strategies -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 2-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">테스트 전략</span>
+            <span class="en" style="display:none;">Testing Strategies</span>
+        </h1>
+        <div class="content">
+            <div class="highlight-box" style="width: 100%;">
+                <h3>
+                    <span class="ko">🧪 테스트 도구</span>
+                    <span class="en" style="display:none;">🧪 Testing Tools</span>
+                </h3>
+                <p class="ko">
+                    ✅ cargo expand - 확장된 코드 확인<br>
+                    ✅ trybuild - 컴파일 실패 테스트<br>
+                    ✅ macrotest - UI 테스트<br>
+                    ✅ cargo test - 일반 단위 테스트<br>
+                    ✅ rust-analyzer - IDE 통합 확인<br>
+                    ✅ criterion - 매크로 성능 측정
+                </p>
+                <p class="en" style="display:none;">
+                    ✅ cargo expand - Check expanded code<br>
+                    ✅ trybuild - Test compile failures<br>
+                    ✅ macrotest - UI tests<br>
+                    ✅ cargo test - Regular unit tests<br>
+                    ✅ rust-analyzer - IDE integration check<br>
+                    ✅ criterion - Macro performance
+                </p>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 2-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">💡✨</div>
+            <div class="highlight-box" style="max-width: 1400px;">
+                <h3>
+                    <span class="ko">핵심 요약</span>
+                    <span class="en" style="display:none;">Key Takeaways</span>
+                </h3>
+                <p class="ko">
+                    ✅ 스팬 보존으로 정확한 에러 위치 표시<br>
+                    ✅ 명시적 타입 힌트로 IDE 지원 강화<br>
+                    ✅ Error::new()로 명확한 에러 메시지<br>
+                    ✅ 문서화 및 예제 코드 제공<br>
+                    ✅ cargo expand, trybuild로 테스트<br>
+                    ✅ rust-analyzer와 통합 확인
+                </p>
+                <p class="en" style="display:none;">
+                    ✅ Preserve spans for accurate error locations<br>
+                    ✅ Explicit type hints enhance IDE support<br>
+                    ✅ Clear error messages with Error::new()<br>
+                    ✅ Provide documentation and examples<br>
+                    ✅ Test with cargo expand, trybuild<br>
+                    ✅ Verify rust-analyzer integration
+                </p>
+            </div>
+            <div style="margin-top: 40px; text-align: center;">
+                <p style="font-size: 36px; margin-bottom: 20px;">
+                    <span class="ko">다음 에피소드: 커스텀 Clippy Lint 작성</span>
+                    <span class="en" style="display:none;">Next Episode: Custom Clippy Lints</span>
+                </p>
+                <p style="font-size: 28px; color: #888;">EP 3-01 →</p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a> |
+                <span class="ko">弘益人間 - 널리 인간을 이롭게 하라</span>
+                <span class="en" style="display:none;">Benefit All Humanity</span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_3_01_Clippy_Lint.html'">
+                <span class="ko">다음 에피소드 →</span>
+                <span class="en" style="display:none;">Next Episode →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') ||
+                    (lang === 'en' && btn.textContent === 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.ko').forEach(el => {
+                el.style.display = lang === 'ko' ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = lang === 'en' ? '' : 'none';
+            });
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                const lines = document.querySelectorAll(`#slide${n} .code-line`);
+                lines.forEach((line, i) => {
+                    setTimeout(() => line.classList.add('show'), i * 80);
+                });
+
+                const items = document.querySelectorAll(`#slide${n} .comparison-item`);
+                items.forEach((item, i) => {
+                    setTimeout(() => item.classList.add('show'), i * 200);
+                });
+            }, 100);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Initialize
+        animateSlide(1);
+    </script>
+</body>
+</html>

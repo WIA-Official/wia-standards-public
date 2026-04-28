@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 3-01: Custom Clippy Lints | WIA-RUST-ADVANCED</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            position: relative;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .episode-badge {
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 10px 25px;
+            border: 2px solid #F39C12;
+            background: transparent;
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: #F39C12;
+        }
+
+        .title {
+            font-size: 72px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border-radius: 15px;
+            padding: 30px;
+            font-family: 'Consolas', 'D2Coding', monospace;
+            font-size: 22px;
+            line-height: 1.6;
+            border: 2px solid #30363d;
+            width: 100%;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+
+        .code-line.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .keyword { color: #ff7b72; }
+        .function { color: #d2a8ff; }
+        .string { color: #a5d6ff; }
+        .macro { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .type { color: #ffa657; }
+        .number { color: #79c0ff; }
+
+        .concept-box {
+            background: rgba(243, 156, 18, 0.1);
+            border-left: 5px solid #F39C12;
+            padding: 40px;
+            border-radius: 0 20px 20px 0;
+            margin: 20px 0;
+        }
+
+        .concept-box h3 {
+            color: #F39C12;
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .concept-box p {
+            font-size: 28px;
+            line-height: 1.8;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 40px;
+            width: 100%;
+        }
+
+        .comparison-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 40px;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 0.5s;
+        }
+
+        .comparison-item.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .comparison-item h3 {
+            color: #F39C12;
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .comparison-item ul {
+            list-style: none;
+            font-size: 24px;
+        }
+
+        .comparison-item li {
+            margin: 12px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .comparison-item li:before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+            color: #F39C12;
+        }
+
+        .navigation {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(243, 156, 18, 0.8);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: #F39C12;
+            transform: scale(1.05);
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 8px;
+            background: #F39C12;
+            transition: width 0.5s;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 100px;
+            right: 60px;
+            font-size: 24px;
+            color: #888;
+        }
+
+        .subtitle {
+            font-size: 36px;
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .big-emoji {
+            font-size: 150px;
+            margin-bottom: 30px;
+        }
+
+        .channel-info {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid #FF0000;
+            border-radius: 20px;
+            padding: 30px 60px;
+            margin-top: 40px;
+            font-size: 32px;
+        }
+
+        .channel-info a {
+            color: #FF6B6B;
+            text-decoration: none;
+        }
+
+        .highlight-box {
+            background: rgba(243, 156, 18, 0.15);
+            border: 2px solid #F39C12;
+            border-radius: 20px;
+            padding: 50px;
+            margin: 30px 0;
+        }
+
+        .highlight-box h3 {
+            color: #F39C12;
+            font-size: 40px;
+            margin-bottom: 25px;
+        }
+
+        .highlight-box p {
+            font-size: 30px;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 3-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">📎</div>
+            <h1 class="title">Custom Clippy Lints</h1>
+            <p class="subtitle">
+                <span class="ko">커스텀 Clippy Lint 작성하기</span>
+                <span class="en" style="display:none;">Writing Custom Clippy Lints</span>
+            </p>
+            <div class="channel-info">
+                📺 YouTube: <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">
+                <span class="ko">시작하기 →</span>
+                <span class="en" style="display:none;">Start →</span>
+            </button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: What is Clippy? -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 3-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Clippy란?</span>
+            <span class="en" style="display:none;">What is Clippy?</span>
+        </h1>
+        <div class="content">
+            <div class="comparison-grid">
+                <div class="comparison-item">
+                    <h3>
+                        <span class="ko">🔍 Correctness</span>
+                        <span class="en" style="display:none;">🔍 Correctness</span>
+                    </h3>
+                    <ul>
+                        <li class="ko">버그 가능성</li>
+                        <li class="en" style="display:none;">Potential bugs</li>
+                        <li class="ko">논리 오류</li>
+                        <li class="en" style="display:none;">Logic errors</li>
+                        <li class="ko">안전성 문제</li>
+                        <li class="en" style="display:none;">Safety issues</li>
+                    </ul>
+                </div>
+                <div class="comparison-item">
+                    <h3>
+                        <span class="ko">⚡ Performance</span>
+                        <span class="en" style="display:none;">⚡ Performance</span>
+                    </h3>
+                    <ul>
+                        <li class="ko">비효율적 코드</li>
+                        <li class="en" style="display:none;">Inefficient code</li>
+                        <li class="ko">불필요한 할당</li>
+                        <li class="en" style="display:none;">Unnecessary allocs</li>
+                        <li class="ko">느린 패턴</li>
+                        <li class="en" style="display:none;">Slow patterns</li>
+                    </ul>
+                </div>
+                <div class="comparison-item">
+                    <h3>
+                        <span class="ko">🎨 Style</span>
+                        <span class="en" style="display:none;">🎨 Style</span>
+                    </h3>
+                    <ul>
+                        <li class="ko">코드 스타일</li>
+                        <li class="en" style="display:none;">Code style</li>
+                        <li class="ko">관용구</li>
+                        <li class="en" style="display:none;">Idioms</li>
+                        <li class="ko">가독성</li>
+                        <li class="en" style="display:none;">Readability</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: Setting Up -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 3-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">프로젝트 설정</span>
+            <span class="en" style="display:none;">Project Setup</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="comment"># Cargo.toml</span></div>
+                    <div class="code-line">[<span class="keyword">package</span>]</div>
+                    <div class="code-line">name = <span class="string">"my_lints"</span></div>
+                    <div class="code-line">version = <span class="string">"0.1.0"</span></div>
+                    <div class="code-line"></div>
+                    <div class="code-line">[<span class="keyword">lib</span>]</div>
+                    <div class="code-line">crate-type = [<span class="string">"dylib"</span>]</div>
+                    <div class="code-line"></div>
+                    <div class="code-line">[<span class="keyword">dependencies</span>]</div>
+                    <div class="code-line">clippy_utils = <span class="string">"0.1"</span></div>
+                    <div class="code-line">rustc_hir = <span class="string">"0.1"</span></div>
+                    <div class="code-line">rustc_lint = <span class="string">"0.1"</span></div>
+                    <div class="code-line">rustc_session = <span class="string">"0.1"</span></div>
+                </div>
+                <div class="concept-box">
+                    <h3>
+                        <span class="ko">⚠️ 주의</span>
+                        <span class="en" style="display:none;">⚠️ Warning</span>
+                    </h3>
+                    <p class="ko">
+                        Clippy lint는 nightly Rust 필요<br>
+                        rustc 내부 API 사용 (불안정)
+                    </p>
+                    <p class="en" style="display:none;">
+                        Clippy lints require nightly Rust<br>
+                        Uses rustc internal API (unstable)
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: Basic Lint Structure -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 3-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">기본 Lint 구조</span>
+            <span class="en" style="display:none;">Basic Lint Structure</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block" style="font-size: 20px;">
+                    <div class="code-line"><span class="macro">declare_clippy_lint!</span> {</div>
+                    <div class="code-line">    <span class="keyword">pub</span> <span class="type">MANUAL_UNWRAP</span>,</div>
+                    <div class="code-line">    style,</div>
+                    <div class="code-line">    <span class="string">"manual implementation of unwrap"</span></div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">pub struct</span> <span class="type">ManualUnwrap</span>;</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">impl</span> <span class="type">LateLintPass</span> <span class="keyword">for</span> <span class="type">ManualUnwrap</span> {</div>
+                    <div class="code-line">    <span class="keyword">fn</span> <span class="function">check_expr</span>(&<span class="keyword">mut self</span>, cx: &<span class="type">LateContext</span>, expr: &<span class="type">Expr</span>) {</div>
+                    <div class="code-line">        <span class="keyword">if let</span> <span class="type">ExprKind</span>::<span class="type">Match</span>(scrutinee, arms, _) = &expr.kind {</div>
+                    <div class="code-line">            <span class="comment">// match Some(x) => x 패턴 감지</span></div>
+                    <div class="code-line">            <span class="keyword">if</span> <span class="function">is_manual_unwrap</span>(arms) {</div>
+                    <div class="code-line">                cx.<span class="function">span_lint</span>(<span class="type">MANUAL_UNWRAP</span>, expr.span,</div>
+                    <div class="code-line">                    <span class="string">"use .unwrap() instead"</span>);</div>
+                    <div class="code-line">            }</div>
+                    <div class="code-line">        }</div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: HIR Navigation -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 3-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">HIR 탐색</span>
+            <span class="en" style="display:none;">HIR Navigation</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block" style="font-size: 20px;">
+                    <div class="code-line"><span class="keyword">use</span> rustc_hir::{<span class="type">Expr</span>, <span class="type">ExprKind</span>, <span class="type">QPath</span>};</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// 메서드 호출 감지</span></div>
+                    <div class="code-line"><span class="keyword">if let</span> <span class="type">ExprKind</span>::<span class="type">MethodCall</span>(path, receiver, args, _) = &expr.kind {</div>
+                    <div class="code-line">    <span class="keyword">let</span> method_name = path.ident.<span class="function">as_str</span>();</div>
+                    <div class="code-line">    </div>
+                    <div class="code-line">    <span class="keyword">if</span> method_name == <span class="string">"clone"</span> {</div>
+                    <div class="code-line">        <span class="comment">// 불필요한 clone 감지</span></div>
+                    <div class="code-line">        <span class="keyword">if</span> <span class="function">is_copy_type</span>(cx, receiver) {</div>
+                    <div class="code-line">            cx.<span class="function">span_lint_and_sugg</span>(</div>
+                    <div class="code-line">                <span class="type">UNNECESSARY_CLONE</span>,</div>
+                    <div class="code-line">                expr.span,</div>
+                    <div class="code-line">                <span class="string">"unnecessary clone on Copy type"</span>,</div>
+                    <div class="code-line">                <span class="string">"remove this"</span>,</div>
+                    <div class="code-line">                <span class="macro">format!</span>(<span class="string">"{}"</span>, <span class="function">snippet</span>(cx, receiver.span, <span class="string">".."</span>)),</div>
+                    <div class="code-line">            );</div>
+                    <div class="code-line">        }</div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: Suggestions -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 3-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">수정 제안</span>
+            <span class="en" style="display:none;">Suggestions</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="comment">// 자동 수정 제안</span></div>
+                    <div class="code-line">cx.<span class="function">span_lint_and_sugg</span>(</div>
+                    <div class="code-line">    <span class="type">MY_LINT</span>,</div>
+                    <div class="code-line">    expr.span,</div>
+                    <div class="code-line">    <span class="string">"use better pattern"</span>,</div>
+                    <div class="code-line">    <span class="string">"try"</span>,</div>
+                    <div class="code-line">    <span class="string">"better_code"</span>.<span class="function">to_string</span>(),</div>
+                    <div class="code-line">    <span class="type">Applicability</span>::<span class="type">MachineApplicable</span>,  <span class="comment">// 안전하게 적용 가능</span></div>
+                    <div class="code-line">);</div>
+                </div>
+                <div class="concept-box">
+                    <h3>
+                        <span class="ko">🔧 Applicability 레벨</span>
+                        <span class="en" style="display:none;">🔧 Applicability Levels</span>
+                    </h3>
+                    <p class="ko">
+                        MachineApplicable - 자동 적용 안전<br>
+                        MaybeIncorrect - 검토 필요<br>
+                        HasPlaceholders - 수동 수정 필요
+                    </p>
+                    <p class="en" style="display:none;">
+                        MachineApplicable - Safe to auto-apply<br>
+                        MaybeIncorrect - Needs review<br>
+                        HasPlaceholders - Manual fix needed
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Testing Lints -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 3-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Lint 테스트</span>
+            <span class="en" style="display:none;">Testing Lints</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block" style="font-size: 20px;">
+                    <div class="code-line"><span class="comment">// tests/ui/manual_unwrap.rs</span></div>
+                    <div class="code-line">#![<span class="macro">warn</span>(clippy::manual_unwrap)]</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                    <div class="code-line">    <span class="keyword">let</span> opt = <span class="type">Some</span>(<span class="number">42</span>);</div>
+                    <div class="code-line">    </div>
+                    <div class="code-line">    <span class="comment">// Should trigger lint</span></div>
+                    <div class="code-line">    <span class="keyword">let</span> x = <span class="keyword">match</span> opt {</div>
+                    <div class="code-line">        <span class="type">Some</span>(v) => v,</div>
+                    <div class="code-line">        <span class="type">None</span> => <span class="macro">panic!</span>(<span class="string">"unwrap failed"</span>),</div>
+                    <div class="code-line">    };</div>
+                    <div class="code-line">}</div>
+                </div>
+                <div class="highlight-box">
+                    <h3>
+                        <span class="ko">🧪 테스트 명령</span>
+                        <span class="en" style="display:none;">🧪 Test Commands</span>
+                    </h3>
+                    <p class="ko">
+                        cargo clippy-dev test manual_unwrap<br>
+                        TESTNAME=manual_unwrap cargo uitest
+                    </p>
+                    <p class="en" style="display:none;">
+                        cargo clippy-dev test manual_unwrap<br>
+                        TESTNAME=manual_unwrap cargo uitest
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 3-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">📎✨</div>
+            <div class="highlight-box" style="max-width: 1400px;">
+                <h3>
+                    <span class="ko">핵심 요약</span>
+                    <span class="en" style="display:none;">Key Takeaways</span>
+                </h3>
+                <p class="ko">
+                    ✅ declare_clippy_lint!로 lint 선언<br>
+                    ✅ LateLintPass trait 구현<br>
+                    ✅ HIR 노드 패턴 매칭<br>
+                    ✅ span_lint_and_sugg로 수정 제안<br>
+                    ✅ clippy_utils 헬퍼 활용<br>
+                    ✅ UI 테스트로 검증
+                </p>
+                <p class="en" style="display:none;">
+                    ✅ Declare lints with declare_clippy_lint!<br>
+                    ✅ Implement LateLintPass trait<br>
+                    ✅ Pattern match HIR nodes<br>
+                    ✅ Suggest fixes with span_lint_and_sugg<br>
+                    ✅ Use clippy_utils helpers<br>
+                    ✅ Verify with UI tests
+                </p>
+            </div>
+            <div style="margin-top: 40px; text-align: center;">
+                <p style="font-size: 36px; margin-bottom: 20px;">
+                    <span class="ko">다음 에피소드: 컴파일 타임 검증</span>
+                    <span class="en" style="display:none;">Next Episode: Compile-time Verification</span>
+                </p>
+                <p style="font-size: 28px; color: #888;">EP 3-02 →</p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a> |
+                <span class="ko">弘益人間 - 널리 인간을 이롭게 하라</span>
+                <span class="en" style="display:none;">Benefit All Humanity</span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_3_02_Compile_Time.html'">
+                <span class="ko">다음 에피소드 →</span>
+                <span class="en" style="display:none;">Next Episode →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') ||
+                    (lang === 'en' && btn.textContent === 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.ko').forEach(el => {
+                el.style.display = lang === 'ko' ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = lang === 'en' ? '' : 'none';
+            });
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                const lines = document.querySelectorAll(`#slide${n} .code-line`);
+                lines.forEach((line, i) => {
+                    setTimeout(() => line.classList.add('show'), i * 70);
+                });
+
+                const items = document.querySelectorAll(`#slide${n} .comparison-item`);
+                items.forEach((item, i) => {
+                    setTimeout(() => item.classList.add('show'), i * 200);
+                });
+            }, 100);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Initialize
+        animateSlide(1);
+    </script>
+</body>
+</html>

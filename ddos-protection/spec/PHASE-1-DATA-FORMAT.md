@@ -5,237 +5,436 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-ddos-protection (Ddos Protection).
+This document defines the canonical data-format
+layer for WIA-ddos-protection. The standard covers
+persistent record shapes for the lifecycle of a
+distributed-denial-of-service (DDoS) protection
+programme — the protected service inventory and the
+protected-asset record; the network-and-application
+baseline traffic profile; the threat-and-attack
+record (volumetric, protocol-state-exhaustion,
+application-layer); the DOTS (DDoS Open Threat
+Signaling) signal channel + data channel record; the
+mitigation-action record (rate-limiting, traffic
+scrubbing, BGP FlowSpec announcement, blackhole
+routing, anycast diversion, captcha challenge); the
+post-incident analysis record; the BCP 38 ingress-
+filtering and BCP 84 multihomed-network filtering
+attestation; the cooperation record with the operator's
+upstream transit provider, scrubbing-centre vendor,
+and CDN; and the supervisory-and-CERT correspondence
+record.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID) and IETF RFC 4122 (UUID URN)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27002:2022 (information security controls)
+- ISO/IEC 27035-1:2023 + 27035-2:2023 + 27035-3:2024
+  (information security incident management)
+- IETF RFC 4732 (Internet Denial-of-Service
+  Considerations)
+- IETF RFC 8499 (DNS Terminology, the canonical
+  vocabulary for DNS-amplification attacks)
+- IETF RFC 8612 (DDoS Open Threat Signaling
+  Requirements)
+- IETF RFC 8782 / 9132 (DOTS Signal Channel
+  Specification — RFC 9132 obsoletes 8782)
+- IETF RFC 8783 (DOTS Data Channel)
+- IETF RFC 8973 (DDoS-Open-Threat-Signaling
+  Architecture)
+- IETF RFC 8955 (BGP FlowSpec, the modern
+  replacement for RFC 5575)
+- IETF RFC 5575 (BGP FlowSpec original; cited as
+  the legacy reference where deployed)
+- IETF RFC 7039 (Source Address Validation
+  Improvement (SAVI))
+- IETF RFC 8174 / 2119 (key-words for normative
+  language)
+- IETF BCP 38 / RFC 2827 (Network Ingress Filtering)
+- IETF BCP 84 / RFC 3704 (Ingress Filtering for
+  Multihomed Networks)
+- IETF RFC 8259 (JSON), RFC 9457 (Problem Details)
+- NIST SP 800-61 Rev 3 (Computer Security Incident
+  Handling Guide)
+- NIST SP 800-189 (Resilient Interdomain Traffic
+  Exchange — BGP origin validation, ROA, RPKI, BGPsec)
+- NIST SP 800-53 Rev 5 (security and privacy
+  controls)
+- US CISA DDoS guide and the CISA Stop Ransomware
+  campaign DDoS supplements
+- ENISA Threat Landscape (the European Union Agency
+  for Cybersecurity's annual report) and ENISA
+  Guidelines on Network and Information Security
+- MITRE ATT&CK Enterprise (Tactic TA0040 Impact;
+  Technique T1498 Network Denial of Service; T1499
+  Endpoint Denial of Service)
+- KR ISMS-P (정보보호 및 개인정보보호 관리체계 인증)
+  framework operated by KISA
+- KR 정보통신망법 + KR 전자금융감독규정 + KR-CERT
+  (KrCERT/CC) cooperation discipline
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-ddos-protection
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the
+artefacts a DDoS-protection operator (an enterprise's
+security team, a managed-security-service provider,
+a CDN edge operator, a scrubbing-centre vendor, an
+ISP transit provider, or a national CERT) maintains:
 
-## §2 Manifest
+- The protected-service inventory.
+- The traffic-baseline record.
+- The attack-detection record.
+- The DOTS signal-and-data-channel record.
+- The mitigation-action record.
+- The post-incident analysis record.
+- The BCP 38 / BCP 84 attestation record.
+- The vendor and partner cooperation record.
+- The supervisory and CERT correspondence record.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "ddos-protection"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Programme Identifier
 
-## §3 Conformance Tiers
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name)
+operatorRole         : enum ("enterprise-security" |
+                       "managed-security-service-
+                       provider" | "cdn-edge" |
+                       "scrubbing-centre" |
+                       "isp-transit" | "national-
+                       cert" | "user-defined")
+operatorAsn          : string (the operator's
+                       autonomous-system number,
+                       AS-format ASN; absent for
+                       non-routed operators)
+operatorJurisdiction : array of string (ISO 3166-1)
+governingFrameworks  : array of enum ("RFC-4732" |
+                       "RFC-8499" | "RFC-8612" |
+                       "RFC-9132-DOTS-SIGNAL" |
+                       "RFC-8783-DOTS-DATA" |
+                       "RFC-8955-BGP-FLOWSPEC" |
+                       "BCP-38-RFC-2827" |
+                       "BCP-84-RFC-3704" |
+                       "NIST-SP-800-61R3" |
+                       "NIST-SP-800-189" |
+                       "NIST-SP-800-53R5" |
+                       "ISO-IEC-27001" |
+                       "ISO-IEC-27035" |
+                       "MITRE-ATTACK-T1498" |
+                       "MITRE-ATTACK-T1499" |
+                       "ENISA-THREAT-LANDSCAPE" |
+                       "CISA-DDOS-GUIDE" |
+                       "KR-ISMS-P" |
+                       "KR-정보통신망법" |
+                       "KR-CERT-COOPERATION" |
+                       "user-defined")
+programmeStatus      : enum ("design" | "operating"
+                       | "limited-rollout" |
+                       "wind-down" | "archived")
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Protected-Service Inventory Record
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+protectedService:
+  serviceId          : string (uuidv7)
+  serviceName        : string
+  serviceClass       : enum ("public-web" | "api-
+                       endpoint" | "authoritative-
+                       dns" | "recursive-dns" |
+                       "mail-receiver" | "voip-sbc"
+                       | "game-server" | "iot-mqtt"
+                       | "infrastructure-routing" |
+                       "user-defined")
+  publicEndpointSet  : array of object (per-
+                       endpoint IPv4 / IPv6 prefix,
+                       transport protocol, port, and
+                       fully-qualified domain name)
+  asnOriginatedFrom  : string (the operator's ASN)
+  upstreamTransitRef : array of string (the upstream
+                       transit AS-set the operator
+                       receives prefixes through)
+  scrubbingCentreRef : array of string (the
+                       scrubbing-centre vendor
+                       references — for cloud-based
+                       traffic scrubbing the
+                       operator's contract reference
+                       is recorded)
+  cdnRef             : array of string (the CDN
+                       provider references; absent
+                       for non-CDN-fronted services)
+  recoveryTimeObjective : object (the operator's
+                       documented RTO under attack)
+```
 
-## §4 Discovery
+## §4 Traffic-Baseline Record
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/ddos-protection`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+trafficBaseline:
+  baselineId         : string (uuidv7)
+  serviceRef         : string (PHASE-1 §3)
+  measuredFrom       : string (ISO 8601)
+  measuredUntil      : string (ISO 8601)
+  pps                : object (mean and 99th
+                       percentile packets-per-second)
+  bps                : object (mean and 99th
+                       percentile bits-per-second)
+  cps                : object (mean and 99th
+                       percentile new-connections-
+                       per-second)
+  rpsApplication     : object (mean and 99th
+                       percentile HTTP-requests-per-
+                       second; absent for non-web
+                       services)
+  geoDistribution    : array of object (per-ISO-
+                       3166-1 country traffic
+                       fraction)
+  asnDistribution    : array of object (per-source-
+                       ASN traffic fraction)
+  baselineMethod     : enum ("rolling-30-day-
+                       window" | "exponentially-
+                       weighted-moving-average" |
+                       "seasonal-arima" |
+                       "peer-comparison" | "user-
+                       defined")
+```
 
-## §5 Time and Identity
+## §5 Attack-Detection Record
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+attackDetection:
+  detectionId        : string (uuidv7)
+  serviceRef         : string
+  detectedAt         : string (ISO 8601 instant;
+                       millisecond precision
+                       recommended)
+  attackVectorKind   : enum ("volumetric-udp-flood"
+                       | "volumetric-icmp-flood" |
+                       "volumetric-syn-flood" |
+                       "volumetric-amplification-
+                       reflection-dns" |
+                       "volumetric-amplification-
+                       reflection-ntp" |
+                       "volumetric-amplification-
+                       reflection-memcached" |
+                       "volumetric-amplification-
+                       reflection-cldap" |
+                       "volumetric-amplification-
+                       reflection-ssdp" |
+                       "protocol-state-exhaustion-
+                       tcp-state" | "protocol-state-
+                       exhaustion-tls-handshake" |
+                       "application-layer-http-
+                       slowloris" | "application-
+                       layer-http-flood" |
+                       "application-layer-rapid-
+                       reset-cve-2023-44487" |
+                       "application-layer-quic-
+                       flood" | "application-layer-
+                       dns-water-torture" |
+                       "low-and-slow" |
+                       "carpet-bombing" |
+                       "user-defined")
+  peakRateObserved   : object (peak pps / bps / cps
+                       / rps observed during the
+                       attack window)
+  durationSeconds    : integer (the detection-to-
+                       attack-end window)
+  attackerProfile    : object (source-ASN
+                       distribution; geographic
+                       distribution; the
+                       operator's identification of
+                       the booter / stresser
+                       service or botnet family
+                       reference where attribution
+                       is possible)
+  mitreTechniqueRef  : array of string (MITRE
+                       ATT&CK Enterprise technique
+                       identifiers — T1498 sub-
+                       techniques for network DoS,
+                       T1499 sub-techniques for
+                       endpoint DoS)
+```
 
-## §6 Versioning and Deprecation
+## §6 DOTS Signal-and-Data-Channel Record
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The DOTS protocol carries the operator's request
+for upstream mitigation between the DOTS client
+(at the protected operator) and the DOTS server
+(at the upstream mitigation provider) per RFC 9132
+(signal channel) and RFC 8783 (data channel):
 
-## §7 Privacy and Security
+```
+dotsRecord:
+  dotsExchangeId     : string (uuidv7)
+  detectionRef       : string (PHASE-1 §5)
+  dotsClientId       : string (the operator's DOTS
+                       client identifier)
+  dotsServerRef      : string (the upstream
+                       mitigation provider's DOTS
+                       server reference)
+  signalChannelKind  : enum ("rfc-9132-coap" |
+                       "user-defined")
+  dataChannelKind    : enum ("rfc-8783-restconf" |
+                       "user-defined")
+  mitigationScope    : object (the IPv4 / IPv6
+                       target prefixes the operator
+                       requests mitigation for)
+  mitigationLifetime : integer (seconds the
+                       operator requests mitigation
+                       to remain active)
+  exchangedAt        : string (ISO 8601)
+  outcomeKind        : enum ("accepted" |
+                       "accepted-with-conflict" |
+                       "rejected" |
+                       "withdrawn-by-client" |
+                       "expired")
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 Mitigation-Action Record
 
-## §8 Open Governance
+```
+mitigationAction:
+  actionId           : string (uuidv7)
+  detectionRef       : string
+  actionKind         : enum ("rate-limiting-edge" |
+                       "rate-limiting-syn-cookies"
+                       | "rate-limiting-quic-
+                       initial-rtt-validation" |
+                       "scrubbing-centre-divert" |
+                       "scrubbing-centre-bgp-
+                       redirect" |
+                       "scrubbing-centre-gre-
+                       tunnel-back" |
+                       "scrubbing-centre-vxlan-
+                       tunnel-back" |
+                       "bgp-flowspec-announcement"
+                       | "bgp-blackhole-
+                       community-rfc-7999" |
+                       "anycast-diversion" |
+                       "geo-blocking" |
+                       "asn-blocking" |
+                       "captcha-challenge" |
+                       "javascript-challenge" |
+                       "tls-fingerprint-block" |
+                       "user-defined")
+  appliedAt          : string (ISO 8601)
+  releasedAt         : string (ISO 8601; absent
+                       until released)
+  effectivenessMetric : object (post-action peak
+                       rate observed; legitimate-
+                       traffic false-positive rate
+                       observed)
+  reviewerRef        : string (the operator's
+                       incident-commander or auto-
+                       mitigation engine reference)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `ddos-protection` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §8 Post-Incident Analysis Record
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+postIncidentAnalysis:
+  analysisId         : string (uuidv7)
+  detectionRef       : string
+  analysisKind       : enum ("root-cause-attack-
+                       reconstruction" |
+                       "mitigation-effectiveness-
+                       review" | "control-gap-
+                       review" | "vendor-cooperation
+                       -review" | "user-defined")
+  conductedAt        : string (ISO 8601)
+  findingsRef        : string (URI of the findings
+                       narrative — covers the NIST
+                       SP 800-61 Rev 3 Detection
+                       and Analysis + Containment
+                       Eradication and Recovery +
+                       Post-Incident Activity
+                       phases)
+  correctiveActions  : array of object (planned
+                       remediation, owner, due
+                       date, completion status)
+```
 
+## §9 BCP 38 / BCP 84 Attestation Record
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+The operator's BCP 38 ingress-filtering and BCP 84
+multihomed-network-filtering attestation is the
+upstream-policy declaration that source-address-
+spoofed traffic does not leave the operator's
+network. The attestation aligns with the MANRS
+(Mutually Agreed Norms for Routing Security)
+discipline:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```
+bcpAttestation:
+  attestationId      : string (uuidv7)
+  reportedAt         : string (ISO 8601)
+  bcp38Compliant     : boolean
+  bcp84Compliant     : boolean
+  manrsParticipantId : string (the MANRS programme
+                       identifier; absent if not a
+                       MANRS participant)
+  rpkiOrigin         : enum ("validated" | "not-
+                       found" | "invalid" |
+                       "user-defined") (per NIST
+                       SP 800-189; the operator's
+                       RPKI ROA / origin-validation
+                       posture)
+  bgpsecRollout      : enum ("rolled-out" |
+                       "partial-rollout" | "not-
+                       rolled-out") (per NIST SP
+                       800-189)
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §10 Cooperation and Correspondence Record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+cooperationRecord:
+  recordId           : string (uuidv7)
+  partnerKind        : enum ("upstream-transit-
+                       provider" | "scrubbing-
+                       centre-vendor" | "cdn-
+                       provider" | "national-cert"
+                       | "law-enforcement" |
+                       "abuse-mailbox-correspondence"
+                       | "isac" | "user-defined")
+  partnerRef         : string
+  exchangedAt        : string (ISO 8601)
+  contentRef         : string (URI of the
+                       correspondence — DOTS
+                       request, telephone-bridge
+                       summary, NCSC / KrCERT-CC
+                       cooperation note, etc.)
+  outcomeKind        : enum ("acknowledged" |
+                       "in-progress" | "closed-
+                       with-finding" | "closed-no-
+                       further-action" |
+                       "user-defined")
+```
 
-## Annex F — Adoption Roadmap
+## §11 Conformance
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Implementations claiming PHASE-1 conformance maintain
+the records defined above for the operator's
+protected services, exercise BCP 38 / BCP 84
+ingress-filtering on the operator's egress, exercise
+the DOTS signal-channel exchange with at least one
+upstream mitigation provider, and preserve the
+incident records under the operating jurisdiction's
+recordkeeping discipline (ISO/IEC 27035-2 §10
+record retention; KR ISMS-P 보존 의무; the operator's
+internal retention horizon, typically three to five
+years).
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+---
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+**Document Information:**
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-ddos-protection
+- **Last Updated:** 2026-04-28

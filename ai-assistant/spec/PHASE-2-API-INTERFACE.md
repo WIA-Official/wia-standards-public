@@ -5,290 +5,346 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-ai-assistant
-implementations. Schemas are expressed in JSON Schema 2020-12 and
-stable for the lifetime of this PHASE. Implementations declare
-their conformance tier (Surface, Verified, Anchored) in the
-OpenAPI document via the `x-wia-conformance-tier` extension
-field.
+This document defines the HTTPS API contract that an AI
+assistant operator exposes for the records defined in
+PHASE-1. Consumers include model providers, evaluation
+service vendors, red-teaming providers, regulators
+(under the operating jurisdiction's AI governance regime),
+and the operator's own audit and analytics platforms.
 
 References (CITATION-POLICY ALLOW only):
+
+- IETF RFC 9110 (HTTP Semantics)
+- IETF RFC 9111 (HTTP Caching)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 6901 / 6902 (JSON Pointer / Patch)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9421 (HTTP Message Signatures)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022 (information security management)
+- W3C Trace Context
 - OpenAPI Specification 3.1
 - JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1)
-- IETF RFC 9457 (Problem Details for HTTP APIs)
-- IETF RFC 8615 (well-known URIs)
-- IETF RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022 (information security management)
-- ISO/IEC 17065:2012 (product certification bodies)
-- CycloneDX 1.5 / SPDX 2.3 (software bill of materials)
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0 (build provenance)
+- NIST AI Risk Management Framework + AI 600-1 GenAI
+  Profile
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document defines the api-interface concerns for WIA-ai-assistant.
-It is one of four PHASE documents that together define the standard:
-PHASE-1 Data Format, PHASE-2 API Interface, PHASE-3 Protocol, and
-PHASE-4 Integration.
+JSON-over-HTTPS served from a domain published by the
+operator. Versioning uses `/v1/` path segments. The
+OpenAPI 3.1 document at `/v1/openapi.json` is canonical.
 
-## §2 Manifest
+The chat-completion runtime (per-token streaming, sampling
+parameters) is documented by the operator's model
+provider's API; this WIA facade is the metadata, audit,
+and governance layer over the runtime, not the runtime
+itself.
 
-Every implementation publishes a signed manifest containing:
+## §2 Root Discovery
 
-- standardSlug (constant value: "ai-assistant")
-- version (Semantic Versioning 2.0.0)
-- implementation: { name, build digest, SBOM URL }
-- profile: { named, version }
-- requirements: per-requirement support status
-- signature: Sigstore DSSE envelope
+```
+GET /v1/
+```
 
-The manifest is anchored to a Sigstore Rekor transparency log entry
-per the cadence declared in the deployment policy (default: every 60
-seconds or every 1024 events, whichever comes first).
+```json
+{
+  "standard": "WIA-ai-assistant",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":         "/v1/programmes",
+    "models":             "/v1/models",
+    "systemPrompts":      "/v1/system-prompts",
+    "toolSchemas":        "/v1/tool-schemas",
+    "conversations":      "/v1/conversations",
+    "toolCalls":          "/v1/tool-calls",
+    "evaluationRuns":     "/v1/evaluation-runs",
+    "safetyIncidents":    "/v1/safety-incidents",
+    "evidence":           "/v1/evidence",
+    "openapi":            "/v1/openapi.json"
+  }
+}
+```
 
-## §3 Conformance Tiers
+## §3 Programme Lifecycle
 
-Three tiers are defined:
+```
+POST   /v1/programmes              — register a programme
+GET    /v1/programmes/{pid}        — retrieve programme
+PATCH  /v1/programmes/{pid}/status — advance status
+PATCH  /v1/programmes/{pid}/governing-frameworks
+                                    — update governing AI
+                                       framework enrolment
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Programmes that operate in EU jurisdictions where the EU
+AI Act 2024 applies require an `EU-AI-Act-2024` framework
+enrolment with a per-risk-category attestation; mismatched
+submissions return `409` with type
+`urn:wia:ai-assistant:eu-ai-act-attestation-required`.
 
-Implementations declare their tier in the OpenAPI document. Auditors
-consume the field to determine the appropriate review depth without
-re-running the full test matrix.
+## §4 Model Registration
 
-## §4 Discovery
+```
+POST   /v1/programmes/{pid}/models       — register a model
+PATCH  /v1/models/{mid}/deprecation      — announce
+                                              deprecation
+GET    /v1/models/{mid}                  — retrieve model
+```
 
-Operation discovery uses the IETF well-known URI mechanism (RFC 8615)
-at `/.well-known/wia/ai-assistant`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key.
+Model registrations require a `modelCardRef`; submissions
+without the model card return `422` with type
+`urn:wia:ai-assistant:model-card-required`.
 
-## §5 Time and Identity
+## §5 System Prompts
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5).
+```
+POST   /v1/programmes/{pid}/system-prompts
+                                          — register a prompt
+PATCH  /v1/system-prompts/{spid}/superseded-by
+                                          — record successor
+GET    /v1/system-prompts/{spid}         — retrieve prompt
+                                              metadata
+GET    /v1/system-prompts/{spid}/content — retrieve prompt
+                                              text (gated by
+                                              the operator's
+                                              prompt-disclosure
+                                              policy)
+```
 
-## §6 Versioning and Deprecation
+Prompt registrations require an `approvedBy` reference;
+operator-internal prompt-governance committee approval is
+prerequisite.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note.
+## §6 Tool Schemas
 
-## §7 Privacy and Security
+```
+POST   /v1/programmes/{pid}/tool-schemas — register a tool
+GET    /v1/tool-schemas/{tid}            — retrieve tool
+                                              metadata
+GET    /v1/tool-schemas/{tid}/input-schema
+                                          — fetch JSON
+                                              Schema input
+GET    /v1/tool-schemas/{tid}/output-schema
+                                          — fetch JSON
+                                              Schema output
+```
 
-Personal data exchanged via this protocol is subject to the relevant
-privacy regulation (GDPR, CCPA, K-PIPA, LGPD, PIPL, etc.).
-Implementations MUST:
+Tools with `authorisationScope=user-context-mutating` or
+`operator-internal-system-action` require operator
+authorisation matrix binding before the tool can be
+invoked from a conversation.
 
-- Encrypt data in transit (TLS 1.3, RFC 8446) and at rest (AES-256-GCM
-  or stronger)
-- Apply role-based access controls
-- Maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-  transparency log pattern)
-- Support consent revocation propagation per the federation manifest
+## §7 Conversation Lifecycle
 
-## §8 Open Governance
+```
+POST   /v1/programmes/{pid}/conversations
+                                          — open a
+                                              conversation
+                                              (pin model and
+                                              system prompt)
+PATCH  /v1/conversations/{cid}/end       — close conversation
+                                              with message
+                                              count
+GET    /v1/conversations/{cid}           — retrieve metadata
+GET    /v1/conversations/{cid}/transcript
+                                          — fetch redacted
+                                              transcript
+                                              (per operator's
+                                              redaction policy)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `ai-assistant` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes.
+Conversation submissions whose `userTokenRef` is not
+recognised by the operator's IDP return `403 Forbidden`
+with type `urn:wia:ai-assistant:user-token-not-resolved`.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §8 Tool Calls
 
+```
+POST   /v1/conversations/{cid}/tool-calls
+                                          — record a tool
+                                              invocation
+GET    /v1/tool-calls/{tcid}             — retrieve call
+                                              record
+GET    /v1/conversations/{cid}/tool-calls
+                                          — list tool calls
+                                              for a
+                                              conversation
+```
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+Tool calls that exceed the per-session rate limit return
+`429 Too Many Requests` with `Retry-After`; calls
+rejected by the authorisation matrix return `403` with
+type `urn:wia:ai-assistant:tool-not-authorised`.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## §9 Evaluation Runs
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+POST   /v1/programmes/{pid}/evaluation-runs
+                                          — register an
+                                              evaluation
+                                              run
+PATCH  /v1/evaluation-runs/{rid}/end     — close run with
+                                              results and
+                                              verdict
+GET    /v1/evaluation-runs/{rid}         — retrieve run
+GET    /v1/programmes/{pid}/evaluation-runs?
+       kind={k}&from={t}                   — query runs
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Robustness evaluation runs (`kind=robustness-iso-iec-
+24029-1`) cite the per-test-vector benchmark suite; the
+operator's pipeline regenerates results on each model or
+prompt revision.
 
-## Annex F — Adoption Roadmap
+## §10 Safety Incidents
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+POST   /v1/programmes/{pid}/safety-incidents
+                                          — register an
+                                              incident
+PATCH  /v1/safety-incidents/{sid}/severity
+                                          — update severity
+PATCH  /v1/safety-incidents/{sid}/root-cause
+                                          — attach root-
+                                              cause reference
+PATCH  /v1/safety-incidents/{sid}/remediation
+                                          — attach
+                                              remediation
+                                              plan
+GET    /v1/safety-incidents/{sid}        — retrieve incident
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Incidents at severity `critical` automatically trigger
+regulator notification through the integration described
+in PHASE-4 §6 where the jurisdiction requires.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §11 Errors, Authentication, Caching, Audit
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Errors: `application/problem+json` per RFC 9457 with the
+types named in §3-§10 plus
+`urn:wia:ai-assistant:evidence-mismatch`. Authentication:
+mutually-authenticated TLS for evaluation, regulator, and
+partner consumers; consumer-facing transcripts respect the
+operator's IDP. Caching: stable resources (closed
+conversations, completed evaluation runs, signed evidence
+packages) cacheable with `Cache-Control: max-age=
+31536000, immutable`. Audit logs carry `programmeId`,
+`conversationId`, `traceId`, the issuing client
+certificate's subject, and the operator's clock skew vs
+the operating jurisdiction's NTP service.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §12 Streaming Subscription
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Consumers subscribe via Server-Sent Events at:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- `/v1/programmes/{pid}/events` — programme-wide events
+  (model deprecation, prompt revision, evaluation
+  outcomes, safety incident escalations).
+- `/v1/conversations/{cid}/events` — conversation-scoped
+  events (tool-call outcomes, end-of-conversation
+  notifications).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Subscribers reconnect via the `Last-Event-ID` header.
 
-## Annex H — Versioning and Deprecation Policy
+## §13 Bulk and Pagination
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+```
+POST   /v1/bulk/conversations            — batched
+                                              conversation
+                                              metadata import
+POST   /v1/bulk/tool-calls               — batched tool-call
+                                              ingest
+GET    /v1/bulk/{operationId}            — operation status
+```
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Cursor-based pagination uses the `cursor` query parameter
+and `Link` headers (RFC 8288); cursors persist for at
+least 24 hours.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §14 Worked Example: Conversation to Incident
 
-## Annex I — Interoperability Profiles
+1. The operator opens a conversation pinning model and
+   system prompt.
+2. The user issues prompts that trigger tool calls
+   recorded against the conversation.
+3. A safety-monitor pipeline detects PII leak in the
+   assistant response and registers a safety incident
+   referencing the conversation.
+4. The operator's incident-response team attaches root-
+   cause and remediation references.
+5. Per the operator's policy, severity `major` triggers
+   regulator notification through the PHASE-4 integration.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §15 Memory and Feedback Endpoints
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+POST   /v1/users/{utid}/memory             — register a
+                                                memory record
+PATCH  /v1/memory/{mid}/opt-out             — record user
+                                                opt-out
+GET    /v1/users/{utid}/memory?
+       class={c}&visibility={v}              — query memory
+                                                for a user
+POST   /v1/conversations/{cid}/feedback    — register user
+                                                feedback
+GET    /v1/feedback/{fid}                  — retrieve feedback
+GET    /v1/conversations/{cid}/feedback    — list feedback
+                                                for a
+                                                conversation
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Memory submissions for users that have opted out (PHASE-1
+§10 `userOptOutHonoured=true`) return `409 Conflict` with
+type `urn:wia:ai-assistant:memory-opt-out-active` and the
+operator's pipeline suppresses the persistence.
 
-## Annex J — Reference Implementation Topology
+## §16 Provenance and Aggregation
 
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
+```
+GET    /v1/provenance/{recordId}    — provenance entry for
+                                       any PHASE-1 record
+GET    /v1/aggregate/conversation-volume?period=...
+GET    /v1/aggregate/safety-incident-rate?period=...
+GET    /v1/aggregate/feedback-distribution?period=...
+GET    /v1/aggregate/tool-usage-by-scope?period=...
+```
 
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-2-API-INTERFACE validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
+## §17 Source Citation Endpoint
 
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+```
+POST   /v1/conversations/{cid}/source-citations
+                                          — register a per-
+                                            response citation
+GET    /v1/source-citations/{scid}        — retrieve citation
+GET    /v1/conversations/{cid}/source-citations
+                                          — list citations
+                                            for a conversation
+```
+
+Citation submissions whose `sourceTrustClass` is
+`model-internal-no-source` for a regulated-domain
+conversation return `409` with type
+`urn:wia:ai-assistant:source-citation-required` and the
+operator's defer-to-human escalation triggers.
+
+## §18 Conformance
+
+A conformant server passes the test vectors published
+under `tests/phase-vectors/phase-2-api-interface/`, emits
+an OpenAPI 3.1 document, signs evidence packages per RFC
+9421, and rejects PII in any DATA-FORMAT field this PHASE
+marks as opaque.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-ai-assistant
+- **Last Updated:** 2026-04-28

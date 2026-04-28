@@ -5,237 +5,378 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-fuel-cell (Fuel Cell).
+This document defines the HTTPS API contract that a
+fuel-cell deployment exposes for the records defined
+in PHASE-1. Consumers include the system manufacturer,
+the system integrator, the operating jurisdiction's
+authority having jurisdiction (AHJ), the operating
+jurisdiction's grid system operator (where the fuel
+cell is grid-coupled), the operating jurisdiction's
+vehicle-type-approval authority (where the fuel cell
+powers a vehicle), the operating jurisdiction's
+hydrogen-fuel-quality auditor, the IECEx certification
+body (where Ex zones apply), and the deployment's own
+maintenance and operations platforms.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics)
+- IETF RFC 9111 (HTTP Caching)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 6901 / 6902 (JSON Pointer / Patch)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9421 (HTTP Message Signatures)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 14687 (hydrogen fuel quality)
+- IEC 62282 series
+- IEEE 1547-2018 / IEEE 1547.1-2020
+- IECEx + IEC 60079 series
+- UN GTR 13 / UN Regulation No. 134
+- W3C Trace Context
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-fuel-cell
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by the
+deployment. Versioning uses `/v1/` path segments. The
+OpenAPI 3.1 document at `/v1/openapi.json` is canonical.
 
-## §2 Manifest
+This API is the deployment-facing facade for fuel-cell
+records. Real-time stack telemetry (per-cell voltage,
+per-cell temperature, fuel utilisation) flows through
+the manufacturer's SCADA-equivalent surface; this API
+records the artefacts of regulatory-grade significance
+(fuel-quality verification, IEEE 1547 conformance,
+AHJ acceptance, incident-record submissions).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "fuel-cell"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Root Discovery
 
-## §3 Conformance Tiers
+```
+GET /v1/
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```json
+{
+  "standard": "WIA-fuel-cell",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":             "/v1/programmes",
+    "stacks":                 "/v1/stacks",
+    "balanceOfPlant":         "/v1/balance-of-plant",
+    "fuelQualityRecords":     "/v1/fuel-quality-records",
+    "gridInterconnections":   "/v1/grid-interconnections",
+    "vehicleOnboards":        "/v1/vehicle-onboards",
+    "commissioningRecords":   "/v1/commissioning-records",
+    "periodicInspections":    "/v1/periodic-inspections",
+    "incidents":              "/v1/incidents",
+    "evidence":               "/v1/evidence",
+    "openapi":                "/v1/openapi.json"
+  }
+}
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Programme Lifecycle
 
-## §4 Discovery
+```
+POST   /v1/programmes              — register a programme
+GET    /v1/programmes/{pid}        — retrieve programme
+PATCH  /v1/programmes/{pid}/status — advance status
+PATCH  /v1/programmes/{pid}/hazardous-area-classification
+                                   — record IEC 60079-
+                                     10-1 area
+                                     classification
+PATCH  /v1/programmes/{pid}/grid-interconnection
+                                   — record grid
+                                     interconnection
+                                     mode
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/fuel-cell`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Programmes that declare `applicationClass=stationary-*`
+without an `iec62282-3-100` reference for the IEC
+62282-3-100 stationary-power-systems-safety attestation
+return `409` with type
+`urn:wia:fuel-cell:iec-62282-3-100-required`.
 
-## §5 Time and Identity
+## §4 Stack Records
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST   /v1/programmes/{pid}/stacks — register a stack
+PATCH  /v1/stacks/{sid}/iec-62282-test
+                                   — attach IEC 62282
+                                     test report
+                                     reference
+GET    /v1/stacks/{sid}            — retrieve stack
+GET    /v1/programmes/{pid}/stacks — list stacks
+```
 
-## §6 Versioning and Deprecation
+Stack submissions whose `fuelInletGrade` is below the
+`fuelQualityRecords` registered for the programme
+return `409` with type
+`urn:wia:fuel-cell:iso-14687-grade-mismatch`.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Balance-of-Plant Records
 
-## §7 Privacy and Security
+```
+POST   /v1/programmes/{pid}/balance-of-plant
+                                   — register the BoP
+                                     for a programme
+PATCH  /v1/balance-of-plant/{bid}/iecex-equipment
+                                   — record IECEx
+                                     Certificate of
+                                     Conformity
+                                     reference for an
+                                     Ex-zoned BoP
+                                     equipment item
+GET    /v1/balance-of-plant/{bid}  — retrieve BoP
+                                     record
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+BoP submissions in zoned `hazardousAreaClassification`
+without `iecExEquipmentRefs` for each equipment item
+intended to operate in the zone return `422` with type
+`urn:wia:fuel-cell:iecex-coc-missing-for-zoned-equipment`.
 
-## §8 Open Governance
+## §6 Fuel-Quality Records
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `fuel-cell` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST   /v1/programmes/{pid}/fuel-quality-records
+                                   — register a fuel-
+                                     quality verification
+                                     per ISO 14687
+PATCH  /v1/fuel-quality-records/{fid}/conformance-verdict
+                                   — record verdict
+                                     from accredited
+                                     laboratory
+GET    /v1/fuel-quality-records/{fid}
+                                   — retrieve fuel-
+                                     quality record
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Fuel-quality submissions whose laboratory does not
+hold ISO/IEC 17025 accreditation for the contaminant
+panel return `422` with type
+`urn:wia:fuel-cell:iso-17025-accreditation-required`.
+Operations on a programme whose most-recent fuel-
+quality verdict is `non-conforming-supply-rejected`
+return `409` with type
+`urn:wia:fuel-cell:fuel-supply-rejected-cannot-operate`.
 
+## §7 Grid-Interconnection Records
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST   /v1/programmes/{pid}/grid-interconnections
+                                   — register a grid-
+                                     interconnection
+                                     event (initial
+                                     and periodic
+                                     re-test)
+PATCH  /v1/grid-interconnections/{gid}/utility-agreement
+                                   — record the grid
+                                     system operator's
+                                     interconnection
+                                     agreement
+                                     reference
+GET    /v1/grid-interconnections/{gid}
+                                   — retrieve record
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+Grid-interconnection submissions whose
+`ieee1547TestRef` does not include a category-i / ii /
+iii ride-through declaration return `422` with type
+`urn:wia:fuel-cell:ieee-1547-ride-through-category-
+required`.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Vehicle-Onboard Records
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+POST   /v1/programmes/{pid}/vehicle-onboards
+                                   — register a
+                                     vehicle-onboard
+                                     deployment
+PATCH  /v1/vehicle-onboards/{vid}/un-r134-type-approval
+                                   — record UN R134
+                                     type-approval
+                                     certificate
+                                     reference
+GET    /v1/vehicle-onboards/{vid}  — retrieve vehicle-
+                                     onboard record
+```
 
-## Annex F — Adoption Roadmap
+Vehicle-onboard submissions whose `vehicleClass` is in
+the M / N classes without `unGtr13TestRef` and
+`unR134TypeApprovalRef` (where the operating
+jurisdiction recognises UN R134 type approval) return
+`409` with type
+`urn:wia:fuel-cell:un-gtr-13-r134-evidence-required`.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Commissioning Records
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+POST   /v1/programmes/{pid}/commissioning-records
+                                   — register
+                                     commissioning
+PATCH  /v1/commissioning-records/{cid}/ahj-acceptance
+                                   — record AHJ
+                                     acceptance
+                                     reference
+GET    /v1/commissioning-records/{cid}
+                                   — retrieve record
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Commissioning submissions for stationary programmes
+without an IEC 62282-3-300 installation-inspection
+reference return `422` with type
+`urn:wia:fuel-cell:iec-62282-3-300-installation-evidence-
+required`.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Periodic Inspections
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+POST   /v1/programmes/{pid}/periodic-inspections
+                                   — register an
+                                     inspection
+PATCH  /v1/periodic-inspections/{iid}/remediation
+                                   — record remediation
+                                     actions
+GET    /v1/periodic-inspections/{iid}
+                                   — retrieve record
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+For Ex-zoned programmes, the IEC 60079-17 inspection
+cadence (initial detailed inspection, periodic close /
+visual / sampling inspections) is enforced as a
+machine invariant; lapsed cadence emits a programme-
+level event so that the operations team can schedule
+the inspection.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §11 Incidents
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+```
+POST   /v1/programmes/{pid}/incidents
+                                   — register an
+                                     incident
+PATCH  /v1/incidents/{iid}/root-cause
+                                   — record root-cause
+                                     analysis narrative
+PATCH  /v1/incidents/{iid}/ahj-notification
+                                   — record AHJ
+                                     notification
+                                     reference
+GET    /v1/incidents/{iid}         — retrieve incident
+```
 
-## Annex H — Versioning and Deprecation Policy
+Incident submissions whose `severityClass` is
+`personnel-injury` or `environmental-release` without
+an `ahjNotifiedAt` field within the operating
+jurisdiction's reporting deadline return `409` with
+type
+`urn:wia:fuel-cell:ahj-notification-required-for-severity`.
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Errors, Authentication, Caching, Audit
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Errors: `application/problem+json` per RFC 9457 with
+the types named above plus
+`urn:wia:fuel-cell:evidence-mismatch`. Authentication:
+mutually-authenticated TLS for AHJ, grid-system-
+operator, type-approval-authority, manufacturer, and
+auditor consumers. Caching: stable resources (closed
+incidents, accepted commissioning records, archived
+programmes, retired stacks) cacheable with
+`Cache-Control: max-age=31536000, immutable`. Audit
+logs carry `programmeId`, `stackId`, `traceId`, the
+issuing client certificate's subject, and the
+deployment's clock skew vs the operating
+jurisdiction's NTP service.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Streaming Subscription, Bulk, Pagination, Provenance
 
-## Annex I — Interoperability Profiles
+SSE at `/v1/programmes/{pid}/events` for programme-
+wide events (fuel-quality verdict issued, IEEE 1547
+test executed, IECEx inspection lapsed, incident
+declared). Subscribers reconnect via `Last-Event-ID`.
+Bulk endpoints: `/v1/bulk/stacks`, `/v1/bulk/fuel-
+quality-records`, `/v1/bulk/periodic-inspections`.
+Cursor-based pagination via `cursor` and `Link`
+headers. Provenance via `/v1/provenance/{recordId}`
+emits the in-toto attestation chain for any record.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Worked Example: Stationary PEMFC Commissioning
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+1. Manufacturer registers the programme with
+   `applicationClass=stationary-power`,
+   `fuelCellChemistry=pemfc`,
+   `gridInterconnection=grid-paralleled-low-voltage`,
+   `hazardousAreaClassification=iec-60079-zone-2`.
+2. Stack registered via `POST /stacks` with the
+   manufacturer's IEC 62282-2 module-test reference.
+3. BoP registered via `POST /balance-of-plant` with
+   IEEE 1547-2018 inverter conformance reference and
+   IECEx Certificate-of-Conformity references for
+   each Ex-zoned equipment item.
+4. Pre-energising fuel-quality verification via
+   `POST /fuel-quality-records` from an ISO/IEC 17025-
+   accredited laboratory; verdict `conforming`.
+5. Grid-interconnection test via `POST /grid-
+   interconnections` with IEEE 1547.1-2020 test
+   report and the grid system operator's
+   interconnection agreement.
+6. Commissioning recorded via `POST /commissioning-
+   records` with AHJ acceptance and IEC 62282-3-300
+   installation-inspection reference.
+7. Periodic-inspection cadence runs per IEC 60079-17
+   Ex-zone schedule and the manufacturer's
+   recommended-maintenance schedule.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §15 Performance Test Endpoint (IEC 62282-3-200)
+
+```
+POST   /v1/stacks/{sid}/performance-tests
+                                   — register a
+                                     performance test
+                                     (commissioning
+                                     and periodic re-
+                                     test) per IEC
+                                     62282-3-200
+GET    /v1/stacks/{sid}/performance-tests
+                                   — list performance
+                                     tests
+```
+
+Performance-test submissions record rated power,
+voltage regulation, response time, electrical
+efficiency, and (where the BoP supports it) thermal
+efficiency.
+
+## §16 Aggregate and Provenance Endpoints
+
+```
+GET    /v1/provenance/{recordId}
+GET    /v1/aggregate/operating-hours?period=...
+GET    /v1/aggregate/incident-rate?period=...&kind=...
+GET    /v1/aggregate/fuel-quality-non-conformance-rate?period=...
+```
+
+## §17 Conformance
+
+A conformant server passes the test vectors published
+under `tests/phase-vectors/phase-2-api-interface/`,
+emits an OpenAPI 3.1 document, signs evidence packages
+per RFC 9421, refuses operation under non-conforming
+fuel quality, refuses zoned BoP without IECEx CoC for
+each zoned equipment item, and refuses grid-
+interconnection submissions without IEEE 1547 ride-
+through category declarations.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-fuel-cell
+- **Last Updated:** 2026-04-28

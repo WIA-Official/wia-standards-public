@@ -5,237 +5,299 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-ddos-protection (Ddos Protection).
+This document defines how a DDoS-protection operator
+integrates with the systems that surround the
+detection-and-mitigation lifecycle: the upstream
+transit providers and their DOTS endpoints; the
+scrubbing-centre vendors and their BGP-redirect /
+GRE / VxLAN tunnels; the CDN edge and its security
+products; the national CERT for incident reporting;
+the supervisory authority for the operating
+jurisdiction (CISA / SEC / ENISA / KrCERT-CC / KR
+ISMS-P auditors); the sector ISAC for threat-
+intelligence sharing; the MANRS observatory for
+routing-security attestation; the threat-
+intelligence platforms; the operator's customer-
+facing notification channel; the external auditor
+and the ISO/IEC 27001 certification body; and the
+long-term archive that preserves incident artefacts
+past the active retention horizon.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9132 (DOTS Signal), RFC 8783 (DOTS Data),
+  RFC 8973 (DOTS Architecture)
+- IETF RFC 8955 (BGP FlowSpec), RFC 7999 (BGP
+  Blackhole Community)
+- IETF BCP 38 / RFC 2827, BCP 84 / RFC 3704
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022, ISO/IEC 27035-1/-2/-3
+- ISO/IEC 17021-1:2015, ISO/IEC 17065:2012
+- ISO 8601
+- W3C Verifiable Credentials Data Model 2.0
+  (optional)
+- NIST SP 800-61 Rev 3
+- NIST SP 800-189 (RPKI / ROA / BGPsec)
+- NIST SP 800-150 (threat-information sharing)
+- US CISA DDoS guide
+- ENISA Threat Landscape, NIS2 Directive (EU)
+  2022/2555 Articles 23 to 24 incident reporting
+- MITRE ATT&CK Enterprise
+- MANRS programme
+- KR ISMS-P, KR 정보통신망법, KrCERT-CC
 
 ---
 
-## §1 Scope
+## §1 Upstream Transit Provider Integration
 
-This PHASE document is one of four that together define the WIA-ddos-protection
-standard. It addresses the integration layer of the standard.
+The operator integrates with each upstream transit
+provider through:
 
-## §2 Manifest
+- The bilateral peering or transit agreement.
+- The provider's DOTS server endpoint (RFC 9132)
+  and the operator's registered DOTS client
+  identifier.
+- The provider's BGP FlowSpec acceptance policy and
+  the rate-limit on FlowSpec rules from the
+  customer-side.
+- The provider's blackhole community (RFC 7999) and
+  the operator's published /32 blackhole policy.
+- The provider's emergency-contact roster (the
+  network-operator-of-watch for after-hours).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "ddos-protection"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Scrubbing-Centre Vendor Integration
 
-## §3 Conformance Tiers
+For cloud-based scrubbing-centre vendors the
+operator's integration covers:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- The vendor's BGP-redirect anycast endpoints (the
+  vendor announces the operator's prefix from the
+  scrubbing-centre's anycast network during attack;
+  the clean traffic is tunnelled back via GRE /
+  VxLAN / IPsec).
+- The vendor's DDoS console for active-attack
+  visibility.
+- The vendor's ASN attribution feed for source-
+  attribution enrichment.
+- The vendor's API for programmatic attack-policy
+  changes.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 CDN Edge Integration
 
-## §4 Discovery
+Where the operator fronts services through a CDN:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/ddos-protection`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- The CDN's edge rate-limiting product is the
+  application-layer mitigation surface.
+- The CDN's bot-management product feeds the
+  operator's classification record.
+- The CDN's TLS-fingerprint and IP-reputation feeds
+  enrich the operator's detection.
+- The CDN's edge cache preserves origin
+  availability during volumetric attacks.
 
-## §5 Time and Identity
+## §4 National CERT and NIS2 Integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+For EU-jurisdiction operators subject to NIS2
+(Directive (EU) 2022/2555) — essential and important
+entities in sectors covered by NIS2 Annex I and
+Annex II:
 
-## §6 Versioning and Deprecation
+- Article 23 incident-notification: significant
+  incidents are reported to the CSIRT or competent
+  authority — early warning within 24 hours;
+  incident notification within 72 hours; final
+  report within one month.
+- Article 24 voluntary notification of significant
+  cyber threats.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+For US-jurisdiction operators the equivalent CISA
+notification under CIRCIA (the Cyber Incident
+Reporting for Critical Infrastructure Act of 2022)
++ sector-specific reporting (e.g., FCC for
+telecommunications operators, SEC for public
+companies under 17 CFR 229.106 / 8-K Item 1.05
+material cybersecurity-incident reporting).
 
-## §7 Privacy and Security
+For KR-jurisdiction operators the KrCERT-CC
+notification under 정보통신망법 Article 48-3 침해사고
+신고 + 전자금융거래법 incident reporting where
+applicable.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Sector ISAC Integration
 
-## §8 Open Governance
+The operator participates in the relevant sector
+ISAC (FS-ISAC for financial services, H-ISAC for
+healthcare, Auto-ISAC for automotive, K-ISAC for
+KR-jurisdiction) for threat-intelligence sharing
+under NIST SP 800-150 + the ISAC's published
+operating procedures. STIX 2.1 + TAXII 2.1 are the
+canonical machine-to-machine sharing wire formats.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `ddos-protection` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 MANRS Observatory Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+For network-operator-class operators the MANRS
+observatory tracks the operator's compliance with
+the MANRS Network Operator Actions (filtering, anti-
+spoofing, coordination, global validation). The
+operator's MANRS participant identifier is published
+on the observatory; periodic re-attestations are
+exercised.
 
+## §7 Threat-Intelligence Platform Integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+The operator's TIP integrates feeds from:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+- Spamhaus DROP / EDROP / SBL / XBL / PBL.
+- Team Cymru BGP feeds (bogon list, full BGP table
+  comparison).
+- Sector ISACs.
+- National-CERT advisories.
+- Commercial threat-intelligence vendors.
+- The operator's own honeypot and dark-net
+  observation.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The TIP normalises feeds to STIX 2.1 and feeds the
+detection and classification records.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 Customer-Facing Notification Channel
 
-## Annex F — Adoption Roadmap
+The operator's customer-facing notification covers:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- Status-page updates (the operator's published
+  service-status surface with the current incident
+  state, expected duration, and remediation
+  progress).
+- Email / SMS / Slack notification per the customer's
+  configured channel.
+- Telephone bridge for high-severity incidents.
+- Post-incident report delivered to the customer
+  within the operator's published SLA.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §9 External Audit and ISMS Certification
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The operator's ISMS is certified against ISO/IEC
+27001:2022 with the scope explicitly extending to
+the DOTS, scrubbing, and detection endpoints.
+Compliance with ISO/IEC 27035-1 + 27035-2 +
+27035-3 incident-management standards is asserted.
+The certification body operates under ISO/IEC
+17021-1; the conformity-assessment body for WIA-
+ddos-protection operates under ISO/IEC 17065.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Long-Term Archival Integration
 
-## Annex G — Test Vectors and Conformance Evidence
+Records governed by the operator's retention
+horizons (ISO/IEC 27035-2 §10 incident-record
+retention; KR ISMS-P 보존 의무; the operator's
+internal three-to-five-year retention) are migrated
+to the long-term archive at the close of the
+active retention window. The archive preserves the
+attack-detection record, the DOTS exchange record,
+the mitigation-action record, the post-incident
+analysis record, the BCP-attestation record, the
+cooperation correspondence record, and the audit-
+event trail.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Sectoral Resilience-Reporting Integration
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+For sector-specific operators the resilience-
+reporting integration extends:
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+- DORA Regulation (EU) 2022/2554 — for financial
+  entities the major-ICT-incident reporting under
+  Article 19 + threat-led penetration testing
+  under Article 26 (TIBER-EU framework).
+- US Reg SCI — for SCI entities the immediate
+  notification (Rule 1002) and member disclosure
+  (Rule 1003).
+- KR 전자금융거래법 + 전자금융감독규정 — for KR-
+  jurisdiction financial operators the FSC / FSS
+  notification.
+- Telecommunications-sector operators integrate
+  with the sector regulator (FCC in US; BNetzA /
+  Member-State NRA in EU; KCC + MSIT in KR) under
+  the sector's published incident-reporting regime.
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Identity-Federation and Access Integration
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+For multi-tenant scrubbing operators and managed-
+security-service providers the operator integrates
+with the customer's identity-federation surface
+(SAML 2.0 + OAuth 2.1 + OpenID Connect 1.0) so
+that customer administrators access the DDoS
+console under the customer's home-realm
+authentication. The customer's authorisation
+discipline (admin / operator / read-only)
+constrains the API surface available to the
+federated identity.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §13 Cross-Operator Cooperation Discipline
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Distributed attacks frequently span multiple operator
+boundaries; the operator's cross-operator cooperation
+discipline covers:
 
-## Annex I — Interoperability Profiles
+- The bilateral routing-security peers (MANRS
+  participants).
+- The multi-operator FIRST (Forum of Incident
+  Response and Security Teams) network for
+  CSIRT-to-CSIRT exchange.
+- The Trusted Introducer programme for European
+  CSIRTs.
+- The operator's participation in the Anti-Phishing
+  Working Group (APWG) and the Spamhaus / Shadowserver
+  observation networks.
+- The voluntary publication of attack signatures
+  through MISP (Malware Information Sharing
+  Platform) where the operator participates.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Resilience-Drill and Tabletop Exercise Integration
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+The operator's drill schedule integrates with:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- The upstream provider's joint-drill schedule.
+- The sector-coordination drill (FS-ISAC's annual
+  CAPS exercise; CISA's Cyber Storm; ENISA's Cyber
+  Europe; KrCERT-CC's 사이버 위기 대응 훈련).
+- The customer's joint tabletop where the operator
+  manages a critical-infrastructure customer.
+
+## §15 IoT and Edge-Device Vendor Coordination
+
+Where the operator's threat surface includes IoT-
+botnet-driven attacks (Mirai-class, Mozi-class,
+Bashlite-class) the operator coordinates with:
+
+- The compromised-device vendor for firmware-update
+  push (where the vendor maintains an OTA channel).
+- The operator's residential ISP customers for
+  customer-notification programmes (the operator's
+  walled-garden discipline).
+- The IoT certification programmes (UK PSTI Act
+  2022, EU Cyber Resilience Act regulatory regime
+  once in force) which set baseline cybersecurity
+  expectations for IoT devices entering the EU
+  market.
+
+## §16 Conformance
+
+Implementations claiming PHASE-4 conformance maintain
+the upstream-transit and scrubbing-centre integrations,
+exercise the national-CERT and NIS2 (where
+applicable) reporting obligations, integrate with
+the sector ISAC and MANRS observatory where the
+operator's role calls for participation, hold the
+ISO/IEC 27001 certification, exercise the IoT-vendor
+coordination discipline where the threat surface
+warrants, and operate the long-term archival
+integration described above.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-ddos-protection
+- **Last Updated:** 2026-04-28

@@ -5,237 +5,412 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-hospital-info-system (Hospital Info System).
+This document defines the canonical data-format layer for
+WIA-hospital-info-system. The standard covers the
+persistent record shapes that a hospital information
+system (HIS) maintains for its admissions, clinical,
+pharmacy, laboratory, radiology, billing, electronic
+medical record (EMR), and operational subsystems.
+Whereas the WIA-healthcare-integration standard governs
+record exchange between organisations, this standard
+governs the in-hospital record substrate and the
+internal-subsystem boundaries within a single
+organisation. Records are consumed by clinicians at the
+operating site, by hospital administration for
+operational and statutory reporting, by the patient
+through the in-hospital patient-portal, by the payer for
+claims adjudication, by external auditors, and by the
+supervisory data-protection authority for inspections.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID) and IETF RFC 4122 (UUID URN)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 27799:2016 (information security in health using
+  ISO/IEC 27002)
+- ISO 13606-1:2019 (electronic health record reference
+  model) and ISO 13606-2:2019 (archetype interchange)
+- HL7 v2.5.1 / v2.8.2 messaging (the operating-site
+  messaging substrate that most hospital information
+  systems still use for ADT, ORM, ORU, BAR, MFN, and
+  SIU message types)
+- HL7 FHIR Release 5 (the modern resource-shape
+  substrate for the EMR facade and for API integration
+  with external partners)
+- IHE PCC (Patient Care Coordination) profiles for
+  clinical-document content
+- IHE LAB profiles (LTW, LCSD, LBL, LCC, LPOCT) for
+  laboratory operations
+- DICOM PS3 (Digital Imaging and Communications in
+  Medicine; cited for the radiology subsystem)
+- LOINC (Logical Observation Identifiers Names and
+  Codes), SNOMED CT, and ICD-11 (the World Health
+  Organization's eleventh revision of the International
+  Classification of Diseases) for code-system bindings
+- IETF RFC 8259 (JSON), RFC 9457 (Problem Details)
+- US HIPAA Security Rule (45 CFR Part 164, Subpart C)
+  and Privacy Rule (45 CFR Part 164, Subpart E)
+- KR Medical Service Act (의료법) Article 22 (medical-
+  record curation), Article 23 (electronic medical-
+  record curation discipline) and the KR EMR
+  certification programme (전자의무기록 시스템 인증)
+  operated under Article 23-2
+- KR Personal Information Protection Act (PIPA,
+  개인정보보호법) Article 23 sensitive-information
+  clauses
+- EU European Health Data Space Regulation (cited
+  where the hospital participates in the EHDS
+  infrastructure)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-hospital-info-system
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts
+the hospital information system maintains:
 
-## §2 Manifest
+- Admissions, discharges, and transfers (ADT) — bed
+  occupancy, encounter status, ward and unit
+  assignment.
+- Computerised provider order entry (CPOE) — the
+  orders the clinician places against the patient's
+  encounter.
+- Pharmacy — the dispense-and-administration cycle
+  paired with the medication order.
+- Laboratory information system (LIS) — the order-
+  result cycle for laboratory tests.
+- Radiology information system (RIS) and PACS — the
+  imaging-order, study, and report cycle.
+- Billing and claims — the charge-master and the
+  claim record.
+- EMR — the longitudinal clinical record visible to
+  the treating clinician.
+- Master files — the patient master, provider master,
+  service master, and code-system master.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "hospital-info-system"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+KR Medical Service Act medical-record curation
+(Article 22) requires ten-year retention for medical
+records and three-year retention for prescription and
+nursing records; the discipline is encoded in PHASE-3
+§9.
 
-## §3 Conformance Tiers
+## §2 Hospital and Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+hospitalProgrammeId  : string (uuidv7)
+hospitalName         : string (legal name of the
+                       hospital)
+hospitalKind         : enum ("tertiary" | "general" |
+                       "specialty" | "primary-care" |
+                       "long-term-care" | "psychiatric"
+                       | "rehabilitation" | "user-
+                       defined")
+hospitalJurisdiction : string (ISO 3166-1 country code)
+operatingFrameworks  : array of enum ("HL7-V2-5-1" |
+                       "HL7-V2-8-2" | "HL7-FHIR-R5" |
+                       "DICOM-PS3" | "ISO-13606" |
+                       "IHE-PCC" | "IHE-LAB" |
+                       "KR-EMR-Certification" |
+                       "US-HIPAA-PRIVACY" |
+                       "US-HIPAA-SECURITY" |
+                       "KR-Medical-Service-Act" |
+                       "KR-PIPA-SENSITIVE" |
+                       "EU-EHDS" | "user-defined")
+codeSystemsUsed      : array of enum ("LOINC" |
+                       "SNOMED-CT" | "ICD-11" |
+                       "ICD-10-CM" | "RxNorm" |
+                       "ATC" | "KCD-8" | "user-defined")
+emrCertificationRef  : string (URI of the operating
+                       jurisdiction's EMR certification
+                       record — for KR hospitals this is
+                       the 전자의무기록 시스템 인증
+                       record)
+programmeStatus      : enum ("commissioning" |
+                       "operating" | "rollout-limited"
+                       | "wind-down" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Patient Master Record
 
-## §4 Discovery
+```
+patientMaster:
+  patientId          : string (uuidv7; the hospital's
+                       master-patient-index identifier)
+  jurisdictionalIdentifiers : array of object (KR
+                       resident registration number, US
+                       medical record number, EU
+                       Member-State national identifier;
+                       the hospital records the issuing-
+                       authority OID and the scope of
+                       use)
+  givenName          : array of string
+  familyName         : string
+  birthDate          : string (ISO 8601 date)
+  administrativeSex  : enum ("female" | "male" |
+                       "unknown" | "other")
+  preferredLanguage  : string (BCP 47)
+  primaryContact     : object (the next-of-kin or
+                       authorised contact reference)
+  insuranceCoverage  : array of object (per-payer
+                       coverage records)
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/hospital-info-system`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Encounter and Bed-Occupancy Record (ADT)
 
-## §5 Time and Identity
+The ADT discipline is captured per HL7 v2.5.1 ADT
+message-type semantics; the persistent shape is:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+encounterRecord:
+  encounterId        : string (uuidv7)
+  patientRef         : string (PHASE-1 §3)
+  encounterClass     : enum ("inpatient" | "outpatient"
+                       | "emergency" | "day-surgery" |
+                       "observation" | "home-care" |
+                       "user-defined")
+  admissionAt        : string (ISO 8601)
+  dischargeAt        : string (ISO 8601; absent until
+                       discharge — corresponds to the
+                       v2 A03 message)
+  admittingProvider  : string (PHASE-1 §6 reference)
+  attendingProvider  : string
+  servicedDepartment : string (e.g. internal-medicine,
+                       cardiology, oncology, paediatrics)
+  bedOccupancy:
+    wardCode         : string
+    roomCode         : string
+    bedCode          : string
+    occupancyFrom    : string (ISO 8601)
+    occupancyTo      : string (ISO 8601; absent until
+                       transferred or discharged —
+                       corresponds to the v2 A02
+                       transfer message)
+  visitNumber        : string (the v2 PV1.19 visit
+                       number for legacy interfaces)
+```
 
-## §6 Versioning and Deprecation
+## §5 Order and Order-Result Record (CPOE)
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+orderRecord:
+  orderId            : string (uuidv7)
+  encounterRef       : string (PHASE-1 §4)
+  orderClass         : enum ("medication" | "laboratory"
+                       | "radiology" | "consultation" |
+                       "procedure" | "diet" | "nursing"
+                       | "blood-product" | "user-
+                       defined")
+  orderingProvider   : string
+  orderedAt          : string (ISO 8601)
+  serviceCode        : object (LOINC for laboratory and
+                       most diagnostic orders; SNOMED CT
+                       for procedures; the hospital's
+                       service-master code as a parallel
+                       coding for charge-master mapping)
+  priorityKind       : enum ("routine" | "stat" | "urgent"
+                       | "asap" | "timing-critical")
+  status             : enum ("draft" | "active" |
+                       "completed" | "cancelled" |
+                       "stopped" | "entered-in-error")
+  resultObservations : array of string (PHASE-1 §7
+                       observation references for
+                       laboratory orders; the v2 ORU
+                       result message that fulfils the
+                       order is referenced here)
+  imagingStudyRef    : string (PHASE-1 §8 reference for
+                       radiology orders)
+```
 
-## §7 Privacy and Security
+## §6 Provider Master Record
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+providerMaster:
+  providerId         : string (uuidv7; the hospital's
+                       internal provider identifier)
+  jurisdictionalLicence : array of object (KR medical-
+                       practitioner licence number, US
+                       NPI, EU Member-State licensing-
+                       authority registration)
+  givenName          : array of string
+  familyName         : string
+  practitionerRoles  : array of object (per-role
+                       assignment — physician, nurse,
+                       pharmacist, technician,
+                       clinical-research-coordinator)
+  privileges         : array of string (the hospital's
+                       privilege-and-credentialling
+                       record reference; controls what
+                       order classes the provider may
+                       place)
+```
 
-## §8 Open Governance
+## §7 Laboratory and Pathology Result Record
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `hospital-info-system` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The laboratory-information-system (LIS) record-shape
+follows the IHE LAB profile for the hospital's
+laboratory operations:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+labResultRecord:
+  resultId           : string (uuidv7)
+  orderRef           : string (PHASE-1 §5)
+  resultStatus       : enum ("preliminary" | "final" |
+                       "amended" | "corrected" |
+                       "cancelled" | "entered-in-error")
+  performedAt        : string (ISO 8601)
+  performingLabRef   : string (the hospital's in-house
+                       laboratory or the reference
+                       laboratory the work was sent to)
+  observationCode    : object (LOINC code is required;
+                       for LIS-internal bench codes the
+                       hospital records both the LOINC
+                       code and the bench code)
+  valueQuantity      : object (UCUM-quantified value)
+  valueCodeable      : object (coded result for
+                       categorical observations)
+  referenceRange     : array of object
+  abnormalFlag       : enum ("normal" | "low" | "high"
+                       | "low-low" | "high-high" |
+                       "abnormal" | "out-of-range" |
+                       "user-defined")
+  pathologyNarrativeRef : string (URI of the
+                       pathology-report narrative —
+                       absent for non-anatomic-pathology
+                       results)
+```
 
+## §8 Imaging-Study Record (RIS / PACS)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+```
+imagingStudyRecord:
+  studyId            : string (uuidv7)
+  patientRef         : string
+  encounterRef       : string
+  orderRef           : string (PHASE-1 §5)
+  studyInstanceUid   : string (DICOM Study Instance UID
+                       — the canonical study identifier
+                       for PACS)
+  modality           : enum ("CR" | "CT" | "MR" | "NM"
+                       | "PT" | "US" | "MG" | "DX" |
+                       "RF" | "XA" | "OT" | "user-
+                       defined")
+  performedAt        : string (ISO 8601)
+  performingTechnologist : string
+  interpretingProvider : string (radiologist
+                       reference)
+  reportObservations : array of string (PHASE-1 §7
+                       observation references for
+                       structured findings)
+  reportNarrativeRef : string (URI of the imaging-
+                       report narrative)
+  pacsInstanceCount  : integer (number of DICOM
+                       instances in the study)
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## §9 Pharmacy Dispense and Administration Record
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+pharmacyDispense:
+  dispenseId         : string (uuidv7)
+  orderRef           : string (the medication-order
+                       reference)
+  dispensedAt        : string (ISO 8601)
+  dispensingPharmacist : string
+  medicationCode     : object (RxNorm for US, ATC for
+                       EU, KR National Drug Master File
+                       for KR)
+  quantity           : object (UCUM quantity)
+  lotNumberRef       : string
+  expiryDate         : string (ISO 8601 date)
+  administrationRefs : array of string (PHASE-1 §10
+                       administration references)
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §10 Medication Administration Record (eMAR)
 
-## Annex F — Adoption Roadmap
+```
+medicationAdministration:
+  administrationId   : string (uuidv7)
+  dispenseRef        : string
+  administeredAt     : string (ISO 8601)
+  administeringNurse : string
+  routeKind          : enum ("oral" | "intravenous" |
+                       "intramuscular" | "subcutaneous"
+                       | "transdermal" | "inhalational"
+                       | "rectal" | "topical" |
+                       "user-defined")
+  doseGiven          : object (UCUM quantity)
+  refusalReason      : string (absent unless refused;
+                       the hospital's nursing
+                       discipline records the reason)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §11 Billing and Charge Record
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+chargeRecord:
+  chargeId           : string (uuidv7)
+  encounterRef       : string
+  chargeMasterCode   : string (the hospital's
+                       chargemaster code — the
+                       chargemaster cross-walks to the
+                       jurisdictional billing-code
+                       system)
+  jurisdictionalBillingCode : object (US CPT or
+                       HCPCS, KR EDI procedure code,
+                       EU national equivalent)
+  serviceDate        : string (ISO 8601 date)
+  performingProvider : string
+  quantity           : integer
+  unitPrice          : object (the chargemaster's
+                       per-unit price in the hospital's
+                       reporting currency)
+  payerRef           : string (the responsible payer
+                       reference; absent for self-pay)
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §12 Audit-and-Access-Log Record
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```
+auditEvent:
+  eventId            : string (uuidv7)
+  occurredAt         : string (ISO 8601 instant)
+  actorRef           : string (provider or system
+                       identity)
+  subjectPatientRef  : string (absent for system events)
+  eventKind          : enum ("login" | "view-record" |
+                       "modify-record" | "place-order"
+                       | "result-access" |
+                       "break-the-glass" |
+                       "consent-capture" |
+                       "consent-withdrawal" |
+                       "report-print" | "user-defined")
+  outcomeKind        : enum ("success" | "minor-
+                       failure" | "serious-failure")
+  rationale          : string (URI of the rationale
+                       narrative for break-the-glass
+                       events)
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+## §13 Conformance
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Implementations claiming PHASE-1 conformance maintain
+the master files, encounter, order, result,
+administration, charge, and audit records described
+above. The KR EMR certification programme (전자의무기록
+시스템 인증, KR Medical Service Act Article 23-2)
+imposes additional record-shape requirements that the
+hospital satisfies through its certification-record
+reference; HIPAA Security Rule 45 CFR 164.312(b)
+audit controls apply to the audit-event record.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+---
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+**Document Information:**
 
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-hospital-info-system
+- **Last Updated:** 2026-04-28

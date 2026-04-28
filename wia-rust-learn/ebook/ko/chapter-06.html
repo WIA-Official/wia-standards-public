@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6장: 고급 기능 - WIA-RUST-LEARN</title>
+    <style>
+        :root { --rust-orange: #f97316; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-orange); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-orange); }
+        h2 { font-size: 1.5rem; margin: 30px 0 15px; color: var(--text); }
+        h3 { font-size: 1.2rem; margin: 20px 0 10px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-orange); }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .tip { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--blue); }
+        code { background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+        ul, ol { padding-left: 25px; color: var(--text-muted); margin-bottom: 15px; }
+        li { margin-bottom: 8px; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>6장: 고급 기능</h1>
+
+        <p>Rust의 고급 기능들을 마스터하면 더 유연하고 재사용 가능한 코드를 작성할 수 있습니다. 이 장에서는 제네릭, 트레이트, 스마트 포인터, 클로저, 이터레이터 등을 심도 있게 다룹니다.</p>
+
+        <h2>6.1 제네릭 (Generics) - 타입의 추상화</h2>
+
+        <p>제네릭을 사용하면 여러 타입에서 작동하는 코드를 한 번만 작성할 수 있습니다. 코드 중복을 줄이고 타입 안전성을 유지합니다.</p>
+
+        <h3>제네릭 함수</h3>
+        <pre>// 제네릭 없이 - 코드 중복
+fn largest_i32(list: &[i32]) -> &i32 {
+    let mut largest = &list[0];
+    for item in list {
+        if item > largest {
+            largest = item;
+        }
+    }
+    largest
+}
+
+fn largest_char(list: &[char]) -> &char {
+    let mut largest = &list[0];
+    for item in list {
+        if item > largest {
+            largest = item;
+        }
+    }
+    largest
+}
+
+// 제네릭 사용 - 한 번만 작성
+fn largest&lt;T: PartialOrd&gt;(list: &[T]) -> &T {
+    let mut largest = &list[0];
+    for item in list {
+        if item > largest {
+            largest = item;
+        }
+    }
+    largest
+}
+
+fn main() {
+    let numbers = vec![34, 50, 25, 100, 65];
+    let result = largest(&numbers);
+    println!("가장 큰 수: {}", result);
+
+    let chars = vec!['y', 'm', 'a', 'q'];
+    let result = largest(&chars);
+    println!("가장 큰 문자: {}", result);
+}</pre>
+
+        <h3>제네릭 구조체</h3>
+        <pre>// 하나의 타입 매개변수
+struct Point&lt;T&gt; {
+    x: T,
+    y: T,
+}
+
+impl&lt;T&gt; Point&lt;T&gt; {
+    fn x(&self) -> &T {
+        &self.x
+    }
+}
+
+fn main() {
+    let integer = Point { x: 5, y: 10 };
+    let float = Point { x: 1.0, y: 4.0 };
+
+    // let wont_work = Point { x: 5, y: 4.0 }; // 에러! 타입이 달라야 함
+}
+
+// 여러 타입 매개변수
+struct Point2D&lt;T, U&gt; {
+    x: T,
+    y: U,
+}
+
+fn main() {
+    let both_integer = Point2D { x: 5, y: 10 };
+    let both_float = Point2D { x: 1.0, y: 4.0 };
+    let integer_and_float = Point2D { x: 5, y: 4.0 }; // OK!
+}</pre>
+
+        <h3>제네릭 열거형</h3>
+        <pre>// Option과 Result는 제네릭 열거형
+enum Option&lt;T&gt; {
+    Some(T),
+    None,
+}
+
+enum Result&lt;T, E&gt; {
+    Ok(T),
+    Err(E),
+}
+
+// 커스텀 제네릭 열거형
+enum Data&lt;T&gt; {
+    Single(T),
+    Multiple(Vec&lt;T&gt;),
+    None,
+}
+
+fn main() {
+    let single = Data::Single(42);
+    let multiple = Data::Multiple(vec![1, 2, 3]);
+    let none: Data&lt;i32&gt; = Data::None;
+}</pre>
+
+        <h3>메서드에서 제네릭</h3>
+        <pre>struct Point&lt;T&gt; {
+    x: T,
+    y: T,
+}
+
+impl&lt;T&gt; Point&lt;T&gt; {
+    fn new(x: T, y: T) -> Self {
+        Point { x, y }
+    }
+}
+
+// 특정 타입에만 메서드 구현
+impl Point&lt;f32&gt; {
+    fn distance_from_origin(&self) -> f32 {
+        (self.x.powi(2) + self.y.powi(2)).sqrt()
+    }
+}
+
+fn main() {
+    let p1 = Point::new(5, 10);
+    let p2 = Point::new(1.0, 4.0);
+
+    // p1.distance_from_origin(); // 에러! i32 타입에는 이 메서드 없음
+    println!("거리: {}", p2.distance_from_origin()); // OK!
+}</pre>
+
+        <div class="highlight">
+            <strong>제네릭 성능</strong>
+            <p style="margin-top: 10px;">Rust는 컴파일 시 <strong>단형화(monomorphization)</strong>를 수행합니다. 제네릭 코드를 사용하는 각 구체 타입에 대해 별도의 코드를 생성하므로, 제네릭 사용에 런타임 비용이 없습니다!</p>
+        </div>
+
+        <h2>6.2 트레이트 (Traits) - 공유 동작 정의</h2>
+
+        <p>트레이트는 특정 타입이 가지고 있는 기능을 다른 타입과 공유할 수 있게 해줍니다. 다른 언어의 인터페이스와 비슷하지만 더 강력합니다.</p>
+
+        <h3>트레이트 정의와 구현</h3>
+        <pre>pub trait Summary {
+    fn summarize(&self) -> String;
+}
+
+pub struct NewsArticle {
+    pub headline: String,
+    pub location: String,
+    pub author: String,
+    pub content: String,
+}
+
+impl Summary for NewsArticle {
+    fn summarize(&self) -> String {
+        format!("{}, by {} ({})", self.headline, self.author, self.location)
+    }
+}
+
+pub struct Tweet {
+    pub username: String,
+    pub content: String,
+    pub reply: bool,
+    pub retweet: bool,
+}
+
+impl Summary for Tweet {
+    fn summarize(&self) -> String {
+        format!("{}: {}", self.username, self.content)
+    }
+}
+
+fn main() {
+    let article = NewsArticle {
+        headline: String::from("Rust 1.0 출시!"),
+        location: String::from("서울"),
+        author: String::from("김러스트"),
+        content: String::from("안전하고 빠른 시스템 프로그래밍 언어..."),
+    };
+
+    let tweet = Tweet {
+        username: String::from("@rustacean"),
+        content: String::from("Rust 배우는 중! #rust"),
+        reply: false,
+        retweet: false,
+    };
+
+    println!("기사: {}", article.summarize());
+    println!("트윗: {}", tweet.summarize());
+}</pre>
+
+        <h3>기본 구현</h3>
+        <pre>pub trait Summary {
+    fn summarize_author(&self) -> String;
+
+    // 기본 구현
+    fn summarize(&self) -> String {
+        format!("({}님의 글 더 읽기...)", self.summarize_author())
+    }
+}
+
+impl Summary for Tweet {
+    fn summarize_author(&self) -> String {
+        format!("@{}", self.username)
+    }
+    // summarize는 기본 구현 사용
+}
+
+fn main() {
+    let tweet = Tweet {
+        username: String::from("rustacean"),
+        content: String::from("물론 Rust는 최고!"),
+        reply: false,
+        retweet: false,
+    };
+
+    println!("1개의 새 트윗: {}", tweet.summarize());
+}</pre>
+
+        <h3>트레이트 바운드</h3>
+        <p>제네릭 타입이 특정 트레이트를 구현하도록 제한합니다.</p>
+
+        <pre>// 트레이트 바운드 - 긴 형식
+pub fn notify&lt;T: Summary&gt;(item: &T) {
+    println!("속보! {}", item.summarize());
+}
+
+// impl Trait 문법 - 짧은 형식
+pub fn notify(item: &impl Summary) {
+    println!("속보! {}", item.summarize());
+}
+
+// 여러 트레이트 바운드
+pub fn notify&lt;T: Summary + Display&gt;(item: &T) {
+    // T는 Summary와 Display 모두 구현해야 함
+}
+
+// where 절 - 복잡한 경우 더 읽기 쉬움
+fn some_function&lt;T, U&gt;(t: &T, u: &U) -> i32
+where
+    T: Display + Clone,
+    U: Clone + Debug,
+{
+    // ...
+}</pre>
+
+        <h3>트레이트를 반환하기</h3>
+        <pre>// impl Trait을 반환 타입으로 사용
+fn returns_summarizable() -> impl Summary {
+    Tweet {
+        username: String::from("rustacean"),
+        content: String::from("Rust는 훌륭해!"),
+        reply: false,
+        retweet: false,
+    }
+}
+
+// 주의: 여러 타입을 반환할 수 없음
+// fn returns_summarizable(switch: bool) -> impl Summary {
+//     if switch {
+//         NewsArticle { ... }  // 에러!
+//     } else {
+//         Tweet { ... }
+//     }
+// }</pre>
+
+        <h3>조건부 메서드 구현</h3>
+        <pre>use std::fmt::Display;
+
+struct Pair&lt;T&gt; {
+    x: T,
+    y: T,
+}
+
+impl&lt;T&gt; Pair&lt;T&gt; {
+    fn new(x: T, y: T) -> Self {
+        Self { x, y }
+    }
+}
+
+// Display를 구현한 타입에만 cmp_display 메서드 제공
+impl&lt;T: Display + PartialOrd&gt; Pair&lt;T&gt; {
+    fn cmp_display(&self) {
+        if self.x >= self.y {
+            println!("가장 큰 멤버는 x = {}", self.x);
+        } else {
+            println!("가장 큰 멤버는 y = {}", self.y);
+        }
+    }
+}</pre>
+
+        <div class="tip">
+            <strong>표준 라이브러리 트레이트</strong>
+            <ul>
+                <li><code>Clone</code>: 값을 명시적으로 복제</li>
+                <li><code>Copy</code>: 값을 암시적으로 복사 (스택 전용)</li>
+                <li><code>Debug</code>: {:?} 포맷팅</li>
+                <li><code>Display</code>: {} 포맷팅</li>
+                <li><code>PartialEq</code>, <code>Eq</code>: 동등성 비교</li>
+                <li><code>PartialOrd</code>, <code>Ord</code>: 순서 비교</li>
+                <li><code>Iterator</code>: 이터레이션 가능</li>
+            </ul>
+        </div>
+
+        <h2>6.3 스마트 포인터</h2>
+
+        <p>스마트 포인터는 포인터처럼 동작하지만 추가 메타데이터와 기능을 가진 데이터 구조입니다.</p>
+
+        <h3>Box&lt;T&gt; - 힙 할당</h3>
+        <pre>fn main() {
+    // 값을 힙에 저장
+    let b = Box::new(5);
+    println!("b = {}", b);
+
+    // 재귀 타입 정의에 필수
+    enum List {
+        Cons(i32, Box&lt;List&gt;),
+        Nil,
+    }
+
+    use List::{Cons, Nil};
+
+    let list = Cons(1,
+        Box::new(Cons(2,
+            Box::new(Cons(3,
+                Box::new(Nil))))));
+}</pre>
+
+        <h3>Rc&lt;T&gt; - 참조 카운팅</h3>
+        <p>여러 소유자가 하나의 데이터를 공유할 때 사용합니다.</p>
+
+        <pre>use std::rc::Rc;
+
+enum List {
+    Cons(i32, Rc&lt;List&gt;),
+    Nil,
+}
+
+use List::{Cons, Nil};
+
+fn main() {
+    let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));
+    println!("a 생성 후 카운트 = {}", Rc::strong_count(&a));
+
+    let b = Cons(3, Rc::clone(&a));
+    println!("b 생성 후 카운트 = {}", Rc::strong_count(&a));
+
+    {
+        let c = Cons(4, Rc::clone(&a));
+        println!("c 생성 후 카운트 = {}", Rc::strong_count(&a));
+    }
+
+    println!("c가 스코프를 벗어난 후 카운트 = {}", Rc::strong_count(&a));
+}</pre>
+
+        <h3>RefCell&lt;T&gt; - 내부 가변성</h3>
+        <p>불변 참조로도 내부 값을 변경할 수 있게 해줍니다. 런타임에 빌림 규칙을 확인합니다.</p>
+
+        <pre>use std::cell::RefCell;
+
+fn main() {
+    let data = RefCell::new(5);
+
+    // 불변 참조
+    let value = data.borrow();
+    println!("값: {}", value);
+    drop(value); // 명시적으로 해제
+
+    // 가변 참조
+    *data.borrow_mut() += 1;
+
+    println!("변경된 값: {}", data.borrow());
+}
+
+// 실제 사용 예: 목(mock) 객체
+pub trait Messenger {
+    fn send(&self, msg: &str);
+}
+
+pub struct MockMessenger {
+    sent_messages: RefCell&lt;Vec&lt;String&gt;&gt;,
+}
+
+impl MockMessenger {
+    pub fn new() -> MockMessenger {
+        MockMessenger {
+            sent_messages: RefCell::new(vec![]),
+        }
+    }
+}
+
+impl Messenger for MockMessenger {
+    fn send(&self, message: &str) {
+        // self가 불변이지만 내부 값 변경 가능!
+        self.sent_messages.borrow_mut().push(String::from(message));
+    }
+}</pre>
+
+        <h3>Rc&lt;RefCell&lt;T&gt;&gt; - 여러 소유자 + 가변성</h3>
+        <pre>use std::rc::Rc;
+use std::cell::RefCell;
+
+#[derive(Debug)]
+enum List {
+    Cons(Rc&lt;RefCell&lt;i32&gt;&gt;, Rc&lt;List&gt;),
+    Nil,
+}
+
+use List::{Cons, Nil};
+
+fn main() {
+    let value = Rc::new(RefCell::new(5));
+
+    let a = Rc::new(Cons(Rc::clone(&value), Rc::new(Nil)));
+    let b = Cons(Rc::new(RefCell::new(3)), Rc::clone(&a));
+    let c = Cons(Rc::new(RefCell::new(4)), Rc::clone(&a));
+
+    *value.borrow_mut() += 10;
+
+    println!("a = {:?}", a);
+    println!("b = {:?}", b);
+    println!("c = {:?}", c);
+}</pre>
+
+        <div class="highlight">
+            <strong>Box vs Rc vs RefCell</strong>
+            <ul style="margin-top: 10px;">
+                <li><code>Box&lt;T&gt;</code>: 단일 소유자, 힙 할당, 컴파일 타임 확인</li>
+                <li><code>Rc&lt;T&gt;</code>: 여러 소유자, 불변 데이터, 컴파일 타임 확인</li>
+                <li><code>RefCell&lt;T&gt;</code>: 단일 소유자, 가변 데이터, 런타임 확인</li>
+            </ul>
+        </div>
+
+        <h2>6.4 클로저 - 환경을 캡처하는 익명 함수</h2>
+
+        <p>클로저는 변수를 캡처할 수 있는 익명 함수입니다.</p>
+
+        <h3>기본 클로저</h3>
+        <pre>fn main() {
+    let expensive_closure = |num: u32| -> u32 {
+        println!("계산 중...");
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        num
+    };
+
+    println!("결과: {}", expensive_closure(10));
+
+    // 타입 추론
+    let add_one = |x| x + 1;
+    println!("5 + 1 = {}", add_one(5));
+}</pre>
+
+        <h3>환경 캡처</h3>
+        <pre>fn main() {
+    let x = 4;
+
+    // 불변 빌림으로 캡처
+    let equal_to_x = |z| z == x;
+
+    // let y = x; // 에러! x가 빌려진 상태
+
+    println!("equal_to_x(4) = {}", equal_to_x(4));
+
+    // 가변 빌림으로 캡처
+    let mut list = vec![1, 2, 3];
+    println!("변경 전: {:?}", list);
+
+    let mut borrows_mutably = || list.push(7);
+    borrows_mutably();
+
+    println!("변경 후: {:?}", list);
+
+    // 소유권 이동
+    let list2 = vec![1, 2, 3];
+    let takes_ownership = move || {
+        println!("클로저에서: {:?}", list2);
+    };
+
+    // println!("{:?}", list2); // 에러! list2가 이동됨
+    takes_ownership();
+}</pre>
+
+        <h3>Fn 트레이트</h3>
+        <pre>// FnOnce: 한 번만 호출 가능 (소유권 이동)
+// FnMut: 여러 번 호출 가능, 환경 변경 가능
+// Fn: 여러 번 호출 가능, 환경 변경 불가
+
+fn call_with_different_values&lt;F&gt;(f: F)
+where
+    F: Fn(i32) -> i32,
+{
+    println!("f(1) = {}", f(1));
+    println!("f(2) = {}", f(2));
+}
+
+fn main() {
+    let double = |x| x * 2;
+    call_with_different_values(double);
+}</pre>
+
+        <h2>6.5 이터레이터 - 컬렉션 순회</h2>
+
+        <p>이터레이터는 값들의 시퀀스를 처리하는 방법을 제공합니다.</p>
+
+        <h3>기본 이터레이터</h3>
+        <pre>fn main() {
+    let v1 = vec![1, 2, 3];
+
+    // iter() - 불변 참조
+    let v1_iter = v1.iter();
+    for val in v1_iter {
+        println!("값: {}", val);
+    }
+
+    // into_iter() - 소유권 이동
+    for val in v1.into_iter() {
+        println!("소유한 값: {}", val);
+    }
+    // println!("{:?}", v1); // 에러! v1이 이동됨
+
+    let mut v2 = vec![1, 2, 3];
+
+    // iter_mut() - 가변 참조
+    for val in v2.iter_mut() {
+        *val += 10;
+    }
+    println!("{:?}", v2); // [11, 12, 13]
+}</pre>
+
+        <h3>이터레이터 어댑터</h3>
+        <pre>fn main() {
+    let v = vec![1, 2, 3, 4, 5];
+
+    // map - 각 요소 변환
+    let doubled: Vec&lt;_&gt; = v.iter().map(|x| x * 2).collect();
+    println!("2배: {:?}", doubled);
+
+    // filter - 조건에 맞는 요소만
+    let evens: Vec&lt;_&gt; = v.iter().filter(|x| *x % 2 == 0).collect();
+    println!("짝수: {:?}", evens);
+
+    // 체이닝
+    let result: Vec&lt;_&gt; = v.iter()
+        .filter(|x| **x > 2)
+        .map(|x| x * 2)
+        .collect();
+    println!("2보다 크고 2배: {:?}", result);
+}</pre>
+
+        <h3>유용한 이터레이터 메서드</h3>
+        <pre>fn main() {
+    let v = vec![1, 2, 3, 4, 5];
+
+    // sum - 합계
+    let sum: i32 = v.iter().sum();
+    println!("합계: {}", sum);
+
+    // any - 하나라도 조건 만족?
+    let has_even = v.iter().any(|x| x % 2 == 0);
+    println!("짝수 있음? {}", has_even);
+
+    // all - 모두 조건 만족?
+    let all_positive = v.iter().all(|x| *x > 0);
+    println!("모두 양수? {}", all_positive);
+
+    // find - 첫 번째 매칭 요소
+    let first_even = v.iter().find(|x| *x % 2 == 0);
+    println!("첫 짝수: {:?}", first_even);
+
+    // enumerate - 인덱스와 함께
+    for (i, val) in v.iter().enumerate() {
+        println!("v[{}] = {}", i, val);
+    }
+
+    // zip - 두 이터레이터 결합
+    let names = vec!["Alice", "Bob", "Carol"];
+    let scores = vec![90, 85, 95];
+
+    for (name, score) in names.iter().zip(scores.iter()) {
+        println!("{}: {}", name, score);
+    }
+}</pre>
+
+        <h3>커스텀 이터레이터 만들기</h3>
+        <pre>struct Counter {
+    count: u32,
+}
+
+impl Counter {
+    fn new() -> Counter {
+        Counter { count: 0 }
+    }
+}
+
+impl Iterator for Counter {
+    type Item = u32;
+
+    fn next(&mut self) -> Option&lt;Self::Item&gt; {
+        if self.count < 5 {
+            self.count += 1;
+            Some(self.count)
+        } else {
+            None
+        }
+    }
+}
+
+fn main() {
+    let counter = Counter::new();
+
+    for num in counter {
+        println!("{}", num); // 1, 2, 3, 4, 5
+    }
+
+    // Iterator 트레이트의 다른 메서드 사용 가능
+    let sum: u32 = Counter::new()
+        .zip(Counter::new().skip(1))
+        .map(|(a, b)| a * b)
+        .filter(|x| x % 3 == 0)
+        .sum();
+
+    println!("합계: {}", sum);
+}</pre>
+
+        <div class="tip">
+            <strong>이터레이터 vs 루프</strong>
+            <p style="margin-top: 10px;">이터레이터는 종종 루프보다 빠릅니다! Rust 컴파일러가 이터레이터를 최적화하여 zero-cost abstraction을 실현합니다.</p>
+        </div>
+
+        <h2>6.6 WIA 고급 패턴 예제</h2>
+
+        <pre>use std::rc::Rc;
+use std::cell::RefCell;
+
+// WIA-AI-CITY 메모리 관리 시스템
+trait MemoryAllocator {
+    fn allocate(&mut self, size: usize) -> Result&lt;usize, String&gt;;
+    fn deallocate(&mut self, ptr: usize);
+}
+
+struct HBMAllocator {
+    total: usize,
+    used: usize,
+    blocks: RefCell&lt;Vec&lt;(usize, usize)&gt;&gt;, // (ptr, size)
+}
+
+impl HBMAllocator {
+    fn new(total_gb: usize) -> Self {
+        HBMAllocator {
+            total: total_gb * 1024 * 1024 * 1024,
+            used: 0,
+            blocks: RefCell::new(Vec::new()),
+        }
+    }
+
+    fn usage_percent(&self) -> f64 {
+        (self.used as f64 / self.total as f64) * 100.0
+    }
+}
+
+impl MemoryAllocator for HBMAllocator {
+    fn allocate(&mut self, size: usize) -> Result&lt;usize, String&gt; {
+        if self.used + size > self.total {
+            return Err("HBM 용량 초과".to_string());
+        }
+
+        let ptr = self.used;
+        self.used += size;
+        self.blocks.borrow_mut().push((ptr, size));
+
+        Ok(ptr)
+    }
+
+    fn deallocate(&mut self, ptr: usize) {
+        let mut blocks = self.blocks.borrow_mut();
+        if let Some(pos) = blocks.iter().position(|(p, _)| *p == ptr) {
+            let (_, size) = blocks.remove(pos);
+            self.used -= size;
+        }
+    }
+}
+
+fn main() {
+    let mut hbm = HBMAllocator::new(80); // 80GB HBM
+
+    match hbm.allocate(1024 * 1024 * 1024) {
+        Ok(ptr) => println!("할당됨: 포인터 {}, 사용률: {:.2}%",
+                           ptr, hbm.usage_percent()),
+        Err(e) => println!("할당 실패: {}", e),
+    }
+}</pre>
+
+        <h2>6.7 성능 최적화 팁</h2>
+
+        <div class="tip">
+            <strong>제로 비용 추상화 활용</strong>
+            <ul>
+                <li>이터레이터 체인: 루프보다 빠르고 읽기 쉬움</li>
+                <li>제네릭: 런타임 오버헤드 없음</li>
+                <li>트레이트 객체보다 제네릭 선호 (정적 디스패치)</li>
+                <li><code>clone()</code> 대신 참조 사용</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

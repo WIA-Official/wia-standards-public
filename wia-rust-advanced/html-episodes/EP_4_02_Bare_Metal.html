@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 4-02: Bare-metal Programming | WIA-RUST-ADVANCED</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            position: relative;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .episode-badge {
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 10px 25px;
+            border: 2px solid #F39C12;
+            background: transparent;
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: #F39C12;
+        }
+
+        .title {
+            font-size: 72px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border-radius: 15px;
+            padding: 30px;
+            font-family: 'Consolas', 'D2Coding', monospace;
+            font-size: 22px;
+            line-height: 1.6;
+            border: 2px solid #30363d;
+            width: 100%;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+
+        .code-line.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .keyword { color: #ff7b72; }
+        .function { color: #d2a8ff; }
+        .string { color: #a5d6ff; }
+        .macro { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .type { color: #ffa657; }
+        .number { color: #79c0ff; }
+
+        .concept-box {
+            background: rgba(243, 156, 18, 0.1);
+            border-left: 5px solid #F39C12;
+            padding: 40px;
+            border-radius: 0 20px 20px 0;
+            margin: 20px 0;
+        }
+
+        .concept-box h3 {
+            color: #F39C12;
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .concept-box p {
+            font-size: 28px;
+            line-height: 1.8;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            width: 100%;
+        }
+
+        .comparison-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 40px;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 0.5s;
+        }
+
+        .comparison-item.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .comparison-item h3 {
+            color: #F39C12;
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .comparison-item ul {
+            list-style: none;
+            font-size: 24px;
+        }
+
+        .comparison-item li {
+            margin: 12px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .comparison-item li:before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+            color: #F39C12;
+        }
+
+        .navigation {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(243, 156, 18, 0.8);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: #F39C12;
+            transform: scale(1.05);
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 8px;
+            background: #F39C12;
+            transition: width 0.5s;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 100px;
+            right: 60px;
+            font-size: 24px;
+            color: #888;
+        }
+
+        .subtitle {
+            font-size: 36px;
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .big-emoji {
+            font-size: 150px;
+            margin-bottom: 30px;
+        }
+
+        .channel-info {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid #FF0000;
+            border-radius: 20px;
+            padding: 30px 60px;
+            margin-top: 40px;
+            font-size: 32px;
+        }
+
+        .channel-info a {
+            color: #FF6B6B;
+            text-decoration: none;
+        }
+
+        .highlight-box {
+            background: rgba(243, 156, 18, 0.15);
+            border: 2px solid #F39C12;
+            border-radius: 20px;
+            padding: 50px;
+            margin: 30px 0;
+        }
+
+        .highlight-box h3 {
+            color: #F39C12;
+            font-size: 40px;
+            margin-bottom: 25px;
+        }
+
+        .highlight-box p {
+            font-size: 30px;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 4-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">⚙️</div>
+            <h1 class="title">Bare-metal Programming</h1>
+            <p class="subtitle">
+                <span class="ko">하드웨어를 직접 제어하기</span>
+                <span class="en" style="display:none;">Direct Hardware Control</span>
+            </p>
+            <div class="channel-info">
+                📺 YouTube: <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">
+                <span class="ko">시작하기 →</span>
+                <span class="en" style="display:none;">Start →</span>
+            </button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: Memory-mapped I/O -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 4-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">메모리 맵 I/O</span>
+            <span class="en" style="display:none;">Memory-mapped I/O</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="comment">// GPIO 레지스터 직접 접근</span></div>
+                    <div class="code-line"><span class="keyword">const</span> <span class="type">GPIO_BASE</span>: <span class="type">usize</span> = <span class="number">0x4002_0000</span>;</div>
+                    <div class="code-line"></div>
+                    <div class="code-line">#[<span class="macro">repr</span>(<span class="type">C</span>)]</div>
+                    <div class="code-line"><span class="keyword">struct</span> <span class="type">GpioRegs</span> {</div>
+                    <div class="code-line">    moder: <span class="type">u32</span>,    <span class="comment">// 모드 레지스터</span></div>
+                    <div class="code-line">    otyper: <span class="type">u32</span>,   <span class="comment">// 출력 타입</span></div>
+                    <div class="code-line">    ospeedr: <span class="type">u32</span>,  <span class="comment">// 속도</span></div>
+                    <div class="code-line">    pupdr: <span class="type">u32</span>,    <span class="comment">// 풀업/다운</span></div>
+                    <div class="code-line">    idr: <span class="type">u32</span>,      <span class="comment">// 입력 데이터</span></div>
+                    <div class="code-line">    odr: <span class="type">u32</span>,      <span class="comment">// 출력 데이터</span></div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">let</span> gpio = <span class="keyword">unsafe</span> { &*(<span class="type">GPIO_BASE</span> <span class="keyword">as</span> *<span class="keyword">const</span> <span class="type">GpioRegs</span>) };</div>
+                    <div class="code-line"><span class="keyword">unsafe</span> { gpio.odr |= <span class="number">1</span> << <span class="number">5</span>; } <span class="comment">// Pin 5 HIGH</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: Volatile Access -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 4-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Volatile 접근</span>
+            <span class="en" style="display:none;">Volatile Access</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">use</span> core::ptr::{<span class="function">read_volatile</span>, <span class="function">write_volatile</span>};</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// 컴파일러 최적화 방지</span></div>
+                    <div class="code-line"><span class="keyword">let</span> reg = <span class="number">0x4000_0000</span> <span class="keyword">as</span> *<span class="keyword">mut</span> <span class="type">u32</span>;</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">unsafe</span> {</div>
+                    <div class="code-line">    <span class="function">write_volatile</span>(reg, <span class="number">0x1234</span>);</div>
+                    <div class="code-line">    <span class="keyword">let</span> value = <span class="function">read_volatile</span>(reg);</div>
+                    <div class="code-line">}</div>
+                </div>
+                <div class="concept-box">
+                    <h3>
+                        <span class="ko">⚠️ 중요</span>
+                        <span class="en" style="display:none;">⚠️ Important</span>
+                    </h3>
+                    <p class="ko">
+                        하드웨어 레지스터는 volatile 필수!<br>
+                        일반 메모리 접근은 최적화될 수 있음<br>
+                        read/write_volatile로 보장
+                    </p>
+                    <p class="en" style="display:none;">
+                        Hardware registers require volatile!<br>
+                        Normal access can be optimized away<br>
+                        Guaranteed with read/write_volatile
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: Interrupt Handling -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 4-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">인터럽트 처리</span>
+            <span class="en" style="display:none;">Interrupt Handling</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block" style="font-size: 20px;">
+                    <div class="code-line"><span class="keyword">use</span> cortex_m_rt::<span class="macro">interrupt</span>;</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// 인터럽트 벡터 테이블</span></div>
+                    <div class="code-line">#[<span class="macro">interrupt</span>]</div>
+                    <div class="code-line"><span class="keyword">fn</span> <span class="function">TIM2</span>() {</div>
+                    <div class="code-line">    <span class="comment">// 타이머 2 인터럽트 핸들러</span></div>
+                    <div class="code-line">    <span class="keyword">unsafe</span> {</div>
+                    <div class="code-line">        <span class="comment">// 인터럽트 플래그 클리어</span></div>
+                    <div class="code-line">        (*<span class="type">TIM2</span>::<span class="function">ptr</span>()).sr.<span class="function">modify</span>(|_, w| w.<span class="function">uif</span>().<span class="function">clear_bit</span>());</div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// 인터럽트 활성화</span></div>
+                    <div class="code-line"><span class="keyword">unsafe</span> {</div>
+                    <div class="code-line">    cortex_m::peripheral::<span class="type">NVIC</span>::<span class="function">unmask</span>(<span class="type">Interrupt</span>::<span class="type">TIM2</span>);</div>
+                    <div class="code-line">}</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: Critical Sections -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 4-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">임계 영역 (Critical Section)</span>
+            <span class="en" style="display:none;">Critical Sections</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">use</span> cortex_m::<span class="macro">interrupt</span>;</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// 인터럽트 비활성화</span></div>
+                    <div class="code-line"><span class="macro">interrupt</span>::<span class="function">free</span>(|_cs| {</div>
+                    <div class="code-line">    <span class="comment">// 임계 영역: 인터럽트 없음</span></div>
+                    <div class="code-line">    <span class="keyword">unsafe</span> {</div>
+                    <div class="code-line">        <span class="type">COUNTER</span> += <span class="number">1</span>;</div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}); <span class="comment">// 인터럽트 자동 재활성화</span></div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// Mutex로 안전하게 공유</span></div>
+                    <div class="code-line"><span class="keyword">static</span> <span class="type">DATA</span>: <span class="type">Mutex</span>&lt;<span class="type">Cell</span>&lt;<span class="type">u32</span>&gt;&gt; = <span class="type">Mutex</span>::<span class="function">new</span>(<span class="type">Cell</span>::<span class="function">new</span>(<span class="number">0</span>));</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="macro">interrupt</span>::<span class="function">free</span>(|cs| {</div>
+                    <div class="code-line">    <span class="type">DATA</span>.<span class="function">borrow</span>(cs).<span class="function">set</span>(<span class="number">42</span>);</div>
+                    <div class="code-line">});</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: DMA -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 4-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">DMA (Direct Memory Access)</span>
+            <span class="en" style="display:none;">DMA (Direct Memory Access)</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block" style="font-size: 20px;">
+                    <div class="code-line"><span class="comment">// DMA로 CPU 개입 없이 데이터 전송</span></div>
+                    <div class="code-line"><span class="keyword">let</span> <span class="keyword">mut</span> buffer = [<span class="number">0u8</span>; <span class="number">128</span>];</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">let</span> transfer = dma_channel.<span class="function">read</span>(</div>
+                    <div class="code-line">    serial.rx,           <span class="comment">// 소스: UART RX</span></div>
+                    <div class="code-line">    &<span class="keyword">mut</span> buffer,         <span class="comment">// 목적지: 버퍼</span></div>
+                    <div class="code-line">);</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// DMA 완료 대기</span></div>
+                    <div class="code-line"><span class="keyword">let</span> (buffer, _channel, _serial) = transfer.<span class="function">wait</span>();</div>
+                </div>
+                <div class="concept-box">
+                    <h3>
+                        <span class="ko">⚡ 장점</span>
+                        <span class="en" style="display:none;">⚡ Benefits</span>
+                    </h3>
+                    <p class="ko">
+                        CPU 부하 감소<br>
+                        백그라운드 데이터 전송<br>
+                        효율적인 I/O 처리
+                    </p>
+                    <p class="en" style="display:none;">
+                        Reduced CPU load<br>
+                        Background data transfer<br>
+                        Efficient I/O handling
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Linker Scripts -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 4-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">링커 스크립트</span>
+            <span class="en" style="display:none;">Linker Scripts</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block" style="font-size: 20px;">
+                    <div class="code-line"><span class="comment">/* memory.x */</span></div>
+                    <div class="code-line"><span class="type">MEMORY</span></div>
+                    <div class="code-line">{</div>
+                    <div class="code-line">  <span class="type">FLASH</span> : <span class="type">ORIGIN</span> = <span class="number">0x08000000</span>, <span class="type">LENGTH</span> = <span class="number">256K</span></div>
+                    <div class="code-line">  <span class="type">RAM</span>   : <span class="type">ORIGIN</span> = <span class="number">0x20000000</span>, <span class="type">LENGTH</span> = <span class="number">64K</span></div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="type">SECTIONS</span></div>
+                    <div class="code-line">{</div>
+                    <div class="code-line">  .<span class="type">text</span> : {</div>
+                    <div class="code-line">    *(.text .<span class="type">text</span>.*)</div>
+                    <div class="code-line">  } > <span class="type">FLASH</span></div>
+                    <div class="code-line"></div>
+                    <div class="code-line">  .<span class="type">data</span> : {</div>
+                    <div class="code-line">    *(.data .<span class="type">data</span>.*)</div>
+                    <div class="code-line">  } > <span class="type">RAM</span> <span class="type">AT</span> > <span class="type">FLASH</span></div>
+                    <div class="code-line"></div>
+                    <div class="code-line">  .<span class="type">bss</span> : {</div>
+                    <div class="code-line">    *(.bss .<span class="type">bss</span>.*)</div>
+                    <div class="code-line">  } > <span class="type">RAM</span></div>
+                    <div class="code-line">}</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 4-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">⚙️✨</div>
+            <div class="highlight-box" style="max-width: 1400px;">
+                <h3>
+                    <span class="ko">핵심 요약</span>
+                    <span class="en" style="display:none;">Key Takeaways</span>
+                </h3>
+                <p class="ko">
+                    ✅ 메모리 맵 I/O로 하드웨어 제어<br>
+                    ✅ Volatile 접근으로 최적화 방지<br>
+                    ✅ 인터럽트 벡터 테이블 설정<br>
+                    ✅ Critical section으로 동기화<br>
+                    ✅ DMA로 효율적 데이터 전송<br>
+                    ✅ 링커 스크립트로 메모리 레이아웃 정의
+                </p>
+                <p class="en" style="display:none;">
+                    ✅ Control hardware with memory-mapped I/O<br>
+                    ✅ Prevent optimization with volatile access<br>
+                    ✅ Configure interrupt vector table<br>
+                    ✅ Synchronize with critical sections<br>
+                    ✅ Efficient data transfer with DMA<br>
+                    ✅ Define memory layout with linker scripts
+                </p>
+            </div>
+            <div style="margin-top: 40px; text-align: center;">
+                <p style="font-size: 36px; margin-bottom: 20px;">
+                    <span class="ko">다음 에피소드: RTOS 연동 (Embassy)</span>
+                    <span class="en" style="display:none;">Next Episode: RTOS Integration (Embassy)</span>
+                </p>
+                <p style="font-size: 28px; color: #888;">EP 4-03 →</p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a> |
+                <span class="ko">弘益人間 - 널리 인간을 이롭게 하라</span>
+                <span class="en" style="display:none;">Benefit All Humanity</span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_4_03_RTOS.html'">
+                <span class="ko">다음 에피소드 →</span>
+                <span class="en" style="display:none;">Next Episode →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') ||
+                    (lang === 'en' && btn.textContent === 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.ko').forEach(el => {
+                el.style.display = lang === 'ko' ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = lang === 'en' ? '' : 'none';
+            });
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                const lines = document.querySelectorAll(`#slide${n} .code-line`);
+                lines.forEach((line, i) => {
+                    setTimeout(() => line.classList.add('show'), i * 70);
+                });
+
+                const items = document.querySelectorAll(`#slide${n} .comparison-item`);
+                items.forEach((item, i) => {
+                    setTimeout(() => item.classList.add('show'), i * 200);
+                });
+            }, 100);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Initialize
+        animateSlide(1);
+    </script>
+</body>
+</html>

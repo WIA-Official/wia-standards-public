@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Memory Allocators & SIMD - WIA-RUST-ADVANCED</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.8;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #F39C12 0%, #E67E22 100%);
+            color: white;
+            padding: 50px 40px;
+        }
+
+        .chapter-number {
+            font-size: 1.2em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .chapter-title {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .chapter-subtitle {
+            font-size: 1.2em;
+            opacity: 0.95;
+        }
+
+        .content {
+            padding: 60px 40px;
+        }
+
+        .nav {
+            background: #f8f9fa;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #F39C12;
+        }
+
+        .nav a {
+            color: #F39C12;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .nav a:hover {
+            background: #F39C12;
+            color: white;
+        }
+
+        h2 {
+            color: #2c3e50;
+            font-size: 2em;
+            margin: 40px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #F39C12;
+        }
+
+        h3 {
+            color: #34495e;
+            font-size: 1.5em;
+            margin: 30px 0 15px 0;
+        }
+
+        p {
+            margin: 15px 0;
+            line-height: 1.8;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border-left: 5px solid #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .info {
+            background: #d1ecf1;
+            border-left: 5px solid #17a2b8;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .success {
+            background: #d4edda;
+            border-left: 5px solid #28a745;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 25px;
+            border-radius: 10px;
+            overflow-x: auto;
+            margin: 20px 0;
+            border-left: 5px solid #F39C12;
+        }
+
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.95em;
+        }
+
+        .inline-code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #e83e8c;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        ul, ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+
+        li {
+            margin: 10px 0;
+        }
+
+        .example {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 25px 0;
+        }
+
+        .example-title {
+            color: #F39C12;
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+        }
+
+        .key-concept {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 25px 0;
+        }
+
+        .key-concept h3 {
+            color: white;
+            margin-top: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background: #F39C12;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                padding: 30px 20px;
+            }
+
+            .nav {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .chapter-title {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">Chapter 6 · Levels 6-7</div>
+            <h1 class="chapter-title">🚀 Memory Allocators & SIMD</h1>
+            <div class="chapter-subtitle">Maximum Performance Through Custom Allocation and Vectorization</div>
+        </div>
+
+        <div class="content">
+            <h2>Part 1: Custom Memory Allocators</h2>
+
+            <h3>Understanding the Global Allocator API</h3>
+
+            <p>
+                Rust's global allocator allows you to replace the default memory allocator with a custom
+                implementation. This is crucial for embedded systems, real-time applications, and
+                performance-critical code.
+            </p>
+
+            <div class="info">
+                <strong>ℹ️ Why Custom Allocators?</strong>
+                <ul>
+                    <li>Reduce fragmentation</li>
+                    <li>Improve cache locality</li>
+                    <li>Deterministic allocation times</li>
+                    <li>Memory-constrained environments</li>
+                    <li>Track memory usage</li>
+                </ul>
+            </div>
+
+            <h3>Simple Bump Allocator</h3>
+
+            <div class="example">
+                <div class="example-title">📝 Example: Bump Allocator</div>
+                <pre><code>use core::alloc::{GlobalAlloc, Layout};
+use core::cell::UnsafeCell;
+use core::ptr;
+
+pub struct BumpAllocator {
+    heap: UnsafeCell<[u8; 64 * 1024]>, // 64 KB heap
+    next: UnsafeCell<usize>,
+}
+
+unsafe impl Sync for BumpAllocator {}
+
+impl BumpAllocator {
+    pub const fn new() -> Self {
+        BumpAllocator {
+            heap: UnsafeCell::new([0; 64 * 1024]),
+            next: UnsafeCell::new(0),
+        }
+    }
+
+    fn align_up(addr: usize, align: usize) -> usize {
+        (addr + align - 1) & !(align - 1)
+    }
+}
+
+unsafe impl GlobalAlloc for BumpAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let heap = &*self.heap.get();
+        let next = &mut *self.next.get();
+
+        let alloc_start = Self::align_up(*next, layout.align());
+        let alloc_end = alloc_start.saturating_add(layout.size());
+
+        if alloc_end > heap.len() {
+            ptr::null_mut()
+        } else {
+            *next = alloc_end;
+            heap.as_ptr().add(alloc_start) as *mut u8
+        }
+    }
+
+    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
+        // Bump allocator doesn't support deallocation
+    }
+}
+
+#[global_allocator]
+static ALLOCATOR: BumpAllocator = BumpAllocator::new();</code></pre>
+            </div>
+
+            <h3>Pool Allocator</h3>
+
+            <div class="example">
+                <div class="example-title">📝 Example: Fixed-Size Block Allocator</div>
+                <pre><code>use core::alloc::{GlobalAlloc, Layout};
+use core::mem;
+use core::ptr::{self, NonNull};
+
+const BLOCK_SIZES: &[usize] = &[8, 16, 32, 64, 128, 256, 512, 1024, 2048];
+
+struct ListNode {
+    next: Option<&'static mut ListNode>,
+}
+
+pub struct PoolAllocator {
+    list_heads: [Option<&'static mut ListNode>; BLOCK_SIZES.len()],
+    fallback_allocator: linked_list_allocator::Heap,
+}
+
+impl PoolAllocator {
+    pub const fn new() -> Self {
+        const EMPTY: Option<&'static mut ListNode> = None;
+        PoolAllocator {
+            list_heads: [EMPTY; BLOCK_SIZES.len()],
+            fallback_allocator: linked_list_allocator::Heap::empty(),
+        }
+    }
+
+    pub unsafe fn init(&mut self, heap_start: usize, heap_size: usize) {
+        self.fallback_allocator.init(heap_start, heap_size);
+    }
+
+    fn fallback_alloc(&mut self, layout: Layout) -> *mut u8 {
+        match self.fallback_allocator.allocate_first_fit(layout) {
+            Ok(ptr) => ptr.as_ptr(),
+            Err(_) => ptr::null_mut(),
+        }
+    }
+}
+
+fn list_index(layout: &Layout) -> Option<usize> {
+    let required_block_size = layout.size().max(layout.align());
+    BLOCK_SIZES.iter().position(|&s| s >= required_block_size)
+}
+
+unsafe impl GlobalAlloc for PoolAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let allocator = &mut *(self as *const Self as *mut Self);
+
+        match list_index(&layout) {
+            Some(index) => {
+                match allocator.list_heads[index].take() {
+                    Some(node) => {
+                        allocator.list_heads[index] = node.next.take();
+                        node as *mut ListNode as *mut u8
+                    }
+                    None => {
+                        let block_size = BLOCK_SIZES[index];
+                        let block_align = block_size;
+                        let layout = Layout::from_size_align(block_size, block_align)
+                            .unwrap();
+                        allocator.fallback_alloc(layout)
+                    }
+                }
+            }
+            None => allocator.fallback_alloc(layout),
+        }
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        let allocator = &mut *(self as *const Self as *mut Self);
+
+        match list_index(&layout) {
+            Some(index) => {
+                let new_node = ListNode {
+                    next: allocator.list_heads[index].take(),
+                };
+                let new_node_ptr = ptr as *mut ListNode;
+                new_node_ptr.write(new_node);
+                allocator.list_heads[index] = Some(&mut *new_node_ptr);
+            }
+            None => {
+                let ptr = NonNull::new(ptr).unwrap();
+                allocator.fallback_allocator.deallocate(ptr, layout);
+            }
+        }
+    }
+}</code></pre>
+            </div>
+
+            <h3>Arena Allocator</h3>
+
+            <div class="example">
+                <div class="example-title">📝 Example: Arena/Region Allocator</div>
+                <pre><code>use std::cell::Cell;
+use std::marker::PhantomData;
+use std::mem;
+use std::ptr;
+
+pub struct Arena<'a> {
+    buffer: Vec<u8>,
+    offset: Cell<usize>,
+    _phantom: PhantomData<&'a ()>,
+}
+
+impl<'a> Arena<'a> {
+    pub fn new(size: usize) -> Self {
+        Arena {
+            buffer: vec![0; size],
+            offset: Cell::new(0),
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn alloc<T>(&'a self, value: T) -> &'a mut T {
+        let offset = self.offset.get();
+        let align = mem::align_of::<T>();
+        let size = mem::size_of::<T>();
+
+        let aligned_offset = (offset + align - 1) & !(align - 1);
+        let new_offset = aligned_offset + size;
+
+        if new_offset > self.buffer.len() {
+            panic!("Arena out of memory");
+        }
+
+        self.offset.set(new_offset);
+
+        let ptr = unsafe {
+            self.buffer.as_ptr().add(aligned_offset) as *mut T
+        };
+
+        unsafe {
+            ptr.write(value);
+            &mut *ptr
+        }
+    }
+
+    pub fn alloc_slice<T: Copy>(&'a self, slice: &[T]) -> &'a mut [T] {
+        let offset = self.offset.get();
+        let align = mem::align_of::<T>();
+        let size = mem::size_of::<T>() * slice.len();
+
+        let aligned_offset = (offset + align - 1) & !(align - 1);
+        let new_offset = aligned_offset + size;
+
+        if new_offset > self.buffer.len() {
+            panic!("Arena out of memory");
+        }
+
+        self.offset.set(new_offset);
+
+        let ptr = unsafe {
+            self.buffer.as_ptr().add(aligned_offset) as *mut T
+        };
+
+        unsafe {
+            ptr::copy_nonoverlapping(slice.as_ptr(), ptr, slice.len());
+            std::slice::from_raw_parts_mut(ptr, slice.len())
+        }
+    }
+
+    pub fn reset(&self) {
+        self.offset.set(0);
+    }
+}
+
+// Usage example
+fn main() {
+    let arena = Arena::new(1024);
+
+    let x = arena.alloc(42i32);
+    let y = arena.alloc(3.14f64);
+    let arr = arena.alloc_slice(&[1, 2, 3, 4, 5]);
+
+    println!("x = {}", x);
+    println!("y = {}", y);
+    println!("arr = {:?}", arr);
+
+    // All allocations freed when arena is dropped
+}</code></pre>
+            </div>
+
+            <h2>Part 2: SIMD Programming</h2>
+
+            <h3>Introduction to SIMD</h3>
+
+            <div class="info">
+                <strong>ℹ️ What is SIMD?</strong> Single Instruction, Multiple Data allows processing
+                multiple data points with a single CPU instruction. Modern CPUs support SSE, AVX, and
+                AVX-512 instruction sets for vectorized operations.
+            </div>
+
+            <h3>Portable SIMD (std::simd)</h3>
+
+            <div class="example">
+                <div class="example-title">📝 Example: Basic SIMD Operations</div>
+                <pre><code>#![feature(portable_simd)]
+
+use std::simd::*;
+
+fn main() {
+    // Create SIMD vectors
+    let a = f32x8::from_array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]);
+    let b = f32x8::from_array([8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]);
+
+    // Vectorized addition
+    let sum = a + b;
+    println!("Sum: {:?}", sum.to_array());
+
+    // Vectorized multiplication
+    let product = a * b;
+    println!("Product: {:?}", product.to_array());
+
+    // Horizontal sum
+    let total: f32 = sum.reduce_sum();
+    println!("Total: {}", total);
+}
+
+// Vector dot product
+fn dot_product_simd(a: &[f32], b: &[f32]) -> f32 {
+    assert_eq!(a.len(), b.len());
+
+    let mut sum = f32x8::splat(0.0);
+    let chunks = a.len() / 8;
+
+    for i in 0..chunks {
+        let a_vec = f32x8::from_slice(&a[i * 8..]);
+        let b_vec = f32x8::from_slice(&b[i * 8..]);
+        sum += a_vec * b_vec;
+    }
+
+    let mut result = sum.reduce_sum();
+
+    // Handle remainder
+    for i in (chunks * 8)..a.len() {
+        result += a[i] * b[i];
+    }
+
+    result
+}</code></pre>
+            </div>
+
+            <h3>Architecture-Specific SIMD</h3>
+
+            <div class="example">
+                <div class="example-title">📝 Example: AVX2 Intrinsics</div>
+                <pre><code>#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
+
+#[target_feature(enable = "avx2")]
+unsafe fn sum_avx2(data: &[f32]) -> f32 {
+    let mut sum = _mm256_setzero_ps();
+
+    let chunks = data.len() / 8;
+    for i in 0..chunks {
+        let values = _mm256_loadu_ps(data.as_ptr().add(i * 8));
+        sum = _mm256_add_ps(sum, values);
+    }
+
+    // Horizontal sum
+    let sum128 = _mm_add_ps(
+        _mm256_extractf128_ps(sum, 0),
+        _mm256_extractf128_ps(sum, 1),
+    );
+
+    let sum64 = _mm_add_ps(sum128, _mm_movehl_ps(sum128, sum128));
+    let sum32 = _mm_add_ss(sum64, _mm_shuffle_ps(sum64, sum64, 0x55));
+
+    let mut result = _mm_cvtss_f32(sum32);
+
+    // Handle remainder
+    for i in (chunks * 8)..data.len() {
+        result += data[i];
+    }
+
+    result
+}
+
+pub fn sum_fast(data: &[f32]) -> f32 {
+    #[cfg(target_arch = "x86_64")]
+    {
+        if is_x86_feature_detected!("avx2") {
+            unsafe { sum_avx2(data) }
+        } else {
+            data.iter().sum()
+        }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        data.iter().sum()
+    }
+}</code></pre>
+            </div>
+
+            <h3>Real-World SIMD: Image Processing</h3>
+
+            <div class="example">
+                <div class="example-title">📝 Example: Grayscale Conversion</div>
+                <pre><code>#![feature(portable_simd)]
+
+use std::simd::*;
+
+// Convert RGB to grayscale using SIMD
+fn rgb_to_gray_simd(rgb: &[u8], gray: &mut [u8]) {
+    assert_eq!(rgb.len(), gray.len() * 3);
+
+    let r_weight = f32x8::splat(0.299);
+    let g_weight = f32x8::splat(0.587);
+    let b_weight = f32x8::splat(0.114);
+
+    let chunks = gray.len() / 8;
+
+    for i in 0..chunks {
+        let idx = i * 8;
+        let rgb_idx = idx * 3;
+
+        // Load RGB values
+        let mut r = [0.0f32; 8];
+        let mut g = [0.0f32; 8];
+        let mut b = [0.0f32; 8];
+
+        for j in 0..8 {
+            r[j] = rgb[rgb_idx + j * 3] as f32;
+            g[j] = rgb[rgb_idx + j * 3 + 1] as f32;
+            b[j] = rgb[rgb_idx + j * 3 + 2] as f32;
+        }
+
+        let r_vec = f32x8::from_array(r);
+        let g_vec = f32x8::from_array(g);
+        let b_vec = f32x8::from_array(b);
+
+        // Weighted sum
+        let result = r_vec * r_weight + g_vec * g_weight + b_vec * b_weight;
+
+        // Convert to u8 and store
+        for j in 0..8 {
+            gray[idx + j] = result.to_array()[j] as u8;
+        }
+    }
+
+    // Handle remainder
+    for i in (chunks * 8)..gray.len() {
+        let rgb_idx = i * 3;
+        gray[i] = (
+            rgb[rgb_idx] as f32 * 0.299 +
+            rgb[rgb_idx + 1] as f32 * 0.587 +
+            rgb[rgb_idx + 2] as f32 * 0.114
+        ) as u8;
+    }
+}
+
+// Benchmark comparison
+#[cfg(test)]
+mod bench {
+    use super::*;
+    use test::Bencher;
+
+    #[bench]
+    fn bench_simd(b: &mut Bencher) {
+        let rgb = vec![128u8; 1920 * 1080 * 3];
+        let mut gray = vec![0u8; 1920 * 1080];
+
+        b.iter(|| {
+            rgb_to_gray_simd(&rgb, &mut gray);
+        });
+    }
+}</code></pre>
+            </div>
+
+            <h3>SIMD Matrix Operations</h3>
+
+            <div class="example">
+                <div class="example-title">📝 Example: Matrix Multiplication</div>
+                <pre><code>#![feature(portable_simd)]
+
+use std::simd::*;
+
+pub struct Matrix {
+    data: Vec<f32>,
+    rows: usize,
+    cols: usize,
+}
+
+impl Matrix {
+    pub fn new(rows: usize, cols: usize) -> Self {
+        Matrix {
+            data: vec![0.0; rows * cols],
+            rows,
+            cols,
+        }
+    }
+
+    pub fn get(&self, row: usize, col: usize) -> f32 {
+        self.data[row * self.cols + col]
+    }
+
+    pub fn set(&mut self, row: usize, col: usize, value: f32) {
+        self.data[row * self.cols + col] = value;
+    }
+
+    // SIMD-accelerated matrix multiplication
+    pub fn multiply_simd(&self, other: &Matrix) -> Matrix {
+        assert_eq!(self.cols, other.rows);
+
+        let mut result = Matrix::new(self.rows, other.cols);
+
+        for i in 0..self.rows {
+            for j in 0..other.cols {
+                let mut sum = f32x8::splat(0.0);
+                let chunks = self.cols / 8;
+
+                for k in 0..chunks {
+                    let a_vec = f32x8::from_slice(
+                        &self.data[i * self.cols + k * 8..]
+                    );
+
+                    let mut b_values = [0.0f32; 8];
+                    for l in 0..8 {
+                        b_values[l] = other.get(k * 8 + l, j);
+                    }
+                    let b_vec = f32x8::from_array(b_values);
+
+                    sum += a_vec * b_vec;
+                }
+
+                let mut total = sum.reduce_sum();
+
+                // Handle remainder
+                for k in (chunks * 8)..self.cols {
+                    total += self.get(i, k) * other.get(k, j);
+                }
+
+                result.set(i, j, total);
+            }
+        }
+
+        result
+    }
+}</code></pre>
+            </div>
+
+            <h2>Performance Optimization</h2>
+
+            <div class="key-concept">
+                <h3>🔑 Optimization Strategies</h3>
+                <table>
+                    <tr>
+                        <th>Technique</th>
+                        <th>Benefit</th>
+                        <th>Use Case</th>
+                    </tr>
+                    <tr>
+                        <td>SIMD</td>
+                        <td>2-8x speedup</td>
+                        <td>Vector operations, image processing</td>
+                    </tr>
+                    <tr>
+                        <td>Custom Allocator</td>
+                        <td>Reduced fragmentation</td>
+                        <td>Games, real-time systems</td>
+                    </tr>
+                    <tr>
+                        <td>Arena Allocation</td>
+                        <td>Fast bulk deallocation</td>
+                        <td>Request handling, parsing</td>
+                    </tr>
+                    <tr>
+                        <td>Pool Allocator</td>
+                        <td>O(1) allocation</td>
+                        <td>Fixed-size objects</td>
+                    </tr>
+                    <tr>
+                        <td>Cache Alignment</td>
+                        <td>Avoid false sharing</td>
+                        <td>Multi-threaded code</td>
+                    </tr>
+                </table>
+            </div>
+
+            <h2>Best Practices</h2>
+
+            <div class="warning">
+                <strong>⚠️ Performance Guidelines:</strong>
+                <ul>
+                    <li><strong>Profile First:</strong> Measure before optimizing</li>
+                    <li><strong>Test Thoroughly:</strong> SIMD code can have edge cases</li>
+                    <li><strong>Consider Portability:</strong> Not all CPUs support all SIMD</li>
+                    <li><strong>Handle Alignment:</strong> Misaligned access can be slow</li>
+                    <li><strong>Benchmark:</strong> Verify performance improvements</li>
+                </ul>
+            </div>
+
+            <h2>Summary</h2>
+
+            <div class="success">
+                <p><strong>✅ You've learned:</strong></p>
+                <ul>
+                    <li>Implementing custom memory allocators</li>
+                    <li>Bump, pool, and arena allocation strategies</li>
+                    <li>SIMD programming with portable_simd</li>
+                    <li>Architecture-specific SIMD intrinsics</li>
+                    <li>Real-world SIMD applications</li>
+                    <li>Performance optimization techniques</li>
+                </ul>
+            </div>
+
+            <p>
+                Custom allocators and SIMD are powerful tools for achieving maximum performance in
+                Rust. By understanding memory allocation patterns and leveraging CPU vectorization,
+                you can build extremely efficient systems that rival or exceed C/C++ performance.
+            </p>
+        </div>
+
+        </div>
+</body>
+</html>

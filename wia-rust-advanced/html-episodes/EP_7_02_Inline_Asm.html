@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 7-02: Inline Assembly | WIA-RUST-ADVANCED</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { width: 1920px; height: 1080px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%); font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; color: #fff; overflow: hidden; }
+        .slide { display: none; width: 100%; height: 100%; padding: 60px; position: relative; }
+        .slide.active { display: flex; flex-direction: column; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        .episode-badge { background: linear-gradient(135deg, #F39C12, #F1C40F); padding: 12px 30px; border-radius: 30px; font-size: 24px; font-weight: bold; }
+        .lang-toggle { display: flex; gap: 10px; }
+        .lang-btn { padding: 10px 25px; border: 2px solid #F39C12; background: transparent; color: #fff; border-radius: 20px; cursor: pointer; font-size: 18px; transition: all 0.3s; }
+        .lang-btn.active { background: #F39C12; }
+        .title { font-size: 60px; font-weight: bold; text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #F39C12, #FFD700); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .content { flex: 1; display: flex; justify-content: center; align-items: center; gap: 60px; }
+        .center-content { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; }
+        .code-block { background: #0d1117; border-radius: 15px; padding: 25px; font-family: 'Consolas', 'D2Coding', monospace; font-size: 24px; line-height: 1.6; border: 2px solid #30363d; }
+        .code-line { opacity: 0; transform: translateY(10px); transition: all 0.4s; }
+        .code-line.show { opacity: 1; transform: translateY(0); }
+        .keyword { color: #ff7b72; }
+        .type { color: #79c0ff; }
+        .variable { color: #ffa657; }
+        .string { color: #a5d6ff; }
+        .number { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .function { color: #d2a8ff; }
+        .macro { color: #d2a8ff; }
+        .asm { color: #7ee787; }
+        .navigation { position: absolute; bottom: 40px; left: 0; right: 0; display: flex; justify-content: center; gap: 20px; }
+        .nav-btn { padding: 15px 40px; background: rgba(243, 156, 18, 0.8); border: none; border-radius: 30px; color: white; font-size: 20px; cursor: pointer; transition: all 0.3s; }
+        .nav-btn:hover { background: #F39C12; transform: scale(1.05); }
+        .progress-bar { position: absolute; bottom: 0; left: 0; height: 8px; background: #F39C12; transition: width 0.5s; }
+        .slide-number { position: absolute; bottom: 100px; right: 60px; font-size: 24px; color: #888; }
+        .big-emoji { font-size: 120px; margin-bottom: 30px; }
+        .subtitle { font-size: 32px; color: #aaa; text-align: center; margin-bottom: 40px; }
+        .tip-box { background: rgba(243, 156, 18, 0.1); border-left: 5px solid #F39C12; padding: 20px; border-radius: 0 15px 15px 0; font-size: 24px; margin: 20px 0; }
+        .channel-info { background: rgba(255, 0, 0, 0.1); border: 2px solid #FF0000; border-radius: 20px; padding: 20px 40px; margin-top: 30px; font-size: 28px; }
+        .channel-info a { color: #FF6B6B; text-decoration: none; }
+        .step-box { background: rgba(255,255,255,0.1); border-radius: 20px; padding: 30px; margin: 15px; text-align: center; width: 450px; opacity: 0; transform: translateY(30px); transition: all 0.5s; }
+        .step-box.show { opacity: 1; transform: translateY(0); }
+        .step-box .number { font-size: 50px; color: #F39C12; font-weight: bold; }
+        .step-box h3 { font-size: 28px; margin: 15px 0; }
+        .step-box p { font-size: 22px; color: #aaa; }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 7-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">⚙️</div>
+            <h1 class="title">Inline Assembly</h1>
+            <p class="subtitle">
+                <span class="ko">인라인 어셈블리 - 하드웨어 직접 제어</span>
+                <span class="en" style="display:none;">Inline Assembly - Direct Hardware Control</span>
+            </p>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: Why Assembly -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 7-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">왜 어셈블리?</span>
+            <span class="en" style="display:none;">Why Assembly?</span>
+        </h1>
+        <div class="content">
+            <div style="display: flex; gap: 30px;">
+                <div class="step-box" id="step1">
+                    <div class="number">🎯</div>
+                    <h3 class="ko">극한 최적화</h3>
+                    <h3 class="en" style="display:none;">Ultimate Optimization</h3>
+                    <p class="ko">CPU 명령<br>직접 제어</p>
+                    <p class="en" style="display:none;">Direct CPU<br>instruction control</p>
+                </div>
+                <div class="step-box" id="step2">
+                    <div class="number">🔧</div>
+                    <h3 class="ko">특수 명령</h3>
+                    <h3 class="en" style="display:none;">Special Instructions</h3>
+                    <p class="ko">Rust에 없는<br>CPU 기능</p>
+                    <p class="en" style="display:none;">CPU features<br>not in Rust</p>
+                </div>
+                <div class="step-box" id="step3">
+                    <div class="number">💻</div>
+                    <h3 class="ko">시스템 프로그래밍</h3>
+                    <h3 class="en" style="display:none;">Systems Programming</h3>
+                    <p class="ko">OS 커널<br>드라이버</p>
+                    <p class="en" style="display:none;">OS kernel<br>Drivers</p>
+                </div>
+            </div>
+        </div>
+        <div class="tip-box" style="max-width: 900px; margin: 30px auto;">
+            <span class="ko">⚠️ 어셈블리는 최후의 수단! 먼저 Rust 최적화를 시도하세요</span>
+            <span class="en" style="display:none;">⚠️ Assembly is the last resort! Try Rust optimization first</span>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: Basic Syntax -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 7-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">기본 문법</span>
+            <span class="en" style="display:none;">Basic Syntax</span>
+        </h1>
+        <div class="center-content">
+            <div class="code-block" style="width: 1100px;">
+                <div class="code-line"><span class="macro">#![feature(asm_sym)]</span></div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">use</span> std::arch::asm;</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">fn</span> <span class="function">simple_asm</span>() {</div>
+                <div class="code-line">    <span class="keyword">let mut</span> <span class="variable">x</span>: <span class="type">u64</span> = <span class="number">5</span>;</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="keyword">unsafe</span> {</div>
+                <div class="code-line">        asm!(</div>
+                <div class="code-line">            <span class="string">"add {0}, {1}"</span>,</div>
+                <div class="code-line">            inout(reg) <span class="variable">x</span>,</div>
+                <div class="code-line">            in(reg) <span class="number">10u64</span>,</div>
+                <div class="code-line">        );</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="macro">println!</span>(<span class="string">"Result: {}"</span>, <span class="variable">x</span>); <span class="comment">// 15</span></div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: Register Constraints -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 7-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">레지스터 제약</span>
+            <span class="en" style="display:none;">Register Constraints</span>
+        </h1>
+        <div class="center-content">
+            <div class="code-block" style="width: 1100px;">
+                <div class="code-line"><span class="keyword">unsafe</span> {</div>
+                <div class="code-line">    <span class="keyword">let</span> <span class="variable">result</span>: <span class="type">u64</span>;</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    asm!(</div>
+                <div class="code-line">        <span class="string">"mov {0}, {1}"</span>,</div>
+                <div class="code-line">        <span class="string">"add {0}, {2}"</span>,</div>
+                <div class="code-line">        out(reg) <span class="variable">result</span>,     <span class="comment">// 출력 레지스터</span></div>
+                <div class="code-line">        in(reg) <span class="number">10u64</span>,       <span class="comment">// 입력 레지스터</span></div>
+                <div class="code-line">        in(reg) <span class="number">20u64</span>,</div>
+                <div class="code-line">    );</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="macro">println!</span>(<span class="string">"Result: {}"</span>, <span class="variable">result</span>); <span class="comment">// 30</span></div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="tip-box" style="max-width: 900px; margin: 30px auto;">
+            <span class="ko">💡 in, out, inout, lateout 등의 제약을 사용합니다</span>
+            <span class="en" style="display:none;">💡 Use constraints like in, out, inout, lateout</span>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: CPUID Example -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 7-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">CPUID 예제</span>
+            <span class="en" style="display:none;">CPUID Example</span>
+        </h1>
+        <div class="center-content">
+            <div class="code-block" style="width: 1100px;">
+                <div class="code-line"><span class="keyword">fn</span> <span class="function">get_cpu_info</span>() -> (<span class="type">u32</span>, <span class="type">u32</span>, <span class="type">u32</span>, <span class="type">u32</span>) {</div>
+                <div class="code-line">    <span class="keyword">let</span> <span class="variable">eax</span>: <span class="type">u32</span>;</div>
+                <div class="code-line">    <span class="keyword">let</span> <span class="variable">ebx</span>: <span class="type">u32</span>;</div>
+                <div class="code-line">    <span class="keyword">let</span> <span class="variable">ecx</span>: <span class="type">u32</span>;</div>
+                <div class="code-line">    <span class="keyword">let</span> <span class="variable">edx</span>: <span class="type">u32</span>;</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="keyword">unsafe</span> {</div>
+                <div class="code-line">        asm!(</div>
+                <div class="code-line">            <span class="string">"cpuid"</span>,</div>
+                <div class="code-line">            inout(<span class="string">"eax"</span>) <span class="number">0u32</span> => <span class="variable">eax</span>,</div>
+                <div class="code-line">            out(<span class="string">"ebx"</span>) <span class="variable">ebx</span>,</div>
+                <div class="code-line">            out(<span class="string">"ecx"</span>) <span class="variable">ecx</span>,</div>
+                <div class="code-line">            out(<span class="string">"edx"</span>) <span class="variable">edx</span>,</div>
+                <div class="code-line">        );</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    (<span class="variable">eax</span>, <span class="variable">ebx</span>, <span class="variable">ecx</span>, <span class="variable">edx</span>)</div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: Memory Barrier -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 7-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">메모리 배리어</span>
+            <span class="en" style="display:none;">Memory Barrier</span>
+        </h1>
+        <div class="center-content">
+            <div class="code-block" style="width: 1100px;">
+                <div class="code-line"><span class="keyword">fn</span> <span class="function">memory_fence</span>() {</div>
+                <div class="code-line">    <span class="keyword">unsafe</span> {</div>
+                <div class="code-line">        asm!(</div>
+                <div class="code-line">            <span class="string">"mfence"</span>,</div>
+                <div class="code-line">            options(nostack, preserves_flags),</div>
+                <div class="code-line">        );</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">}</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">fn</span> <span class="function">compiler_fence</span>() {</div>
+                <div class="code-line">    <span class="keyword">unsafe</span> {</div>
+                <div class="code-line">        asm!(<span class="string">""</span>, options(nomem, nostack, preserves_flags));</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="tip-box" style="max-width: 900px; margin: 30px auto;">
+            <span class="ko">💡 멀티스레드 프로그래밍에서 메모리 순서를 보장합니다</span>
+            <span class="en" style="display:none;">💡 Ensures memory ordering in multithreaded programming</span>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Atomic Operations -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 7-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">원자적 연산</span>
+            <span class="en" style="display:none;">Atomic Operations</span>
+        </h1>
+        <div class="center-content">
+            <div class="code-block" style="width: 1200px;">
+                <div class="code-line"><span class="keyword">fn</span> <span class="function">atomic_increment</span>(<span class="variable">ptr</span>: <span class="type">*mut</span> <span class="type">i64</span>) -> <span class="type">i64</span> {</div>
+                <div class="code-line">    <span class="keyword">let</span> <span class="variable">result</span>: <span class="type">i64</span>;</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="keyword">unsafe</span> {</div>
+                <div class="code-line">        asm!(</div>
+                <div class="code-line">            <span class="string">"mov {tmp}, 1"</span>,</div>
+                <div class="code-line">            <span class="string">"lock xadd [{ptr}], {tmp}"</span>,</div>
+                <div class="code-line">            ptr = in(reg) <span class="variable">ptr</span>,</div>
+                <div class="code-line">            tmp = out(reg) <span class="variable">result</span>,</div>
+                <div class="code-line">        );</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="variable">result</span></div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 7-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">✅</div>
+            <h1 class="title">
+                <span class="ko">어셈블리 마스터!</span>
+                <span class="en" style="display:none;">Assembly Master!</span>
+            </h1>
+            <div style="font-size: 28px; text-align: center; margin: 30px 0; max-width: 1000px;">
+                <p class="ko">이제 인라인 어셈블리를 사용할 수 있습니다!<br>다음: CPU 최적화 기법</p>
+                <p class="en" style="display:none;">Now you can use inline assembly!<br>Next: CPU Optimization Techniques</p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_7_03_CPU_Optimize.html'">
+                <span class="ko">다음 에피소드 →</span>
+                <span class="en" style="display:none;">Next Episode →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() { if (currentSlide < totalSlides) showSlide(currentSlide + 1); }
+        function prevSlide() { if (currentSlide > 1) showSlide(currentSlide - 1); }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') || (lang === 'en' && btn.textContent === 'English')) btn.classList.add('active');
+            });
+            document.querySelectorAll('.ko').forEach(el => el.style.display = lang === 'ko' ? '' : 'none');
+            document.querySelectorAll('.en').forEach(el => el.style.display = lang === 'en' ? '' : 'none');
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                if (n === 2) {
+                    ['step1', 'step2', 'step3'].forEach((id, i) => {
+                        setTimeout(() => document.getElementById(id).classList.add('show'), i * 300);
+                    });
+                }
+                if (n === 3 || n === 4 || n === 5 || n === 6 || n === 7) {
+                    document.querySelectorAll('#slide' + n + ' .code-line').forEach((line, i) => {
+                        setTimeout(() => line.classList.add('show'), i * 100);
+                    });
+                }
+            }, 100);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        animateSlide(1);
+    </script>
+</body>
+</html>

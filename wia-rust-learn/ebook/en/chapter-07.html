@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Fearless Concurrency - WIA-RUST-LEARN</title>
+    <style>
+        :root { --rust-orange: #f97316; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; --yellow: #eab308; --red: #ef4444; --purple: #8b5cf6; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-orange); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-orange); }
+        h2 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); border-bottom: 2px solid var(--rust-orange); padding-bottom: 10px; }
+        h3 { font-size: 1.2rem; margin: 25px 0 15px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-orange); }
+        code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; font-family: monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-orange); }
+        .success-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .warning-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--yellow); }
+        .danger-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--red); }
+        table { width: 100%; margin: 20px 0; border-collapse: collapse; background: var(--bg-card); border-radius: 8px; overflow: hidden; }
+        th { background: var(--rust-orange); color: white; padding: 15px; text-align: left; }
+        td { padding: 12px 15px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+        tr:last-child td { border-bottom: none; }
+        .questions-box { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; }
+        .questions-box h3 { color: var(--blue); margin-top: 0; }
+        .questions-box ol { padding-left: 25px; }
+        .questions-box li { color: var(--text-muted); margin-bottom: 15px; }
+        .summary-box { background: linear-gradient(135deg, #1a2f1a 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--green); }
+        .summary-box h3 { color: var(--green); margin-top: 0; }
+        .summary-box ul { padding-left: 25px; }
+        .summary-box li { color: var(--text-muted); margin-bottom: 10px; }
+        .looking-ahead { background: linear-gradient(135deg, #2d1f3d 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--purple); }
+        .looking-ahead h3 { color: var(--purple); margin-top: 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 7: Fearless Concurrency</h1>
+
+        <p>Rust's ownership system enables "fearless concurrency" - the ability to write concurrent code with confidence that the compiler will catch data races before they happen. This chapter covers threads, message passing, shared state, and the traits that make it all work.</p>
+
+        <div class="highlight">
+            <strong>Why "Fearless"?</strong>
+            <p style="margin-top: 10px;">In most languages, concurrent programming is notoriously error-prone. Data races are subtle bugs that only appear under specific timing conditions, making them nearly impossible to reproduce and debug. Rust prevents data races at compile time - if your concurrent code compiles, it's free from data races. This is a game-changer for systems programming.</p>
+        </div>
+
+        <h2>7.1 Creating Threads</h2>
+
+        <p>Spawn threads using <code>thread::spawn</code>, which takes a closure that runs in the new thread:</p>
+
+        <pre>use std::thread;
+use std::time::Duration;
+
+fn main() {
+    // Spawn a new thread
+    let handle = thread::spawn(|| {
+        for i in 1..10 {
+            println!("spawned thread: {}", i);
+            thread::sleep(Duration::from_millis(1));
+        }
+    });
+
+    // Main thread continues
+    for i in 1..5 {
+        println!("main thread: {}", i);
+        thread::sleep(Duration::from_millis(1));
+    }
+
+    // Wait for spawned thread to finish
+    handle.join().unwrap();
+    println!("All threads completed!");
+}</pre>
+
+        <div class="success-box">
+            <strong>JoinHandle</strong>
+            <p style="margin-top: 10px;"><code>thread::spawn</code> returns a <code>JoinHandle</code>. Calling <code>.join()</code> on it blocks the current thread until the spawned thread completes. The return value is a <code>Result</code> - if the thread panicked, you'll get an <code>Err</code>.</p>
+        </div>
+
+        <h2>7.2 Move Closures</h2>
+
+        <p>Use the <code>move</code> keyword to transfer ownership of captured variables to the thread:</p>
+
+        <pre>use std::thread;
+
+fn main() {
+    let v = vec![1, 2, 3];
+
+    // move transfers ownership of v to the thread
+    let handle = thread::spawn(move || {
+        println!("vector: {:?}", v);
+    });
+
+    // println!("{:?}", v);  // ERROR: v was moved to the thread
+
+    handle.join().unwrap();
+}</pre>
+
+        <div class="danger-box">
+            <strong>Why Move Is Required</strong>
+            <p style="margin-top: 10px;">Rust can't know how long the spawned thread will run. If it borrowed <code>v</code>, the main thread might drop <code>v</code> before the spawned thread finishes, creating a dangling reference. <code>move</code> ensures the thread owns its data, eliminating this possibility.</p>
+        </div>
+
+        <h3>Sharing Data Between Threads</h3>
+
+        <pre>use std::thread;
+
+fn main() {
+    let numbers = vec![1, 2, 3, 4, 5];
+
+    // Clone data for each thread
+    let numbers_clone = numbers.clone();
+
+    let handle = thread::spawn(move || {
+        let sum: i32 = numbers_clone.iter().sum();
+        println!("Sum in thread: {}", sum);
+    });
+
+    println!("Original: {:?}", numbers);  // Still available
+    handle.join().unwrap();
+}</pre>
+
+        <h2>7.3 Message Passing with Channels</h2>
+
+        <p>Channels provide safe communication between threads following the motto: "Do not communicate by sharing memory; instead, share memory by communicating."</p>
+
+        <pre>use std::sync::mpsc;  // multiple producer, single consumer
+use std::thread;
+
+fn main() {
+    // Create a channel
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        let msg = String::from("hello from thread");
+        tx.send(msg).unwrap();
+        // println!("{}", msg);  // ERROR: msg was moved into channel
+    });
+
+    // Receive blocks until a message is available
+    let received = rx.recv().unwrap();
+    println!("Got: {}", received);
+}</pre>
+
+        <h3>Sending Multiple Values</h3>
+
+        <pre>use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        let messages = vec![
+            String::from("hello"),
+            String::from("from"),
+            String::from("the"),
+            String::from("thread"),
+        ];
+
+        for msg in messages {
+            tx.send(msg).unwrap();
+            thread::sleep(Duration::from_millis(200));
+        }
+    });
+
+    // Iterate over received messages
+    for received in rx {
+        println!("Got: {}", received);
+    }
+}</pre>
+
+        <h3>Multiple Producers</h3>
+
+        <pre>use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+    let tx2 = tx.clone();  // Clone the sender
+
+    thread::spawn(move || {
+        tx.send(String::from("from tx1")).unwrap();
+    });
+
+    thread::spawn(move || {
+        tx2.send(String::from("from tx2")).unwrap();
+    });
+
+    // Receive from both producers
+    for received in rx {
+        println!("Got: {}", received);
+    }
+}</pre>
+
+        <h3>Channel Methods</h3>
+
+        <table>
+            <tr>
+                <th>Method</th>
+                <th>Behavior</th>
+            </tr>
+            <tr>
+                <td><code>rx.recv()</code></td>
+                <td>Blocks until a message is received or channel closes</td>
+            </tr>
+            <tr>
+                <td><code>rx.try_recv()</code></td>
+                <td>Returns immediately with Result (non-blocking)</td>
+            </tr>
+            <tr>
+                <td><code>rx.recv_timeout(duration)</code></td>
+                <td>Blocks for specified duration, then returns error</td>
+            </tr>
+            <tr>
+                <td><code>tx.send(value)</code></td>
+                <td>Sends value, returns error if receiver dropped</td>
+            </tr>
+        </table>
+
+        <h2>7.4 Shared State with Mutex</h2>
+
+        <p><code>Mutex</code> (mutual exclusion) provides safe access to shared data - only one thread at a time can access the data:</p>
+
+        <pre>use std::sync::Mutex;
+
+fn main() {
+    let m = Mutex::new(5);
+
+    {
+        // Acquire lock - blocks until available
+        let mut num = m.lock().unwrap();
+        *num = 6;
+    }  // Lock released here when MutexGuard goes out of scope
+
+    println!("m = {:?}", m);  // Mutex { data: 6, ... }
+}</pre>
+
+        <div class="warning-box">
+            <strong>Deadlock Warning</strong>
+            <p style="margin-top: 10px;">If you acquire a lock and never release it (or try to lock it again from the same thread), your program will deadlock. The lock is automatically released when the <code>MutexGuard</code> goes out of scope, so keeping critical sections small is important.</p>
+        </div>
+
+        <h2>7.5 Arc: Thread-Safe Shared Ownership</h2>
+
+        <p><code>Arc</code> (Atomic Reference Counting) allows multiple threads to own shared data. It's the thread-safe version of <code>Rc</code>:</p>
+
+        <pre>use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    // Arc allows multiple owners across threads
+    // Mutex allows mutation by one thread at a time
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let counter = Arc::clone(&counter);  // Clone the Arc
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    // Wait for all threads
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("Result: {}", *counter.lock().unwrap());  // 10
+}</pre>
+
+        <div class="highlight">
+            <strong>Rc vs Arc</strong>
+            <ul style="padding-left: 20px; margin-top: 10px; color: var(--text-muted);">
+                <li><code>Rc&lt;T&gt;</code>: Single-threaded reference counting (faster, no atomic operations)</li>
+                <li><code>Arc&lt;T&gt;</code>: Thread-safe atomic reference counting (for multi-threaded code)</li>
+            </ul>
+            <p style="margin-top: 10px;">The compiler won't let you use <code>Rc</code> across threads - you'll get a compile error telling you to use <code>Arc</code>.</p>
+        </div>
+
+        <h2>7.6 Send and Sync Traits</h2>
+
+        <p>Two marker traits govern thread safety in Rust:</p>
+
+        <table>
+            <tr>
+                <th>Trait</th>
+                <th>Meaning</th>
+                <th>Example Types</th>
+            </tr>
+            <tr>
+                <td><code>Send</code></td>
+                <td>Type can be transferred between threads</td>
+                <td>Most types: String, Vec, i32</td>
+            </tr>
+            <tr>
+                <td><code>Sync</code></td>
+                <td>Type can be referenced from multiple threads</td>
+                <td>Immutable references, Mutex&lt;T&gt;</td>
+            </tr>
+        </table>
+
+        <pre>// Types that are NOT Send or Sync
+// Rc is NOT Send - use Arc instead
+// RefCell is NOT Sync - use Mutex instead
+// Raw pointers are neither
+
+// If all components of a type are Send, the type is Send
+// If all components of a type are Sync, the type is Sync</pre>
+
+        <div class="success-box">
+            <strong>Automatic Safety</strong>
+            <p style="margin-top: 10px;">You rarely implement these traits manually. The compiler automatically derives them based on a type's contents. If you try to send a non-<code>Send</code> type to another thread, you'll get a clear compile error explaining the issue.</p>
+        </div>
+
+        <h2>7.7 Async/Await Preview</h2>
+
+        <p>Rust also supports async programming for I/O-bound tasks. While threads are great for CPU-bound parallel work, async is more efficient for handling many concurrent I/O operations:</p>
+
+        <pre>// Requires an async runtime like tokio
+use tokio;
+
+#[tokio::main]
+async fn main() {
+    let result = fetch_data().await;
+    println!("{}", result);
+
+    // Run multiple futures concurrently
+    let (r1, r2) = tokio::join!(
+        fetch_data(),
+        fetch_data()
+    );
+}
+
+async fn fetch_data() -> String {
+    // Simulate async I/O operation
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    "data".to_string()
+}</pre>
+
+        <div class="warning-box">
+            <strong>Async vs Threads</strong>
+            <ul style="padding-left: 20px; margin-top: 10px; color: var(--text-muted);">
+                <li><strong>Threads:</strong> Best for CPU-bound parallel work; each thread has overhead</li>
+                <li><strong>Async:</strong> Best for I/O-bound concurrent work (network, files); thousands of tasks efficiently</li>
+            </ul>
+            <p style="margin-top: 10px;">Async is a large topic that deserves its own deep dive. This is just a preview of what's possible.</p>
+        </div>
+
+        <h2>7.8 Chapter Summary</h2>
+
+        <div class="summary-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>Threads:</strong> Use <code>thread::spawn</code> with <code>move</code> closures to transfer ownership to new threads</li>
+                <li><strong>Channels:</strong> Message passing with <code>mpsc</code> - multiple producers, single consumer; ownership is transferred through the channel</li>
+                <li><strong>Mutex&lt;T&gt;:</strong> Mutual exclusion for shared mutable state; lock is released when MutexGuard drops</li>
+                <li><strong>Arc&lt;T&gt;:</strong> Thread-safe shared ownership; use with Mutex for shared mutable state across threads</li>
+                <li><strong>Send/Sync:</strong> Marker traits for thread safety; automatically derived by the compiler</li>
+                <li><strong>Fearless Concurrency:</strong> Rust's ownership system prevents data races at compile time</li>
+            </ul>
+        </div>
+
+        <h2>7.9 Review Questions</h2>
+
+        <div class="questions-box">
+            <h3>Test Your Understanding</h3>
+            <ol>
+                <li>Why is the <code>move</code> keyword often required when spawning threads? What would happen without it?</li>
+                <li>What does <code>mpsc</code> stand for? How do you create multiple producers for a channel?</li>
+                <li>What happens if you try to use a Mutex without ever releasing the lock? How does Rust help prevent this?</li>
+                <li>Why do we need <code>Arc&lt;Mutex&lt;T&gt;&gt;</code> instead of just <code>Mutex&lt;T&gt;</code> for shared state across threads?</li>
+                <li>What's the difference between the <code>Send</code> and <code>Sync</code> traits? Why is <code>Rc</code> not <code>Send</code>?</li>
+                <li>When would you choose async/await over threads? What types of workloads benefit most from each approach?</li>
+            </ol>
+        </div>
+
+        <h2>7.10 Looking Ahead</h2>
+
+        <div class="looking-ahead">
+            <h3>What's Next: Chapter 8 - Building Real Projects</h3>
+            <p>Apply everything you've learned to build practical applications:</p>
+            <ul style="padding-left: 25px; color: var(--text-muted);">
+                <li>CLI tools with the clap crate for argument parsing</li>
+                <li>Web services with Axum for async HTTP servers</li>
+                <li>Testing strategies for Rust applications</li>
+                <li>WIA ecosystem integration examples</li>
+                <li>Next steps for your continued Rust journey</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

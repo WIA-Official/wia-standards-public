@@ -629,11 +629,8 @@ WIA certification available at: [cert.wiastandards.com](https://cert.wiastandard
 
 ## 11. References
 
-1. 선행 연구. *Scanning Electron Microscopy and X-ray Microanalysis*. Springer.
 2. Dass, C. (2007). *Fundamentals of Contemporary Mass Spectrometry*. Wiley.
 3. Williams, D.B. & Carter, C.B. (2009). *Transmission Electron Microscopy*. Springer.
-4. 선행 연구. Observation of Gravitational Waves. *Phys. Rev. Lett.* 116, 061102.
-5. 선행 연구. *Principles of Instrumental Analysis*. Cengage Learning.
 
 ---
 

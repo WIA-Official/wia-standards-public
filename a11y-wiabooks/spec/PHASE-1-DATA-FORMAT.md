@@ -5,258 +5,328 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-a11y-wiabooks.
+This document defines the canonical data-format layer for
+WIA-a11y-wiabooks. The standard covers persistent record
+shapes for digital book accessibility — EPUB 3 Accessibility
+conformance, alternative formats (DAISY-aligned navigable
+audio, refreshable Braille, large-print, simplified-language
+companions), reading-system capability negotiation, screen-
+reader and assistive-technology compatibility test results,
+and the per-publication accessibility statements that
+publishers issue to readers and to the regulators that
+oversee accessibility law (US ADA / Section 508, EU EAA
+2025, KR Disability Discrimination Act). The format is
+consumed by accessibility metadata aggregators, screen-reader
+vendors, refreshable-Braille device manufacturers, EPUB
+reading systems, library and education-procurement
+platforms, and the operators of the wiabooks publishing
+infrastructure.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID)
+- ISO/IEC 40500:2012 (Information technology — W3C Web
+  Content Accessibility Guidelines (WCAG) 2.0; WCAG 2.1 and
+  2.2 referenced as community-managed updates)
+- ISO/IEC 23761 (Information technology — Document
+  description and processing languages — DAISY 3
+  distribution format; the standard's WIA records
+  reference the DAISY ANSI/NISO Z39.86-2005 base spec)
+- ANSI/NISO Z39.86-2005 (Specifications for the Digital
+  Talking Book; cited as the canonical DAISY reference
+  alongside the EPUB 3 successor spec)
+- W3C EPUB 3.3 (Open Container Format, Content Documents,
+  Packages, Reading Systems) — community-managed
+- W3C EPUB Accessibility 1.1 (conformance and discoverability)
+- W3C EPUB Accessibility Techniques 1.1
+- W3C MathML 3.0 (cited normatively for accessible math
+  rendering in EPUB 3 reading systems)
+- W3C SSML 1.1 (Speech Synthesis Markup Language; cited as
+  the per-passage pronunciation override format that
+  publishers may attach for screen-reader rendering)
+- W3C PronunciationLexicon (PLS) 1.0 (per-publication
+  pronunciation lexicons for screen-reader engines)
+- W3C ARIA 1.2 / DPub-ARIA 1.1 (accessible-rich-internet-
+  applications roles for digital publications)
+- W3C SMIL 3.0 (Synchronized Multimedia Integration
+  Language; cited as the EPUB Media Overlays format that
+  binds text to audio for synchronised navigable
+  reading)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 5646 / BCP 47 (language tags)
+- ISO 15924 (script codes; relevant for Braille script
+  selection across regions)
+- ISO/IEC 27001:2022 (information security management)
+- Schema.org `Accessibility*` properties (a11yMode,
+  a11yFeature, a11yHazard, a11yAPI, a11ySummary; cited
+  as the canonical metadata vocabulary for catalogue
+  exchange)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-a11y-wiabooks
-standard. Schemas use JSON Schema 2020-12; APIs use OpenAPI 3.1.
+This PHASE defines persistent shapes for the artefacts a
+wiabooks accessibility programme manages. Implementations
+covered include:
 
-## §2 Manifest
+- EPUB 3 production toolchains that emit Accessibility-1.1-
+  conformant EPUBs.
+- DAISY-aligned navigable-audio production for blind and
+  print-disabled readers.
+- Refreshable-Braille production using the operating
+  jurisdiction's Braille code (UEB / Korean Braille / kana
+  Braille / equivalent).
+- Reading-system capability registries (Apple Books,
+  Google Play Books, Kobo, Thorium, Readium-based readers,
+  Voice Dream, Adobe Digital Editions, Calibre's reader
+  pane).
+- Assistive-technology compatibility test platforms (NVDA,
+  JAWS, VoiceOver, TalkBack, Orca, ZoomText, Dragon
+  NaturallySpeaking, Switch Access).
+- Library and education-procurement platforms that filter
+  catalogue by accessibility conformance.
 
-Implementations publish a signed manifest containing standardSlug,
-version, implementation (name + build digest + SBOM URL), profile
-(named + version), per-requirement support status, and a Sigstore
-DSSE signature. The manifest is anchored to a Sigstore Rekor entry.
+Print-format accessibility (large-print PDF rasterisation
+beyond what reflowable EPUB 3 produces) is out of scope; the
+wiabooks programme focuses on digital reading systems.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+programmeOperator    : string (institutional identifier of
+                         the publishing operator)
+programmeRegistered  : string (ISO 8601 / RFC 3339)
+publishingStreams    : array of enum ("trade-fiction" |
+                         "trade-non-fiction" |
+                         "academic-textbook" |
+                         "professional-reference" |
+                         "k-12-education" |
+                         "higher-education" |
+                         "religious-publication" |
+                         "government-publication" |
+                         "research-monograph" |
+                         "user-defined")
+jurisdictionScope    : array of string (ISO 3166-1; per
+                         jurisdiction the operator's
+                         accessibility-statement profile
+                         applies)
+accessibilityFramework : array of enum ("EPUB-Accessibility-1.1"
+                         | "WCAG-2.0-AA" | "WCAG-2.1-AA" |
+                         "WCAG-2.2-AA" | "DAISY-3" |
+                         "EAA-2025" | "ADA-Section-508" |
+                         "KR-Disability-Discrimination-Act"
+                         | "user-defined")
+programmeStatus      : enum ("draft" | "operating" |
+                         "frozen" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Publication Identifier
 
-## §4 Discovery
+```
+publication:
+  publicationId      : string (uuidv7)
+  programmeId        : string (uuidv7)
+  isbn               : string (13-digit ISBN; absent for
+                         publications below the ISBN
+                         registration threshold)
+  workTitle          : string (UTF-8)
+  primaryLanguage    : string (BCP 47 tag — e.g. "ko-KR",
+                         "en-US", "ja-JP")
+  authoredAt         : string (ISO 8601 date)
+  publicationStatus  : enum ("draft" | "in-production" |
+                         "ready-for-distribution" |
+                         "distributed" | "withdrawn")
+  primaryFormatRef   : string (URI of the primary EPUB 3
+                         distribution package)
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/a11y-wiabooks`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key.
+## §4 EPUB Accessibility Statement Record
 
-## §5 Time and Identity
+The EPUB Accessibility Statement is the publisher's per-
+publication declaration of conformance per W3C EPUB
+Accessibility 1.1 + Schema.org `Accessibility*` vocabulary.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better). Time-bound tokens (RFC 9700) are verified against the TLS
-session's exporter value (RFC 8446 §7.5).
+```
+accessibilityStatement:
+  statementId        : string (uuidv7)
+  publicationId      : string (uuidv7)
+  conformanceProfile : enum ("EPUB-A-1.1-A" |
+                         "EPUB-A-1.1-AA" |
+                         "EPUB-A-1.1-AAA" |
+                         "EPUB-A-1.1-Optimised-Discovery-only"
+                         | "non-conformant-known-limitations")
+  a11yMode           : array of string (Schema.org accessMode
+                         vocabulary: "textual", "visual",
+                         "auditory", "tactile",
+                         "chartOnVisual", "mathOnVisual",
+                         "chemOnVisual", "diagramOnVisual",
+                         "musicOnVisual", "textOnVisual")
+  a11yFeature        : array of string (Schema.org
+                         accessibilityFeature: "alternativeText",
+                         "captions", "describedMath",
+                         "displayTransformability",
+                         "longDescription", "MathML",
+                         "readingOrder", "structuralNavigation",
+                         "tableOfContents", "taggedPDF",
+                         "transcript", "ttsMarkup",
+                         "synchronizedAudioText",
+                         "highContrastDisplay",
+                         "largePrint", "braille",
+                         "audioDescription",
+                         "signLanguage")
+  a11yHazard         : array of string (Schema.org
+                         accessibilityHazard: "flashing",
+                         "noFlashingHazard", "motionSimulation",
+                         "noMotionSimulationHazard", "sound",
+                         "noSoundHazard", "unknown")
+  a11yAPI            : array of string (Schema.org
+                         accessibilityAPI: "ARIA")
+  a11ySummary        : string (UTF-8; human-readable
+                         accessibility statement; localised
+                         per primary language)
+  knownLimitations   : array of string (per-limitation
+                         description for cases where the
+                         publication does not fully meet the
+                         declared conformance profile)
+  certifiedBy        : string (operator-internal certifier
+                         identifier; for AA / AAA conformance,
+                         the operator's accessibility-
+                         certification body)
+  certifiedAt        : string (ISO 8601)
+```
 
-## §6 Versioning and Deprecation
+## §5 Alternative Format Record
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version.
-Patch releases are editorial only. Deprecation enters a 12-month
-sunset window during which the registry marks the version as
-Deprecated with a migration note.
+```
+alternativeFormat:
+  formatId           : string (uuidv7)
+  publicationId      : string (uuidv7)
+  formatKind         : enum ("epub-3-reflowable" |
+                         "epub-3-fixed-layout" |
+                         "epub-3-with-media-overlays" |
+                         "daisy-3-navigable-audio-only" |
+                         "daisy-3-full-text-and-audio" |
+                         "refreshable-braille-brf" |
+                         "refreshable-braille-pef" |
+                         "embossed-braille-pdf" |
+                         "large-print-pdf" |
+                         "simplified-language-companion" |
+                         "sign-language-video-companion")
+  artefactRef        : string (content-addressed URI of the
+                         format artefact)
+  artefactDigest     : string (SHA-256)
+  brailleCodeRef     : string (URI of the Braille code in
+                         use; e.g. "UEB-2023", "KR-Braille-
+                         Standard", "Japanese-Braille")
+  audioVoiceRef      : string (TTS / human narrator
+                         identifier for audio formats)
+  derivationToolRef  : string (URI of the derivation toolchain
+                         that produced the alternative format
+                         from the primary EPUB 3)
+```
 
-## §7 Privacy and Security
+## §6 Media Overlay Record (EPUB Synchronised Audio-Text)
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446)
-and at rest (AES-256-GCM or stronger), apply role-based access
-controls, and maintain tamper-evident audit logs (Merkle tree per
-RFC 9162-style transparency log pattern).
+EPUB 3 Media Overlays use W3C SMIL 3.0 to bind text fragments
+to audio time intervals for synchronised navigable reading.
 
-## §8 Open Governance
+```
+mediaOverlay:
+  overlayId          : string (uuidv7)
+  publicationId      : string (uuidv7)
+  smilArtefactRef    : string (content-addressed URI of the
+                         SMIL document)
+  audioArtefactRef   : string (content-addressed URI of the
+                         narration audio)
+  textFragmentMap    : object (per-fragment ID with start /
+                         end times in the audio; the SMIL
+                         document is canonical, this object
+                         is an indexable summary)
+  narrationKind      : enum ("human-narrator" | "tts-engine"
+                         | "hybrid")
+  ttsLexiconRef      : string (URI of the W3C PLS
+                         pronunciation lexicon when narration
+                         is TTS)
+  ssmlOverridesRef   : string (URI of W3C SSML 1.1
+                         per-passage pronunciation overrides
+                         where the lexicon is insufficient)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `a11y-wiabooks` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle.
+## §7 Assistive-Technology Compatibility Test Record
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+atCompatibilityTest:
+  testId             : string (uuidv7)
+  publicationId      : string (uuidv7)
+  testedAt           : string (ISO 8601)
+  assistiveTechRef   : enum ("nvda-windows" |
+                         "jaws-windows" | "voiceover-macos"
+                         | "voiceover-ios" | "talkback-android"
+                         | "orca-linux" | "zoomtext-windows"
+                         | "dragon-naturallyspeaking" |
+                         "switch-access-android" |
+                         "switch-control-ios" |
+                         "user-defined")
+  assistiveTechVersion : string
+  readingSystemRef   : enum ("apple-books" |
+                         "google-play-books" | "kobo" |
+                         "thorium" | "readium-2" |
+                         "voice-dream" |
+                         "adobe-digital-editions" |
+                         "calibre-reader" | "user-defined")
+  readingSystemVersion : string
+  testResultsArtefactRef : string (URI of the test results
+                         archive — screenshots, captured
+                         screen-reader output, navigation
+                         trace)
+  outcome            : enum ("nominal" |
+                         "partial-functionality" |
+                         "blocked-defect-found" |
+                         "incompatible")
+  defectsFiledRefs   : array of string (URIs of defect
+                         tickets filed against publisher,
+                         AT vendor, or reading-system vendor)
+```
 
+## §8 Per-Reader Reading Preference Record (Optional)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+```
+readingPreference:
+  preferenceId       : string (uuidv7)
+  publicationId      : string (uuidv7)
+  readerTokenRef     : string (opaque token for the reader;
+                         clinical reader identity in the
+                         operator's CRM, never on this API)
+  preferredFormat    : enum (matches §5 formatKind)
+  preferredFontSize  : integer (px; absent for non-visual
+                         readers)
+  preferredHighContrast : boolean
+  preferredReadingOrder : enum ("publisher-default" |
+                         "linear-reading-order" |
+                         "structural-reading-order")
+  preferredTtsVoiceRef : string (TTS voice identifier where
+                         the reader uses TTS)
+  preferredBrailleCodeRef : string (Braille code identifier
+                         where the reader uses Braille)
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## §9 Conformance
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Implementations claiming PHASE-1 conformance emit each of
+the records defined above for every published title and
+honour the EPUB Accessibility 1.1 conformance profile in §4.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+---
 
-## Annex F — Adoption Roadmap
+**Document Information:**
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
-
-## Annex J — Reference Implementation Topology
-
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
-
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-1-DATA-FORMAT validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
-
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-a11y-wiabooks
+- **Last Updated:** 2026-04-28

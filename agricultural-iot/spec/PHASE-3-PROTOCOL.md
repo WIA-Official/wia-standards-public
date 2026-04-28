@@ -5,270 +5,307 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-agricultural-iot (Agricultural Iot).
+This document defines the protocols that govern an
+agricultural-IoT operation: ISO 11783 (ISOBUS) task
+controller compliance, AgGateway ADAPT envelope discipline,
+OGC SensorThings ingest discipline, water-rights compliance,
+pesticide application compliance, livestock RFID-traceability
+discipline, animal-welfare governance, agronomic
+recordkeeping, and end-of-season disposition.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO 22000:2018 (food safety management)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 11783 series (ISOBUS)
+- ISO 11784 / 11785 (animal RFID)
+- ISO 14064-1:2018 (greenhouse gas accounting)
+- ISO 19156:2011 (Observations and Measurements)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 9457 (Problem Details)
+- AgGateway ADAPT
+- OGC SensorThings API 1.1
+- W3C SSN / SOSA
+- Codex Alimentarius CXG 65-1997 (HACCP)
+- US EPA FIFRA / Worker Protection Standard
+- EU Regulation (EC) 1107/2009 (plant protection products)
+- KR Pesticide Control Act + Positive List System
+- OIE Terrestrial Animal Health Code (cited as the
+  international animal-welfare reference; the operating
+  jurisdiction's national animal-welfare law is the
+  governing framework)
 
 ---
 
-## §1 Scope
+## §1 ISOBUS Compliance Discipline
 
-This PHASE document is one of four that together define the WIA-agricultural-iot
-standard. It addresses the protocol layer of the standard.
+ISOBUS task controllers and implements communicate per ISO
+11783 series (Parts 1, 7, 10, 11). The operator's per-OEM
+ISOBUS conformance verification covers:
 
-## §2 Manifest
+- per-implement compliance with ISO 11783-7 application-
+  layer messages;
+- per-task-controller compliance with ISO 11783-10 task
+  data interchange;
+- per-data-element coverage of ISO 11783-11 mobile data
+  element dictionary;
+- per-vehicle plug-and-play interoperability test against
+  the operator's typical implement fleet.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "agricultural-iot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Non-conformant implements are flagged in the operator's
+equipment register and not used for task data round-trip
+until the OEM resolves the conformance issue.
 
-## §3 Conformance Tiers
+## §2 AgGateway ADAPT Envelope Discipline
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+ISOBUS task data, OEM telemetry, and FMIS-side ingest flow
+through AgGateway ADAPT envelopes that wrap the ISOXML
+representation in a vendor-neutral interchange shape. The
+operator's per-vendor ADAPT plug-in mapping is recorded in
+the quality dossier; ADAPT plug-in upgrades trigger
+regression tests against the operator's historical task
+archive to confirm interpretation continuity.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 OGC SensorThings Ingest Discipline
 
-## §4 Discovery
+Sensor observations follow the OGC SensorThings API 1.1
+data model (Thing → Datastream → Observation). The
+operator's ingest pipeline:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/agricultural-iot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- per-device Datastream registration with ObservedProperty
+  + UnitOfMeasurement bound to the W3C SSN/SOSA profile;
+- per-observation FoI (Feature of Interest) reference for
+  non-fixed-location sensors (e.g. rover-mounted soil
+  sensors);
+- per-observation timestamp tolerance (devices with
+  imprecise clocks annotate observations with the
+  device-side clock skew at upload).
 
-## §5 Time and Identity
+## §4 Water-Rights Compliance
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Irrigation operations honour the operating jurisdiction's
+water-rights regime (US prior-appropriation in western
+states, riparian rights in eastern states, KR Water Use
+Permit Act, EU Water Framework Directive 2000/60/EC,
+equivalent regimes elsewhere). Per-zone irrigation plans
+(PHASE-1 §8) cite the water-rights allocation; over-
+allocation triggers `urn:wia:agricultural-iot:water-rights-
+exceeded` (PHASE-2 §9).
 
-## §6 Versioning and Deprecation
+## §5 Pesticide Application Compliance
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Spraying tasks (PHASE-1 §6 `taskKind=spraying`) honour the
+operating jurisdiction's pesticide-application rules:
 
-## §7 Privacy and Security
+- US: EPA FIFRA + Worker Protection Standard + state
+  pesticide control act;
+- EU: Regulation (EC) 1107/2009 + national implementation;
+- KR: Pesticide Control Act + Positive List System;
+- equivalent rules elsewhere.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Per-task records cite the registered product, the rate
+(per the product label), the buffer zones honoured (per
+the product label), the applicator certification reference,
+and the re-entry interval. Records flow into the operator's
+pesticide-applicator log retained per the regulator's
+retention rule (typically 2-3 years post-application).
 
-## §8 Open Governance
+## §6 Livestock RFID Traceability Discipline
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `agricultural-iot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Livestock RFID tags (PHASE-1 §7) follow ISO 11784 / 11785
+code structure and air-interface. Per-jurisdiction
+traceability requirements:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- US National Animal Identification System (where
+  applicable) + state cattle-traceability programmes;
+- EU IPAFFS / TRACES (traceability for animal movements);
+- KR Livestock Traceability Act + KAHIS reporting;
+- equivalent national rules elsewhere.
 
+Per-animal birth, movement, and slaughter events are
+recorded against the animal record and reported to the
+jurisdiction's traceability authority at the cadence the
+authority requires.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §7 Animal Welfare Governance
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Operators that handle animals follow the operating
+jurisdiction's animal-welfare law (US AWA / state animal-
+cruelty statutes; EU Council Directives on the protection
+of farmed animals; KR Animal Protection Act; equivalent
+national law). The operator's welfare programme covers:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+- per-species housing standards (space, ventilation,
+  lighting, social grouping);
+- per-species health management (preventive veterinary
+  care, vaccination, biosecurity);
+- per-species transport conditions (max journey time,
+  rest stops, loading density);
+- per-species end-of-life handling (pre-slaughter
+  stunning, on-farm euthanasia for non-marketable
+  animals).
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Welfare incidents trigger the operator's welfare-incident
+workflow with the welfare officer of record; serious
+incidents notify the jurisdiction's animal-welfare
+authority within the required notification window.
 
-## Annex F — Adoption Roadmap
+## §8 Greenhouse Climate Control Discipline
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Greenhouse climate controllers operate per the operator's
+crop-specific climate-control SOP:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+- per-crop temperature / humidity / CO2 setpoint envelope
+  per growth stage;
+- per-zone controller tuning to avoid integral-windup
+  during sensor-fault recovery;
+- per-house energy-use accounting per ISO 14064-1:2018
+  for greenhouse-gas inventory.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Climate-control deviations from the SOP envelope emit
+alerts through the streaming subscription and feed the
+operator's quality-deviation workflow.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §9 Records Retention
 
-## Annex G — Test Vectors and Conformance Evidence
+Operation records — every observation / ISOBUS task /
+animal / irrigation plan / soil classification / API audit
+log — retain per the operating jurisdiction's agricultural
+records-retention rules (typically 5 years for EU CAP
+cross-compliance, 3 years for US FSMA produce-safety, 7
+years for tax-relevant records). Pesticide application
+records and livestock traceability records retain per the
+regulator's rule (typically longer than general operation
+records).
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §10 Time Synchronisation
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Operator clocks synchronise per RFC 5905 (NTPv4) so that
+observation timestamps and ISOBUS task timing are
+consistent. Field devices with imprecise clocks annotate
+their observations with clock-skew metadata so that the
+ingest pipeline can correct or annotate accordingly.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §11 Cross-Jurisdictional Operation
 
-## Annex H — Versioning and Deprecation Policy
+Multi-jurisdiction operators (cross-border co-operatives,
+multinational farming companies) honour each jurisdiction's
+water-rights, pesticide, livestock-traceability, and
+animal-welfare rules. Per-operation governing-jurisdiction
+tagging supports downstream regulator-specific reporting.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Quality Dossier
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+The operator's quality dossier records the ISOBUS
+conformance verifications, the AgGateway ADAPT plug-in
+mappings, the OGC SensorThings profile, the water-rights
+allocations per zone, the pesticide-applicator
+certifications, the livestock-traceability binding, the
+animal-welfare officer of record, and the operator's
+incident history. The dossier is reviewed at least
+annually by the operator's quality manager.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Crop-Protection Drift and Buffer Discipline
 
-## Annex I — Interoperability Profiles
+Spraying tasks honour the operator's drift-and-buffer SOP:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- per-product buffer-zone distance per the product label
+  (typically 5-30m depending on product class and adjacent
+  receptor type — sensitive crops, water bodies, public
+  areas);
+- per-task wind-speed observation cited from the field's
+  weather station (PHASE-1 §5 `wind-speed-ms` /
+  `wind-direction-deg`); spraying halts when wind speed
+  exceeds the product label's threshold;
+- per-task drift-card placement at downwind receptor edges
+  for high-drift-risk applications;
+- per-task post-application drift assessment when drift
+  cards or visual observation suggest off-target deposition.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Drift incidents trigger the operator's notification
+workflow to the affected receptor's owner and (where the
+jurisdiction requires) to the pesticide regulator.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §14 Soil-Sampling and Laboratory Discipline
 
-## Annex J — Reference Implementation Topology
+Soil classification (PHASE-1 §9) follows the operator's
+soil-sampling SOP:
 
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
+- per-sample geographic reference per ISO 19111 with sub-
+  metre precision;
+- per-sample depth interval (0-15cm topsoil, 15-30cm
+  subsoil, deeper for tile-drainage management);
+- per-sample laboratory analysis at an ISO/IEC 17025-
+  accredited soil-testing laboratory;
+- per-sample retention of the physical sample for the
+  jurisdiction's required period (typically 12-24 months
+  post-analysis).
 
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-3-PROTOCOL validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
+## §15 Sustainability and Carbon Footprint Discipline
 
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+Operators that participate in agricultural carbon
+markets (US Climate Action Reserve, EU CAP eco-schemes,
+KR K-ETS agricultural protocol, voluntary registries
+including Verra and Gold Standard) record per-field
+practice changes (cover-cropping, reduced tillage,
+nitrogen-management changes) that drive carbon credit
+issuance. The operator's carbon-protocol binding cites
+the registry's methodology version and the per-field
+baseline year that the additionality claim depends on.
+
+Carbon-credit verification follows the registry's
+verification cadence (typically annual or biennial) by
+an accredited third-party verifier; verification reports
+are attached to the operator's quality dossier.
+
+## §16 Greenhouse and Indoor Operation Discipline
+
+Greenhouse and indoor (vertical farming) operations
+operate per the operator's controlled-environment SOP:
+
+- per-zone temperature / humidity / VPD setpoint envelope;
+- per-zone CO2 enrichment rate per crop;
+- per-zone supplemental lighting schedule (PPFD per
+  growth stage);
+- per-zone fertigation EC and pH targets;
+- per-zone IPM monitoring (pest scouting, biological
+  control agent releases).
+
+Controlled-environment data flows through the same
+observation channel (PHASE-1 §5) but with greenhouse-
+specific ObservedProperty values (CO2-ppm, PPFD-
+umol-per-m2-per-s, fertigation EC, fertigation pH, vapor
+pressure deficit kPa).
+
+## §17 Aquaculture Operation Discipline
+
+Operators that operate aquaculture (pond, marine net-pen,
+recirculating-aquaculture systems) honour the operating
+jurisdiction's aquaculture rules: water-quality monitoring
+(DO, ammonia, nitrite, pH), fish-health surveillance
+(per-species pathogen-screening cadence), feed-conversion
+recording, and (for marine net-pen) per-site environmental
+monitoring including benthic impact and sea-lice or
+parasite control.
+
+## §18 Conformance and Auditing
+
+An operation conformant with WIA-agricultural-iot publishes
+its ISOBUS conformance verifications, its water-rights
+allocations, its pesticide-application register summary,
+its livestock-traceability binding, and its animal-welfare
+incident summary, and answers an annual self-assessment
+that maps each clause of this PHASE to the operator's
+implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-agricultural-iot
+- **Last Updated:** 2026-04-28

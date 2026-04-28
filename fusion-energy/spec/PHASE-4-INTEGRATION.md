@@ -5,237 +5,342 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-fusion-energy (Fusion Energy).
+This document defines how a fusion-energy facility
+integrates with the systems that surround it: the
+operating jurisdiction's nuclear-or-radiation-safety
+regulator (US NRC, UK ONR, EU national regulators per
+Council Directive 2009/71/Euratom + 2013/59/Euratom,
+JP NRA, KR NSSC); the IAEA where the operating
+jurisdiction reports voluntary fusion-safety
+information and where IAEA additional-protocol
+arrangements apply to tritium accountancy; the
+EURATOM safeguards inspectorate where the operating
+jurisdiction is an EU Member State; the operating
+jurisdiction's radioactive-waste regulator; the host
+site's safety committee; the operating jurisdiction's
+emergency-management agency; the contracted ASME
+NQA-1 quality-assurance auditor (where ASME is
+adopted); the contracted IEC 61508 functional-safety
+assessor; the plasma-physics community partners
+(IAEA Fusion Energy Conference, the IEA Fusion
+Implementing Agreement participants, the operating
+jurisdiction's domestic plasma-physics community);
+and long-term archives.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17021-1:2015 (management-system audit and
+  certification)
+- ISO 8601 (date and time)
+- ICRP Publication 103 (recommendations on radiological
+  protection)
+- W3C Verifiable Credentials Data Model 2.0 (optional)
 
 ---
 
-## §1 Scope
+## §1 Operating-Jurisdiction Regulator Integration
 
-This PHASE document is one of four that together define the WIA-fusion-energy
-standard. It addresses the integration layer of the standard.
+The operating jurisdiction's regulator is the
+authoritative consumer of safety-case submissions,
+operating-phase advances, and reportable-event
+notifications. Integration carries the regulator's
+identifier, the per-submission cooperation workflow,
+the per-inspection on-site-cooperation workflow, the
+per-enforcement-action response workflow, and the
+regulator's response SLA.
 
-## §2 Manifest
+For US-jurisdiction facilities, integration with the
+NRC follows the NRC's risk-informed performance-based
+fusion regulatory framework. For UK-jurisdiction
+facilities, integration with ONR follows ONR's fusion-
+safety pathway. For EU-Member-State-jurisdiction
+facilities, integration with the operating Member
+State's nuclear regulator follows the Member State's
+transposition of Council Directive 2009/71/Euratom +
+2013/59/Euratom. For JP-jurisdiction facilities,
+integration with the NRA follows the NRA's adopted
+fusion guidance. For KR-jurisdiction facilities,
+integration with the NSSC follows the NSSC's adopted
+fusion guidance.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "fusion-energy"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 IAEA Integration
 
-## §3 Conformance Tiers
+The IAEA integration spans:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- voluntary fusion-safety information reporting where
+  the operating jurisdiction participates in the
+  IAEA Fusion Safety project information exchange;
+- IAEA Specific Safety Guides SSG-77 / SSG-78 /
+  SSG-79 reference adoption tracking;
+- IAEA INSAG and TECDOC consumption (the operator's
+  safety-case authoring team consumes IAEA
+  publications for community-recognised baselines);
+- IAEA safeguards integration where the operating
+  jurisdiction's additional-protocol arrangements
+  reach the facility's tritium inventory.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 EURATOM Safeguards Inspectorate Integration
 
-## §4 Discovery
+For EU-Member-State facilities the EURATOM safeguards
+inspectorate consumes tritium-accountancy submissions
+under the operating jurisdiction's safeguards regime.
+Integration carries the inspectorate's identifier,
+the per-period accountancy submission, the per-on-
+site-inspection cooperation workflow, and the per-
+period reconciliation workflow.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/fusion-energy`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Radioactive-Waste Regulator Integration
 
-## §5 Time and Identity
+The operating jurisdiction's radioactive-waste
+regulator consumes the facility's activated-component
+inventory and waste-route declarations. Integration
+carries the regulator's identifier, the per-route
+acceptance workflow, the per-shipment chain-of-
+custody envelope, and the per-cycle reconciliation
+between the facility's activated-component inventory
+and the regulator's record.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 Host-Site Safety Committee Integration
 
-## §6 Versioning and Deprecation
+The host site's safety committee (typically composed
+of senior facility staff plus independent members) is
+the internal review body for safety-case revisions,
+operating-experience feedback, and reportable-event
+post-mortems. Integration carries the committee's
+identifier, the per-meeting cooperation record, the
+per-decision recommendation register, and the
+operator's response to committee recommendations.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 Emergency-Management Agency Integration
 
-## §7 Privacy and Security
+The operating jurisdiction's emergency-management
+agency (the operating jurisdiction's civil-protection
+agency that would respond off-site to a radiation
+emergency) integrates with the facility's emergency
+plan. Integration carries the agency's identifier,
+the per-cycle exercise schedule, the per-notification
+classification map (the facility's classification
+mapped to the agency's emergency-classification
+levels), and the per-public-information protocol.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 ASME NQA-1 Quality-Assurance Auditor Integration
 
-## §8 Open Governance
+Where the operating jurisdiction adopts ASME NQA-1
+(typically US-jurisdiction facilities and some non-US
+facilities that voluntarily adopt NQA-1), the
+contracted NQA-1 auditor consumes the facility's
+quality-assurance dossier. Integration carries the
+auditor's identifier, the per-cycle audit-report
+archive, the per-finding remediation tracker, and
+the per-cycle scope statement.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `fusion-energy` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §8 IEC 61508 Functional-Safety Assessor Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+The contracted IEC 61508 functional-safety assessor
+consumes the protection-system functional-safety
+dossier and emits SIL claim assessments. Integration
+carries the assessor's identifier, the per-claim
+assessment-report archive, and the per-modification
+re-assessment workflow.
 
+## §9 Evidence Package Format
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+```
+evidence/
+  manifest.json                — package manifest (signed)
+  programme.json               — programme record
+  safety-cases/                — safety-case revisions
+                                  (current and superseded)
+  tritium-inventory/           — tritium-accountancy
+                                  history (gated to
+                                  regulator and EURATOM
+                                  / IAEA inspectorate)
+  postulated-events/           — initiating-event
+                                  register
+  safety-classified-components/
+                               — qualification records
+  operating-limits/            — operating-limit register
+  plasma-operations/           — discharge metadata (
+                                  shareable subset for
+                                  community partners)
+  reportable-events/           — reportable events with
+                                  root-cause narratives
+  decommissioning/             — decommissioning records
+  audit/                       — API audit log excerpts
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+The package is content-addressable; the manifest is
+signed by the facility's HTTP-message-signature key
+(RFC 9421) and counter-signed by the facility safety
+manager when the package supports a regulator
+submission.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §10 Manifest and Signatures
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Verification tools recompute file digests, compare to
+the manifest, and reject the package on mismatch with
+type `urn:wia:fusion-energy:evidence-mismatch`.
+Tritium-inventory bundles for regulator submission
+carry the per-period mass-balance reconciliation;
+public-shareable bundles do not.
 
-## Annex F — Adoption Roadmap
+## §11 well-known URI Discovery
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+A conformant facility exposes a discovery document at
+`/.well-known/wia-fusion-energy` that links to the API
+root, the operating jurisdiction's regulator binding,
+the IAEA voluntary-reporting binding, the EURATOM /
+domestic-safeguards binding (where applicable), and
+the host-site safety committee binding. End-public
+disclosure (e.g. emergency-preparedness public
+information) flows through the operating jurisdiction's
+emergency-management agency channels, not through the
+discovery document.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §12 Long-Term Archive Integration
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Facilities designate a long-term archive that holds
+safety-case revisions, regulator-correspondence
+history, tritium-accountancy history, reportable-event
+records, and decommissioning records beyond the
+facility's primary retention horizon. Quarterly
+deposits round-trip content-addresses; on facility
+decommissioning, remaining records transfer to the
+archive with content-addresses preserved subject to
+the operating jurisdiction's records-retention rules
+(nuclear safety records typically retain for facility
+life plus thirty years).
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §13 Verifiable-Credential Re-Issuance (optional)
 
-## Annex G — Test Vectors and Conformance Evidence
+Facilities that wish to expose attestations (regulator-
+approved safety case, ASME NQA-1 audit clearance, IEC
+61508 functional-safety assessment, ISO/IEC 17021
+quality-management-system certification) to consumers
+of W3C Verifiable Credentials MAY re-issue the
+attestations as Verifiable Credentials under the Data
+Model 2.0 specification. Re-issuance is optional; the
+canonical record remains the JSON evidence-package
+manifest.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §14 Streaming Heartbeat
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+SSE subscribers receive a heartbeat every 30 seconds
+with `Last-Event-ID` resume support. Subscribers that
+disconnect during regulator-correspondence windows or
+during plasma-campaign windows resume from the last
+seen event identifier without losing visibility of
+priority-1 events (safety case approved, reportable
+event detected, regulator notification deadline
+elapsed, tritium mass-balance reconciliation flagged).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §15 Backwards-Compatibility Guarantee
 
-## Annex H — Versioning and Deprecation Policy
+PHASE-4 minor revisions remain backwards-compatible
+with prior-minor clients. Major revisions go through
+a deprecation window of at least one full regulator-
+review cycle so that regulator, IAEA, EURATOM /
+domestic-safeguards, host-site-safety-committee, NQA-1
+auditor, and IEC 61508 assessor integrations have time
+to migrate.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §16 Cross-Standard Linkage
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Facilities that consume adjacent WIA standards (WIA-
+fuel-cell for hydrogen-handling discipline that
+intersects with the deuterium-fuel-handling
+discipline at facilities that produce or consume
+deuterium without tritium, WIA-energy-storage for the
+energy-storage overlay where the facility's pulse-
+power supply is itself a regulated energy-storage
+asset, WIA-distributed-energy for the grid-
+interconnection overlay where the facility supplies
+auxiliary power to the grid) emit cross-standard
+linkage records.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §17 Reader Tooling
 
-## Annex I — Interoperability Profiles
+Facilities MAY publish supplementary reader tools
+(per-shot plasma-parameter dashboards, per-period
+tritium-inventory mass-balance trackers, per-system
+protection-function status dashboards, per-cycle
+operating-experience catalogues) alongside the
+canonical evidence package; the tools are non-
+normative.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §18 Public Catalogue Feed
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Facilities publish a public catalogue feed listing the
+in-force safety case (public summary version where
+the operating jurisdiction publishes one), the
+operating jurisdiction's regulator binding, the
+operating-phase declaration, the aggregate
+reportable-event count, and the aggregate operating-
+hour count. The feed enables regulator and civil-
+society discovery of the facility's operating posture.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §19 IEA Fusion Implementing Agreement Integration
+
+For facilities operated by Implementing Agreement
+participants, integration carries the participant's
+identifier, the per-cycle technology-collaboration
+report submission, and the per-meeting Implementing
+Agreement working-group cooperation record.
+
+## §20 Plasma-Physics Community Partner Integration
+
+The plasma-physics community (the IAEA Fusion Energy
+Conference series, the EFTC, the operating
+jurisdiction's domestic plasma-physics conferences,
+and the operating jurisdiction's plasma-physics
+research consortia) consumes shareable plasma-
+operation datasets for independent analysis.
+Integration carries the partner's identifier, the
+per-research-purpose data-sharing agreement, the
+shareable subset of plasma-operation records (with
+tritium-cycle and safety-classified data redacted),
+and the facility's publication of partner-attribution
+in any derivative research output.
+
+## §21 Public Catalogue Aggregator Integration
+
+Civil-society researchers, energy-policy research
+organisations, and academic-research consortia consume
+aggregate operating-hour and reportable-event
+statistics for independent analysis. Integration
+carries the consumer's identifier, the per-research-
+purpose data-access agreement, and the facility's
+publication of consumer-attribution in any derivative
+research output. Per-discharge or per-component
+records are NOT shared through this channel; only
+aggregate statistics are.
+
+## §22 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated
+successfully with the operating jurisdiction's
+regulator, the operating jurisdiction's emergency-
+management agency, at least one ASME NQA-1 auditor
+(where ASME is adopted) or equivalent national-
+standard auditor, at least one IEC 61508 functional-
+safety assessor, the operating jurisdiction's
+radioactive-waste regulator (where activated-material
+disposition is in scope), and at least one long-term
+archive, and has published at least one externally
+citable evidence package.
+
+Sunsetting an integration is announced via the well-
+known discovery document at least 90 calendar days
+before removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-fusion-energy
+- **Last Updated:** 2026-04-28

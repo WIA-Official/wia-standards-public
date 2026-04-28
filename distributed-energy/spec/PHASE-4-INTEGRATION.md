@@ -5,237 +5,291 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-distributed-energy (Distributed Energy).
+This document defines how a distributed-energy
+operator integrates with the systems that surround
+the DER lifecycle: the local distribution utility
+(DSO) and its distribution-management system; the
+balancing authority and the wholesale Regional
+Transmission Organisation / Independent System
+Operator under FERC Order 2222; the utility's DERMS
+(Distributed Energy Resources Management System);
+the customer's energy-management system (EMS) and
+home-energy-management system (HEMS); the OpenADR
+VTN at the utility / curtailment-service provider;
+the OCPP CSMS at the EV-charge-network operator; the
+wholesale-market settlement infrastructure (the
+operating jurisdiction's settlement engine, the
+billing engine, the metering data-management agent);
+the cybersecurity supervisory authority (NERC + CISA
+in US, ENISA in EU, KISA / KrCERT-CC in KR); the
+external auditor and the ISO/IEC 27001 + ISO/IEC
+27019 certification body; and the long-term archive
+that preserves operating records past the active
+retention horizon.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IEEE 1547-2018 + IEEE 1547.1-2020 + IEEE 1547.9
+- IEEE 2030.5-2018 + CSIP
+- IEC 61850-7-420 + IEC 61968 + IEC 61970 CIM
+- IEC 62351 + IEC 62933-1 + IEC 62933-5-2 + IEC
+  62619
+- UL 1741-SB + UL 9540 + UL 9540A
+- SunSpec Modbus, OpenADR 2.0, OCPP 2.0.1, ISO
+  15118-2 + 15118-20
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022, ISO/IEC 27019:2024
+- ISO/IEC 17021-1:2015, ISO/IEC 17065:2012
+- ISO 8601
+- W3C Verifiable Credentials Data Model 2.0
+  (optional)
+- NERC CIP-002 to CIP-014
+- FERC Order 2222 + Order 2003-D
+- US DOE OE GMI initiatives + DOE Cybersecurity
+  Capability Maturity Model (C2M2)
+- KR 신·재생에너지법 + KEPCO 분산전원 계통연계 +
+  KR ETSC 전력시장운영규칙 + KEPIC
 
 ---
 
-## §1 Scope
+## §1 Distribution Utility (DSO) Integration
 
-This PHASE document is one of four that together define the WIA-distributed-energy
-standard. It addresses the integration layer of the standard.
+The operator's DSO integration covers:
 
-## §2 Manifest
+- The interconnection-application portal under the
+  utility's published Rule 21 (CA), MA SREC II,
+  Australian AS/NZS 4777.2, KEPCO 분산전원 계통연계
+  기준, or other jurisdictional interconnection-
+  rule equivalent.
+- The metering and telemetry feed (advanced-metering-
+  infrastructure data) under the utility's data-
+  exchange protocol (commonly IEEE 2030.5 + IEC
+  61968 message envelopes).
+- The protection-coordination dossier — the asset's
+  protection settings recorded against the utility's
+  feeder-protection scheme.
+- The curtailment-and-restoration coordination —
+  during distribution-feeder constraint events the
+  utility issues curtailment via DERMS or via the
+  IEEE 2030.5 DERControl resource.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "distributed-energy"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 DERMS Integration
 
-## §3 Conformance Tiers
+The utility's DERMS is the integration boundary for
+fleet-level operations:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- Asset registration and visibility — the DERMS
+  carries the asset register and the controller
+  binding (PHASE-1 §3 + §5).
+- Forecasting — short-term DER-output forecasts
+  feed the DSO's distribution-operating decisions.
+- Dispatch — the DERMS issues dispatch instructions
+  through IEEE 2030.5, OpenADR, or proprietary
+  channels.
+- Settlement — the DERMS reconciles dispatched
+  output against actual telemetry for wholesale-
+  market settlement.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Balancing-Authority and RTO / ISO Integration
 
-## §4 Discovery
+For DER aggregators participating in FERC-
+jurisdictional wholesale markets under FERC Order
+2222:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/distributed-energy`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- The aggregator's enrolment with the RTO / ISO
+  (CAISO, MISO, ERCOT, PJM, NYISO, ISO-NE, SPP).
+- The aggregator's compliance with the RTO / ISO's
+  Tariff DER-aggregation provisions.
+- The aggregator's bidding interface (RTO / ISO
+  bid-and-offer-submission API).
+- The aggregator's settlement reconciliation.
 
-## §5 Time and Identity
+For KR-jurisdiction the equivalent KR ETSC 전력
+시장운영규칙 + 전력거래소 (KPX) integration applies
+under KR 전기사업법 + 신·재생에너지법 등록.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Customer EMS / HEMS Integration
 
-## §6 Versioning and Deprecation
+For prosumer-class operators the customer's energy-
+management system (EMS) for commercial / industrial
+or home-energy-management system (HEMS) for
+residential is the integration boundary for the
+customer-facing experience:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+- The EMS / HEMS receives the asset's telemetry
+  (state-of-charge, output, ride-through events).
+- The EMS / HEMS exposes the customer's control
+  preferences (priority charging from solar,
+  emergency-grid-export disable, etc.).
+- The EMS / HEMS coordinates with the operator's
+  DERMS for dispatch-and-settlement.
 
-## §7 Privacy and Security
+## §5 OpenADR VTN Integration
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+For demand-response programmes the operator's VEN
+integrates with the curtailment-service provider's
+or utility's VTN:
 
-## §8 Open Governance
+- Event notification per OpenADR 2.0b.
+- Opt-in / opt-out response.
+- Performance reporting via the OpenADR report
+  profile.
+- Settlement reconciliation under the programme's
+  published baseline-and-performance methodology.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `distributed-energy` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 OCPP CSMS Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+For EV-charge network operators:
 
+- Each charging station maintains a WebSocket
+  Secure connection to the CSMS.
+- ISO 15118-2 / -20 plug-and-charge enrolment is
+  recorded in the CSMS.
+- Smart-charging profiles received via OCPP
+  SetChargingProfile constrain station output.
+- Roaming-network integration (e.g., Hubject /
+  OCPI) extends customer-facing access across
+  multi-CPO networks.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §7 Cybersecurity Supervisory Integration
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+For US bulk-electric-system operators:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+- NERC for CIP audits and self-reports.
+- CISA for incident reporting under EO 14028 and
+  CIRCIA.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+For EU operators:
 
-## Annex F — Adoption Roadmap
+- ENISA for sector-specific cybersecurity guidance.
+- NIS2 (Directive (EU) 2022/2555) for incident
+  reporting where the operator is an essential or
+  important entity in the energy sector.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+For KR operators:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+- KISA + KrCERT-CC for incident reporting under
+  정보통신망법.
+- KR FSC for OT-related supervisory oversight where
+  applicable.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §8 Settlement and Metering Data Management
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The operator integrates with:
 
-## Annex G — Test Vectors and Conformance Evidence
+- The metering data-management agent (the utility's
+  AMI head-end + MDMS) for verified metering data.
+- The wholesale-market settlement engine for FERC
+  Order 2222-aligned settlement.
+- The retail-billing engine for customer-facing
+  bill credits / charges.
+- The renewable-energy-credit (REC) registry — the
+  WREGIS / NEPOOL-GIS / M-RETS / K-RECS registry
+  that issues per-MWh tradeable credits.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §9 External Audit and ISMS Certification
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The operator's ISMS is certified against ISO/IEC
+27001:2022 with the energy-sector ISO/IEC 27019:2024
+extension applied. The certification body operates
+under ISO/IEC 17021-1; the conformity-assessment body
+for WIA-distributed-energy operates under ISO/IEC
+17065. UL 1741-SB + UL 9540 + UL 9540A
+certifications are held by the asset-supplier and
+recorded in PHASE-1 §3.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §10 Long-Term Archival Integration
 
-## Annex H — Versioning and Deprecation Policy
+Records governed by the operator's retention horizons
+(NERC CIP-013-2 retention; FERC Order 2222 settlement-
+record retention; KR 신·재생에너지법 + KEPCO
+records-retention; ISO/IEC 27001 audit-log integrity)
+are migrated to the long-term archive at the close
+of the active retention window. The archive preserves
+the asset register, the interconnection record, the
+cybersecurity posture record, the event records (with
+COMTRADE waveforms), and the audit-event trail.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 V2G and Vehicle-to-Building Integration
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+For bidirectional EV interoperability:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+- ISO 15118-20:2022 V2G messages enable bidirectional
+  power flow.
+- The vehicle-original-equipment-manufacturer's
+  battery-warranty terms are reflected in the
+  operator's V2G dispatch policy.
+- The OEM's API for state-of-charge, state-of-
+  health, and battery-management constraints feeds
+  the operator's optimisation engine.
 
-## Annex I — Interoperability Profiles
+## §12 Climate-Disclosure Integration
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+For operators subject to ESG-disclosure regimes
+the operator's GHG-inventory benefits from the
+distributed-energy fleet's net contribution: the
+operator's avoided-emissions calculation references
+the local grid's carbon-intensity factor and the
+asset's actual output, integrating with the entity's
+WIA-esg-finance disclosure record (ISSB IFRS S2 +
+ESRS E1) where the entity is a CSRD-or-ISSB-
+reporting entity.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §13 Wildfire-Risk and Public-Safety-Power-Shutoff
+        Integration
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+For operators in wildfire-risk service territories
+(California Investor-Owned Utilities, parts of
+Australia, KR 산림청 wildfire-risk areas):
+
+- Public-Safety Power Shutoff (PSPS) coordination —
+  the operator integrates with the utility's PSPS
+  programme so that islanded operation under PSPS
+  preserves the customer's critical loads where the
+  asset's storage is dimensioned for backup.
+- Vehicle-and-electrification-load shedding under
+  PSPS conditions per the operating utility's
+  published policy.
+- Black-start coordination — for utility-scale DER
+  participating in distribution-grid black-start the
+  operator maintains the grid-forming capability and
+  participates in the utility's restoration drill.
+
+## §14 Microgrid Integration
+
+For operators participating in microgrids:
+
+- The microgrid controller's grid-forming asset
+  designation.
+- The point-of-interconnection switch coordination
+  with the utility for islanding-and-resynchronisation.
+- The microgrid's per-IEEE-2030.7 (microgrid
+  controller specification) and IEEE 2030.8 (test
+  procedures) compliance.
+- The community-microgrid governance arrangement
+  where the microgrid serves multiple customers.
+
+## §15 Conformance
+
+Implementations claiming PHASE-4 conformance maintain
+the DSO and DERMS integrations, exercise the FERC
+Order 2222 (or jurisdictional equivalent)
+participation where the operator participates in
+wholesale markets, integrate with the OpenADR / OCPP
+networks where DR / EV-charging are in scope, hold
+the ISO/IEC 27001 + ISO/IEC 27019 certifications,
+exercise the cybersecurity supervisory integration on
+the operating jurisdiction's cadence, exercise the
+PSPS and microgrid integration where the territory
+or programme calls for it, and operate the long-term
+archival integration described above.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-distributed-energy
+- **Last Updated:** 2026-04-28

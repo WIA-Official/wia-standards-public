@@ -738,9 +738,7 @@ Test devices on:
 - **IEC 62368-1**: Audio/video, information and communication technology equipment - Safety requirements
 
 ### Technical References
-- 선행 연구. "Wireless Power Transfer via Strongly Coupled Magnetic Resonances". *Science*.
 - Covic, G., & Boys, J. (2013). "Inductive Power Transfer". *IEEE Transactions on Industrial Electronics*.
-- 선행 연구. "A Critical Review of Recent Progress in Mid-Range Wireless Power Transfer". *IEEE Transactions on Power Electronics*.
 
 ---
 

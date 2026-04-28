@@ -5,237 +5,449 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-gdpr-compliance (Gdpr Compliance).
+This document defines the canonical data-format layer for
+WIA-gdpr-compliance. The standard covers persistent record
+shapes for organisations subject to the EU General Data
+Protection Regulation (Regulation (EU) 2016/679 / GDPR)
+and to the equivalent UK GDPR retained-EU-law regime —
+controllers, processors, sub-processors, joint
+controllers, the data-protection officer, the records of
+processing activities (per GDPR Article 30), data subject
+requests (Articles 15 to 22), consent records (Article 7),
+international transfer mechanisms (Chapter V), data-
+breach notifications (Articles 33 and 34), data-protection
+impact assessments (Article 35), and supervisory-authority
+correspondence (Articles 51 to 59). The format is
+consumed by data-protection officers (DPO), supervisory
+authorities (the EU's national Data Protection
+Authorities and the UK Information Commissioner's
+Office), the European Data Protection Board (EDPB), the
+controller's joint controllers and processors, the
+controller's external auditors, and the data subjects
+themselves through the Article 15 right of access.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27018:2019 (PII in public clouds)
+- ISO/IEC 27701:2019 (privacy information management
+  system; the controller's PIMS aligns its records with
+  the PIMS clauses where adopted)
+- ISO/IEC 29100:2011 (privacy framework)
+- ISO/IEC 29134:2017 (privacy impact assessment)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- EU GDPR (Regulation (EU) 2016/679; cited normatively
+  for every Article that this PHASE references)
+- UK GDPR (the retained-EU-law version of GDPR plus the
+  Data Protection Act 2018; cited where the operating
+  jurisdiction is the UK)
+- EU Law Enforcement Directive (Directive (EU) 2016/680;
+  cited where the controller is a competent authority
+  for criminal-investigation purposes)
+- EU Standard Contractual Clauses (Commission Implementing
+  Decision (EU) 2021/914; cited for the international
+  transfer mechanism in Chapter V)
+- EDPB Guidelines (cited as the European Data Protection
+  Board's authoritative interpretive guidance, including
+  Guidelines on consent, on transparency, on Article 6(1)
+  legal bases, and on the international transfer toolkit)
+- W3C Verifiable Credentials Data Model 2.0 (used in
+  PHASE-4 for optional re-issuance of compliance
+  attestations)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-gdpr-compliance
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts a
+controller (or, where applicable, a joint controller or a
+processor) maintains under GDPR. Implementations covered
+include:
 
-## §2 Manifest
+- Single-establishment controllers operating from one
+  EU Member State.
+- Multi-establishment controllers with a lead supervisory
+  authority designated under the one-stop-shop mechanism
+  per Article 56.
+- Controllers established outside the EU but offering
+  goods or services to EU data subjects (Article 3(2)),
+  who must designate a representative per Article 27.
+- Joint controllers operating under an Article 26
+  arrangement.
+- Processors (Article 28) and sub-processors operating
+  under data-processing agreements with the controller.
+- UK-only controllers operating under UK GDPR with the
+  ICO as supervisory authority.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "gdpr-compliance"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+GDPR Article 9 special-category data (health, biometric,
+genetic, racial, religious, political-opinion, sexual-
+orientation, trade-union-membership) is handled with the
+record-shape extensions in §6; the additional safeguards
+required by Article 9 are encoded in PHASE-3 §4.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+controllerName       : string (legal name of the
+                       controller; the entity that
+                       determines the purposes and means
+                       of processing per GDPR Article
+                       4(7))
+controllerEstablishment : array of string (ISO 3166-1
+                       country codes of the controller's
+                       EU establishments)
+leadSupervisoryAuthority : string (the lead DPA per
+                       Article 56; absent for non-cross-
+                       border processing)
+representative       : object (Article 27 representative
+                       reference; absent if the
+                       controller is established in the
+                       EU)
+dpoReference         : string (the controller's
+                       designated DPO contact reference,
+                       per Article 37)
+processingScope      : enum ("single-establishment" |
+                       "multi-establishment-eu" |
+                       "extra-territorial-art-3-2" |
+                       "joint-controller" |
+                       "processor-only" |
+                       "uk-only-uk-gdpr" |
+                       "user-defined")
+governingFrameworks  : array of enum ("EU-GDPR" |
+                       "UK-GDPR" |
+                       "EU-Law-Enforcement-Directive" |
+                       "Member-State-Derogation" |
+                       "user-defined")
+programmeStatus      : enum ("design" | "operating" |
+                       "limited-rollout" |
+                       "wind-down" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Records of Processing Activities (Article 30)
 
-## §4 Discovery
+Article 30 obligates controllers (and processors) to
+maintain records of processing activities. The record
+shape:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/gdpr-compliance`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+processingActivity:
+  activityId         : string (uuidv7)
+  programmeId        : string (uuidv7)
+  controllerOrProcessor : enum ("controller" |
+                       "joint-controller" | "processor")
+  activityName       : string
+  purpose            : string (the purpose of the
+                       processing; specific, explicit,
+                       legitimate per Article 5(1)(b))
+  legalBasis         : enum ("art-6-1-a-consent" |
+                       "art-6-1-b-contract" |
+                       "art-6-1-c-legal-obligation" |
+                       "art-6-1-d-vital-interest" |
+                       "art-6-1-e-public-task" |
+                       "art-6-1-f-legitimate-interest")
+  specialCategoryBasis : enum ("art-9-2-a-explicit-
+                       consent" | "art-9-2-b-employment"
+                       | "art-9-2-c-vital-interest" |
+                       "art-9-2-d-not-for-profit" |
+                       "art-9-2-e-publicly-disclosed" |
+                       "art-9-2-f-legal-claim" |
+                       "art-9-2-g-substantial-public-
+                       interest" | "art-9-2-h-health-
+                       care" | "art-9-2-i-public-
+                       health" | "art-9-2-j-archiving")
+                       (absent unless special-category
+                       data is processed)
+  dataSubjectCategory : array of enum ("customer" |
+                       "employee" | "applicant" |
+                       "child-under-16" | "patient" |
+                       "research-participant" |
+                       "platform-user" | "user-defined")
+  personalDataCategory : array of string (controller's
+                       data dictionary categories
+                       cross-walked to the EDPB
+                       transparency-guidance taxonomy)
+  recipientCategory  : array of string (joint
+                       controllers, processors, third
+                       parties, public authorities;
+                       Article 30(1)(d))
+  internationalTransfer : object (Chapter V mechanism
+                       reference; absent if no transfer)
+  retentionPolicy    : string (retention horizon and
+                       criteria, Article 30(1)(f))
+  securityMeasures   : array of string (Article 32
+                       technical-and-organisational
+                       measure cross-references)
+  dpiaReference      : string (PHASE-1 §8 record
+                       reference; absent if Article
+                       35 DPIA not triggered)
+```
 
-## §5 Time and Identity
+## §4 Data Subject Request Record (Articles 15 to 22)
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+dataSubjectRequest:
+  requestId          : string (uuidv7)
+  programmeId        : string (uuidv7)
+  receivedAt         : string (ISO 8601)
+  requestKind        : enum ("art-15-access" |
+                       "art-16-rectification" |
+                       "art-17-erasure" |
+                       "art-18-restriction" |
+                       "art-19-recipient-notification" |
+                       "art-20-portability" |
+                       "art-21-objection" |
+                       "art-22-automated-decision-
+                       review")
+  dataSubjectIdentity : string (the controller's
+                       identity-verification record
+                       reference; verified per the
+                       controller's Article 12(6)
+                       discipline)
+  responseDueAt      : string (ISO 8601; the Article 12(3)
+                       one-month deadline plus any
+                       Article 12(3) two-month extension
+                       declared)
+  responseExtensionReason : string (the controller's
+                       documented reason for an Article
+                       12(3) extension; absent unless
+                       extension declared)
+  responseStatus     : enum ("pending" | "fulfilled" |
+                       "partially-fulfilled" |
+                       "refused" | "subject-withdrew")
+  responseRationale  : string (URI of the response
+                       narrative; refused responses cite
+                       the Article 12(5) or Article 23
+                       basis explicitly)
+  responseDeliveredAt : string (ISO 8601; absent until
+                       delivery)
+```
 
-## §6 Versioning and Deprecation
+## §5 Consent Record (Article 7)
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+consentRecord:
+  consentId          : string (uuidv7)
+  programmeId        : string (uuidv7)
+  dataSubjectIdentity : string (identity reference)
+  capturedAt         : string (ISO 8601)
+  consentText        : string (URI of the consent
+                       statement as presented to the
+                       data subject; the EDPB consent
+                       guidelines require freely-given,
+                       specific, informed and
+                       unambiguous statements)
+  granularPurposes   : array of object (per-purpose
+                       opt-in flags so that bundled
+                       consent — prohibited under the
+                       EDPB consent guidelines — is
+                       avoided by design)
+  parentalConsent    : boolean (true when the data
+                       subject is under the operating
+                       jurisdiction's Article 8 age
+                       threshold and parental consent
+                       was captured)
+  withdrawalAt       : string (ISO 8601; absent until
+                       withdrawn)
+  withdrawalChannel  : string (URI of the withdrawal
+                       channel — under Article 7(3) the
+                       channel must be as easy as the
+                       capture channel)
+```
 
-## §7 Privacy and Security
+## §6 Special-Category Data Annotation
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Special-category data (Article 9) records require an
+extension annotation:
 
-## §8 Open Governance
+```
+specialCategoryAnnotation:
+  recordRef          : string (the PHASE-1 §3 activity
+                       reference)
+  category           : enum ("health" | "biometric" |
+                       "genetic" | "racial-ethnic" |
+                       "religious" | "political-opinion"
+                       | "sexual-orientation" | "trade-
+                       union-membership" | "criminal-
+                       record")
+  art9Basis          : string (Article 9(2)(a) to (j)
+                       basis — duplicating PHASE-1 §3
+                       for cross-validation)
+  memberStateLawRef  : string (the operating Member
+                       State's national derogation, per
+                       Article 9(4); absent for bases
+                       that do not require national law)
+  additionalSafeguards : array of string (PHASE-3 §4
+                       safeguard cross-references)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `gdpr-compliance` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §7 International-Transfer Record (Chapter V)
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+internationalTransfer:
+  transferId         : string (uuidv7)
+  programmeId        : string (uuidv7)
+  destinationCountry : string (ISO 3166-1)
+  transferMechanism  : enum ("art-45-adequacy" |
+                       "art-46-2-c-scc-controller-to-
+                       controller" | "art-46-2-c-scc-
+                       controller-to-processor" |
+                       "art-46-2-c-scc-processor-to-
+                       processor" | "art-46-2-d-scc-
+                       processor-to-controller" |
+                       "art-46-2-b-bcr" |
+                       "art-49-derogation" |
+                       "user-defined")
+  transferImpactAssessmentRef : string (URI of the
+                       transfer-impact assessment
+                       performed against the
+                       destination country's third-
+                       country surveillance regime, per
+                       the EDPB Recommendations)
+  supplementaryMeasures : array of string (technical
+                       and organisational supplementary
+                       measures applied to the transfer
+                       per the EDPB Recommendations on
+                       supplementary measures)
+  effectiveFrom      : string (ISO 8601)
+  effectiveUntil     : string (ISO 8601; absent until
+                       superseded)
+```
 
+## §8 Data-Protection Impact Assessment Record (Article 35)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+```
+dpiaRecord:
+  dpiaId             : string (uuidv7)
+  activityRef        : string (PHASE-1 §3 activity
+                       reference)
+  triggeringFactor   : enum ("art-35-3-a-systematic-
+                       evaluation" | "art-35-3-b-
+                       large-scale-special-category" |
+                       "art-35-3-c-public-monitoring" |
+                       "supervisory-authority-list" |
+                       "controller-discretionary")
+  conductedAt        : string (ISO 8601)
+  dpoConsultedAt     : string (ISO 8601; per Article
+                       35(2))
+  residualRiskAssessment : string (URI of the residual-
+                       risk narrative)
+  priorConsultationRef : string (Article 36 prior-
+                       consultation correspondence
+                       reference; present when
+                       residual high risk persists
+                       after mitigation)
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## §9 Data-Breach Notification Record (Articles 33 and 34)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+breachNotification:
+  notificationId     : string (uuidv7)
+  programmeId        : string (uuidv7)
+  detectedAt         : string (ISO 8601)
+  awareAt            : string (ISO 8601; the Article 33
+                       72-hour clock starts from this
+                       moment)
+  saNotifiedAt       : string (ISO 8601; absent if
+                       Article 33(1) "unlikely to result
+                       in a risk" applies)
+  saNotificationDelayReason : string (the Article 33(1)
+                       reason for delay beyond 72 hours;
+                       absent unless delay declared)
+  dataSubjectNotifiedAt : string (ISO 8601; absent
+                       unless Article 34 high-risk
+                       threshold met or supervisory
+                       authority required notification)
+  affectedDataSubjectCount : integer (approximate count;
+                       Article 33(3)(a))
+  breachKind         : enum ("confidentiality-loss" |
+                       "integrity-loss" |
+                       "availability-loss")
+  containmentNarrativeRef : string (URI of the
+                       containment-and-recovery
+                       narrative)
+  remediationNarrativeRef : string (URI of the
+                       lessons-learned narrative;
+                       absent until remediation
+                       complete)
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §10 Supervisory-Authority Correspondence Record
 
-## Annex F — Adoption Roadmap
+```
+saCorrespondence:
+  correspondenceId   : string (uuidv7)
+  programmeId        : string (uuidv7)
+  saIdentity         : string (the supervisory
+                       authority's identity — lead DPA
+                       or other DPA per Article 56 / 60)
+  correspondenceKind : enum ("inquiry" | "investigation"
+                       | "complaint-relayed" | "audit"
+                       | "guidance-request" |
+                       "voluntary-notification" |
+                       "art-58-2-corrective-measure")
+  receivedAt         : string (ISO 8601)
+  responseDueAt      : string (ISO 8601)
+  responseDeliveredAt : string (ISO 8601; absent until
+                       delivery)
+  outcomeKind        : enum ("closed-no-action" |
+                       "advisory-comment" |
+                       "warning-issued" |
+                       "reprimand-issued" |
+                       "compliance-order-issued" |
+                       "ban-on-processing-issued" |
+                       "fine-imposed" |
+                       "open-pending")
+  outcomeReferenceRef : string (URI of the supervisory
+                       authority's decision document)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §11 Joint-Controller and Processor Record (Articles 26 and 28)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+controllerArrangement:
+  arrangementId      : string (uuidv7)
+  programmeId        : string (uuidv7)
+  arrangementKind    : enum ("art-26-joint-controller"
+                       | "art-28-processor-dpa" |
+                       "art-28-sub-processor-dpa")
+  counterpartyRef    : string (counterparty legal
+                       identifier)
+  contractRef        : string (URI of the executed
+                       contract / DPA)
+  effectiveFrom      : string (ISO 8601)
+  effectiveUntil     : string (ISO 8601; absent until
+                       superseded)
+  responsibilityMatrixRef : string (URI of the Article
+                       26(1) "essence" published to
+                       data subjects; absent for
+                       processor DPAs)
+  auditFrequency     : enum ("annual" | "biennial" |
+                       "ad-hoc-on-request" |
+                       "user-defined")
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §12 Conformance
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Implementations claiming PHASE-1 conformance emit each of
+the records defined above for every operating programme,
+maintain the Article 30 records of processing activities,
+honour the Article 12(3) deadlines for data subject
+requests, observe the Article 33 72-hour breach clock,
+and preserve correspondence with the lead supervisory
+authority for the operating retention horizon.
 
-## Annex G — Test Vectors and Conformance Evidence
+---
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+**Document Information:**
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-gdpr-compliance
+- **Last Updated:** 2026-04-28

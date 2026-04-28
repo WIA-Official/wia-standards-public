@@ -591,9 +591,7 @@ Standard error codes:
 
 ### 10.1 Scientific Papers
 
-1. 선행 연구. "Radar Cross Section" (2nd ed.)
 2. Lynch, D. (2004). "Introduction to RF Stealth"
-3. 선행 연구. "Infrared Signature Studies of Aerospace Vehicles"
 4. Rao, G.A. (2010). "Electromagnetic Wave Propagation Through Absorbing Media"
 
 ### 10.2 Physical Constants

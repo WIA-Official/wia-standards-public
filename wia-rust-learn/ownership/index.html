@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-RUST-LEARN | Ownership Visualizer</title>
+    <style>
+        :root {
+            --rust-orange: #f74c00;
+            --rust-dark: #1a1a2e;
+            --rust-light: #16213e;
+            --accent: #0f3460;
+            --text: #e6e6e6;
+            --success: #00d26a;
+            --warning: #ffc107;
+            --error: #ff4757;
+            --stack-color: #3498db;
+            --heap-color: #9b59b6;
+            --ref-color: #2ecc71;
+            --mut-color: #e74c3c;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--rust-dark) 0%, var(--rust-light) 100%);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 1.5rem 0;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--rust-orange);
+            margin-bottom: 0.25rem;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.8;
+        }
+
+        nav {
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            flex-wrap: wrap;
+        }
+
+        nav a {
+            color: var(--text);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        nav a:hover {
+            background: var(--rust-orange);
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .panel {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: var(--accent);
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-header h3 {
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .panel-body {
+            padding: 1rem;
+        }
+
+        /* Code Editor */
+        .code-editor {
+            font-family: 'Fira Code', 'Monaco', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            background: #1e1e1e;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            position: relative;
+            min-height: 300px;
+        }
+
+        .code-line {
+            display: flex;
+            align-items: flex-start;
+            padding: 2px 0;
+            transition: background 0.3s;
+        }
+
+        .code-line.active {
+            background: rgba(247, 76, 0, 0.2);
+            border-left: 3px solid var(--rust-orange);
+            margin-left: -1rem;
+            padding-left: calc(1rem - 3px);
+        }
+
+        .code-line.error {
+            background: rgba(255, 71, 87, 0.2);
+            border-left: 3px solid var(--error);
+        }
+
+        .line-num {
+            color: #666;
+            width: 30px;
+            text-align: right;
+            margin-right: 1rem;
+            user-select: none;
+        }
+
+        .code-content {
+            flex: 1;
+        }
+
+        .keyword { color: #c586c0; }
+        .type { color: #4ec9b0; }
+        .string { color: #ce9178; }
+        .comment { color: #6a9955; }
+        .function { color: #dcdcaa; }
+        .variable { color: #9cdcfe; }
+        .number { color: #b5cea8; }
+        .macro { color: #569cd6; }
+
+        /* Memory Visualization */
+        .memory-container {
+            display: flex;
+            gap: 2rem;
+            min-height: 350px;
+        }
+
+        .memory-section {
+            flex: 1;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .memory-title {
+            text-align: center;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+
+        .stack-section .memory-title {
+            background: var(--stack-color);
+        }
+
+        .heap-section .memory-title {
+            background: var(--heap-color);
+        }
+
+        .memory-slots {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .memory-slot {
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+            padding: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .memory-slot.active {
+            border: 2px solid var(--rust-orange);
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        .memory-slot.moving {
+            animation: moveOut 0.5s ease-out forwards;
+        }
+
+        .memory-slot.dropped {
+            animation: fadeOut 0.5s ease-out forwards;
+            background: rgba(255, 71, 87, 0.3);
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(247, 76, 0, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(247, 76, 0, 0); }
+        }
+
+        @keyframes moveOut {
+            0% { transform: translateX(0); opacity: 1; }
+            100% { transform: translateX(50px); opacity: 0; }
+        }
+
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; height: 0; padding: 0; margin: 0; }
+        }
+
+        .slot-name {
+            font-weight: bold;
+            min-width: 80px;
+            color: var(--rust-orange);
+        }
+
+        .slot-value {
+            flex: 1;
+            font-family: monospace;
+            background: rgba(0,0,0,0.3);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .slot-type {
+            font-size: 0.75rem;
+            color: var(--type);
+        }
+
+        .slot-owner {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            background: var(--success);
+            color: white;
+        }
+
+        .slot-borrowed {
+            background: var(--ref-color);
+        }
+
+        .slot-mut-borrowed {
+            background: var(--mut-color);
+        }
+
+        /* Reference Arrow */
+        .reference-arrow {
+            position: absolute;
+            right: -30px;
+            top: 50%;
+            width: 25px;
+            height: 2px;
+            background: var(--ref-color);
+        }
+
+        .reference-arrow::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: -4px;
+            border: 5px solid transparent;
+            border-left-color: var(--ref-color);
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--rust-orange);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: var(--text);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Example Selector */
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+        }
+
+        .example-card {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .example-card:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: var(--rust-orange);
+        }
+
+        .example-card.active {
+            background: rgba(247, 76, 0, 0.2);
+            border-color: var(--rust-orange);
+        }
+
+        .example-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .example-title {
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .example-desc {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 0.25rem;
+        }
+
+        /* Explanation Panel */
+        .explanation {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .explanation h4 {
+            color: var(--rust-orange);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .explanation p {
+            line-height: 1.8;
+            margin-bottom: 1rem;
+        }
+
+        .explanation .highlight {
+            background: rgba(247, 76, 0, 0.2);
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .rules-box {
+            background: rgba(0,0,0,0.3);
+            border-left: 4px solid var(--rust-orange);
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .rules-box h5 {
+            margin-bottom: 0.5rem;
+        }
+
+        .rules-box ul {
+            margin-left: 1.5rem;
+        }
+
+        .rules-box li {
+            margin-bottom: 0.25rem;
+        }
+
+        /* Step indicator */
+        .step-indicator {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .step-badge {
+            background: var(--rust-orange);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .step-progress {
+            flex: 1;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .step-fill {
+            height: 100%;
+            background: var(--rust-orange);
+            transition: width 0.3s;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem 0;
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 900px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .memory-container {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">WIA-RUST-LEARN</div>
+            <div class="subtitle">Interactive Ownership Visualizer</div>
+        </header>
+
+        <nav>
+            <a href="../">Home</a>
+            <a href="../curriculum/">Curriculum</a>
+            <a href="../videos/">Videos</a>
+            <a href="../playground/">Playground</a>
+            <a href="../ebook/">Ebook</a>
+            <a href="../certification/">Certification</a>
+        </nav>
+
+        <div class="examples-grid">
+            <div class="example-card active" data-example="move" onclick="loadExample('move')">
+                <div class="example-icon"></div>
+                <div class="example-title">Move Semantics</div>
+                <div class="example-desc">소유권 이동</div>
+            </div>
+            <div class="example-card" data-example="copy" onclick="loadExample('copy')">
+                <div class="example-icon"></div>
+                <div class="example-title">Copy Trait</div>
+                <div class="example-desc">값 복사</div>
+            </div>
+            <div class="example-card" data-example="clone" onclick="loadExample('clone')">
+                <div class="example-icon"></div>
+                <div class="example-title">Clone</div>
+                <div class="example-desc">깊은 복사</div>
+            </div>
+            <div class="example-card" data-example="borrow" onclick="loadExample('borrow')">
+                <div class="example-icon"></div>
+                <div class="example-title">Borrowing</div>
+                <div class="example-desc">불변 참조</div>
+            </div>
+            <div class="example-card" data-example="mut-borrow" onclick="loadExample('mut-borrow')">
+                <div class="example-icon"></div>
+                <div class="example-title">Mutable Borrow</div>
+                <div class="example-desc">가변 참조</div>
+            </div>
+            <div class="example-card" data-example="drop" onclick="loadExample('drop')">
+                <div class="example-icon"></div>
+                <div class="example-title">Drop & Scope</div>
+                <div class="example-desc">자동 해제</div>
+            </div>
+        </div>
+
+        <div class="step-indicator">
+            <div class="step-badge">Step <span id="current-step">1</span> / <span id="total-steps">5</span></div>
+            <div class="step-progress">
+                <div class="step-fill" id="step-fill" style="width: 20%"></div>
+            </div>
+        </div>
+
+        <div class="main-layout">
+            <div class="panel">
+                <div class="panel-header">
+                    <h3> Code</h3>
+                    <div class="controls">
+                        <button class="btn btn-secondary" onclick="prevStep()" id="btn-prev"> Prev</button>
+                        <button class="btn btn-primary" onclick="nextStep()" id="btn-next">Next </button>
+                        <button class="btn btn-secondary" onclick="resetExample()"> Reset</button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="code-editor" id="code-editor">
+                        <!-- Code will be inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3> Memory</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="memory-container">
+                        <div class="memory-section stack-section">
+                            <div class="memory-title">STACK</div>
+                            <div class="memory-slots" id="stack-slots">
+                                <!-- Stack slots will be inserted here -->
+                            </div>
+                        </div>
+                        <div class="memory-section heap-section">
+                            <div class="memory-title">HEAP</div>
+                            <div class="memory-slots" id="heap-slots">
+                                <!-- Heap slots will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="explanation" id="explanation">
+            <!-- Explanation will be inserted here -->
+        </div>
+
+        <footer>
+            <p> 2025 WIA-RUST-LEARN | Part of WIA Standards</p>
+            <p>  (Hongik Ingan) - Benefit All Humanity</p>
+        </footer>
+    </div>
+
+    <script>
+        // Example Definitions
+        const EXAMPLES = {
+            'move': {
+                title: 'Move Semantics',
+                code: [
+                    { num: 1, content: '<span class="keyword">fn</span> <span class="function">main</span>() {', active: false },
+                    { num: 2, content: '    <span class="keyword">let</span> <span class="variable">s1</span> = <span class="type">String</span>::<span class="function">from</span>(<span class="string">"hello"</span>);', active: false },
+                    { num: 3, content: '    <span class="keyword">let</span> <span class="variable">s2</span> = <span class="variable">s1</span>;  <span class="comment">// s1 moves to s2</span>', active: false },
+                    { num: 4, content: '    <span class="comment">// println!("{}", s1);  // ERROR!</span>', active: false, error: true },
+                    { num: 5, content: '    <span class="macro">println!</span>(<span class="string">"{}"</span>, <span class="variable">s2</span>);  <span class="comment">// OK</span>', active: false },
+                    { num: 6, content: '}', active: false }
+                ],
+                steps: [
+                    {
+                        line: 2,
+                        stack: [
+                            { name: 's1', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello"', type: 'str data', linkedFrom: 's1' }
+                        ],
+                        explanation: {
+                            title: 'String 생성',
+                            text: '<span class="highlight">String::from("hello")</span>가 호출되면:',
+                            details: [
+                                'Stack에 s1 변수 생성 (포인터, 길이, 용량 저장)',
+                                'Heap에 실제 문자열 데이터 "hello" 할당',
+                                's1이 이 데이터의 소유자(owner)가 됨'
+                            ]
+                        }
+                    },
+                    {
+                        line: 3,
+                        stack: [
+                            { name: 's1', value: 'MOVED', type: 'String', owner: false, dropped: true },
+                            { name: 's2', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true, active: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello"', type: 'str data', linkedFrom: 's2' }
+                        ],
+                        explanation: {
+                            title: 'Move 발생!',
+                            text: '<span class="highlight">let s2 = s1;</span> 실행 시 소유권이 이동합니다:',
+                            details: [
+                                's1의 소유권이 s2로 이동 (move)',
+                                's1은 더 이상 유효하지 않음',
+                                'Heap 데이터는 복사되지 않음 (효율적!)',
+                                '이제 s2만이 유일한 소유자'
+                            ]
+                        }
+                    },
+                    {
+                        line: 4,
+                        stack: [
+                            { name: 's1', value: 'INVALID', type: 'String', owner: false, error: true },
+                            { name: 's2', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello"', type: 'str data', linkedFrom: 's2' }
+                        ],
+                        explanation: {
+                            title: ' 컴파일 에러!',
+                            text: '<span class="highlight">println!("{}", s1)</span>을 시도하면 에러:',
+                            details: [
+                                '"value borrowed after move" 에러 발생',
+                                's1은 이미 s2로 이동됨 (invalidated)',
+                                'Rust는 컴파일 타임에 이를 감지!',
+                                'Double-free 버그를 원천 차단'
+                            ]
+                        }
+                    },
+                    {
+                        line: 5,
+                        stack: [
+                            { name: 's2', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true, active: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello"', type: 'str data', linkedFrom: 's2' }
+                        ],
+                        explanation: {
+                            title: ' s2 사용 가능',
+                            text: '<span class="highlight">println!("{}", s2)</span>는 정상 작동:',
+                            details: [
+                                's2는 현재 유효한 소유자',
+                                'Heap의 "hello" 데이터에 접근 가능',
+                                '프로그램 종료 시 s2가 스코프를 벗어나면 자동 해제'
+                            ]
+                        }
+                    },
+                    {
+                        line: 6,
+                        stack: [],
+                        heap: [],
+                        explanation: {
+                            title: ' 자동 메모리 해제',
+                            text: '함수가 끝나면 <span class="highlight">drop</span>이 자동 호출:',
+                            details: [
+                                's2가 스코프를 벗어남',
+                                's2의 drop() 호출',
+                                'Heap 메모리 자동 해제',
+                                'Memory leak 없음, GC 없음!'
+                            ]
+                        }
+                    }
+                ]
+            },
+            'copy': {
+                title: 'Copy Trait',
+                code: [
+                    { num: 1, content: '<span class="keyword">fn</span> <span class="function">main</span>() {', active: false },
+                    { num: 2, content: '    <span class="keyword">let</span> <span class="variable">x</span> = <span class="number">5</span>;', active: false },
+                    { num: 3, content: '    <span class="keyword">let</span> <span class="variable">y</span> = <span class="variable">x</span>;  <span class="comment">// x is copied, not moved!</span>', active: false },
+                    { num: 4, content: '    <span class="macro">println!</span>(<span class="string">"x={}, y={}"</span>, <span class="variable">x</span>, <span class="variable">y</span>);  <span class="comment">// Both work!</span>', active: false },
+                    { num: 5, content: '}', active: false }
+                ],
+                steps: [
+                    {
+                        line: 2,
+                        stack: [
+                            { name: 'x', value: '5', type: 'i32', owner: true }
+                        ],
+                        heap: [],
+                        explanation: {
+                            title: '정수 생성',
+                            text: '<span class="highlight">let x = 5;</span>',
+                            details: [
+                                'i32는 고정 크기 (4 bytes)',
+                                '값이 Stack에 직접 저장됨',
+                                'Heap 할당 불필요',
+                                'i32는 Copy trait 구현'
+                            ]
+                        }
+                    },
+                    {
+                        line: 3,
+                        stack: [
+                            { name: 'x', value: '5', type: 'i32', owner: true },
+                            { name: 'y', value: '5', type: 'i32', owner: true, active: true }
+                        ],
+                        heap: [],
+                        explanation: {
+                            title: ' Copy 발생!',
+                            text: '<span class="highlight">let y = x;</span>에서 Move가 아닌 Copy:',
+                            details: [
+                                'i32는 Copy trait를 구현',
+                                '값이 bit-by-bit 복사됨',
+                                'x도 여전히 유효!',
+                                '두 변수가 독립적인 값 보유'
+                            ]
+                        }
+                    },
+                    {
+                        line: 4,
+                        stack: [
+                            { name: 'x', value: '5', type: 'i32', owner: true, active: true },
+                            { name: 'y', value: '5', type: 'i32', owner: true, active: true }
+                        ],
+                        heap: [],
+                        explanation: {
+                            title: ' 둘 다 사용 가능!',
+                            text: '<span class="highlight">println!("x={}, y={}", x, y);</span>',
+                            details: [
+                                'x와 y 모두 유효',
+                                '각자 독립된 값 소유',
+                                '출력: "x=5, y=5"',
+                                'Copy types: i32, f64, bool, char, 튜플(Copy요소만)'
+                            ]
+                        }
+                    }
+                ]
+            },
+            'clone': {
+                title: 'Clone',
+                code: [
+                    { num: 1, content: '<span class="keyword">fn</span> <span class="function">main</span>() {', active: false },
+                    { num: 2, content: '    <span class="keyword">let</span> <span class="variable">s1</span> = <span class="type">String</span>::<span class="function">from</span>(<span class="string">"hello"</span>);', active: false },
+                    { num: 3, content: '    <span class="keyword">let</span> <span class="variable">s2</span> = <span class="variable">s1</span>.<span class="function">clone</span>();  <span class="comment">// Deep copy</span>', active: false },
+                    { num: 4, content: '    <span class="macro">println!</span>(<span class="string">"s1={}, s2={}"</span>, <span class="variable">s1</span>, <span class="variable">s2</span>);', active: false },
+                    { num: 5, content: '}', active: false }
+                ],
+                steps: [
+                    {
+                        line: 2,
+                        stack: [
+                            { name: 's1', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello"', type: 'str data', linkedFrom: 's1' }
+                        ],
+                        explanation: {
+                            title: 'String 생성',
+                            text: '<span class="highlight">String::from("hello")</span>',
+                            details: [
+                                's1이 Heap 데이터의 소유자',
+                                'Stack: 포인터, 길이, 용량',
+                                'Heap: 실제 문자열 데이터'
+                            ]
+                        }
+                    },
+                    {
+                        line: 3,
+                        stack: [
+                            { name: 's1', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true },
+                            { name: 's2', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true, active: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello"', type: 'str data', linkedFrom: 's1' },
+                            { name: '[0x5678]', value: '"hello"', type: 'str data', linkedFrom: 's2', active: true }
+                        ],
+                        explanation: {
+                            title: ' Clone - 깊은 복사',
+                            text: '<span class="highlight">s1.clone()</span> 호출:',
+                            details: [
+                                'Heap에 새로운 메모리 할당',
+                                '데이터가 완전히 복사됨',
+                                's1과 s2 모두 유효',
+                                '각자 독립된 Heap 데이터 소유',
+                                '비용이 발생함 (명시적)'
+                            ]
+                        }
+                    },
+                    {
+                        line: 4,
+                        stack: [
+                            { name: 's1', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true, active: true },
+                            { name: 's2', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true, active: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello"', type: 'str data', linkedFrom: 's1' },
+                            { name: '[0x5678]', value: '"hello"', type: 'str data', linkedFrom: 's2' }
+                        ],
+                        explanation: {
+                            title: ' 둘 다 사용 가능!',
+                            text: '<span class="highlight">println!("s1={}, s2={}", s1, s2);</span>',
+                            details: [
+                                '출력: "s1=hello, s2=hello"',
+                                '각 String이 자신의 Heap 데이터 소유',
+                                '스코프 종료 시 각각 해제됨',
+                                'clone()은 비용을 명시적으로 표현'
+                            ]
+                        }
+                    }
+                ]
+            },
+            'borrow': {
+                title: 'Borrowing (Immutable Reference)',
+                code: [
+                    { num: 1, content: '<span class="keyword">fn</span> <span class="function">main</span>() {', active: false },
+                    { num: 2, content: '    <span class="keyword">let</span> <span class="variable">s1</span> = <span class="type">String</span>::<span class="function">from</span>(<span class="string">"hello"</span>);', active: false },
+                    { num: 3, content: '    <span class="keyword">let</span> <span class="variable">r1</span> = &<span class="variable">s1</span>;  <span class="comment">// Immutable borrow</span>', active: false },
+                    { num: 4, content: '    <span class="keyword">let</span> <span class="variable">r2</span> = &<span class="variable">s1</span>;  <span class="comment">// Multiple immutable borrows OK!</span>', active: false },
+                    { num: 5, content: '    <span class="macro">println!</span>(<span class="string">"{}, {}, {}"</span>, <span class="variable">s1</span>, <span class="variable">r1</span>, <span class="variable">r2</span>);', active: false },
+                    { num: 6, content: '}', active: false }
+                ],
+                steps: [
+                    {
+                        line: 2,
+                        stack: [
+                            { name: 's1', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello"', type: 'str data', linkedFrom: 's1' }
+                        ],
+                        explanation: {
+                            title: 'String 생성',
+                            text: '<span class="highlight">String::from("hello")</span>',
+                            details: [
+                                's1이 String의 소유자',
+                                'Heap에 문자열 데이터 저장'
+                            ]
+                        }
+                    },
+                    {
+                        line: 3,
+                        stack: [
+                            { name: 's1', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true, borrowed: true },
+                            { name: 'r1', value: '-> s1', type: '&String', borrowed: true, active: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello"', type: 'str data', linkedFrom: 's1' }
+                        ],
+                        explanation: {
+                            title: ' 불변 참조 (Borrow)',
+                            text: '<span class="highlight">let r1 = &s1;</span>',
+                            details: [
+                                'r1은 s1을 "빌림" (borrow)',
+                                '소유권은 이동하지 않음!',
+                                's1은 여전히 소유자',
+                                'r1은 읽기만 가능'
+                            ]
+                        }
+                    },
+                    {
+                        line: 4,
+                        stack: [
+                            { name: 's1', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true, borrowed: true },
+                            { name: 'r1', value: '-> s1', type: '&String', borrowed: true },
+                            { name: 'r2', value: '-> s1', type: '&String', borrowed: true, active: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello"', type: 'str data', linkedFrom: 's1' }
+                        ],
+                        explanation: {
+                            title: ' 여러 불변 참조 가능!',
+                            text: '<span class="highlight">let r2 = &s1;</span>',
+                            details: [
+                                '불변 참조는 여러 개 동시에 가능',
+                                '읽기만 하므로 안전',
+                                'r1, r2 모두 s1의 데이터 읽기 가능',
+                                '규칙: 불변 참조 N개 OR 가변 참조 1개'
+                            ]
+                        }
+                    },
+                    {
+                        line: 5,
+                        stack: [
+                            { name: 's1', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true, active: true },
+                            { name: 'r1', value: '-> s1', type: '&String', active: true },
+                            { name: 'r2', value: '-> s1', type: '&String', active: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello"', type: 'str data', linkedFrom: 's1' }
+                        ],
+                        explanation: {
+                            title: ' 모두 사용 가능!',
+                            text: '<span class="highlight">println!("{}, {}, {}", s1, r1, r2);</span>',
+                            details: [
+                                '출력: "hello, hello, hello"',
+                                '소유자 s1도 사용 가능',
+                                '참조 r1, r2도 사용 가능',
+                                '모두 같은 데이터를 읽음'
+                            ]
+                        }
+                    }
+                ]
+            },
+            'mut-borrow': {
+                title: 'Mutable Borrow',
+                code: [
+                    { num: 1, content: '<span class="keyword">fn</span> <span class="function">main</span>() {', active: false },
+                    { num: 2, content: '    <span class="keyword">let mut</span> <span class="variable">s</span> = <span class="type">String</span>::<span class="function">from</span>(<span class="string">"hello"</span>);', active: false },
+                    { num: 3, content: '    <span class="keyword">let</span> <span class="variable">r</span> = &<span class="keyword">mut</span> <span class="variable">s</span>;  <span class="comment">// Mutable borrow</span>', active: false },
+                    { num: 4, content: '    <span class="variable">r</span>.<span class="function">push_str</span>(<span class="string">", world"</span>);  <span class="comment">// Modify through ref</span>', active: false },
+                    { num: 5, content: '    <span class="macro">println!</span>(<span class="string">"{}"</span>, <span class="variable">r</span>);', active: false },
+                    { num: 6, content: '}', active: false }
+                ],
+                steps: [
+                    {
+                        line: 2,
+                        stack: [
+                            { name: 's', value: 'ptr | len: 5 | cap: 5', type: 'mut String', owner: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello"', type: 'str data', linkedFrom: 's' }
+                        ],
+                        explanation: {
+                            title: '가변 String 생성',
+                            text: '<span class="highlight">let mut s = String::from("hello");</span>',
+                            details: [
+                                'mut 키워드로 가변 변수 선언',
+                                's는 나중에 수정 가능',
+                                'String의 소유자'
+                            ]
+                        }
+                    },
+                    {
+                        line: 3,
+                        stack: [
+                            { name: 's', value: 'ptr | len: 5 | cap: 5', type: 'mut String', owner: true, mutBorrowed: true },
+                            { name: 'r', value: '-> s (mut)', type: '&mut String', mutBorrowed: true, active: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello"', type: 'str data', linkedFrom: 's' }
+                        ],
+                        explanation: {
+                            title: ' 가변 참조',
+                            text: '<span class="highlight">let r = &mut s;</span>',
+                            details: [
+                                'r은 s를 가변 빌림',
+                                '가변 참조는 오직 1개만 가능!',
+                                's는 r이 살아있는 동안 직접 사용 불가',
+                                '데이터 경쟁 (data race) 방지'
+                            ]
+                        }
+                    },
+                    {
+                        line: 4,
+                        stack: [
+                            { name: 's', value: 'ptr | len: 12 | cap: 12', type: 'mut String', owner: true, mutBorrowed: true },
+                            { name: 'r', value: '-> s (mut)', type: '&mut String', mutBorrowed: true, active: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello, world"', type: 'str data', linkedFrom: 's', active: true }
+                        ],
+                        explanation: {
+                            title: ' 참조를 통한 수정!',
+                            text: '<span class="highlight">r.push_str(", world");</span>',
+                            details: [
+                                'r을 통해 원본 데이터 수정',
+                                '"hello" -> "hello, world"',
+                                'Heap 데이터가 변경됨',
+                                '소유권 없이도 수정 가능'
+                            ]
+                        }
+                    },
+                    {
+                        line: 5,
+                        stack: [
+                            { name: 's', value: 'ptr | len: 12 | cap: 12', type: 'mut String', owner: true },
+                            { name: 'r', value: '-> s (mut)', type: '&mut String', active: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"hello, world"', type: 'str data', linkedFrom: 's' }
+                        ],
+                        explanation: {
+                            title: ' 결과 출력',
+                            text: '<span class="highlight">println!("{}", r);</span>',
+                            details: [
+                                '출력: "hello, world"',
+                                '수정된 데이터가 출력됨',
+                                'r의 마지막 사용 후 s 다시 사용 가능',
+                                '(NLL - Non-Lexical Lifetimes)'
+                            ]
+                        }
+                    }
+                ]
+            },
+            'drop': {
+                title: 'Drop & Scope',
+                code: [
+                    { num: 1, content: '<span class="keyword">fn</span> <span class="function">main</span>() {', active: false },
+                    { num: 2, content: '    <span class="keyword">let</span> <span class="variable">s1</span> = <span class="type">String</span>::<span class="function">from</span>(<span class="string">"outer"</span>);', active: false },
+                    { num: 3, content: '    {', active: false },
+                    { num: 4, content: '        <span class="keyword">let</span> <span class="variable">s2</span> = <span class="type">String</span>::<span class="function">from</span>(<span class="string">"inner"</span>);', active: false },
+                    { num: 5, content: '        <span class="macro">println!</span>(<span class="string">"{}, {}"</span>, <span class="variable">s1</span>, <span class="variable">s2</span>);', active: false },
+                    { num: 6, content: '    }  <span class="comment">// s2 dropped here</span>', active: false },
+                    { num: 7, content: '    <span class="macro">println!</span>(<span class="string">"{}"</span>, <span class="variable">s1</span>);  <span class="comment">// s1 still valid</span>', active: false },
+                    { num: 8, content: '}  <span class="comment">// s1 dropped here</span>', active: false }
+                ],
+                steps: [
+                    {
+                        line: 2,
+                        stack: [
+                            { name: 's1', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"outer"', type: 'str data', linkedFrom: 's1' }
+                        ],
+                        explanation: {
+                            title: '외부 스코프에서 s1 생성',
+                            text: '<span class="highlight">let s1 = String::from("outer");</span>',
+                            details: [
+                                's1이 main 함수 스코프에 생성됨',
+                                'main이 끝날 때까지 유효'
+                            ]
+                        }
+                    },
+                    {
+                        line: 4,
+                        stack: [
+                            { name: 's1', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true },
+                            { name: 's2', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true, active: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"outer"', type: 'str data', linkedFrom: 's1' },
+                            { name: '[0x5678]', value: '"inner"', type: 'str data', linkedFrom: 's2', active: true }
+                        ],
+                        explanation: {
+                            title: '내부 스코프에서 s2 생성',
+                            text: '<span class="highlight">let s2 = String::from("inner");</span>',
+                            details: [
+                                's2가 내부 {} 블록에 생성됨',
+                                's2는 이 블록 안에서만 유효',
+                                's1과 s2 모두 현재 유효'
+                            ]
+                        }
+                    },
+                    {
+                        line: 5,
+                        stack: [
+                            { name: 's1', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true, active: true },
+                            { name: 's2', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true, active: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"outer"', type: 'str data', linkedFrom: 's1' },
+                            { name: '[0x5678]', value: '"inner"', type: 'str data', linkedFrom: 's2' }
+                        ],
+                        explanation: {
+                            title: ' 둘 다 사용',
+                            text: '<span class="highlight">println!("{}, {}", s1, s2);</span>',
+                            details: [
+                                '출력: "outer, inner"',
+                                '두 String 모두 유효한 상태'
+                            ]
+                        }
+                    },
+                    {
+                        line: 6,
+                        stack: [
+                            { name: 's1', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true },
+                            { name: 's2', value: 'DROPPED', type: 'String', dropped: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"outer"', type: 'str data', linkedFrom: 's1' },
+                            { name: '[0x5678]', value: 'FREED', type: 'deallocated', dropped: true }
+                        ],
+                        explanation: {
+                            title: ' s2 자동 해제!',
+                            text: '내부 블록 <span class="highlight">}</span>에서:',
+                            details: [
+                                's2가 스코프를 벗어남',
+                                's2.drop() 자동 호출',
+                                'Heap의 "inner" 메모리 해제',
+                                's1은 영향받지 않음 (다른 스코프)'
+                            ]
+                        }
+                    },
+                    {
+                        line: 7,
+                        stack: [
+                            { name: 's1', value: 'ptr | len: 5 | cap: 5', type: 'String', owner: true, active: true }
+                        ],
+                        heap: [
+                            { name: '[0x1234]', value: '"outer"', type: 'str data', linkedFrom: 's1' }
+                        ],
+                        explanation: {
+                            title: 's1 여전히 유효',
+                            text: '<span class="highlight">println!("{}", s1);</span>',
+                            details: [
+                                '출력: "outer"',
+                                's1은 아직 스코프 안에 있음',
+                                's2 해제와 무관'
+                            ]
+                        }
+                    },
+                    {
+                        line: 8,
+                        stack: [],
+                        heap: [],
+                        explanation: {
+                            title: ' 모든 메모리 해제',
+                            text: 'main 함수 종료 <span class="highlight">}</span>:',
+                            details: [
+                                's1이 스코프를 벗어남',
+                                's1.drop() 자동 호출',
+                                '모든 Heap 메모리 해제 완료',
+                                'No memory leaks, No GC needed!'
+                            ]
+                        }
+                    }
+                ]
+            }
+        };
+
+        let currentExample = 'move';
+        let currentStep = 0;
+
+        function loadExample(name) {
+            currentExample = name;
+            currentStep = 0;
+
+            // Update active card
+            document.querySelectorAll('.example-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            document.querySelector(`[data-example="${name}"]`).classList.add('active');
+
+            renderStep();
+        }
+
+        function renderStep() {
+            const example = EXAMPLES[currentExample];
+            const step = example.steps[currentStep];
+
+            // Update step indicator
+            document.getElementById('current-step').textContent = currentStep + 1;
+            document.getElementById('total-steps').textContent = example.steps.length;
+            document.getElementById('step-fill').style.width = `${((currentStep + 1) / example.steps.length) * 100}%`;
+
+            // Render code
+            const codeEditor = document.getElementById('code-editor');
+            codeEditor.innerHTML = example.code.map((line, i) => {
+                const isActive = line.num === step.line;
+                const isError = line.error && isActive;
+                return `<div class="code-line ${isActive ? 'active' : ''} ${isError ? 'error' : ''}">
+                    <span class="line-num">${line.num}</span>
+                    <span class="code-content">${line.content}</span>
+                </div>`;
+            }).join('');
+
+            // Render stack
+            const stackSlots = document.getElementById('stack-slots');
+            stackSlots.innerHTML = step.stack.map(slot => {
+                let statusClass = '';
+                let statusBadge = '';
+
+                if (slot.active) statusClass = 'active';
+                if (slot.dropped) statusClass = 'dropped';
+                if (slot.error) statusClass = 'error';
+
+                if (slot.owner) statusBadge = '<span class="slot-owner">Owner</span>';
+                if (slot.borrowed) statusBadge = '<span class="slot-owner slot-borrowed">Borrowed</span>';
+                if (slot.mutBorrowed) statusBadge = '<span class="slot-owner slot-mut-borrowed">&mut</span>';
+
+                return `<div class="memory-slot ${statusClass}">
+                    <span class="slot-name">${slot.name}</span>
+                    <span class="slot-value">${slot.value}</span>
+                    <span class="slot-type">${slot.type}</span>
+                    ${statusBadge}
+                </div>`;
+            }).join('') || '<div style="opacity:0.5;text-align:center;padding:2rem;">Empty</div>';
+
+            // Render heap
+            const heapSlots = document.getElementById('heap-slots');
+            heapSlots.innerHTML = step.heap.map(slot => {
+                let statusClass = '';
+                if (slot.active) statusClass = 'active';
+                if (slot.dropped) statusClass = 'dropped';
+
+                return `<div class="memory-slot ${statusClass}">
+                    <span class="slot-name">${slot.name}</span>
+                    <span class="slot-value">${slot.value}</span>
+                    <span class="slot-type">${slot.type}</span>
+                </div>`;
+            }).join('') || '<div style="opacity:0.5;text-align:center;padding:2rem;">Empty</div>';
+
+            // Render explanation
+            const explanation = document.getElementById('explanation');
+            const exp = step.explanation;
+            explanation.innerHTML = `
+                <h4>${exp.title}</h4>
+                <p>${exp.text}</p>
+                <div class="rules-box">
+                    <h5>Details:</h5>
+                    <ul>
+                        ${exp.details.map(d => `<li>${d}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+
+            // Update button states
+            document.getElementById('btn-prev').disabled = currentStep === 0;
+            document.getElementById('btn-next').disabled = currentStep === example.steps.length - 1;
+        }
+
+        function nextStep() {
+            const example = EXAMPLES[currentExample];
+            if (currentStep < example.steps.length - 1) {
+                currentStep++;
+                renderStep();
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 0) {
+                currentStep--;
+                renderStep();
+            }
+        }
+
+        function resetExample() {
+            currentStep = 0;
+            renderStep();
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                nextStep();
+            } else if (e.key === 'ArrowLeft') {
+                prevStep();
+            } else if (e.key === 'r') {
+                resetExample();
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadExample('move');
+        });
+    </script>
+</body>
+</html>

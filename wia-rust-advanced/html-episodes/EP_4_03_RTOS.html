@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 4-03: RTOS Integration (Embassy) | WIA-RUST-ADVANCED</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            position: relative;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .episode-badge {
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 10px 25px;
+            border: 2px solid #F39C12;
+            background: transparent;
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: #F39C12;
+        }
+
+        .title {
+            font-size: 72px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border-radius: 15px;
+            padding: 30px;
+            font-family: 'Consolas', 'D2Coding', monospace;
+            font-size: 22px;
+            line-height: 1.6;
+            border: 2px solid #30363d;
+            width: 100%;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+
+        .code-line.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .keyword { color: #ff7b72; }
+        .function { color: #d2a8ff; }
+        .string { color: #a5d6ff; }
+        .macro { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .type { color: #ffa657; }
+        .number { color: #79c0ff; }
+
+        .concept-box {
+            background: rgba(243, 156, 18, 0.1);
+            border-left: 5px solid #F39C12;
+            padding: 40px;
+            border-radius: 0 20px 20px 0;
+            margin: 20px 0;
+        }
+
+        .concept-box h3 {
+            color: #F39C12;
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .concept-box p {
+            font-size: 28px;
+            line-height: 1.8;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 40px;
+            width: 100%;
+        }
+
+        .comparison-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 40px;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 0.5s;
+        }
+
+        .comparison-item.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .comparison-item h3 {
+            color: #F39C12;
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .comparison-item ul {
+            list-style: none;
+            font-size: 24px;
+        }
+
+        .comparison-item li {
+            margin: 12px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .comparison-item li:before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+            color: #F39C12;
+        }
+
+        .navigation {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(243, 156, 18, 0.8);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: #F39C12;
+            transform: scale(1.05);
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 8px;
+            background: #F39C12;
+            transition: width 0.5s;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 100px;
+            right: 60px;
+            font-size: 24px;
+            color: #888;
+        }
+
+        .subtitle {
+            font-size: 36px;
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .big-emoji {
+            font-size: 150px;
+            margin-bottom: 30px;
+        }
+
+        .channel-info {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid #FF0000;
+            border-radius: 20px;
+            padding: 30px 60px;
+            margin-top: 40px;
+            font-size: 32px;
+        }
+
+        .channel-info a {
+            color: #FF6B6B;
+            text-decoration: none;
+        }
+
+        .highlight-box {
+            background: rgba(243, 156, 18, 0.15);
+            border: 2px solid #F39C12;
+            border-radius: 20px;
+            padding: 50px;
+            margin: 30px 0;
+        }
+
+        .highlight-box h3 {
+            color: #F39C12;
+            font-size: 40px;
+            margin-bottom: 25px;
+        }
+
+        .highlight-box p {
+            font-size: 30px;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 4-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">🚀</div>
+            <h1 class="title">RTOS Integration (Embassy)</h1>
+            <p class="subtitle">
+                <span class="ko">Embassy로 async 임베디드 개발</span>
+                <span class="en" style="display:none;">Async Embedded Development with Embassy</span>
+            </p>
+            <div class="channel-info">
+                📺 YouTube: <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">
+                <span class="ko">시작하기 →</span>
+                <span class="en" style="display:none;">Start →</span>
+            </button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: What is Embassy? -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 4-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Embassy란?</span>
+            <span class="en" style="display:none;">What is Embassy?</span>
+        </h1>
+        <div class="content">
+            <div class="comparison-grid">
+                <div class="comparison-item">
+                    <h3>
+                        <span class="ko">🔄 async/await</span>
+                        <span class="en" style="display:none;">🔄 async/await</span>
+                    </h3>
+                    <ul>
+                        <li class="ko">임베디드 async</li>
+                        <li class="en" style="display:none;">Embedded async</li>
+                        <li class="ko">동시성 지원</li>
+                        <li class="en" style="display:none;">Concurrency</li>
+                        <li class="ko">간결한 코드</li>
+                        <li class="en" style="display:none;">Clean code</li>
+                    </ul>
+                </div>
+                <div class="comparison-item">
+                    <h3>
+                        <span class="ko">⏱️ Executor</span>
+                        <span class="en" style="display:none;">⏱️ Executor</span>
+                    </h3>
+                    <ul>
+                        <li class="ko">단일 스레드</li>
+                        <li class="en" style="display:none;">Single-threaded</li>
+                        <li class="ko">협력적 멀티태스킹</li>
+                        <li class="en" style="display:none;">Cooperative</li>
+                        <li class="ko">낮은 오버헤드</li>
+                        <li class="en" style="display:none;">Low overhead</li>
+                    </ul>
+                </div>
+                <div class="comparison-item">
+                    <h3>
+                        <span class="ko">🔌 HAL</span>
+                        <span class="en" style="display:none;">🔌 HAL</span>
+                    </h3>
+                    <ul>
+                        <li class="ko">다양한 MCU 지원</li>
+                        <li class="en" style="display:none;">Multi-MCU</li>
+                        <li>STM32, nRF52...</li>
+                        <li class="ko">통합 인터페이스</li>
+                        <li class="en" style="display:none;">Unified API</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: Basic Embassy App -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 4-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">기본 Embassy 앱</span>
+            <span class="en" style="display:none;">Basic Embassy App</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line">#![<span class="macro">no_std</span>]</div>
+                    <div class="code-line">#![<span class="macro">no_main</span>]</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">use</span> embassy_executor::<span class="type">Spawner</span>;</div>
+                    <div class="code-line"><span class="keyword">use</span> embassy_time::{<span class="type">Duration</span>, <span class="type">Timer</span>};</div>
+                    <div class="code-line"></div>
+                    <div class="code-line">#[<span class="macro">embassy_executor::main</span>]</div>
+                    <div class="code-line"><span class="keyword">async fn</span> <span class="function">main</span>(_spawner: <span class="type">Spawner</span>) {</div>
+                    <div class="code-line">    <span class="keyword">loop</span> {</div>
+                    <div class="code-line">        <span class="comment">// LED 토글</span></div>
+                    <div class="code-line">        led.<span class="function">toggle</span>();</div>
+                    <div class="code-line">        <span class="type">Timer</span>::<span class="function">after</span>(<span class="type">Duration</span>::<span class="function">from_millis</span>(<span class="number">1000</span>)).<span class="keyword">await</span>;</div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                </div>
+                <div class="concept-box">
+                    <h3>
+                        <span class="ko">⚡ 핵심 개념</span>
+                        <span class="en" style="display:none;">⚡ Key Concept</span>
+                    </h3>
+                    <p class="ko">
+                        async/await로 간결한 비동기 코드<br>
+                        Timer::after()로 논블로킹 대기<br>
+                        자동으로 다른 태스크에 양보
+                    </p>
+                    <p class="en" style="display:none;">
+                        Clean async code with async/await<br>
+                        Non-blocking wait with Timer::after()<br>
+                        Automatically yields to other tasks
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: Spawning Tasks -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 4-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">태스크 생성</span>
+            <span class="en" style="display:none;">Spawning Tasks</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block" style="font-size: 20px;">
+                    <div class="code-line">#[<span class="macro">embassy_executor::task</span>]</div>
+                    <div class="code-line"><span class="keyword">async fn</span> <span class="function">blink_led</span>(<span class="keyword">mut</span> led: <span class="type">Output</span>) {</div>
+                    <div class="code-line">    <span class="keyword">loop</span> {</div>
+                    <div class="code-line">        led.<span class="function">toggle</span>();</div>
+                    <div class="code-line">        <span class="type">Timer</span>::<span class="function">after_millis</span>(<span class="number">500</span>).<span class="keyword">await</span>;</div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line">#[<span class="macro">embassy_executor::task</span>]</div>
+                    <div class="code-line"><span class="keyword">async fn</span> <span class="function">read_sensor</span>(<span class="keyword">mut</span> i2c: <span class="type">I2c</span>) {</div>
+                    <div class="code-line">    <span class="keyword">loop</span> {</div>
+                    <div class="code-line">        <span class="keyword">let</span> data = i2c.<span class="function">read</span>(&<span class="keyword">mut</span> buffer).<span class="keyword">await</span>;</div>
+                    <div class="code-line">        <span class="type">Timer</span>::<span class="function">after_secs</span>(<span class="number">1</span>).<span class="keyword">await</span>;</div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line">#[<span class="macro">embassy_executor::main</span>]</div>
+                    <div class="code-line"><span class="keyword">async fn</span> <span class="function">main</span>(spawner: <span class="type">Spawner</span>) {</div>
+                    <div class="code-line">    spawner.<span class="function">spawn</span>(<span class="function">blink_led</span>(led)).<span class="function">unwrap</span>();</div>
+                    <div class="code-line">    spawner.<span class="function">spawn</span>(<span class="function">read_sensor</span>(i2c)).<span class="function">unwrap</span>();</div>
+                    <div class="code-line">}</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: Channels -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 4-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">채널 (Channels)</span>
+            <span class="en" style="display:none;">Channels</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block" style="font-size: 20px;">
+                    <div class="code-line"><span class="keyword">use</span> embassy_sync::channel::<span class="type">Channel</span>;</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">static</span> <span class="type">CHANNEL</span>: <span class="type">Channel</span>&lt;<span class="type">NoopRawMutex</span>, <span class="type">SensorData</span>, <span class="number">10</span>&gt;</div>
+                    <div class="code-line">    = <span class="type">Channel</span>::<span class="function">new</span>();</div>
+                    <div class="code-line"></div>
+                    <div class="code-line">#[<span class="macro">embassy_executor::task</span>]</div>
+                    <div class="code-line"><span class="keyword">async fn</span> <span class="function">producer</span>() {</div>
+                    <div class="code-line">    <span class="keyword">loop</span> {</div>
+                    <div class="code-line">        <span class="keyword">let</span> data = <span class="function">read_sensor</span>();</div>
+                    <div class="code-line">        <span class="type">CHANNEL</span>.<span class="function">send</span>(data).<span class="keyword">await</span>;</div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line">#[<span class="macro">embassy_executor::task</span>]</div>
+                    <div class="code-line"><span class="keyword">async fn</span> <span class="function">consumer</span>() {</div>
+                    <div class="code-line">    <span class="keyword">loop</span> {</div>
+                    <div class="code-line">        <span class="keyword">let</span> data = <span class="type">CHANNEL</span>.<span class="function">receive</span>().<span class="keyword">await</span>;</div>
+                    <div class="code-line">        <span class="function">process</span>(data);</div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: Signals -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 4-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">시그널 (Signals)</span>
+            <span class="en" style="display:none;">Signals</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">use</span> embassy_sync::signal::<span class="type">Signal</span>;</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">static</span> <span class="type">BUTTON_SIGNAL</span>: <span class="type">Signal</span>&lt;<span class="type">NoopRawMutex</span>, ()&gt; = <span class="type">Signal</span>::<span class="function">new</span>();</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// 인터럽트 핸들러</span></div>
+                    <div class="code-line">#[<span class="macro">interrupt</span>]</div>
+                    <div class="code-line"><span class="keyword">fn</span> <span class="function">EXTI0</span>() {</div>
+                    <div class="code-line">    <span class="type">BUTTON_SIGNAL</span>.<span class="function">signal</span>(());</div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// 태스크에서 대기</span></div>
+                    <div class="code-line">#[<span class="macro">embassy_executor::task</span>]</div>
+                    <div class="code-line"><span class="keyword">async fn</span> <span class="function">button_handler</span>() {</div>
+                    <div class="code-line">    <span class="keyword">loop</span> {</div>
+                    <div class="code-line">        <span class="type">BUTTON_SIGNAL</span>.<span class="function">wait</span>().<span class="keyword">await</span>;</div>
+                    <div class="code-line">        <span class="comment">// 버튼 처리</span></div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: USB & Networking -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 4-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">USB & 네트워킹</span>
+            <span class="en" style="display:none;">USB & Networking</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block" style="font-size: 20px;">
+                    <div class="code-line"><span class="comment">// USB Serial</span></div>
+                    <div class="code-line"><span class="keyword">use</span> embassy_usb::<span class="type">Builder</span>;</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">let</span> <span class="keyword">mut</span> usb = <span class="type">Builder</span>::<span class="function">new</span>(...)</div>
+                    <div class="code-line">    .<span class="function">build</span>();</div>
+                    <div class="code-line">usb.<span class="function">run</span>().<span class="keyword">await</span>;</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// Ethernet</span></div>
+                    <div class="code-line"><span class="keyword">use</span> embassy_net::{<span class="type">Stack</span>, <span class="type">StackResources</span>};</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">let</span> stack = <span class="type">Stack</span>::<span class="function">new</span>(device, config, resources);</div>
+                    <div class="code-line">spawner.<span class="function">spawn</span>(<span class="function">net_task</span>(stack));</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// TCP 서버</span></div>
+                    <div class="code-line"><span class="keyword">let</span> <span class="keyword">mut</span> socket = <span class="type">TcpSocket</span>::<span class="function">new</span>(stack, &<span class="keyword">mut</span> rx_buffer, &<span class="keyword">mut</span> tx_buffer);</div>
+                    <div class="code-line">socket.<span class="function">accept</span>(<span class="number">8080</span>).<span class="keyword">await</span>?;</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 4-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">🚀✨</div>
+            <div class="highlight-box" style="max-width: 1400px;">
+                <h3>
+                    <span class="ko">핵심 요약</span>
+                    <span class="en" style="display:none;">Key Takeaways</span>
+                </h3>
+                <p class="ko">
+                    ✅ Embassy는 임베디드 async 런타임<br>
+                    ✅ async/await로 간결한 비동기 코드<br>
+                    ✅ Spawner로 태스크 생성 및 관리<br>
+                    ✅ Channel로 태스크 간 통신<br>
+                    ✅ Signal로 이벤트 전달<br>
+                    ✅ USB, 네트워킹 등 풍부한 기능
+                </p>
+                <p class="en" style="display:none;">
+                    ✅ Embassy is embedded async runtime<br>
+                    ✅ Clean async code with async/await<br>
+                    ✅ Spawn and manage tasks with Spawner<br>
+                    ✅ Inter-task communication with Channels<br>
+                    ✅ Event signaling with Signals<br>
+                    ✅ Rich features: USB, networking, etc.
+                </p>
+            </div>
+            <div style="margin-top: 40px; text-align: center;">
+                <p style="font-size: 36px; margin-bottom: 20px;">
+                    <span class="ko">Level 2-4 완료! 🎉</span>
+                    <span class="en" style="display:none;">Level 2-4 Complete! 🎉</span>
+                </p>
+                <p style="font-size: 28px; color: #888;">
+                    <span class="ko">고급 Rust 마스터 축하합니다!</span>
+                    <span class="en" style="display:none;">Congratulations on mastering Advanced Rust!</span>
+                </p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a> |
+                <span class="ko">弘益人間 - 널리 인간을 이롭게 하라</span>
+                <span class="en" style="display:none;">Benefit All Humanity</span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="alert('Level 2-4 완료!')">
+                <span class="ko">완료! 🎉</span>
+                <span class="en" style="display:none;">Complete! 🎉</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') ||
+                    (lang === 'en' && btn.textContent === 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.ko').forEach(el => {
+                el.style.display = lang === 'ko' ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = lang === 'en' ? '' : 'none';
+            });
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                const lines = document.querySelectorAll(`#slide${n} .code-line`);
+                lines.forEach((line, i) => {
+                    setTimeout(() => line.classList.add('show'), i * 70);
+                });
+
+                const items = document.querySelectorAll(`#slide${n} .comparison-item`);
+                items.forEach((item, i) => {
+                    setTimeout(() => item.classList.add('show'), i * 200);
+                });
+            }, 100);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Initialize
+        animateSlide(1);
+    </script>
+</body>
+</html>

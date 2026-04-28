@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 8-02: Macros - Rust NRT Academy</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 50%, #3d3d3d 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #f5f5f5;
+            overflow: hidden;
+        }
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            display: none;
+            flex-direction: column;
+        }
+        .slide.active { display: flex; }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+        .logo { font-size: 28px; font-weight: bold; color: #a855f7; }
+        .episode-tag {
+            background: linear-gradient(90deg, #a855f7, #9333ea);
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-size: 18px;
+            color: white;
+        }
+        .lang-toggle { display: flex; gap: 10px; }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 2px solid #a855f7;
+            background: transparent;
+            color: #a855f7;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .lang-btn.active { background: #a855f7; color: #1f1f1f; }
+
+        h1 {
+            font-size: 72px;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #a855f7, #c084fc, #e879f9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+        h2 { font-size: 48px; color: #a855f7; margin-bottom: 30px; }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .code-block {
+            background: #0f0f0f;
+            border-radius: 20px;
+            padding: 35px;
+            margin: 15px 0;
+            border: 2px solid #a855f7;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 22px;
+            line-height: 1.5;
+            position: relative;
+        }
+        .code-block::before {
+            content: 'RUST';
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            color: #a855f7;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateX(-30px);
+            animation: slideIn 0.5s forwards;
+        }
+        @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+
+        .keyword { color: #ff6b6b; }
+        .type { color: #ffc371; }
+        .string { color: #a8e6cf; }
+        .comment { color: #6b7280; font-style: italic; }
+        .function { color: #74b9ff; }
+        .number { color: #fab1a0; }
+        .macro { color: #a855f7; font-weight: bold; }
+
+        .concept-box {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(147, 51, 234, 0.1));
+            border: 2px solid #a855f7;
+            border-radius: 20px;
+            padding: 30px;
+            margin: 15px 0;
+        }
+
+        .flex-container { display: flex; gap: 30px; align-items: flex-start; }
+        .flex-item { flex: 1; }
+
+        .highlight { color: #e879f9; font-weight: bold; }
+
+        .bullet-list {
+            list-style: none;
+            font-size: 24px;
+            line-height: 1.8;
+        }
+        .bullet-list li::before { content: '✨ '; }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #a855f7, #e879f9);
+            transition: width 0.3s;
+        }
+        .slide-number {
+            position: fixed;
+            bottom: 20px;
+            right: 40px;
+            font-size: 24px;
+            color: #a855f7;
+        }
+        .nav-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 40px;
+            font-size: 18px;
+            color: #6b7280;
+        }
+
+        .ko { display: block; }
+        .en { display: none; }
+        body.lang-en .ko { display: none; }
+        body.lang-en .en { display: block; }
+
+        .center { text-align: center; }
+        .subtitle { font-size: 28px; color: #c084fc; text-align: center; margin-bottom: 30px; }
+
+        .magic-icon { font-size: 100px; text-align: center; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">EP 8-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="content center">
+            <h1>Macros</h1>
+            <p class="subtitle ko">매크로: 코드를 작성하는 코드</p>
+            <p class="subtitle en">Macros: Code that Writes Code</p>
+            <div class="magic-icon">🪄</div>
+            <p style="font-size: 26px; color: #9ca3af;">
+                <span class="ko">메타프로그래밍의 힘 - println!, vec!, derive 의 비밀</span>
+                <span class="en">The power of metaprogramming - secrets of println!, vec!, derive</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Slide 2: Declarative Macros -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">선언적 매크로</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">macro_rules! - 선언적 매크로</h2>
+        <h2 class="en">macro_rules! - Declarative Macros</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// 간단한 매크로 정의</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="macro">macro_rules!</span> say_hello {</div>
+                <div class="code-line" style="animation-delay: 0.3s">    () => {</div>
+                <div class="code-line" style="animation-delay: 0.4s">        <span class="macro">println!</span>(<span class="string">"Hello!"</span>);</div>
+                <div class="code-line" style="animation-delay: 0.5s">    };</div>
+                <div class="code-line" style="animation-delay: 0.6s">}</div>
+                <div class="code-line" style="animation-delay: 0.8s"></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="comment">// 인자 받는 매크로</span></div>
+                <div class="code-line" style="animation-delay: 1.0s"><span class="macro">macro_rules!</span> greet {</div>
+                <div class="code-line" style="animation-delay: 1.1s">    ($name:expr) => {</div>
+                <div class="code-line" style="animation-delay: 1.2s">        <span class="macro">println!</span>(<span class="string">"안녕, {}!"</span>, $name);</div>
+                <div class="code-line" style="animation-delay: 1.3s">    };</div>
+                <div class="code-line" style="animation-delay: 1.4s">}</div>
+                <div class="code-line" style="animation-delay: 1.6s"></div>
+                <div class="code-line" style="animation-delay: 1.7s"><span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                <div class="code-line" style="animation-delay: 1.8s">    <span class="macro">say_hello!</span>();        <span class="comment">// Hello!</span></div>
+                <div class="code-line" style="animation-delay: 1.9s">    <span class="macro">greet!</span>(<span class="string">"Rust"</span>);      <span class="comment">// 안녕, Rust!</span></div>
+                <div class="code-line" style="animation-delay: 2.0s">}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 3: Pattern Matching in Macros -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">패턴 매칭</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">매크로 패턴 매칭</h2>
+        <h2 class="en">Pattern Matching in Macros</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="macro">macro_rules!</span> calculate {</div>
+                <div class="code-line" style="animation-delay: 0.2s">    <span class="comment">// 여러 패턴 매칭!</span></div>
+                <div class="code-line" style="animation-delay: 0.3s">    (add $a:expr, $b:expr) => {</div>
+                <div class="code-line" style="animation-delay: 0.4s">        $a + $b</div>
+                <div class="code-line" style="animation-delay: 0.5s">    };</div>
+                <div class="code-line" style="animation-delay: 0.6s">    (mul $a:expr, $b:expr) => {</div>
+                <div class="code-line" style="animation-delay: 0.7s">        $a * $b</div>
+                <div class="code-line" style="animation-delay: 0.8s">    };</div>
+                <div class="code-line" style="animation-delay: 0.9s">}</div>
+                <div class="code-line" style="animation-delay: 1.1s"></div>
+                <div class="code-line" style="animation-delay: 1.2s"><span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                <div class="code-line" style="animation-delay: 1.3s">    <span class="keyword">let</span> sum = <span class="macro">calculate!</span>(add <span class="number">5</span>, <span class="number">3</span>);   <span class="comment">// 8</span></div>
+                <div class="code-line" style="animation-delay: 1.4s">    <span class="keyword">let</span> prod = <span class="macro">calculate!</span>(mul <span class="number">4</span>, <span class="number">7</span>);  <span class="comment">// 28</span></div>
+                <div class="code-line" style="animation-delay: 1.5s">}</div>
+            </div>
+            <div class="concept-box">
+                <p style="font-size: 20px;">
+                    <span class="ko">📝 <span class="highlight">$name:type</span> 형식으로 캡처. type: expr, ident, ty, pat, stmt, block, item, tt 등</span>
+                    <span class="en">📝 Capture with <span class="highlight">$name:type</span>. type: expr, ident, ty, pat, stmt, block, item, tt etc</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: Variadic Macros -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">가변 인자</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">가변 인자 매크로</h2>
+        <h2 class="en">Variadic Macros</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// vec! 스타일 매크로</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="macro">macro_rules!</span> my_vec {</div>
+                <div class="code-line" style="animation-delay: 0.3s">    <span class="comment">// $(...),* = 0개 이상 반복</span></div>
+                <div class="code-line" style="animation-delay: 0.4s">    ( $( $x:expr ),* ) => {</div>
+                <div class="code-line" style="animation-delay: 0.5s">        {</div>
+                <div class="code-line" style="animation-delay: 0.6s">            <span class="keyword">let mut</span> temp_vec = <span class="type">Vec</span>::<span class="function">new</span>();</div>
+                <div class="code-line" style="animation-delay: 0.7s">            $(</div>
+                <div class="code-line" style="animation-delay: 0.8s">                temp_vec.<span class="function">push</span>($x);</div>
+                <div class="code-line" style="animation-delay: 0.9s">            )*</div>
+                <div class="code-line" style="animation-delay: 1.0s">            temp_vec</div>
+                <div class="code-line" style="animation-delay: 1.1s">        }</div>
+                <div class="code-line" style="animation-delay: 1.2s">    };</div>
+                <div class="code-line" style="animation-delay: 1.3s">}</div>
+                <div class="code-line" style="animation-delay: 1.5s"></div>
+                <div class="code-line" style="animation-delay: 1.6s"><span class="keyword">let</span> v = <span class="macro">my_vec!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>];</div>
+                <div class="code-line" style="animation-delay: 1.7s"><span class="macro">println!</span>(<span class="string">"{:?}"</span>, v);  <span class="comment">// [1, 2, 3, 4, 5]</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 5: Derive Macros -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Derive 매크로</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">#[derive] 절차적 매크로</h2>
+        <h2 class="en">#[derive] Procedural Macros</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// 컴파일러가 자동으로 코드 생성!</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="macro">#[derive(Debug, Clone, PartialEq)]</span></div>
+                <div class="code-line" style="animation-delay: 0.3s"><span class="keyword">struct</span> <span class="type">User</span> {</div>
+                <div class="code-line" style="animation-delay: 0.4s">    name: <span class="type">String</span>,</div>
+                <div class="code-line" style="animation-delay: 0.5s">    age: <span class="type">u32</span>,</div>
+                <div class="code-line" style="animation-delay: 0.6s">}</div>
+                <div class="code-line" style="animation-delay: 0.8s"></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="comment">// serde로 직렬화</span></div>
+                <div class="code-line" style="animation-delay: 1.0s"><span class="keyword">use</span> serde::{<span class="type">Serialize</span>, <span class="type">Deserialize</span>};</div>
+                <div class="code-line" style="animation-delay: 1.2s"></div>
+                <div class="code-line" style="animation-delay: 1.3s"><span class="macro">#[derive(Serialize, Deserialize)]</span></div>
+                <div class="code-line" style="animation-delay: 1.4s"><span class="keyword">struct</span> <span class="type">Config</span> {</div>
+                <div class="code-line" style="animation-delay: 1.5s">    host: <span class="type">String</span>,</div>
+                <div class="code-line" style="animation-delay: 1.6s">    port: <span class="type">u16</span>,</div>
+                <div class="code-line" style="animation-delay: 1.7s">}</div>
+                <div class="code-line" style="animation-delay: 1.9s"></div>
+                <div class="code-line" style="animation-delay: 2.0s"><span class="comment">// JSON으로 자동 변환 가능!</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 6: Attribute Macros -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">속성 매크로</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">속성 매크로</h2>
+        <h2 class="en">Attribute Macros</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// tokio의 #[tokio::main]</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="macro">#[tokio::main]</span></div>
+                <div class="code-line" style="animation-delay: 0.3s"><span class="keyword">async fn</span> <span class="function">main</span>() {</div>
+                <div class="code-line" style="animation-delay: 0.4s">    <span class="macro">println!</span>(<span class="string">"비동기 메인!"</span>);</div>
+                <div class="code-line" style="animation-delay: 0.5s">}</div>
+                <div class="code-line" style="animation-delay: 0.7s"></div>
+                <div class="code-line" style="animation-delay: 0.8s"><span class="comment">// 테스트 속성</span></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="macro">#[test]</span></div>
+                <div class="code-line" style="animation-delay: 1.0s"><span class="keyword">fn</span> <span class="function">test_something</span>() { }</div>
+                <div class="code-line" style="animation-delay: 1.2s"></div>
+                <div class="code-line" style="animation-delay: 1.3s"><span class="comment">// 조건부 컴파일</span></div>
+                <div class="code-line" style="animation-delay: 1.4s"><span class="macro">#[cfg(target_os = "linux")]</span></div>
+                <div class="code-line" style="animation-delay: 1.5s"><span class="keyword">fn</span> <span class="function">linux_only</span>() { }</div>
+                <div class="code-line" style="animation-delay: 1.7s"></div>
+                <div class="code-line" style="animation-delay: 1.8s"><span class="comment">// 인라인 힌트</span></div>
+                <div class="code-line" style="animation-delay: 1.9s"><span class="macro">#[inline(always)]</span></div>
+                <div class="code-line" style="animation-delay: 2.0s"><span class="keyword">fn</span> <span class="function">hot_function</span>() { }</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 7: Popular Macros -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">인기 매크로</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">자주 쓰는 매크로들</h2>
+        <h2 class="en">Commonly Used Macros</h2>
+        <div class="content">
+            <div class="flex-container">
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #a855f7; margin-bottom: 20px;" class="ko">표준 라이브러리</h3>
+                        <h3 style="color: #a855f7; margin-bottom: 20px;" class="en">Standard Library</h3>
+                        <div class="code-block" style="font-size: 18px; padding: 20px;">
+                            <div class="code-line"><span class="macro">println!</span>(<span class="string">"출력"</span>);</div>
+                            <div class="code-line"><span class="macro">format!</span>(<span class="string">"포맷 {}"</span>, val);</div>
+                            <div class="code-line"><span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>];</div>
+                            <div class="code-line"><span class="macro">panic!</span>(<span class="string">"에러!"</span>);</div>
+                            <div class="code-line"><span class="macro">assert!</span>(condition);</div>
+                            <div class="code-line"><span class="macro">assert_eq!</span>(a, b);</div>
+                            <div class="code-line"><span class="macro">dbg!</span>(value);</div>
+                            <div class="code-line"><span class="macro">todo!</span>();</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #c084fc; margin-bottom: 20px;" class="ko">인기 크레이트</h3>
+                        <h3 style="color: #c084fc; margin-bottom: 20px;" class="en">Popular Crates</h3>
+                        <div class="code-block" style="font-size: 18px; padding: 20px;">
+                            <div class="code-line"><span class="comment">// serde</span></div>
+                            <div class="code-line"><span class="macro">#[derive(Serialize)]</span></div>
+                            <div class="code-line"></div>
+                            <div class="code-line"><span class="comment">// thiserror</span></div>
+                            <div class="code-line"><span class="macro">#[derive(Error)]</span></div>
+                            <div class="code-line"></div>
+                            <div class="code-line"><span class="comment">// tokio</span></div>
+                            <div class="code-line"><span class="macro">#[tokio::main]</span></div>
+                            <div class="code-line"><span class="macro">tokio::select!</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">정리</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">EP 8-02 요약</h2>
+        <h2 class="en">EP 8-02 Summary</h2>
+        <div class="content">
+            <div class="flex-container">
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #a855f7; margin-bottom: 20px;">매크로 종류</h3>
+                        <ul class="bullet-list" style="font-size: 20px;">
+                            <li class="ko">선언적: macro_rules!</li>
+                            <li class="en">Declarative: macro_rules!</li>
+                            <li class="ko">절차적: derive, attribute</li>
+                            <li class="en">Procedural: derive, attribute</li>
+                            <li class="ko">함수형: fn-like</li>
+                            <li class="en">Function-like: fn-like</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #e879f9; margin-bottom: 20px;">핵심 포인트</h3>
+                        <ul class="bullet-list" style="font-size: 20px;">
+                            <li class="ko">코드 생성 = 보일러플레이트 제거</li>
+                            <li class="en">Code generation = No boilerplate</li>
+                            <li class="ko">컴파일 타임에 확장</li>
+                            <li class="en">Expanded at compile time</li>
+                            <li class="ko">! 로 호출 (함수와 구분)</li>
+                            <li class="en">Called with ! (vs functions)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 40px;">
+                <p style="font-size: 28px; color: #c084fc;">
+                    <span class="ko">마지막 레벨: 실전 프로젝트! 🚀</span>
+                    <span class="en">Final Level: Real-world Projects! 🚀</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="progress-bar" id="progress"></div>
+    <div class="slide-number" id="slideNum">1 / 8</div>
+    <div class="nav-hint">← → 키 또는 클릭으로 이동</div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+
+        function showSlide(n) {
+            if (n < 1) n = 1;
+            if (n > totalSlides) n = totalSlides;
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            document.getElementById('progress').style.width = (n / totalSlides * 100) + '%';
+            document.getElementById('slideNum').textContent = n + ' / ' + totalSlides;
+            animateSlide();
+        }
+
+        function nextSlide() { showSlide(currentSlide + 1); }
+        function prevSlide() { showSlide(currentSlide - 1); }
+
+        function animateSlide() {
+            const slide = document.getElementById('slide' + currentSlide);
+            const lines = slide.querySelectorAll('.code-line');
+            lines.forEach((line, i) => {
+                line.style.animation = 'none';
+                line.offsetHeight;
+                line.style.animation = `slideIn 0.5s ${i * 0.1}s forwards`;
+            });
+        }
+
+        function setLang(lang) {
+            document.body.classList.remove('lang-en');
+            if (lang === 'en') document.body.classList.add('lang-en');
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.includes(lang === 'ko' ? '한국어' : 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                if (e.clientX > window.innerWidth / 2) nextSlide();
+                else prevSlide();
+            }
+        });
+
+        showSlide(1);
+    </script>
+</body>
+</html>

@@ -5,237 +5,365 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-fuel-cell (Fuel Cell).
+This document defines the protocols that govern a
+fuel-cell deployment: the IEC 62282 series safety,
+performance, installation and test discipline; the ISO
+14687 hydrogen-fuel-quality discipline; the IEEE 1547
+grid-interconnection discipline (where the system is
+grid-coupled); the IECEx hazardous-area discipline
+(where the installation handles flammable hydrogen);
+the UN GTR 13 / UN R134 vehicle-onboard discipline; the
+operating-jurisdiction AHJ permitting and acceptance
+discipline; the periodic-inspection cadence discipline;
+and the incident-record discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 17021-1:2015 (management-system audit and
+  certification)
+- ISO/IEC 17025:2017 (testing and calibration
+  laboratories)
+- ISO/IEC 17065:2012 (conformity-assessment bodies)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 8601 (date and time)
+- ISO 14687 (hydrogen fuel quality)
+- ISO 19880-1 (gaseous hydrogen — fuelling stations)
+- ISO 22734 (hydrogen generators using water
+  electrolysis)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 9457 (Problem Details)
+- IEC 62282-2 / -3-100 / -3-200 / -3-300 / -4-101 /
+  -6-100 / -6-200 / -7-1 / -7-2 / -8
+- IEEE 1547-2018 / IEEE 1547.1-2020
+- IECEx system documents and the IEC 60079 series
+  (60079-0 general, 60079-10-1 area classification,
+  60079-14 design selection erection, 60079-17
+  inspection and maintenance)
+- UN GTR 13 (hydrogen and fuel-cell vehicles)
+- UN ECE Regulation No. 134
+- SAE J2601:2020 (gaseous hydrogen fuelling protocol);
+  cited where the operating environment uses the SAE
+  J2601 protocol in parallel with ISO 19880-1
+- NFPA 2 (Hydrogen Technologies Code); cited where the
+  operating jurisdiction is the United States and the
+  AHJ adopts NFPA 2
 
 ---
 
-## §1 Scope
+## §1 IEC 62282 Discipline
 
-This PHASE document is one of four that together define the WIA-fuel-cell
-standard. It addresses the protocol layer of the standard.
+The IEC 62282 series is the primary normative reference
+for fuel-cell systems. The deployment's IEC 62282
+discipline:
 
-## §2 Manifest
+- per-stack IEC 62282-2 module test (or IEC 62282-7-1
+  / 7-2 single-cell-and-stack test) before
+  installation;
+- per-stationary-system IEC 62282-3-100 safety
+  attestation (the safety standard for stationary
+  fuel-cell power systems);
+- per-stationary-system IEC 62282-3-200 performance
+  test methods (measurement of rated power, voltage,
+  efficiency, response time at the manufacturer's
+  rated operating point);
+- per-stationary-system IEC 62282-3-300 installation
+  inspection (covering electrical, fluid, gas,
+  thermal, ventilation, and emergency-shutdown
+  installation);
+- per-industrial-truck system IEC 62282-4-101 (the
+  electric-truck specific safety standard);
+- per-micro-system IEC 62282-6-100 / 6-200 (safety and
+  performance for portable systems);
+- per-regenerative-energy-storage system IEC 62282-8
+  (the standard for regenerative fuel-cell energy
+  storage operating in reverse mode).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "fuel-cell"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 ISO 14687 Hydrogen-Fuel-Quality Discipline
 
-## §3 Conformance Tiers
+Hydrogen fuel supplied to the stack inlet conforms to
+the ISO 14687 grade the stack tolerates per the
+manufacturer's data sheet:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- Grade A (general industrial use, lower purity);
+- Grade B (intermediate);
+- Grades C / D (PEMFC for stationary or transport
+  applications, requiring tight control of CO,
+  sulphur, ammonia, and total hydrocarbons);
+- Grade E (PEMFC for road-vehicle applications, with
+  the strictest contaminant limits to protect on-
+  board catalysts).
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+The discipline:
 
-## §4 Discovery
+- per-supply-handoff fuel-quality verification using
+  the contaminant panel ISO 14687 specifies;
+- per-laboratory ISO/IEC 17025 accreditation for the
+  contaminant panel (without ISO/IEC 17025
+  accreditation the verdict has no defensible
+  provenance);
+- per-non-conformance impact analysis — sulphur and
+  CO contaminants typically cause reversible
+  degradation, while halogenated compounds cause
+  irreversible degradation, and the impact analysis
+  drives the operations team's response (continued
+  operation with elevated monitoring, supply
+  rejection, or stack inspection).
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/fuel-cell`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 IEEE 1547 Grid-Interconnection Discipline
 
-## §5 Time and Identity
+Where the system is grid-coupled (PHASE-1 §2
+`gridInterconnection` of `grid-paralleled-low-voltage`
+or `grid-paralleled-medium-voltage`) the deployment's
+discipline:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- per-system IEEE 1547.1-2020 conformance test report;
+- per-system ride-through category declaration
+  (category-i / ii / iii per IEEE 1547-2018 abnormal-
+  condition performance);
+- per-system interoperability protocol (SunSpec
+  Modbus, IEEE 2030.5, DNP3 — IEEE 1547-2018 cites
+  these as the recognised interoperability
+  protocols);
+- per-installation utility interconnection agreement
+  with the grid system operator (the agreement records
+  the point-of-common-coupling capacity, the
+  voltage-and-frequency operating bands, and the
+  abnormal-condition trip and ride-through settings).
 
-## §6 Versioning and Deprecation
+The IEEE 1547-2018 abnormal-condition ride-through
+requires the system to remain connected during voltage
+and frequency excursions within the per-category
+envelope rather than tripping immediately, supporting
+grid stability under disturbance.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 IECEx Hazardous-Area Discipline
 
-## §7 Privacy and Security
+Where the installation handles flammable hydrogen with
+the potential for leak, the deployment's IECEx
+discipline:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- per-area IEC 60079-10-1 area classification (Zone 0
+  / 1 / 2 for gas atmospheres);
+- per-equipment IECEx Certificate of Conformity for
+  equipment intended to operate in the zone (the IECEx
+  CoC certifies the equipment against the relevant IEC
+  60079 part — flameproof Ex d, increased safety Ex e,
+  intrinsic safety Ex i, encapsulation Ex m,
+  pressurisation Ex p, etc.);
+- per-installation IEC 60079-14 design verification
+  (selection of equipment for the zone, cable entry,
+  bonding, separation distances);
+- per-installation IEC 60079-17 inspection cadence
+  (initial detailed inspection followed by periodic
+  close, visual, or sampling inspections per the
+  cadence the standard prescribes).
 
-## §8 Open Governance
+The installation team's "Ex competent person"
+qualification (per IEC 60079-14 / 60079-17
+recommendations) is recorded against the inspector
+identity in PHASE-1 §9.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `fuel-cell` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 UN GTR 13 / UN R134 Vehicle-Onboard Discipline
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+For vehicle-onboard installations the deployment's
+discipline:
 
+- per-vehicle UN GTR 13 test report (covering crash
+  test, post-crash fuel leakage, hydrogen-storage
+  container — environmental testing, expected service
+  performance, baseline performance, durability — and
+  fuel-system integrity in normal and post-crash
+  conditions);
+- per-vehicle UN ECE Regulation No. 134 type approval
+  certificate where the operating jurisdiction
+  recognises UN R134 type approval (the EU, JP, and
+  KR, among the operating jurisdictions that have
+  acceded to the UNECE 1958 Agreement);
+- per-vehicle storage-container specification
+  (typically 70 MPa for passenger cars and 35 to 70
+  MPa for heavy duty, with Type 4 fully wrapped
+  composite cylinders dominating the passenger-car
+  market and Type 3 metal-lined composite cylinders
+  also in use);
+- per-vehicle fuelling-protocol declaration (SAE
+  J2601:2020 for the SAE community, ISO 19880-1 for
+  the ISO community).
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §6 AHJ Permitting and Acceptance Discipline
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+The operating jurisdiction's authority having
+jurisdiction (AHJ) permits and accepts the
+installation:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+- per-permit installation-permit application with
+  the submitted IEC 62282-3-300 installation design
+  documentation;
+- per-acceptance commissioning inspection by the AHJ
+  or AHJ-recognised inspection body;
+- per-acceptance certificate of occupancy or operating
+  permit;
+- per-modification re-acceptance for material
+  modifications (capacity change, fuel-supply-rail
+  change, hazardous-area-classification change).
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+In the United States, NFPA 2 (the Hydrogen Technologies
+Code) is widely adopted by AHJs and applies in
+parallel with the IEC 62282 series. In the European
+Union, the operating Member State's transposition of
+the ATEX Directives and the Pressure Equipment
+Directive applies in parallel with the IEC 62282
+series. In Korea, KGS Code AC112 (KGS Industries' fuel-
+cell installation code) and the operating Ministry of
+Trade, Industry and Energy's enforcement rules apply.
 
-## Annex F — Adoption Roadmap
+## §7 Periodic-Inspection Cadence Discipline
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Periodic-inspection cadence is driven by:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+- per-stack manufacturer-recommended-maintenance
+  schedule;
+- per-zone IEC 60079-17 inspection cadence;
+- per-jurisdiction AHJ-mandated inspection cadence
+  (some AHJs mandate annual inspection as a permit
+  condition, some mandate inspection on operating-hour
+  thresholds);
+- per-event-trigger re-inspection (post-incident,
+  post-modification, post-environmental event such
+  as flood or seismic event affecting the
+  installation).
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §8 Incident-Record Discipline
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Per-incident discipline:
 
-## Annex G — Test Vectors and Conformance Evidence
+- per-incident detection — automated leak detection
+  via hydrogen sensors with pre-defined alarm
+  thresholds, automated flame detection where the
+  application class warrants, and operator
+  observation;
+- per-incident containment — emergency shutdown,
+  isolation of the affected hydrogen supply, ventilation
+  activation, evacuation if personnel-affecting;
+- per-incident root-cause analysis using the
+  manufacturer's failure-mode library and the
+  operating jurisdiction's incident-investigation
+  framework;
+- per-incident AHJ notification on the operating
+  jurisdiction's reporting threshold (typical
+  thresholds: any personnel injury, any environmental
+  release, any incident triggering emergency-services
+  response);
+- per-incident lessons-learned narrative feeding the
+  deployment's preventive-maintenance and design-
+  review cycles.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §9 Records Retention
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Programme records — every stack registration, BoP
+registration, fuel-quality verification, grid-
+interconnection test, vehicle-onboard test,
+commissioning record, periodic inspection, and
+incident record — retain for the operating life of
+the system plus the operating jurisdiction's records-
+retention horizon (typically the system life plus five
+to ten years for the AHJ's operational records, with
+incident records retained longer per the operating
+jurisdiction's investigation rules).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §10 Time Synchronisation
 
-## Annex H — Versioning and Deprecation Policy
+Operator clocks synchronise per RFC 5905 (NTPv4) so
+that grid-disturbance event timestamps, IEEE 1547
+ride-through performance audits, IEC 60079-17
+inspection cadence, AHJ incident-notification
+deadlines, and SAE J2601 fuelling-protocol exchanges
+are consistent across the deployment's runtime fleet.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 End-of-Life and Stack Replacement Discipline
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+End-of-life criteria are recorded at stack
+registration (PHASE-1 §3 `endOfLifeCriteria`).
+Replacement discipline:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+- pre-replacement fuel-quality re-verification (a
+  stack replacement provides an opportunity to
+  recheck the supply rail);
+- replacement-stack IEC 62282-2 or IEC 62282-7-1 / 7-2
+  test record;
+- post-replacement performance test (IEC 62282-3-200);
+- post-replacement AHJ acceptance for material
+  capacity-change replacements;
+- replaced-stack disposition record (recycling,
+  manufacturer take-back, or disposal per the
+  operating jurisdiction's hazardous-waste rules).
 
-## Annex I — Interoperability Profiles
+## §12 Manufacturer-Operator Coordination Discipline
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Manufacturer-operator coordination spans:
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+- per-system technical-data-package handoff at
+  commissioning (manufacturer's IEC 62282 evidence,
+  IEC 60079 evidence for Ex equipment, recommended-
+  maintenance schedule, spare-parts inventory);
+- per-system field-service incident reporting back to
+  the manufacturer feeding the manufacturer's
+  reliability database;
+- per-system firmware / control-system update
+  cadence;
+- per-system warranty-period support handoff.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §13 Per-Application Operating Discipline
+
+Application-class adaptations:
+
+- stationary-power: voltage-and-frequency operating
+  bands declared in the IEEE 1547 utility agreement;
+  CHP applications add thermal-recovery monitoring;
+- industrial-electric-truck: per-shift refuelling
+  events, per-cycle operating-hours tracking, on-site
+  refuelling-station integration per ISO 19880-1
+  where applicable;
+- micro-portable: per-cartridge refuelling events,
+  fuel-quality re-verification at cartridge swap;
+- regenerative-energy-storage: per-cycle round-trip
+  efficiency tracking, electrolysis-mode hydrogen-
+  generation integration per ISO 22734 where the
+  system is co-located with an electrolyser;
+- vehicle-passenger / heavy-duty: per-fill SAE J2601
+  / ISO 19880-1 protocol log, periodic UN R134 in-
+  service inspection per the operating jurisdiction's
+  vehicle-inspection regime.
+
+## §14 Quality Dossier and Conformance
+
+The deployment's quality dossier records the governing
+frameworks, the manufacturer-of-record and the system-
+integrator-of-record, the IEC 62282 evidence, the IEC
+60079 / IECEx evidence (where Ex zones apply), the
+IEEE 1547 / IEEE 1547.1 evidence (for grid-
+interconnected installations), the UN GTR 13 / UN
+R134 evidence (for vehicle-onboard installations), the
+ISO 14687 fuel-quality verification history, the AHJ
+permitting and acceptance correspondence, the periodic-
+inspection history, and the incident history. The
+dossier is reviewed at least annually by the
+deployment's quality manager.
+
+A programme conformant with WIA-fuel-cell publishes its
+governing-framework declarations, its commissioning
+acceptance, its periodic-inspection cadence, the
+aggregate fuel-quality conformance rate, and the
+aggregate incident rate; and answers an annual self-
+assessment that maps each clause of this PHASE to the
+deployment's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-fuel-cell
+- **Last Updated:** 2026-04-28

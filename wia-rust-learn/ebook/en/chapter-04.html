@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Borrowing & Lifetimes - WIA-RUST-LEARN</title>
+    <style>
+        :root { --rust-orange: #f97316; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; --yellow: #eab308; --red: #ef4444; --purple: #8b5cf6; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-orange); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-orange); }
+        h2 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); border-bottom: 2px solid var(--rust-orange); padding-bottom: 10px; }
+        h3 { font-size: 1.2rem; margin: 25px 0 15px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-orange); }
+        code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; font-family: monospace; color: var(--rust-orange); }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-orange); }
+        .success-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .warning-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--yellow); }
+        .danger-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--red); }
+        table { width: 100%; margin: 20px 0; border-collapse: collapse; background: var(--bg-card); border-radius: 8px; overflow: hidden; }
+        th { background: var(--rust-orange); color: white; padding: 15px; text-align: left; }
+        td { padding: 12px 15px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+        tr:last-child td { border-bottom: none; }
+        .rule { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 15px 0; }
+        .rule.immutable { border-left: 4px solid var(--blue); }
+        .rule.mutable { border-left: 4px solid var(--yellow); }
+        .rule.danger { border-left: 4px solid var(--red); }
+        .questions-box { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; }
+        .questions-box h3 { color: var(--blue); margin-top: 0; }
+        .questions-box ol { padding-left: 25px; }
+        .questions-box li { color: var(--text-muted); margin-bottom: 15px; }
+        .summary-box { background: linear-gradient(135deg, #1a2f1a 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--green); }
+        .summary-box h3 { color: var(--green); margin-top: 0; }
+        .summary-box ul { padding-left: 25px; }
+        .summary-box li { color: var(--text-muted); margin-bottom: 10px; }
+        .looking-ahead { background: linear-gradient(135deg, #2d1f3d 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--purple); }
+        .looking-ahead h3 { color: var(--purple); margin-top: 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: Borrowing & Lifetimes</h1>
+
+        <p>What if you want to use a value without taking ownership? That's where borrowing comes in. Borrowing lets you reference data without owning it, enabling more flexible and efficient code while maintaining Rust's safety guarantees.</p>
+
+        <div class="highlight">
+            <strong>The Core Insight</strong>
+            <p style="margin-top: 10px;">References allow you to refer to a value without taking ownership. Like borrowing a book from a library—you can read it, but you don't own it, and you must return it.</p>
+        </div>
+
+        <h2>4.1 References: The Basics</h2>
+
+        <p>A <strong>reference</strong> is like a pointer that's guaranteed to point to valid data. You create a reference using the <code>&</code> operator:</p>
+
+        <pre>fn main() {
+    let s1 = String::from("hello");
+    let len = calculate_length(&s1);  // Pass a reference, not ownership
+
+    println!("The length of '{}' is {}.", s1, len);  // s1 is still valid!
+}
+
+fn calculate_length(s: &String) -> usize {  // s is a reference to a String
+    s.len()
+}  // s goes out of scope, but it doesn't own the data, so nothing is dropped</pre>
+
+        <div class="success-box">
+            <strong>References vs Ownership</strong>
+            <p style="margin-top: 10px;">When you pass <code>&s1</code>, you're passing a reference. The function borrows the data but doesn't own it. When the function ends, the borrow ends, but the original data remains with the owner.</p>
+        </div>
+
+        <h3>The Ampersand (&) Operator</h3>
+
+        <table>
+            <tr>
+                <th>Syntax</th>
+                <th>Meaning</th>
+            </tr>
+            <tr>
+                <td><code>&value</code></td>
+                <td>Create an immutable reference to value</td>
+            </tr>
+            <tr>
+                <td><code>&mut value</code></td>
+                <td>Create a mutable reference to value</td>
+            </tr>
+            <tr>
+                <td><code>*reference</code></td>
+                <td>Dereference (follow the reference to the value)</td>
+            </tr>
+        </table>
+
+        <h2>4.2 Immutable References</h2>
+
+        <p>By default, references are immutable. You can read the data but not modify it:</p>
+
+        <div class="rule immutable">
+            <strong>Immutable Reference (&T)</strong>
+            <p style="margin-top: 10px;">An immutable reference lets you read data without modifying it. Think of it as "read-only access." You can have multiple immutable references to the same data.</p>
+        </div>
+
+        <pre>fn main() {
+    let s = String::from("hello");
+
+    let r1 = &s;  // OK
+    let r2 = &s;  // OK - multiple immutable refs allowed
+
+    println!("{} and {}", r1, r2);  // Both work
+}</pre>
+
+        <h3>Why Multiple Immutable References Are Safe</h3>
+
+        <p>Multiple readers don't conflict. If no one is modifying the data, any number of functions can read it simultaneously without risk of inconsistency.</p>
+
+        <h2>4.3 Mutable References</h2>
+
+        <p>To modify borrowed data, you need a mutable reference with <code>&mut</code>:</p>
+
+        <div class="rule mutable">
+            <strong>Mutable Reference (&mut T)</strong>
+            <p style="margin-top: 10px;">A mutable reference lets you read AND modify the data. But there's a restriction: you can only have one mutable reference to a value at a time.</p>
+        </div>
+
+        <pre>fn main() {
+    let mut s = String::from("hello");  // s must be declared mut
+
+    change(&mut s);  // Pass a mutable reference
+
+    println!("{}", s);  // Prints "hello, world"
+}
+
+fn change(some_string: &mut String) {
+    some_string.push_str(", world");  // Modify the borrowed data
+}</pre>
+
+        <div class="warning-box">
+            <strong>The Variable Must Be Mutable</strong>
+            <p style="margin-top: 10px;">To create a mutable reference, the original variable must be declared with <code>let mut</code>. You can't get a mutable reference to an immutable binding.</p>
+        </div>
+
+        <h2>4.4 The Borrowing Rules</h2>
+
+        <p>Rust enforces two critical rules to prevent data races at compile time:</p>
+
+        <div class="rule danger">
+            <strong>Rule 1: One Mutable OR Many Immutable</strong>
+            <p style="margin-top: 10px;">At any given time, you can have either:</p>
+            <ul style="padding-left: 20px; margin-top: 10px; color: var(--text-muted);">
+                <li>One mutable reference, OR</li>
+                <li>Any number of immutable references</li>
+            </ul>
+            <p style="margin-top: 10px;">But NOT both at the same time!</p>
+        </div>
+
+        <pre>// This is OK: multiple immutable references
+let s = String::from("hello");
+let r1 = &s;
+let r2 = &s;
+println!("{} and {}", r1, r2);</pre>
+
+        <pre>// This is NOT OK: mutable reference while immutable exists
+let mut s = String::from("hello");
+let r1 = &s;     // immutable borrow
+let r2 = &mut s; // ERROR! Can't borrow as mutable while immutable ref exists
+println!("{}", r1);</pre>
+
+        <div class="danger-box">
+            <strong>Why This Rule Exists</strong>
+            <p style="margin-top: 10px;">This rule prevents data races at compile time. A data race occurs when:</p>
+            <ul style="padding-left: 20px; margin-top: 10px; color: var(--text-muted);">
+                <li>Two or more pointers access the same data at the same time</li>
+                <li>At least one pointer is writing</li>
+                <li>There's no synchronization mechanism</li>
+            </ul>
+            <p style="margin-top: 10px;">Rust eliminates this entire class of bugs by enforcing exclusive access for mutation.</p>
+        </div>
+
+        <div class="rule danger">
+            <strong>Rule 2: References Must Be Valid</strong>
+            <p style="margin-top: 10px;">A reference cannot outlive the data it refers to. No dangling references!</p>
+        </div>
+
+        <pre>// This won't compile - dangling reference
+fn dangle() -> &String {
+    let s = String::from("hello");
+    &s  // ERROR! s is dropped when function ends, but we're returning a ref
+}
+
+// This is correct - return ownership instead
+fn no_dangle() -> String {
+    let s = String::from("hello");
+    s  // Ownership is moved out, no dangling reference
+}</pre>
+
+        <h2>4.5 Non-Lexical Lifetimes (NLL)</h2>
+
+        <p>Modern Rust uses "Non-Lexical Lifetimes" - references end when they're last used, not when they go out of scope:</p>
+
+        <pre>let mut s = String::from("hello");
+
+let r1 = &s;     // immutable borrow starts
+let r2 = &s;     // another immutable borrow
+println!("{} and {}", r1, r2);  // r1 and r2 are last used here
+
+// After this point, r1 and r2 are no longer in use
+let r3 = &mut s;  // OK! mutable borrow starts here
+println!("{}", r3);</pre>
+
+        <div class="success-box">
+            <strong>The Compiler Is Smart</strong>
+            <p style="margin-top: 10px;">The Rust compiler tracks exactly where each reference is used. References are considered "live" only until their last use, not until the end of the scope. This makes Rust more ergonomic without sacrificing safety.</p>
+        </div>
+
+        <h2>4.6 Lifetime Annotations</h2>
+
+        <p>Sometimes the compiler needs help understanding how long references should live. That's where lifetime annotations come in:</p>
+
+        <pre>// 'a is a lifetime parameter
+fn longest&lt;'a&gt;(x: &'a str, y: &'a str) -> &'a str {
+    if x.len() > y.len() {
+        x
+    } else {
+        y
+    }
+}</pre>
+
+        <p>The <code>'a</code> annotation means: "the returned reference will live at least as long as the shorter of the two input references."</p>
+
+        <h3>Reading Lifetime Syntax</h3>
+
+        <table>
+            <tr>
+                <th>Syntax</th>
+                <th>Meaning</th>
+            </tr>
+            <tr>
+                <td><code>&'a T</code></td>
+                <td>Reference to T with lifetime 'a</td>
+            </tr>
+            <tr>
+                <td><code>&'a mut T</code></td>
+                <td>Mutable reference to T with lifetime 'a</td>
+            </tr>
+            <tr>
+                <td><code>fn foo&lt;'a&gt;(x: &'a str)</code></td>
+                <td>Function with lifetime parameter</td>
+            </tr>
+            <tr>
+                <td><code>struct Foo&lt;'a&gt; { x: &'a str }</code></td>
+                <td>Struct holding a reference</td>
+            </tr>
+        </table>
+
+        <h3>Lifetime Elision Rules</h3>
+
+        <p>In many cases, Rust infers lifetimes automatically using these rules:</p>
+
+        <div class="highlight">
+            <ol style="padding-left: 20px; color: var(--text-muted);">
+                <li>Each input reference gets its own lifetime parameter</li>
+                <li>If there's exactly one input lifetime, it's assigned to all output references</li>
+                <li>If one of the inputs is <code>&self</code> or <code>&mut self</code>, its lifetime is assigned to outputs</li>
+            </ol>
+        </div>
+
+        <pre>// These two signatures are equivalent:
+fn first_word(s: &str) -> &str { ... }
+fn first_word&lt;'a&gt;(s: &'a str) -> &'a str { ... }</pre>
+
+        <h2>4.7 The 'static Lifetime</h2>
+
+        <p>The special <code>'static</code> lifetime means the reference lives for the entire program:</p>
+
+        <pre>let s: &'static str = "I have a static lifetime.";
+// String literals are stored in the program binary and always valid</pre>
+
+        <div class="warning-box">
+            <strong>Be Careful with 'static</strong>
+            <p style="margin-top: 10px;">Don't overuse <code>'static</code>. Usually when the compiler suggests it, there's a better solution. String literals are naturally 'static, but most data isn't.</p>
+        </div>
+
+        <h2>4.8 Chapter Summary</h2>
+
+        <div class="summary-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>References:</strong> Use <code>&</code> to borrow data without taking ownership</li>
+                <li><strong>Immutable:</strong> <code>&T</code> allows reading; multiple immutable refs allowed</li>
+                <li><strong>Mutable:</strong> <code>&mut T</code> allows modification; only one at a time</li>
+                <li><strong>Borrowing Rules:</strong> Either one mutable OR many immutable; refs must be valid</li>
+                <li><strong>Lifetimes:</strong> Annotations like <code>'a</code> tell the compiler how long refs should live</li>
+            </ul>
+        </div>
+
+        <h2>4.9 Review Questions</h2>
+
+        <div class="questions-box">
+            <h3>Test Your Understanding</h3>
+            <ol>
+                <li>What's the difference between ownership and borrowing?</li>
+                <li>Explain the two borrowing rules. Why does Rust enforce them?</li>
+                <li>What's the difference between <code>&String</code> and <code>&mut String</code>?</li>
+                <li>What is a lifetime? When do you need to annotate them explicitly?</li>
+                <li>What are the lifetime elision rules? Give an example where they apply.</li>
+                <li>What does <code>'static</code> mean? Give an example of data with a static lifetime.</li>
+            </ol>
+        </div>
+
+        <h2>4.10 Looking Ahead</h2>
+
+        <div class="looking-ahead">
+            <h3>What's Next: Chapter 5 - Structuring Your Code</h3>
+            <p>With ownership and borrowing mastered, you're ready to build larger programs:</p>
+            <ul style="padding-left: 25px; color: var(--text-muted);">
+                <li>Structs for grouping related data</li>
+                <li>Implementing methods with impl blocks</li>
+                <li>Enums for variant types</li>
+                <li>Pattern matching with match</li>
+                <li>Modules for organizing code</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

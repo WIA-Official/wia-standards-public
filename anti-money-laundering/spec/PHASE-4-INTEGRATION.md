@@ -5,270 +5,374 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-anti-money-laundering (Anti Money Laundering).
+This document defines how an obliged entity integrates
+with the systems that surround AML/CFT compliance: the
+operating jurisdiction's financial-intelligence unit
+(FinCEN, KoFIU, the operating Member State's FIU,
+NCA-UKFIU); the operating jurisdiction's AML/CFT
+supervisor (FinCEN + prudential regulator for US, AMLA
+for EU once operational, FSC + FSS for KR, FCA / HMRC
+/ Gambling Commission for UK per the obliged entity's
+class); the SWIFT network and ISO 20022 payment
+clearing infrastructure; sanctions-list providers (UN,
+EU, OFAC, UK OFSI, KR MOFA, the obliged entity's
+contracted screening service); the operating
+jurisdiction's beneficial-ownership register; the
+Egmont Group (international FIU cooperation); the
+Wolfsberg Group (cross-border banking community); the
+obliged entity's external auditors; and long-term
+archives.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17021-1:2015 (management-system audit and
+  certification)
+- ISO 8601 (date and time)
+- ISO 20022 (financial-services messaging)
+- ISO 17442 (LEI)
+- W3C Verifiable Credentials Data Model 2.0 (optional)
 
 ---
 
-## §1 Scope
+## §1 Financial-Intelligence Unit Integration
 
-This PHASE document is one of four that together define the WIA-anti-money-laundering
-standard. It addresses the integration layer of the standard.
+The operating jurisdiction's FIU is the destination
+for STR / SAR filings:
 
-## §2 Manifest
+- US: FinCEN BSA E-Filing System for SARs and CTRs;
+- KR: KoFIU electronic STR / CTR reporting channel;
+- EU: each Member State's FIU portal (FIU.NL for
+  Netherlands, TRACFIN for France, etc.);
+- UK: National Crime Agency UK FIU portal.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "anti-money-laundering"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Integration carries the FIU's identifier, the per-
+filing acknowledgement workflow, the per-FIU response
+SLA, and the per-FIU feedback consumption channel.
+FIUs share information with peer FIUs through the
+Egmont Group's secure web channel; the obliged entity
+does not interact with Egmont directly but its filings
+flow through the Egmont channel by way of the
+operating jurisdiction's FIU.
 
-## §3 Conformance Tiers
+## §2 AML/CFT Supervisor Integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Per-jurisdiction supervisor integration:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- US: FinCEN as the BSA administrator plus the obliged
+  entity's primary prudential regulator (Federal
+  Reserve, OCC, FDIC, NCUA, SEC, CFTC, state
+  regulator) per the obliged entity's federal /
+  state charter;
+- EU: AMLA (Authority for Anti-Money Laundering and
+  Countering the Financing of Terrorism) for direct
+  supervision of cross-border high-risk obliged
+  entities once AMLA is operational; the operating
+  Member State's national AML/CFT supervisor for all
+  other obliged entities;
+- KR: FSC (Financial Services Commission) and FSS
+  (Financial Supervisory Service) per the obliged
+  entity's class;
+- UK: FCA (Financial Conduct Authority) for FCA-
+  supervised firms; HMRC for trust-and-company-
+  service providers, accountancy service providers,
+  art-market participants, and money-service
+  businesses; the Gambling Commission for casinos.
 
-## §4 Discovery
+Integration carries the supervisor's identifier, the
+per-examination cooperation workflow, the per-
+enforcement-action response workflow, and the per-
+periodic-reporting cadence (where the supervisor
+requires periodic AML reporting beyond inquiry-driven
+reporting).
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/anti-money-laundering`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 SWIFT and ISO 20022 Payment Network Integration
 
-## §5 Time and Identity
+Cross-border payment messaging integrates with the
+SWIFT network for MT and ISO 20022 messages:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- MT 103 single customer credit transfer (originator
+  and beneficiary fields 50 and 59);
+- MT 202 / MT 202 COV financial-institution transfer
+  / cover payment (with the underlying customer
+  credit transfer's fields 50 and 59 in the COV
+  envelope);
+- ISO 20022 pacs.008 / pacs.009 / camt.* under the
+  SWIFT MT-to-ISO 20022 migration timetable; the
+  obliged entity's parallel-running discipline is
+  recorded in the per-corridor migration tracker.
 
-## §6 Versioning and Deprecation
+Integration carries the SWIFT BIC of the obliged
+entity, the per-corridor migration status, and the
+per-message Travel-Rule field validation gate.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Sanctions-List Provider Integration
 
-## §7 Privacy and Security
+Sanctions-list integration consumes:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- UN Security Council Consolidated Sanctions List (the
+  baseline list referenced by Recommendations 6
+  and 7);
+- EU consolidated sanctions list;
+- US OFAC SDN and consolidated sanctions list (cited
+  authoritatively for US sanctions);
+- UK OFSI consolidated list (cited for UK sanctions);
+- KR MOFA sanctions list (cited for KR sanctions);
+- the obliged entity's internal watchlist of customers
+  exited under prior STR / SAR filings;
+- the obliged entity's contracted PEP screening
+  service.
 
-## §8 Open Governance
+Integration carries each list's identifier, the per-
+list refresh cadence (UN and OFAC publish updates
+without notice; EU publishes via the OJEU; the
+obliged entity's discipline is "without delay"
+ingest), and the per-list false-positive-rate
+monitoring.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `anti-money-laundering` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Beneficial-Ownership Register Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Per-jurisdiction beneficial-ownership register
+integration:
 
+- US: FinCEN Beneficial Ownership Information (BOI)
+  reporting under the Corporate Transparency Act
+  beneficial-ownership reporting regime;
+- EU: each Member State's central beneficial-
+  ownership register under EU AML Regulation
+  2024/1624 (some Member States' registers are public,
+  some are restricted to obliged entities and
+  competent authorities, per the post-2022-CJEU-
+  judgment evolution);
+- KR: 실질소유자 신고 under KR Specific Financial
+  Information Act and the Commercial Act register;
+- UK: Companies House Register of People with
+  Significant Control (PSC).
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+Integration carries the register's identifier, the
+per-register lookup endpoint, and the per-register
+discrepancy-reporting workflow (the obliged entity
+reports discrepancies between register content and
+its own CDD finding back to the register).
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## §6 Egmont Group International Cooperation
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The Egmont Group is the international association of
+FIUs. The obliged entity does not interact with
+Egmont directly, but its STR / SAR filings flow into
+the Egmont information-sharing channel through the
+operating jurisdiction's FIU when the FIU determines
+international cooperation is warranted. Integration
+carries the FIU's identifier as the proxy and the
+per-filing flow indicator.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §7 Wolfsberg Group Community Integration
 
-## Annex F — Adoption Roadmap
+The Wolfsberg Group publishes principles, frequently-
+asked questions, and the Correspondent Banking Due
+Diligence Questionnaire (CBDDQ) that obliged entities
+use as community-recognised baselines. Integration
+carries the obliged entity's adoption statement of
+the Wolfsberg Principles (where adopted), the per-
+respondent CBDDQ archive, and the per-cycle CBDDQ
+refresh.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §8 External Auditor Integration
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+External auditors (the obliged entity's independent
+auditor under Recommendation 18, the supervisor-
+mandated external auditor under enforcement action,
+the FATF mutual-evaluation review) consume audit-
+trail exports through dedicated client certificates.
+The export carries the API audit logs for the audit
+window, the EWRA, the CDD population sample, the
+transaction-monitoring rule library, the STR / SAR
+inventory, the sanctions-screening sample, and the
+correspondent-banking review sample.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §9 Evidence Package Format
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```
+evidence/
+  manifest.json                — package manifest (signed)
+  programme.json               — programme record
+  ewra/                        — enterprise-wide risk
+                                  assessment
+  cdd-records/                 — CDD records (gated by
+                                  the operating
+                                  jurisdiction's
+                                  privacy regime)
+  sanctions-screenings/        — sanctions screening
+                                  evidence
+  transactions/                — transaction-monitoring
+                                  evidence (sample;
+                                  full set under
+                                  supervisor request)
+  suspicious-reports/          — STR / SAR filings
+                                  (gated to compliance
+                                  officer / MLRO and
+                                  external auditors)
+  ctr-records/                 — CTR filings
+  correspondent-banking/       — correspondent-banking
+                                  relationship
+                                  evidence
+  investigation-cases/         — case histories
+  audit/                       — API audit log excerpts
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+The package is content-addressable; the manifest is
+signed by the obliged entity's HTTP-message-signature
+key (RFC 9421) and counter-signed by the MLRO when
+the package supports a regulator submission.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §10 Manifest and Signatures
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Verification tools recompute file digests, compare to
+the manifest, and reject the package on mismatch with
+type `urn:wia:anti-money-laundering:evidence-mismatch`.
+STR / SAR records are gated; bundles for supervisor
+submission carry the records, bundles for civil-
+society research carry only aggregate counts.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §11 well-known URI Discovery
 
-## Annex H — Versioning and Deprecation Policy
+A conformant obliged entity exposes a discovery
+document at `/.well-known/wia-anti-money-laundering`
+that links to the API root, the MLRO contact, the
+operating-jurisdiction supervisor binding, and the
+operating-jurisdiction FIU binding. End-customer
+disclosure (e.g. Recommendation 16 originator
+information disclosure to the beneficiary) flows
+through the obliged entity's product-surface, not
+through the discovery document.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Long-Term Archive Integration
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Obliged entities designate a long-term archive that
+holds CDD records, transaction-monitoring evidence,
+STR / SAR filings, sanctions screenings, and
+supervisor correspondence beyond the obliged entity's
+primary retention horizon. Quarterly deposits round-
+trip content-addresses; on programme wind-down,
+remaining records transfer to the archive with
+content-addresses preserved subject to the operating
+jurisdiction's records-retention rules.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Verifiable-Credential Re-Issuance (optional)
 
-## Annex I — Interoperability Profiles
+Obliged entities that wish to expose attestations
+(Wolfsberg Principles adoption, ISO/IEC 27001
+certification, supervisor on-site examination
+clearance) to consumers of W3C Verifiable
+Credentials MAY re-issue the attestations as
+Verifiable Credentials under the Data Model 2.0
+specification. Re-issuance is optional; the
+canonical record remains the JSON evidence-package
+manifest.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Streaming Heartbeat
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+SSE subscribers receive a heartbeat every 30 seconds
+with `Last-Event-ID` resume support. Subscribers that
+disconnect during sanctions-list update windows or
+transaction-monitoring alert windows resume from the
+last seen event identifier without losing visibility
+of priority-1 events (sanctions match confirmed,
+freezing applied, supervisor inquiry opened, FIU
+filing acknowledged).
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §15 Backwards-Compatibility Guarantee
 
-## Annex J — Reference Implementation Topology
+PHASE-4 minor revisions remain backwards-compatible
+with prior-minor clients. Major revisions go through
+a deprecation window of at least one full supervisor
+examination cycle so that supervisor, FIU, prudential-
+regulator, and external-auditor integrations have
+time to migrate.
 
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
+## §16 Cross-Standard Linkage
 
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-4-INTEGRATION validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
+Obliged entities that consume adjacent WIA standards
+(WIA-credit-scoring for credit-decision processing
+that intersects with AML risk rating, WIA-cross-border-
+payment for cross-border payment messaging, WIA-
+financial-data-exchange for shared customer data
+governance, WIA-gdpr-compliance for the privacy
+overlay across CDD records) emit cross-standard
+linkage records.
 
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+## §17 Reader Tooling
+
+Obliged entities MAY publish supplementary reader
+tools (per-corridor sanctions exposure dashboards,
+per-rule transaction-monitoring tuning consoles, per-
+PEP-list refresh trackers, per-respondent
+correspondent-banking review consoles) alongside the
+canonical evidence package; the tools are non-
+normative.
+
+## §18 Public Catalogue Feed
+
+Obliged entities publish a public catalogue feed
+listing the in-force MLRO contact, the operating-
+jurisdiction supervisor binding, the operating-
+jurisdiction FIU binding, and the obliged entity's
+adopted community baselines (Wolfsberg Principles,
+sectoral codes of conduct). The feed enables peer
+obliged entities and supervisor discovery of the
+obliged entity's AML/CFT posture.
+
+## §19 FATF Mutual-Evaluation Integration
+
+FATF and FATF-style regional bodies (MONEYVAL for
+Council of Europe, APG for Asia-Pacific, GAFILAT for
+Latin America, MENAFATF for Middle East and North
+Africa, etc.) conduct mutual evaluations of the
+operating jurisdiction's AML/CFT regime. Obliged
+entities support the mutual evaluation by providing
+case studies and aggregate statistics through the
+operating jurisdiction's coordinator. Integration
+carries the per-evaluation cycle's coordinator
+identifier and the per-evaluation case-study and
+aggregate-statistics submission.
+
+## §20 Public Catalogue Aggregator Integration
+
+Civil-society researchers and academic-research
+consortia (anti-corruption observatories, academic
+financial-crime research consortia) consume aggregate
+AML/CFT statistics for independent analysis.
+Integration carries the consumer's identifier, the
+per-research-purpose data-access agreement, and the
+obliged entity's publication of consumer-attribution
+in any derivative research output. Per-customer or
+per-transaction records are NOT shared through this
+channel; only aggregate statistics are.
+
+## §21 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated
+successfully with the operating jurisdiction's FIU,
+the operating jurisdiction's AML/CFT supervisor, at
+least one sanctions-list provider for each major
+list (UN, the operating jurisdiction's national list,
+and the obliged entity's coalition lists where
+applicable), the operating jurisdiction's beneficial-
+ownership register, at least one external auditor,
+and at least one long-term archive, and has published
+at least one externally citable evidence package.
+
+Sunsetting an integration is announced via the well-
+known discovery document at least 90 calendar days
+before removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-anti-money-laundering
+- **Last Updated:** 2026-04-28

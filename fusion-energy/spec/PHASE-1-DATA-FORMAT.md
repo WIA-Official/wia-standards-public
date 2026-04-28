@@ -5,237 +5,477 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-fusion-energy (Fusion Energy).
+This document defines the canonical data-format layer for
+WIA-fusion-energy. The standard covers persistent record
+shapes for fusion-energy facilities — research and
+demonstration tokamaks, stellarators, magnetised target
+fusion devices, inertial confinement fusion (ICF) /
+laser-fusion facilities, and small-scale alternative-
+concept devices — operating under the IAEA's safety-
+guide series for fusion (Safety Guides SSG-77 / SSG-78
+/ SSG-79 issued by the IAEA's Fusion Safety Working
+Group through the IAEA Fusion Safety project), the
+operating jurisdiction's nuclear-or-radiation-safety
+regulator's safety case, the IEC 61508 functional-safety
+discipline as adopted for protection-system electronics,
+the ASME Boiler and Pressure Vessel Code where the
+operating jurisdiction's regulator adopts BPVC for
+fusion components, and the operating jurisdiction's
+radiation-protection regime. The format is consumed by
+the operating jurisdiction's safety regulator (US NRC,
+UK ONR, EU national regulators per the Council
+Directive 2009/71/Euratom basic-safety-standards
+framework, JP NRA, KR NSSC), the IAEA where the
+operating jurisdiction reports voluntary fusion-safety
+information, the host site's safety committee, the
+facility's safety organisation, and the facility's
+external technical-safety reviewer.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 19115 (geographic information — metadata)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- IAEA Safety Standards Series — General Safety
+  Requirements (GSR Part 1 to 7) where the operating
+  jurisdiction's regulator adopts the GSR framework
+  for fusion (the IAEA fusion-safety project has
+  developed Specific Safety Guides addressing
+  fusion-specific safety topics, with SSG-77 / SSG-78
+  / SSG-79 in publication tracking)
+- IAEA TECDOC series and the ITER Organization's
+  technical-safety reports (cited as community-
+  recognised baselines for tokamak design and
+  operation)
+- IEA Fusion Implementing Agreement (cited where the
+  operating jurisdiction participates in the
+  International Energy Agency Fusion technology
+  collaboration programme)
+- ASME Boiler and Pressure Vessel Code (BPVC) Section
+  III (rules for construction of nuclear facility
+  components) where the operating jurisdiction's
+  regulator adopts ASME BPVC for fusion components
+- ASME B31.1 (power piping) where the operating
+  jurisdiction adopts B31.1 for the fusion facility's
+  piping systems
+- ASME NQA-1 (quality assurance requirements for
+  nuclear facility applications) where the operating
+  jurisdiction's regulator adopts NQA-1 for fusion-
+  facility quality assurance
+- ANS-58 series (American Nuclear Society safety
+  standards for nuclear facilities) where the
+  operating jurisdiction adopts ANS standards in
+  parallel with ASME
+- IEC 61508-1 to -7 (functional safety of
+  electrical/electronic/programmable electronic
+  safety-related systems) where the operating
+  jurisdiction adopts IEC 61508 for the protection
+  system; IEC 61511 for the process-industry
+  application of IEC 61508
+- IEC 60880 (nuclear power plants — instrumentation
+  and control important to safety — software aspects
+  for computer-based systems performing category A
+  functions)
+- IEC 60709 (separation of redundant safety-classified
+  channels) referenced through IEC 60880
+- IAEA Safety Standards GS-R-3 / GSR Part 2 (leadership
+  and management for safety)
+- ICRP Publication 103 (recommendations of the
+  International Commission on Radiological Protection)
+- W3C Verifiable Credentials Data Model 2.0 (used in
+  PHASE-4 for optional re-issuance)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-fusion-energy
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts a
+fusion-energy facility manages. Implementations covered
+include:
 
-## §2 Manifest
+- Magnetic-confinement-fusion devices: tokamaks
+  (research, demonstration, prototype reactors),
+  stellarators, spherical tokamaks, and reversed-field
+  pinch and other alternative magnetic configurations.
+- Inertial-confinement-fusion devices: laser-driven
+  ICF facilities (the major direct-drive and
+  indirect-drive configurations operated by national
+  laboratories) and magnetised-target fusion devices.
+- Plasma-based research devices that operate at
+  parameters short of net energy gain (linear-
+  geometry plasma physics test stands, plasma-
+  material-interaction test stands).
+- Pre-construction and construction-phase safety
+  records for fusion-pilot-plant designs operating
+  under the operating jurisdiction's regulatory
+  pathway (e.g. US NRC's risk-informed performance-
+  based regulatory framework for fusion, UK ONR's
+  fusion-safety adoption, KR NSSC's pathway).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "fusion-energy"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Disposal of fusion-derived activated materials is
+addressed through the operating jurisdiction's
+radioactive-waste regulator's records (a separate
+record-keeping regime that this PHASE references but
+does not duplicate).
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name of the
+                       facility operator)
+hostSite             : object (site identifier, ISO
+                       3166-1 country code, the
+                       operating jurisdiction's
+                       regulatory body identity)
+deviceClass          : enum ("tokamak" | "stellarator"
+                       | "spherical-tokamak" |
+                       "reversed-field-pinch" |
+                       "inertial-confinement-laser-
+                       direct-drive" | "inertial-
+                       confinement-laser-indirect-
+                       drive" | "magnetised-target-
+                       fusion" | "plasma-physics-test-
+                       stand" | "pilot-plant-design-
+                       phase" | "user-defined")
+operatingPhase       : enum ("design-basis-development"
+                       | "construction" | "commissioning"
+                       | "first-plasma-and-low-
+                       performance-research" | "high-
+                       performance-research" | "pilot-
+                       plant-net-energy-research" |
+                       "decommissioning" | "archived")
+governingFrameworks  : array of enum ("IAEA-GSR-Part-
+                       1-to-7" | "IAEA-fusion-SSG-77-
+                       78-79" | "ASME-BPVC-Section-III"
+                       | "ASME-NQA-1" | "IEC-61508" |
+                       "IEC-60880" | "ANS-58-series" |
+                       "operating-jurisdiction-
+                       fusion-licensing-pathway" |
+                       "user-defined")
+fuelCycle            : enum ("hydrogen-only-research-
+                       no-tritium" | "deuterium-only-
+                       research-no-tritium" |
+                       "deuterium-deuterium" |
+                       "deuterium-tritium-low-
+                       inventory" | "deuterium-tritium-
+                       full-inventory" |
+                       "alternative-fuel-research" |
+                       "user-defined")
+programmeStatus      : enum ("design" | "operating" |
+                       "limited-rollout" |
+                       "wind-down" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Safety-Case Record
 
-## §4 Discovery
+```
+safetyCase:
+  safetyCaseId       : string (uuidv7)
+  programmeId        : string (uuidv7)
+  publishedAt        : string (ISO 8601)
+  effectiveFrom      : string (ISO 8601)
+  effectiveUntil     : string (ISO 8601; absent until
+                       superseded)
+  designBasisRef     : string (URI of the device
+                       design-basis-events analysis;
+                       the analysis enumerates
+                       postulated initiating events
+                       and the device's response,
+                       framing the safety functions
+                       the protection system performs)
+  hazardCategorisation : enum ("non-nuclear-fusion-
+                       research" | "limited-tritium-
+                       inventory-modest-hazard-
+                       category" | "significant-
+                       tritium-or-activation-inventory"
+                       | "pilot-plant-pre-licensing-
+                       framework" | "user-defined")
+  regulatoryPathway  : enum ("us-nrc-risk-informed-
+                       performance-based-fusion" |
+                       "uk-onr-fusion-safety" |
+                       "eu-member-state-basic-
+                       safety-standards" |
+                       "jp-nra-fusion-safety" |
+                       "kr-nssc-fusion-safety" |
+                       "user-defined")
+  approvalRef        : string (URI of the operating
+                       jurisdiction's regulator
+                       approval; absent until
+                       approval issued)
+  publicSummaryRef   : string (URI of the public
+                       summary version of the safety
+                       case, where the operating
+                       jurisdiction publishes the
+                       summary)
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/fusion-energy`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Tritium-Inventory Record
 
-## §5 Time and Identity
+For programmes whose `fuelCycle` includes tritium
+(low-inventory or full-inventory):
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+tritiumInventory:
+  inventoryId        : string (uuidv7)
+  programmeId        : string (uuidv7)
+  measurementAt      : string (ISO 8601)
+  inventoryLocation  : enum ("tritium-storage-vessel"
+                       | "fuel-cycle-loop" |
+                       "vacuum-vessel-retention" |
+                       "first-wall-retention" |
+                       "facility-stack-release-
+                       monitoring" | "off-site-
+                       transfer-shipment" |
+                       "user-defined")
+  inventoryMassKg    : number (the operator's
+                       reported total grams or
+                       kilograms of tritium at the
+                       location; tritium accountancy
+                       is the central record-keeping
+                       under the operating
+                       jurisdiction's safeguards
+                       regime)
+  measurementMethodRef : string (URI of the methodology
+                       reference — calorimetry,
+                       beta-radiation in-line monitor,
+                       gas chromatography, ion
+                       chamber)
+  uncertaintyClass   : enum ("better-than-1-percent"
+                       | "1-to-5-percent" |
+                       "5-to-10-percent" | "greater-
+                       than-10-percent")
+  reportingObligationRef : string (URI of the
+                       operating jurisdiction's
+                       tritium-accountancy reporting
+                       obligation reference)
+```
 
-## §6 Versioning and Deprecation
+## §5 Postulated-Initiating-Event Record
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+postulatedEvent:
+  eventId            : string (uuidv7)
+  programmeId        : string (uuidv7)
+  eventCategory      : enum ("loss-of-vacuum-with-air-
+                       ingress" | "loss-of-coolant" |
+                       "magnet-quench-without-
+                       protection" | "tritium-bypass-
+                       primary-confinement" | "in-
+                       vessel-component-failure" |
+                       "off-normal-plasma-disruption"
+                       | "external-hazard-seismic-
+                       wind-flood" | "loss-of-off-
+                       site-power-prolonged" |
+                       "user-defined")
+  frequencyClass     : enum ("anticipated-operational-
+                       occurrence" | "design-basis-
+                       accident" | "beyond-design-
+                       basis-accident" | "design-
+                       extension-condition")
+  consequenceCategoryRef : string (URI of the
+                       consequence-category narrative
+                       per the operating
+                       jurisdiction's classification
+                       — radiation dose to public,
+                       worker dose, environmental
+                       release)
+  protectionFunctionsCited : array of string (the
+                       safety functions the protection
+                       system invokes for this event;
+                       cross-references PHASE-1 §6)
+```
 
-## §7 Privacy and Security
+## §6 Safety-Classified Component Record
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+safetyClassifiedComponent:
+  componentId        : string (uuidv7)
+  programmeId        : string (uuidv7)
+  componentName      : string
+  safetyClass        : enum ("safety-class-1" |
+                       "safety-class-2" |
+                       "safety-class-3" |
+                       "non-safety-but-important-to-
+                       safety" | "non-safety")
+  asmeBpvcDesignCode : enum ("asme-bpvc-section-iii-
+                       class-1" | "asme-bpvc-section-
+                       iii-class-2" | "asme-bpvc-
+                       section-iii-class-3" |
+                       "asme-bpvc-section-viii-
+                       division-1" | "asme-bpvc-
+                       section-viii-division-2" |
+                       "non-asme" | "user-defined")
+  iec61508Sil        : enum ("sil-1" | "sil-2" |
+                       "sil-3" | "sil-4" | "non-
+                       safety-instrumented")
+                       (where the component is part
+                       of the protection system's
+                       electrical / electronic /
+                       programmable-electronic
+                       chain)
+  iec60880Category   : enum ("category-a" | "category-
+                       b" | "category-c" | "non-
+                       categorised")
+                       (where the component is a
+                       computer-based instrumentation-
+                       and-control system performing
+                       a safety function)
+  qualificationRef   : string (URI of the
+                       qualification record — type
+                       test, analysis, operating-
+                       experience, or seismic
+                       qualification per the
+                       operating jurisdiction's
+                       seismic-qualification
+                       standard)
+```
 
-## §8 Open Governance
+## §7 Operating-Limit and Condition Record
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `fusion-energy` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+operatingLimit:
+  limitId            : string (uuidv7)
+  programmeId        : string (uuidv7)
+  limitName          : string
+  limitKind          : enum ("safety-limit" |
+                       "limiting-condition-for-
+                       operation" | "surveillance-
+                       requirement" | "design-feature-
+                       declaration" | "administrative-
+                       control" | "user-defined")
+  limitNarrativeRef  : string (URI of the limit
+                       narrative; the narrative
+                       cites the design-basis
+                       analysis and the protection
+                       function that maintains the
+                       limit)
+  surveillanceFrequency : enum ("continuous" |
+                       "per-shift" | "daily" |
+                       "weekly" | "monthly" |
+                       "quarterly" | "annual" |
+                       "per-cycle" | "per-shutdown")
+  responseOnExcursion : string (URI of the response
+                       narrative — corrective
+                       action, shutdown, regulatory
+                       reporting per the operating
+                       jurisdiction's reportable-
+                       event threshold)
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §8 Plasma-Operation Record
 
+```
+plasmaOperation:
+  shotId             : string (uuidv7) (the per-
+                       discharge identifier the
+                       operator uses for plasma-
+                       physics record-keeping)
+  programmeId        : string (uuidv7)
+  performedAt        : string (ISO 8601)
+  fuelMix            : enum (PHASE-1 §2 fuelCycle
+                       enumeration plus per-shot
+                       composition)
+  plasmaParametersRef : string (URI of the per-shot
+                       parameters — toroidal field,
+                       plasma current, density,
+                       temperature, energy, duration,
+                       confinement-time-and-quality
+                       indicators)
+  protectionInvocationRef : string (URI of any
+                       protection-function
+                       invocations during the shot;
+                       absent for nominal shots)
+  reportableEventRef : string (URI of any reportable-
+                       event record; absent unless
+                       the shot triggered a
+                       reportable event)
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+## §9 Reportable-Event Record
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```
+reportableEvent:
+  eventId            : string (uuidv7)
+  programmeId        : string (uuidv7)
+  detectedAt         : string (ISO 8601)
+  eventClassification : enum ("operational-occurrence-
+                       no-safety-significance" |
+                       "anticipated-operational-
+                       occurrence-with-protection-
+                       success" | "design-basis-
+                       accident-prevented" |
+                       "abnormal-tritium-release-
+                       within-permit" |
+                       "abnormal-tritium-release-
+                       above-permit" | "personnel-
+                       dose-above-investigation-
+                       level" | "safety-system-
+                       degradation-without-event" |
+                       "user-defined")
+  regulatorNotifiedAt : string (ISO 8601; absent if
+                       the event does not meet the
+                       operating jurisdiction's
+                       reportable threshold)
+  rootCauseNarrativeRef : string (URI; absent until
+                       analysis complete)
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §10 Decommissioning Record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+decommissioning:
+  decommissioningId  : string (uuidv7)
+  programmeId        : string (uuidv7)
+  declaredAt         : string (ISO 8601)
+  decommissioningPhase : enum ("planning-pre-
+                       cessation-of-operations" |
+                       "preparation-for-decommissioning"
+                       | "active-decommissioning" |
+                       "post-decommissioning-
+                       monitoring" | "site-release")
+  activatedComponentInventoryRef : string (URI of the
+                       activated-component inventory
+                       — first-wall, divertor,
+                       blanket modules, structural
+                       supports — derived from the
+                       fusion-derived neutron-fluence
+                       analysis)
+  wasteRouteRef      : string (URI of the waste-
+                       route declaration — the
+                       operating jurisdiction's
+                       radioactive-waste regulator
+                       holds the canonical record of
+                       the waste route, referenced
+                       here)
+  siteReleaseCriteriaRef : string (URI of the operating
+                       jurisdiction's site-release
+                       criteria; absent until
+                       release planning commences)
+```
 
-## Annex F — Adoption Roadmap
+## §11 Conformance
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Implementations claiming PHASE-1 conformance emit each
+of the records defined above for every operating
+programme, retain safety-case records for the operating
+life of the facility plus the operating jurisdiction's
+records-retention horizon, preserve tritium-inventory
+records per the operating jurisdiction's accountancy
+rules, and preserve reportable-event records per the
+operating jurisdiction's investigation-and-disclosure
+rules.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+---
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+**Document Information:**
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-fusion-energy
+- **Last Updated:** 2026-04-28

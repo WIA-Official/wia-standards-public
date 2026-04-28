@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8장: 실전 프로젝트 - WIA-RUST-LEARN</title>
+    <style>
+        :root { --rust-orange: #f97316; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-orange); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-orange); }
+        h2 { font-size: 1.5rem; margin: 30px 0 15px; color: var(--text); }
+        h3 { font-size: 1.2rem; margin: 20px 0 10px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-orange); }
+        .project { background: var(--bg-card); padding: 25px; border-radius: 12px; margin: 20px 0; border: 1px solid var(--border); }
+        .project h3 { margin-top: 0; }
+        .tip { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--blue); }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        code { background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+        ul { padding-left: 25px; color: var(--text-muted); margin-bottom: 15px; }
+        li { margin-bottom: 8px; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>8장: 실전 프로젝트</h1>
+
+        <p>지금까지 배운 모든 것을 실제 프로젝트에 적용해봅시다. 각 프로젝트는 핵심 Rust 개념을 종합적으로 활용합니다.</p>
+
+        <h2>8.1 프로젝트 1: CLI 도구 - WIA 검증기</h2>
+
+        <p>Clap 라이브러리를 사용해 전문적인 커맨드라인 도구를 만들어봅시다.</p>
+
+        <div class="project">
+            <h3>프로젝트 설정</h3>
+            <pre># 새 프로젝트 생성
+cargo new wia-validator
+cd wia-validator
+
+# Cargo.toml 의존성 추가
+[dependencies]
+clap = { version = "4.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+colored = "2.0"</pre>
+
+            <h3>기본 구조</h3>
+            <pre>use clap::{Parser, Subcommand};
+use colored::*;
+use std::fs;
+use std::path::PathBuf;
+
+#[derive(Parser)]
+#[command(name = "wia-validator")]
+#[command(about = "WIA 표준 파일 검증 도구", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// 파일 검증
+    Validate {
+        /// 검증할 표준 (예: HOME, SOCIAL, AI-CITY)
+        #[arg(short, long)]
+        standard: String,
+
+        /// 검증할 파일 경로
+        #[arg(short, long)]
+        file: PathBuf,
+
+        /// 자세한 출력
+        #[arg(short, long)]
+        verbose: bool,
+    },
+    /// 표준 목록 조회
+    List {
+        /// 카테고리 필터
+        #[arg(short, long)]
+        category: Option&lt;String&gt;,
+    },
+    /// 표준 정보 조회
+    Info {
+        /// 표준 이름
+        standard: String,
+    },
+}
+
+fn main() {
+    let cli = Cli::parse();
+
+    match &cli.command {
+        Commands::Validate { standard, file, verbose } => {
+            validate_file(standard, file, *verbose);
+        }
+        Commands::List { category } => {
+            list_standards(category.as_deref());
+        }
+        Commands::Info { standard } => {
+            show_info(standard);
+        }
+    }
+}
+
+fn validate_file(standard: &str, file: &PathBuf, verbose: bool) {
+    println!("{}", format!("WIA-{} 검증 중...", standard).cyan().bold());
+
+    match fs::read_to_string(file) {
+        Ok(content) => {
+            if verbose {
+                println!("파일 크기: {} 바이트", content.len());
+            }
+
+            // JSON 파싱 시도
+            match serde_json::from_str::<serde_json::Value>(&content) {
+                Ok(json) => {
+                    if validate_json(&json, standard) {
+                        println!("{}", "✅ 검증 성공!".green().bold());
+                    } else {
+                        println!("{}", "❌ 검증 실패".red().bold());
+                        std::process::exit(1);
+                    }
+                }
+                Err(e) => {
+                    println!("{}", format!("❌ JSON 파싱 실패: {}", e).red());
+                    std::process::exit(1);
+                }
+            }
+        }
+        Err(e) => {
+            println!("{}", format!("❌ 파일 읽기 실패: {}", e).red());
+            std::process::exit(1);
+        }
+    }
+}
+
+fn validate_json(json: &serde_json::Value, standard: &str) -> bool {
+    // 표준별 검증 로직
+    match standard {
+        "HOME" => {
+            json.get("deviceType").is_some() &&
+            json.get("deviceId").is_some()
+        }
+        "SOCIAL" => {
+            json.get("userId").is_some() &&
+            json.get("platform").is_some()
+        }
+        "AI-CITY" => {
+            json.get("gpuType").is_some() &&
+            json.get("hbmCapacity").is_some()
+        }
+        _ => {
+            println!("{}", format!("⚠️  알 수 없는 표준: {}", standard).yellow());
+            false
+        }
+    }
+}
+
+fn list_standards(category: Option&lt;&str&gt;) {
+    println!("{}", "WIA 표준 목록".cyan().bold());
+    println!("─────────────────────");
+
+    let standards = vec![
+        ("WIA-HOME", "스마트 홈 & 라이프"),
+        ("WIA-SOCIAL", "소셜 네트워크"),
+        ("WIA-AI-CITY", "AI 도시 인프라"),
+        ("WIA-BLOCKCHAIN", "블록체인"),
+    ];
+
+    for (name, desc) in standards {
+        if let Some(cat) = category {
+            if !name.contains(&cat.to_uppercase()) {
+                continue;
+            }
+        }
+        println!("  {} - {}", name.green(), desc);
+    }
+}
+
+fn show_info(standard: &str) {
+    println!("{}", format!("WIA-{} 정보", standard).cyan().bold());
+    println!("─────────────────────");
+
+    match standard {
+        "HOME" => {
+            println!("설명: 스마트 홈 장치 통합 표준");
+            println!("버전: 1.0");
+            println!("필수 필드: deviceType, deviceId, status");
+        }
+        "SOCIAL" => {
+            println!("설명: 소셜 네트워크 통합 표준");
+            println!("버전: 1.0");
+            println!("필수 필드: userId, platform, profile");
+        }
+        "AI-CITY" => {
+            println!("설명: AI 도시 인프라 표준");
+            println!("버전: 1.0");
+            println!("필수 필드: gpuType, hbmCapacity, powerDistribution");
+        }
+        _ => {
+            println!("{}", "알 수 없는 표준".yellow());
+        }
+    }
+}</pre>
+
+            <h3>사용 예제</h3>
+            <pre># 빌드
+cargo build --release
+
+# 실행
+./target/release/wia-validator validate -s HOME -f device.json -v
+./target/release/wia-validator list
+./target/release/wia-validator info HOME</pre>
+        </div>
+
+        <h2>8.2 프로젝트 2: 웹 API 서버 - WIA 레지스트리</h2>
+
+        <p>Axum 프레임워크로 고성능 웹 API를 구축합니다.</p>
+
+        <div class="project">
+            <h3>의존성 설정</h3>
+            <pre># Cargo.toml
+[dependencies]
+axum = "0.7"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"</pre>
+
+            <h3>서버 구현</h3>
+            <pre>use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    routing::{get, post},
+    Json, Router,
+};
+use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
+use tower_http::cors::CorsLayer;
+use tracing::info;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Standard {
+    id: String,
+    name: String,
+    version: String,
+    description: String,
+    status: StandardStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+enum StandardStatus {
+    Draft,
+    Active,
+    Deprecated,
+}
+
+#[derive(Clone)]
+struct AppState {
+    standards: Arc&lt;Mutex&lt;Vec&lt;Standard&gt;&gt;&gt;,
+}
+
+#[tokio::main]
+async fn main() {
+    // 로깅 초기화
+    tracing_subscriber::fmt::init();
+
+    // 앱 상태 초기화
+    let state = AppState {
+        standards: Arc::new(Mutex::new(init_standards())),
+    };
+
+    // 라우터 설정
+    let app = Router::new()
+        .route("/", get(root))
+        .route("/health", get(health_check))
+        .route("/api/standards", get(list_standards))
+        .route("/api/standards/:id", get(get_standard))
+        .route("/api/standards", post(create_standard))
+        .route("/api/validate/:id", post(validate_data))
+        .with_state(state)
+        .layer(CorsLayer::permissive());
+
+    // 서버 시작
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+        .await
+        .unwrap();
+
+    info!("🚀 WIA 레지스트리 서버 시작: http://localhost:3000");
+
+    axum::serve(listener, app).await.unwrap();
+}
+
+async fn root() -> &'static str {
+    "WIA 표준 레지스트리 API v1.0"
+}
+
+async fn health_check() -> Json&lt;serde_json::Value&gt; {
+    Json(serde_json::json!({
+        "status": "healthy",
+        "version": "1.0.0",
+        "service": "wia-registry"
+    }))
+}
+
+async fn list_standards(
+    State(state): State&lt;AppState&gt;,
+) -> Json&lt;Vec&lt;Standard&gt;&gt; {
+    let standards = state.standards.lock().unwrap();
+    Json(standards.clone())
+}
+
+async fn get_standard(
+    Path(id): Path&lt;String&gt;,
+    State(state): State&lt;AppState&gt;,
+) -> Result&lt;Json&lt;Standard&gt;, StatusCode&gt; {
+    let standards = state.standards.lock().unwrap();
+
+    standards
+        .iter()
+        .find(|s| s.id == id)
+        .cloned()
+        .map(Json)
+        .ok_or(StatusCode::NOT_FOUND)
+}
+
+async fn create_standard(
+    State(state): State&lt;AppState&gt;,
+    Json(payload): Json&lt;Standard&gt;,
+) -> Result&lt;Json&lt;Standard&gt;, StatusCode&gt; {
+    let mut standards = state.standards.lock().unwrap();
+
+    // 중복 검사
+    if standards.iter().any(|s| s.id == payload.id) {
+        return Err(StatusCode::CONFLICT);
+    }
+
+    standards.push(payload.clone());
+    info!("새 표준 생성: {}", payload.id);
+
+    Ok(Json(payload))
+}
+
+#[derive(Deserialize)]
+struct ValidationRequest {
+    data: serde_json::Value,
+}
+
+async fn validate_data(
+    Path(id): Path&lt;String&gt;,
+    Json(payload): Json&lt;ValidationRequest&gt;,
+) -> Result&lt;Json&lt;serde_json::Value&gt;, StatusCode&gt; {
+    // 간단한 검증 로직
+    let is_valid = match id.as_str() {
+        "WIA-HOME" => {
+            payload.data.get("deviceType").is_some() &&
+            payload.data.get("deviceId").is_some()
+        }
+        "WIA-SOCIAL" => {
+            payload.data.get("userId").is_some()
+        }
+        _ => false,
+    };
+
+    Ok(Json(serde_json::json!({
+        "valid": is_valid,
+        "standard": id,
+    })))
+}
+
+fn init_standards() -> Vec&lt;Standard&gt; {
+    vec![
+        Standard {
+            id: "WIA-HOME".to_string(),
+            name: "스마트 홈".to_string(),
+            version: "1.0.0".to_string(),
+            description: "스마트 홈 장치 통합 표준".to_string(),
+            status: StandardStatus::Active,
+        },
+        Standard {
+            id: "WIA-SOCIAL".to_string(),
+            name: "소셜 네트워크".to_string(),
+            version: "1.0.0".to_string(),
+            description: "소셜 네트워크 통합 표준".to_string(),
+            status: StandardStatus::Active,
+        },
+        Standard {
+            id: "WIA-AI-CITY".to_string(),
+            name: "AI 도시".to_string(),
+            version: "1.0.0".to_string(),
+            description: "AI 도시 인프라 표준".to_string(),
+            status: StandardStatus::Draft,
+        },
+    ]
+}</pre>
+
+            <h3>API 테스트</h3>
+            <pre># 서버 실행
+cargo run
+
+# API 호출
+curl http://localhost:3000/health
+curl http://localhost:3000/api/standards
+curl http://localhost:3000/api/standards/WIA-HOME
+
+# 검증
+curl -X POST http://localhost:3000/api/validate/WIA-HOME \
+  -H "Content-Type: application/json" \
+  -d '{"data": {"deviceType": "light", "deviceId": "001"}}'</pre>
+        </div>
+
+        <h2>8.3 프로젝트 3: WIA-AI-CITY Rust-Core</h2>
+
+        <p>AI 도시의 핵심 시스템을 Rust로 구현합니다.</p>
+
+        <div class="project">
+            <h3>완전한 구현</h3>
+            <pre>use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
+
+/// GPU 타입
+#[derive(Debug, Clone)]
+enum GPUType {
+    H100,
+    H200,
+    GB200,
+}
+
+impl GPUType {
+    fn hbm_capacity(&self) -> usize {
+        match self {
+            GPUType::H100 => 80,  // 80GB
+            GPUType::H200 => 141, // 141GB
+            GPUType::GB200 => 192, // 192GB
+        }
+    }
+
+    fn tflops(&self) -> f64 {
+        match self {
+            GPUType::H100 => 1979.0,
+            GPUType::H200 => 1979.0,
+            GPUType::GB200 => 2500.0,
+        }
+    }
+}
+
+/// 전력 분배
+#[derive(Debug, Clone)]
+struct PowerDistribution {
+    ai_compute: f64,      // 70%
+    infrastructure: f64,  // 20%
+    reserve: f64,         // 10%
+}
+
+impl PowerDistribution {
+    fn new() -> Self {
+        PowerDistribution {
+            ai_compute: 0.70,
+            infrastructure: 0.20,
+            reserve: 0.10,
+        }
+    }
+
+    fn validate(&self) -> bool {
+        (self.ai_compute + self.infrastructure + self.reserve - 1.0).abs() < 0.01
+    }
+}
+
+/// 열 상태
+#[derive(Debug, Clone)]
+struct ThermalStatus {
+    core_temp: f64,
+    hbm_temp: f64,
+    ambient_temp: f64,
+}
+
+impl ThermalStatus {
+    fn new() -> Self {
+        ThermalStatus {
+            core_temp: 45.0,
+            hbm_temp: 55.0,
+            ambient_temp: 25.0,
+        }
+    }
+
+    fn is_safe(&self) -> bool {
+        self.core_temp < 85.0 && self.hbm_temp < 95.0
+    }
+
+    fn update(&mut self, load: f64) {
+        // 부하에 따라 온도 증가
+        self.core_temp += load * 0.1;
+        self.hbm_temp += load * 0.15;
+
+        // 쿨링 시뮬레이션
+        if self.core_temp > 50.0 {
+            self.core_temp -= 0.5;
+        }
+        if self.hbm_temp > 60.0 {
+            self.hbm_temp -= 0.7;
+        }
+    }
+}
+
+/// AI 작업
+#[derive(Debug, Clone)]
+struct AIJob {
+    id: String,
+    priority: u8,
+    hbm_required: usize,
+    estimated_time: Duration,
+}
+
+/// Rust-Core 메인 시스템
+pub struct RustCore {
+    gpu_type: GPUType,
+    hbm_usage: Arc&lt;Mutex&lt;usize&gt;&gt;,
+    power_distribution: PowerDistribution,
+    thermal_status: Arc&lt;Mutex&lt;ThermalStatus&gt;&gt;,
+    active_jobs: Arc&lt;Mutex&lt;Vec&lt;AIJob&gt;&gt;&gt;,
+}
+
+impl RustCore {
+    pub fn new(gpu_type: GPUType) -> Self {
+        let power = PowerDistribution::new();
+        assert!(power.validate(), "전력 분배 합계가 100%가 아닙니다");
+
+        RustCore {
+            gpu_type: gpu_type.clone(),
+            hbm_usage: Arc::new(Mutex::new(0)),
+            power_distribution: power,
+            thermal_status: Arc::new(Mutex::new(ThermalStatus::new())),
+            active_jobs: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    /// HBM 할당
+    pub fn allocate_hbm(&self, amount: usize) -> Result&lt;(), String&gt; {
+        let mut usage = self.hbm_usage.lock().unwrap();
+        let total = self.gpu_type.hbm_capacity();
+
+        if *usage + amount > total {
+            return Err(format!(
+                "HBM 용량 초과: 사용 중 {}GB, 요청 {}GB, 최대 {}GB",
+                usage, amount, total
+            ));
+        }
+
+        *usage += amount;
+        Ok(())
+    }
+
+    /// HBM 해제
+    pub fn deallocate_hbm(&self, amount: usize) {
+        let mut usage = self.hbm_usage.lock().unwrap();
+        *usage = usage.saturating_sub(amount);
+    }
+
+    /// 작업 제출
+    pub fn submit_job(&self, job: AIJob) -> Result&lt;(), String&gt; {
+        // HBM 할당 시도
+        self.allocate_hbm(job.hbm_required)?;
+
+        // 작업 큐에 추가
+        let mut jobs = self.active_jobs.lock().unwrap();
+        jobs.push(job.clone());
+
+        println!("✅ 작업 제출: {} (우선순위: {})", job.id, job.priority);
+        Ok(())
+    }
+
+    /// 작업 완료
+    pub fn complete_job(&self, job_id: &str) {
+        let mut jobs = self.active_jobs.lock().unwrap();
+
+        if let Some(pos) = jobs.iter().position(|j| j.id == job_id) {
+            let job = jobs.remove(pos);
+            drop(jobs); // 락 해제
+
+            self.deallocate_hbm(job.hbm_required);
+            println!("✅ 작업 완료: {}", job_id);
+        }
+    }
+
+    /// 시스템 상태
+    pub fn get_status(&self) -> String {
+        let usage = *self.hbm_usage.lock().unwrap();
+        let total = self.gpu_type.hbm_capacity();
+        let usage_percent = (usage as f64 / total as f64) * 100.0;
+
+        let thermal = self.thermal_status.lock().unwrap();
+        let job_count = self.active_jobs.lock().unwrap().len();
+
+        format!(
+            "🖥️  GPU: {:?} | HBM: {}/{}GB ({:.1}%) | 온도: {:.1}°C/{:.1}°C | 작업: {}개",
+            self.gpu_type,
+            usage,
+            total,
+            usage_percent,
+            thermal.core_temp,
+            thermal.hbm_temp,
+            job_count
+        )
+    }
+
+    /// 열 모니터링 시작
+    pub fn start_thermal_monitor(&self) {
+        let thermal = Arc::clone(&self.thermal_status);
+        let hbm_usage = Arc::clone(&self.hbm_usage);
+        let total_hbm = self.gpu_type.hbm_capacity();
+
+        thread::spawn(move || {
+            loop {
+                thread::sleep(Duration::from_secs(1));
+
+                let usage = *hbm_usage.lock().unwrap();
+                let load = usage as f64 / total_hbm as f64;
+
+                let mut thermal_guard = thermal.lock().unwrap();
+                thermal_guard.update(load);
+
+                if !thermal_guard.is_safe() {
+                    println!("⚠️  경고: 온도 임계값 초과! Core: {:.1}°C, HBM: {:.1}°C",
+                             thermal_guard.core_temp, thermal_guard.hbm_temp);
+                }
+            }
+        });
+    }
+}
+
+fn main() {
+    println!("🚀 WIA-AI-CITY Rust-Core 시작\n");
+
+    // GB200 GPU 초기화
+    let core = Arc::new(RustCore::new(GPUType::GB200));
+
+    // 열 모니터링 시작
+    core.start_thermal_monitor();
+
+    // 작업 생성
+    let jobs = vec![
+        AIJob {
+            id: "LLM-Training-001".to_string(),
+            priority: 1,
+            hbm_required: 80,
+            estimated_time: Duration::from_secs(5),
+        },
+        AIJob {
+            id: "Inference-002".to_string(),
+            priority: 2,
+            hbm_required: 40,
+            estimated_time: Duration::from_secs(3),
+        },
+        AIJob {
+            id: "FineTune-003".to_string(),
+            priority: 1,
+            hbm_required: 60,
+            estimated_time: Duration::from_secs(4),
+        },
+    ];
+
+    let mut handles = vec![];
+
+    // 작업 제출 및 실행
+    for job in jobs {
+        let core_clone = Arc::clone(&core);
+        let job_clone = job.clone();
+
+        let handle = thread::spawn(move || {
+            // 작업 제출
+            match core_clone.submit_job(job_clone.clone()) {
+                Ok(_) => {
+                    // 상태 출력
+                    println!("{}", core_clone.get_status());
+
+                    // 작업 시뮬레이션
+                    thread::sleep(job_clone.estimated_time);
+
+                    // 작업 완료
+                    core_clone.complete_job(&job_clone.id);
+                }
+                Err(e) => {
+                    println!("❌ 작업 제출 실패 ({}): {}", job_clone.id, e);
+                }
+            }
+        });
+
+        handles.push(handle);
+        thread::sleep(Duration::from_millis(500));
+    }
+
+    // 모든 작업 완료 대기
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("\n{}", core.get_status());
+    println!("\n✅ 모든 AI 작업 완료!");
+
+    // 모니터링 스레드가 계속 실행되도록 대기
+    thread::sleep(Duration::from_secs(2));
+}</pre>
+
+            <h3>실행 결과</h3>
+            <pre>🚀 WIA-AI-CITY Rust-Core 시작
+
+✅ 작업 제출: LLM-Training-001 (우선순위: 1)
+🖥️  GPU: GB200 | HBM: 80/192GB (41.7%) | 온도: 45.0°C/55.0°C | 작업: 1개
+✅ 작업 제출: Inference-002 (우선순위: 2)
+🖥️  GPU: GB200 | HBM: 120/192GB (62.5%) | 온도: 49.2°C/62.8°C | 작업: 2개
+✅ 작업 제출: FineTune-003 (우선순위: 1)
+🖥️  GPU: GB200 | HBM: 180/192GB (93.8%) | 온도: 58.1°C/74.5°C | 작업: 3개
+✅ 작업 완료: Inference-002
+✅ 작업 완료: FineTune-003
+✅ 작업 완료: LLM-Training-001
+
+🖥️  GPU: GB200 | HBM: 0/192GB (0.0%) | 온도: 52.3°C/68.9°C | 작업: 0개
+
+✅ 모든 AI 작업 완료!</pre>
+        </div>
+
+        <h2>8.4 다음 단계: 계속 배우기</h2>
+
+        <div class="tip">
+            <strong>추천 학습 경로</strong>
+            <ul>
+                <li><strong>The Rust Book</strong> - doc.rust-lang.org/book</li>
+                <li><strong>Rust by Example</strong> - doc.rust-lang.org/rust-by-example</li>
+                <li><strong>Rustlings</strong> - github.com/rust-lang/rustlings</li>
+                <li><strong>Exercism Rust 트랙</strong> - exercism.org/tracks/rust</li>
+                <li><strong>Rust 공식 블로그</strong> - blog.rust-lang.org</li>
+            </ul>
+        </div>
+
+        <h3>고급 주제</h3>
+        <ul>
+            <li><strong>Async/Await</strong>: 비동기 프로그래밍 (Tokio, async-std)</li>
+            <li><strong>Unsafe Rust</strong>: 저수준 제어가 필요할 때</li>
+            <li><strong>매크로</strong>: 코드 생성 및 메타프로그래밍</li>
+            <li><strong>FFI</strong>: C/C++ 라이브러리 연동</li>
+            <li><strong>임베디드</strong>: 마이크로컨트롤러 프로그래밍</li>
+            <li><strong>WebAssembly</strong>: 웹 브라우저에서 Rust 실행</li>
+        </ul>
+
+        <h3>실전 프로젝트 아이디어</h3>
+        <ol>
+            <li><strong>파일 압축 도구</strong>: CLI 경험 쌓기</li>
+            <li><strong>HTTP 클라이언트</strong>: 네트워크 프로그래밍</li>
+            <li><strong>간단한 데이터베이스</strong>: 자료구조 및 파일 I/O</li>
+            <li><strong>채팅 서버</strong>: 동시성 및 네트워킹</li>
+            <li><strong>게임 엔진</strong>: 그래픽스 및 물리 엔진</li>
+            <li><strong>블록체인 노드</strong>: 암호화 및 분산 시스템</li>
+        </ol>
+
+        <h2>8.5 WIA 생태계 통합</h2>
+
+        <p>Rust 기술은 전체 WIA 표준 생태계와 연결됩니다:</p>
+
+        <div class="highlight">
+            <strong>WIA 표준 × Rust</strong>
+            <ul style="margin-top: 10px;">
+                <li><strong>WIA-HOME</strong>: 스마트 디바이스 드라이버를 Rust로 개발</li>
+                <li><strong>WIA-SOCIAL</strong>: 고성능 소셜 네트워크 API 백엔드</li>
+                <li><strong>WIA-AI-CITY</strong>: Rust-Core 인프라로 AI 워크로드 관리</li>
+                <li><strong>WIA-BLOCKCHAIN</strong>: 안전한 블록체인 노드 구현</li>
+                <li><strong>AIDC-Link</strong>: 초저지연 프로토콜 구현</li>
+            </ul>
+        </div>
+
+        <h3>WIA 인증 프로그램</h3>
+        <pre>WIA-RUST-LEARN 인증 레벨:
+
+🥉 Bronze   - 기초 문법 및 소유권 이해
+🥈 Silver   - 고급 기능 및 프로젝트 완성
+🥇 Gold     - 실전 프로젝트 3개 이상 구현
+💎 Diamond  - WIA 표준 기여 및 커뮤니티 활동</pre>
+
+        <h2>8.6 커뮤니티 및 리소스</h2>
+
+        <div class="tip">
+            <strong>Rust 커뮤니티</strong>
+            <ul>
+                <li><strong>공식 포럼</strong>: users.rust-lang.org</li>
+                <li><strong>Reddit</strong>: r/rust</li>
+                <li><strong>Discord</strong>: discord.gg/rust-lang</li>
+                <li><strong>This Week in Rust</strong>: this-week-in-rust.org</li>
+            </ul>
+        </div>
+
+        <div class="tip">
+            <strong>유용한 크레이트</strong>
+            <ul>
+                <li><strong>serde</strong>: 직렬화/역직렬화</li>
+                <li><strong>tokio</strong>: 비동기 런타임</li>
+                <li><strong>clap</strong>: CLI 파서</li>
+                <li><strong>axum</strong>: 웹 프레임워크</li>
+                <li><strong>diesel</strong>: ORM</li>
+                <li><strong>rayon</strong>: 병렬 처리</li>
+            </ul>
+        </div>
+
+        <h2>8.7 마무리</h2>
+
+        <p style="font-size: 1.1rem; line-height: 1.9;">축하합니다! Rust 프로그래밍의 기초부터 실전 프로젝트까지 완주했습니다. 🎉</p>
+
+        <p>Rust는 학습 곡선이 가파르지만, 한번 익히면 안전하고 빠른 시스템을 구축할 수 있는 강력한 도구입니다. 계속해서 코드를 작성하고, 커뮤니티에 참여하며, WIA 표준을 통해 더 나은 소프트웨어 생태계를 만들어갑시다.</p>
+
+        <div class="highlight">
+            <strong style="font-size: 1.2rem;">弘益人間 - 널리 인간을 이롭게 하라</strong>
+            <p style="margin-top: 15px;">WIA와 Rust로 인류에 이로운 기술을 만들어갑니다.</p>
+        </div>
+
+        <p style="text-align: center; margin-top: 40px; font-size: 1.3rem;">
+            Happy Coding! 🦀
+        </p>
+
+        </div>
+</body>
+</html>

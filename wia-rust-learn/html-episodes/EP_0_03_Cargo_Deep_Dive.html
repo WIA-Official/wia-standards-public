@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 0-03: Cargo Deep Dive | WIA-RUST-LEARN</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            width: 1920px; height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            color: #fff; overflow: hidden;
+        }
+        .slide { display: none; width: 100%; height: 100%; padding: 60px; position: relative; }
+        .slide.active { display: flex; flex-direction: column; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        .episode-badge { background: linear-gradient(135deg, #F74C00, #ff6b35); padding: 12px 30px; border-radius: 30px; font-size: 24px; font-weight: bold; }
+        .lang-toggle { display: flex; gap: 10px; }
+        .lang-btn { padding: 10px 25px; border: 2px solid #F74C00; background: transparent; color: #fff; border-radius: 20px; cursor: pointer; font-size: 18px; transition: all 0.3s; }
+        .lang-btn.active { background: #F74C00; }
+        .title { font-size: 64px; font-weight: bold; text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #F74C00, #FFD700); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .content { flex: 1; display: flex; justify-content: center; align-items: center; gap: 60px; }
+        .center-content { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; }
+        .code-block { background: #0d1117; border-radius: 15px; padding: 30px; font-family: 'Consolas', 'D2Coding', monospace; font-size: 26px; line-height: 1.6; border: 2px solid #30363d; }
+        .code-line { opacity: 0; transform: translateY(10px); transition: all 0.4s; }
+        .code-line.show { opacity: 1; transform: translateY(0); }
+        .keyword { color: #ff7b72; }
+        .string { color: #a5d6ff; }
+        .comment { color: #8b949e; }
+        .prompt { color: #7ee787; }
+        .output { color: #8b949e; }
+        .key { color: #79c0ff; }
+        .value { color: #a5d6ff; }
+        .terminal { background: #0d1117; border-radius: 15px; padding: 20px; font-family: monospace; width: 900px; }
+        .terminal-header { display: flex; gap: 8px; margin-bottom: 15px; }
+        .terminal-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .terminal-dot.red { background: #ff5f56; }
+        .terminal-dot.yellow { background: #ffbd2e; }
+        .terminal-dot.green { background: #27c93f; }
+        .terminal-content { font-size: 24px; line-height: 1.8; }
+        .file-tree { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 30px; font-family: monospace; font-size: 24px; line-height: 2; }
+        .file-tree .folder { color: #79c0ff; }
+        .file-tree .file { color: #a5d6ff; }
+        .command-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; max-width: 1400px; }
+        .command-card { background: rgba(255,255,255,0.1); border-radius: 15px; padding: 30px; opacity: 0; transform: translateY(20px); transition: all 0.4s; }
+        .command-card.show { opacity: 1; transform: translateY(0); }
+        .command-card h3 { color: #F74C00; font-size: 28px; margin-bottom: 15px; font-family: monospace; }
+        .command-card p { font-size: 22px; color: #aaa; }
+        .navigation { position: absolute; bottom: 40px; left: 0; right: 0; display: flex; justify-content: center; gap: 20px; }
+        .nav-btn { padding: 15px 40px; background: rgba(247, 76, 0, 0.8); border: none; border-radius: 30px; color: white; font-size: 20px; cursor: pointer; transition: all 0.3s; }
+        .nav-btn:hover { background: #F74C00; transform: scale(1.05); }
+        .progress-bar { position: absolute; bottom: 0; left: 0; height: 8px; background: #F74C00; transition: width 0.5s; }
+        .slide-number { position: absolute; bottom: 100px; right: 60px; font-size: 24px; color: #888; }
+        .big-emoji { font-size: 120px; margin-bottom: 30px; }
+        .subtitle { font-size: 32px; color: #aaa; text-align: center; margin-bottom: 40px; }
+        .tip-box { background: rgba(247, 76, 0, 0.1); border-left: 5px solid #F74C00; padding: 25px; border-radius: 0 15px 15px 0; font-size: 26px; max-width: 900px; margin: 30px auto; }
+        .two-col { display: flex; gap: 60px; align-items: flex-start; }
+        .channel-info { background: rgba(255, 0, 0, 0.1); border: 2px solid #FF0000; border-radius: 20px; padding: 20px 40px; margin-top: 30px; font-size: 28px; }
+        .channel-info a { color: #FF6B6B; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">📦</div>
+            <h1 class="title">Cargo Deep Dive</h1>
+            <p class="subtitle">
+                <span class="ko">Rust의 패키지 매니저와 빌드 시스템</span>
+                <span class="en" style="display:none;">Rust's Package Manager & Build System</span>
+            </p>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">
+                <span class="ko">시작하기 →</span>
+                <span class="en" style="display:none;">Start →</span>
+            </button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: What is Cargo -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Cargo란?</span>
+            <span class="en" style="display:none;">What is Cargo?</span>
+        </h1>
+        <div class="content">
+            <div class="command-grid">
+                <div class="command-card">
+                    <h3>📦 Package Manager</h3>
+                    <p class="ko">의존성 관리 & crates.io 연동</p>
+                    <p class="en" style="display:none;">Dependency management & crates.io</p>
+                </div>
+                <div class="command-card">
+                    <h3>🔨 Build System</h3>
+                    <p class="ko">컴파일 & 빌드 자동화</p>
+                    <p class="en" style="display:none;">Compilation & build automation</p>
+                </div>
+                <div class="command-card">
+                    <h3>🧪 Test Runner</h3>
+                    <p class="ko">테스트 실행 & 벤치마크</p>
+                    <p class="en" style="display:none;">Test execution & benchmarks</p>
+                </div>
+                <div class="command-card">
+                    <h3>📚 Doc Generator</h3>
+                    <p class="ko">문서 자동 생성</p>
+                    <p class="en" style="display:none;">Automatic documentation</p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: Create Project -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">프로젝트 생성</span>
+            <span class="en" style="display:none;">Create Project</span>
+        </h1>
+        <div class="content">
+            <div class="two-col">
+                <div class="terminal" style="width: 700px;">
+                    <div class="terminal-header">
+                        <div class="terminal-dot red"></div>
+                        <div class="terminal-dot yellow"></div>
+                        <div class="terminal-dot green"></div>
+                    </div>
+                    <div class="terminal-content">
+                        <div class="code-line"><span class="prompt">$</span> cargo new my_project</div>
+                        <div class="code-line"><span class="output">     Created binary (application) `my_project`</span></div>
+                        <div class="code-line" style="margin-top: 20px;"><span class="prompt">$</span> cd my_project</div>
+                        <div class="code-line"><span class="prompt">$</span> tree</div>
+                    </div>
+                </div>
+                <div class="file-tree" style="width: 500px;">
+                    <div class="code-line"><span class="folder">my_project/</span></div>
+                    <div class="code-line">├── <span class="file">Cargo.toml</span></div>
+                    <div class="code-line">└── <span class="folder">src/</span></div>
+                    <div class="code-line">    └── <span class="file">main.rs</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: Cargo.toml -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">Cargo.toml</h1>
+        <div class="center-content">
+            <div class="code-block" style="width: 900px;">
+                <div class="code-line"><span class="comment"># 프로젝트 메타데이터</span></div>
+                <div class="code-line">[<span class="key">package</span>]</div>
+                <div class="code-line"><span class="key">name</span> = <span class="value">"my_project"</span></div>
+                <div class="code-line"><span class="key">version</span> = <span class="value">"0.1.0"</span></div>
+                <div class="code-line"><span class="key">edition</span> = <span class="value">"2021"</span></div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="comment"># 의존성</span></div>
+                <div class="code-line">[<span class="key">dependencies</span>]</div>
+                <div class="code-line"><span class="key">serde</span> = <span class="value">"1.0"</span></div>
+                <div class="code-line"><span class="key">tokio</span> = { <span class="key">version</span> = <span class="value">"1"</span>, <span class="key">features</span> = [<span class="value">"full"</span>] }</div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: Essential Commands -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">필수 명령어</span>
+            <span class="en" style="display:none;">Essential Commands</span>
+        </h1>
+        <div class="content">
+            <div class="command-grid">
+                <div class="command-card">
+                    <h3>cargo build</h3>
+                    <p class="ko">프로젝트 컴파일 (debug)</p>
+                    <p class="en" style="display:none;">Compile project (debug)</p>
+                </div>
+                <div class="command-card">
+                    <h3>cargo run</h3>
+                    <p class="ko">빌드 후 실행</p>
+                    <p class="en" style="display:none;">Build and run</p>
+                </div>
+                <div class="command-card">
+                    <h3>cargo test</h3>
+                    <p class="ko">테스트 실행</p>
+                    <p class="en" style="display:none;">Run tests</p>
+                </div>
+                <div class="command-card">
+                    <h3>cargo check</h3>
+                    <p class="ko">빠른 문법 검사</p>
+                    <p class="en" style="display:none;">Quick syntax check</p>
+                </div>
+                <div class="command-card">
+                    <h3>cargo build --release</h3>
+                    <p class="ko">최적화 빌드 (배포용)</p>
+                    <p class="en" style="display:none;">Optimized build (production)</p>
+                </div>
+                <div class="command-card">
+                    <h3>cargo doc --open</h3>
+                    <p class="ko">문서 생성 & 열기</p>
+                    <p class="en" style="display:none;">Generate & open docs</p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: Adding Dependencies -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">의존성 추가</span>
+            <span class="en" style="display:none;">Adding Dependencies</span>
+        </h1>
+        <div class="center-content">
+            <div class="terminal" style="width: 1000px;">
+                <div class="terminal-header">
+                    <div class="terminal-dot red"></div>
+                    <div class="terminal-dot yellow"></div>
+                    <div class="terminal-dot green"></div>
+                </div>
+                <div class="terminal-content">
+                    <div class="code-line"><span class="comment"># 패키지 추가</span></div>
+                    <div class="code-line"><span class="prompt">$</span> cargo add serde</div>
+                    <div class="code-line"><span class="output">    Adding serde v1.0.193 to dependencies</span></div>
+                    <div class="code-line" style="margin-top: 15px;"><span class="comment"># 기능(feature) 포함</span></div>
+                    <div class="code-line"><span class="prompt">$</span> cargo add serde --features derive</div>
+                    <div class="code-line" style="margin-top: 15px;"><span class="comment"># 개발 의존성</span></div>
+                    <div class="code-line"><span class="prompt">$</span> cargo add --dev mockall</div>
+                </div>
+            </div>
+            <div class="tip-box">
+                <span class="ko">💡 <strong>crates.io</strong>에서 10만개 이상의 패키지를 찾을 수 있습니다!</span>
+                <span class="en" style="display:none;">💡 Find 100,000+ packages on <strong>crates.io</strong>!</span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Cargo.lock -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">Cargo.lock</h1>
+        <div class="content">
+            <div class="two-col" style="align-items: center;">
+                <div style="flex: 1;">
+                    <div class="command-card show" style="margin-bottom: 30px;">
+                        <h3>📋 Cargo.toml</h3>
+                        <p class="ko">원하는 버전 범위 지정<br><code>serde = "1.0"</code></p>
+                        <p class="en" style="display:none;">Desired version range<br><code>serde = "1.0"</code></p>
+                    </div>
+                    <div class="command-card show">
+                        <h3>🔒 Cargo.lock</h3>
+                        <p class="ko">정확한 버전 고정<br><code>serde = "1.0.193"</code></p>
+                        <p class="en" style="display:none;">Exact version locked<br><code>serde = "1.0.193"</code></p>
+                    </div>
+                </div>
+                <div class="tip-box" style="flex: 1; max-width: 600px;">
+                    <p class="ko" style="margin-bottom: 15px;">
+                        <strong>규칙:</strong><br>
+                        ✅ 바이너리: Cargo.lock 커밋<br>
+                        ❌ 라이브러리: Cargo.lock 제외 (.gitignore)
+                    </p>
+                    <p class="en" style="display:none; margin-bottom: 15px;">
+                        <strong>Rule:</strong><br>
+                        ✅ Binary: Commit Cargo.lock<br>
+                        ❌ Library: Exclude Cargo.lock (.gitignore)
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">📦✨</div>
+            <h1 class="title">
+                <span class="ko">Level 0 완료!</span>
+                <span class="en" style="display:none;">Level 0 Complete!</span>
+            </h1>
+            <div style="font-size: 28px; text-align: center; margin: 30px 0;">
+                <p class="ko">
+                    ✅ Why Rust<br>
+                    ✅ Installing Rust<br>
+                    ✅ Cargo Deep Dive<br><br>
+                    다음: Level 1 - 기초 문법!
+                </p>
+                <p class="en" style="display:none;">
+                    ✅ Why Rust<br>
+                    ✅ Installing Rust<br>
+                    ✅ Cargo Deep Dive<br><br>
+                    Next: Level 1 - Basic Syntax!
+                </p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a> |
+                <span class="ko">弘益人間 - 널리 인간을 이롭게 하라</span>
+                <span class="en" style="display:none;">Benefit All Humanity</span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_1_01_Variables_Types.html'">
+                <span class="ko">Level 1 시작 →</span>
+                <span class="en" style="display:none;">Start Level 1 →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() { if (currentSlide < totalSlides) showSlide(currentSlide + 1); }
+        function prevSlide() { if (currentSlide > 1) showSlide(currentSlide - 1); }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') || (lang === 'en' && btn.textContent === 'English')) btn.classList.add('active');
+            });
+            document.querySelectorAll('.ko').forEach(el => el.style.display = lang === 'ko' ? '' : 'none');
+            document.querySelectorAll('.en').forEach(el => el.style.display = lang === 'en' ? '' : 'none');
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                document.querySelectorAll('#slide' + n + ' .code-line').forEach((line, i) => {
+                    setTimeout(() => line.classList.add('show'), i * 150);
+                });
+                document.querySelectorAll('#slide' + n + ' .command-card').forEach((card, i) => {
+                    setTimeout(() => card.classList.add('show'), i * 200);
+                });
+            }, 100);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        animateSlide(1);
+    </script>
+</body>
+</html>

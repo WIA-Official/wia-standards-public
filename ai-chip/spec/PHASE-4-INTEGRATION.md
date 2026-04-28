@@ -5,237 +5,275 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-ai-chip (Ai Chip).
+This document defines how an AI-chip programme integrates
+with the systems that surround it: MLCommons (for MLPerf
+submission); ONNX / TVM / OpenXLA / OpenAI Triton compiler
+toolchains; PCI-SIG and CXL Consortium reference
+materials; OCP Open Accelerator Module specification;
+hyperscale cloud provider fleet-management platforms;
+data-centre BMC and IPMI infrastructure; export-control
+regulators (US BIS, EU dual-use authorities, KR Strategic
+Trade authorities); CVE Numbering Authorities; customer-
+notification systems; and long-term archives.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17065:2012 (conformity-assessment bodies)
+- ISO 8601 (date and time)
+- MLCommons MLPerf submission infrastructure
+- ONNX
+- W3C Verifiable Credentials Data Model 2.0 (optional)
 
 ---
 
-## §1 Scope
+## §1 MLCommons Submission Integration
 
-This PHASE document is one of four that together define the WIA-ai-chip
-standard. It addresses the integration layer of the standard.
+MLCommons operates the MLPerf submission infrastructure.
+Integration carries the operator's MLCommons submitter
+identifier, the per-suite submission template, the per-
+result auditor-verification workflow, and MLCommons-side
+publication channel that the operator's analytics
+ingest. MLCommons release schedules (typically twice per
+year for Inference and twice per year for Training)
+drive the operator's benchmark-publication calendar.
 
-## §2 Manifest
+## §2 Compiler Toolchain Integration
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "ai-chip"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Compiler toolchains (TVM, OpenXLA, OpenAI Triton,
+vendor-proprietary CUDA / ROCm / oneAPI compilers)
+emit compiled-artefact lineage records (PHASE-1 §5).
+Integration carries each toolchain's identifier, the
+per-version reference, and the deterministic-build
+attestation that allows the operator's downstream
+consumers to reproduce the compilation given the input
+artefact and the toolchain version.
 
-## §3 Conformance Tiers
+## §3 PCI-SIG / CXL Consortium Integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Host-attach interface conformance (PCIe 6.0, CXL 3.0)
+follows PCI-SIG and CXL Consortium compliance programmes.
+Integration carries the operator's PCI-SIG / CXL
+membership reference, the per-product compliance test
+report, and the consortium's published compliance-list
+position.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 OCP Open Accelerator Module Integration
 
-## §4 Discovery
+Operators that adopt the OCP OAM form factor integrate
+with OCP's specification registry. Integration carries the
+operator's OCP membership reference, the per-product OAM
+compliance attestation, and the OCP Open System Firmware
+binding where the operator participates in OSF.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/ai-chip`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §5 Customer Notification System Integration
 
-## §5 Time and Identity
+Customer notifications for security disclosures (PHASE-3
+§5) and EOL announcements (PHASE-3 §8) flow through the
+operator's customer-notification system. Integration
+carries the system's identifier, the per-customer
+contact roster, and the per-notification-class delivery
+SLA (immediate for critical security disclosures,
+30-day-advance for major EOL announcements).
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §6 Cloud Provider Fleet-Management Integration
 
-## §6 Versioning and Deprecation
+Hyperscale cloud providers operate accelerator fleets at
+scale and consume per-chip telemetry, firmware-revision
+events, and security disclosures. Integration carries
+each cloud provider's identifier, the per-fleet-segment
+telemetry feed, and the per-security-disclosure embargo-
+share agreement (cloud providers often coordinate
+embargoed disclosure visibility before public
+publication so that they can pre-stage firmware
+deployments).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §7 Data-Centre BMC / IPMI Integration
 
-## §7 Privacy and Security
+Per-chip telemetry (PHASE-1 §6) ingests through the
+operator's data-centre BMC (per Redfish / IPMI / vendor-
+proprietary BMC APIs). Integration carries the BMC
+vendor's identifier, the per-rack BMC mapping, and the
+per-chip telemetry-tag mapping that translates BMC
+sensor identifiers into the WIA telemetry schema.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §8 Export-Control Regulator Integration
 
-## §8 Open Governance
+Export-control regulators (US BIS, EU national export-
+control authorities, KR MOTIE Strategic Trade Bureau,
+equivalent authorities) consume per-shipment licence
+applications and post-shipment compliance reports.
+Integration carries the regulator's identifier, the per-
+shipment submission template, and the regulator's
+audit-report intake.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `ai-chip` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §9 CVE Numbering Authority Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+For security disclosures (PHASE-1 §8), the operator
+integrates with its CVE Numbering Authority (CNA). Where
+the operator is its own CNA, the CNA endpoint is
+internal; where the operator coordinates through MITRE
+or another CNA, the integration carries the upstream
+CNA's identifier and the per-disclosure CVE-assignment
+workflow.
 
+## §10 Evidence Package Format
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+```
+evidence/
+  manifest.json                — package manifest (signed)
+  programme.json               — programme record
+  chips/                       — chip records and capability
+                                  declarations
+  mlperf-results/              — submitted and published
+                                  MLPerf results
+  compilation-lineages/        — compilation lineage records
+                                  for the cited interval
+  runtime-telemetry-summaries/ — telemetry summaries (raw
+                                  telemetry in the
+                                  operator's time-series
+                                  database)
+  firmware-revisions/          — firmware-application history
+  security-disclosures/        — disclosure records
+                                  (post-embargo only;
+                                  pre-embargo records gated
+                                  by the operator's CVD
+                                  policy)
+  audit/                       — API audit log excerpts
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+The package is content-addressable; the manifest is
+signed by the operator's HTTP-message-signature key
+(RFC 9421) and counter-signed by the operator's quality
+manager when the package supports an external audit or
+regulator submission.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §11 Manifest and Signatures
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Verification tools recompute file digests, compare to
+the manifest, and reject the package on mismatch with
+type `urn:wia:ai-chip:evidence-mismatch`.
 
-## Annex F — Adoption Roadmap
+## §12 well-known URI Discovery
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+A conformant operator exposes a discovery document at
+`/.well-known/wia-ai-chip` that links to the API root,
+the MLCommons submitter binding, the published quality
+dossier, the chip-catalogue summary (Production-stage
+chips), and the per-jurisdiction export-control binding.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §13 Long-Term Archive Integration
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Operators designate a long-term archive that holds chip
+records, MLPerf results, and security disclosures
+beyond the operator's primary retention horizon.
+Quarterly deposits round-trip content-addresses; on
+programme wind-down, remaining records transfer to the
+archive with content-addresses preserved.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §14 Verifiable-Credential Re-Issuance (optional)
 
-## Annex G — Test Vectors and Conformance Evidence
+Operators that wish to expose attestations (PCI-SIG /
+CXL compliance, MLCommons submission verification, ISO/
+IEC 24029 robustness assessment, ISO/IEC 27001
+certification) to consumers of W3C Verifiable Credentials
+MAY re-issue the attestations as Verifiable Credentials
+under the Data Model 2.0 specification. Re-issuance is
+optional; the canonical record remains the JSON
+evidence-package manifest.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §15 Streaming Heartbeat
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+SSE subscribers receive a heartbeat every 30 seconds
+with `Last-Event-ID` resume support. Subscribers that
+disconnect during long telemetry-stream windows resume
+from the last seen event identifier without losing
+visibility of priority-1 events.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §16 Backwards-Compatibility Guarantee
 
-## Annex H — Versioning and Deprecation Policy
+PHASE-4 minor revisions remain backwards-compatible with
+prior-minor clients. Major revisions go through a
+deprecation window of at least one full MLPerf release
+cycle so that fleet-management and benchmark integrations
+have time to migrate.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §17 Cross-Standard Linkage
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Operators that consume adjacent WIA standards (WIA-ai-
+assistant for assistant-deployment chip lifecycle, WIA-
+generative-ai for foundation-model deployment, WIA-data-
+center for data-centre power and cooling integration,
+WIA-iot-m2m for accelerator-attached edge devices) emit
+cross-standard linkage records.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §18 Reader Tooling
 
-## Annex I — Interoperability Profiles
+Operators MAY publish supplementary reader tools
+(per-chip MLPerf trend dashboards, per-fleet thermal /
+power dashboards, firmware-rollout coverage maps,
+security-disclosure timeline visualisers) alongside the
+canonical evidence package; the tools are non-normative.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §19 Public Catalogue and Aggregator Feeds
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Operators publish a public catalogue of registered
+chips (Production stage), MLPerf verified-published
+results, and post-embargo security disclosures through
+an Atom or JSON Feed. Aggregator consumers subscribe to
+compare accelerator behaviour across the AI-chip
+industry.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §20 Sustainability Reporting Platform Integration
+
+Sustainability-disclosure platforms (CSRD-aligned, GRI,
+SASB, ISSB IFRS S2) consume per-chip embodied- and
+operating-emission attribution per PHASE-3 §14.
+Integration carries the platform's identifier, the per-
+disclosure-period methodology, and the per-product
+embodied-emission accession reference.
+
+## §21 Compliance Test Lab Integration
+
+PCI-SIG and CXL Consortium host compliance test labs
+that issue per-product compliance certificates.
+Integration carries the lab's identifier, the per-product
+compliance test report, and the consortium-side
+publication endpoint.
+
+## §22 Foundry and Packaging Vendor Integration
+
+Operators integrate with foundries (TSMC, Samsung Foundry,
+Intel Foundry Services, GlobalFoundries) and advanced-
+packaging vendors (TSMC InFO / CoWoS, Intel Foveros,
+Amkor / ASE / SPIL packaging providers) for per-wafer
+and per-package provenance records (PHASE-1 §12).
+Integration carries each vendor's identifier, the per-
+lot record reference, and the per-event handoff
+acknowledgement.
+
+## §23 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated
+successfully with MLCommons (where the operator submits
+MLPerf), at least one compiler toolchain provider, the
+relevant host-attach consortium (PCI-SIG / CXL), the
+operator's customer-notification system, the relevant
+export-control regulator, the operator's CNA, and at
+least one long-term archive, and has published at least
+one externally citable evidence package.
+
+Sunsetting an integration is announced via the well-
+known discovery document at least 90 calendar days
+before removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-ai-chip
+- **Last Updated:** 2026-04-28

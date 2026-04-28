@@ -1,0 +1,10 @@
+# DALL-E Prompts for WIA-AUTO-012 Press Materials
+
+## Prompt 1: Hero Image - Intelligent Traffic Management System
+A futuristic urban traffic control center with orange (#F97316) displays: AI-powered traffic signal optimization system showing real-time vehicle flow at intersections, adaptive signal timing reducing delays by 35%, congestion detection with heat maps highlighting problem areas, incident detection automatically alerting emergency services, and predictive analytics forecasting rush hour patterns. Holographic traffic flow models with Webster's optimization algorithms. Multiple monitors showing Level of Service (LOS) metrics. Modern smart city infrastructure photography, professional transportation technology aesthetic.
+
+## Prompt 2: Problem Scenario - Urban Traffic Congestion Crisis
+A frustrating rush hour gridlock scene: cars stopped in heavy traffic with drivers stressed and wasting time, outdated fixed-timing signals causing unnecessary delays at empty intersections, accidents blocking lanes with delayed emergency response, commuters spending 100+ hours annually in traffic, excessive fuel waste and air pollution from idling vehicles, and pedestrians waiting dangerously long at crosswalks. Show economic losses: $160 billion yearly from congestion, environmental damage. Documentary urban photography emphasizing wasted time, pollution, and inefficiency of outdated traffic management.
+
+## Prompt 3: Solution Visualization - Optimized Traffic Flow
+A smooth-flowing urban traffic scene powered by WIA-AUTO-012 intelligent management: vehicles moving efficiently through adaptive green waves synchronized by AI, real-time incident detection clearing accidents within 5 minutes, public transit given priority signal preemption, pedestrians crossing safely with optimized timing, and congestion reduced by 40% compared to fixed signals. Dashboard shows average delay <20 seconds, LOS Level C or better, 30% fuel savings, reduced emissions. Clean, efficient, sustainable urban mobility. Modern smart city photography celebrating technology solving traffic problems and improving quality of life.

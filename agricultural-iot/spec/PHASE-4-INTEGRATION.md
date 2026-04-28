@@ -5,270 +5,265 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-agricultural-iot (Agricultural Iot).
+This document defines how an agricultural-IoT operation
+integrates with the systems that surround it: FMIS vendors;
+equipment OEMs (John Deere Operations Center, AGCO
+FarmHub, CNH AFS Connect, Kubota K-Hub, equivalent
+platforms); AgGateway ADAPT plug-in registry; LoRaWAN
+network operators; cellular IoT carriers; OGC SensorThings
+catalogue services; livestock-traceability authorities;
+water-rights administrators; pesticide-product registries;
+animal-welfare authorities; and long-term archives.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17065:2012 (conformity-assessment bodies)
+- ISO 8601 (date and time)
+- ISO 11783 series
+- AgGateway ADAPT
+- OGC SensorThings API 1.1
+- W3C Verifiable Credentials Data Model 2.0 (optional)
 
 ---
 
-## §1 Scope
+## §1 FMIS Vendor Integration
 
-This PHASE document is one of four that together define the WIA-agricultural-iot
-standard. It addresses the integration layer of the standard.
+FMIS vendors (Climate FieldView, Granular, Trimble Ag
+Software, Conservis, AgriWebb, AgVend, equivalent
+platforms) consume operation, field, observation, and
+ISOBUS task records. Integration carries the FMIS vendor's
+identifier, the per-vendor adapter mapping (operator
+records the FMIS-side schema mapping for each consumed
+record class), and the per-record reconciliation cadence.
 
-## §2 Manifest
+## §2 Equipment OEM Integration
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "agricultural-iot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Equipment OEMs operate manufacturer-specific platforms
+that consume task data round-trip. Integration carries
+each OEM's identifier, the per-OEM AgGateway ADAPT plug-in
+reference, the per-OEM tractor / implement fleet binding,
+and the OEM-side telemetry feed that feeds back into the
+operator's analytics.
 
-## §3 Conformance Tiers
+## §3 AgGateway ADAPT Plug-in Registry Integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+AgGateway operates the ADAPT plug-in registry. Integration
+carries the registry's identifier, the per-plug-in version
+the operator pins, and the registry's notification endpoint
+for plug-in revisions. Plug-in revisions trigger the
+operator's regression-test cadence (PHASE-3 §2).
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 LoRaWAN Network Operator Integration
 
-## §4 Discovery
+LoRaWAN-using deployments integrate with a LoRaWAN Network
+Server (LNS): The Things Stack, ChirpStack, vendor-managed
+LNS. Integration carries the LNS's identifier, the per-
+device JoinEUI / DevEUI / AppKey configuration (keys held
+in HSM, references-only here), and the LNS-side uplink
+endpoint.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/agricultural-iot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §5 Cellular IoT Carrier Integration
 
-## §5 Time and Identity
+Cellular-IoT (NB-IoT, Cat-M, 5G RedCap) deployments
+integrate with the mobile-network operator (MNO). Integration
+carries the MNO's identifier, the per-SIM eSIM profile
+management endpoint (per GSMA RSP), and the per-device data
+plan binding.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §6 OGC SensorThings Catalogue Service Integration
 
-## §6 Versioning and Deprecation
+OGC SensorThings catalogue services consume the operator's
+device / Datastream / Observation records to expose them to
+broader research and policy consumers. Integration carries
+each catalogue's identifier, the per-Datastream public-
+catalogue eligibility, and the catalogue's ingest cadence.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §7 Livestock Traceability Authority Integration
 
-## §7 Privacy and Security
+Livestock traceability authorities (national programmes per
+PHASE-3 §6) consume per-animal birth, movement, and
+slaughter events. Integration carries the authority's
+identifier, the per-event submission template, and the
+authority's audit-trail export endpoint.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §8 Water-Rights Administrator Integration
 
-## §8 Open Governance
+Water-rights administrators (state water boards in the US,
+EU national water authorities, KR water-rights authorities
+under the Water Use Permit Act) consume per-zone irrigation
+plans and as-applied water-application records. Integration
+carries the administrator's identifier, the per-allocation
+reporting cadence, and the over-allocation notification
+intake.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `agricultural-iot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §9 Pesticide Product Registry Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Pesticide product registries (EPA OPP in the US, EU EFSA
+under Regulation 1107/2009, KR Pesticide Control Division,
+equivalent national registries) provide product label data
+that the operator's spraying-task records cite for rate /
+buffer / re-entry-interval compliance. Integration carries
+the registry's identifier, the per-product registration
+reference, and the operator's product-revision pickup
+cadence.
 
+## §10 Animal Welfare Authority Integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+Animal welfare authorities (USDA APHIS in the US, EU
+national veterinary authorities, KR Animal Health and
+Welfare Division, equivalent rules elsewhere) consume
+welfare-incident notifications per PHASE-3 §7. Integration
+carries the authority's identifier, the per-incident-class
+notification template, and the authority's investigation
+intake.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## §11 Evidence Package Format
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+evidence/
+  manifest.json              — package manifest (signed)
+  operation.json             — operation record
+  geo-references/            — field / zone geometry
+  devices/                   — device inventory
+  observations/              — observation summaries for the
+                                cited interval
+  isobus-tasks/              — task records and as-applied
+                                map references
+  animals/                   — livestock records (no PII;
+                                opaque tokens for human
+                                handlers)
+  irrigation-plans/          — irrigation plans and applied
+                                records
+  soil-classifications/      — soil sample classifications
+  audit/                     — API audit log excerpts
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The package is content-addressable; the manifest is signed
+by the operator's HTTP-message-signature key (RFC 9421)
+and counter-signed by the operator's quality manager when
+the package supports a regulator submission.
 
-## Annex F — Adoption Roadmap
+## §12 Manifest and Signatures
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Verification tools recompute file digests, compare to the
+manifest, and reject the package on mismatch with type
+`urn:wia:agricultural-iot:evidence-mismatch`.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §13 well-known URI Discovery
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A conformant operator exposes a discovery document at
+`/.well-known/wia-agricultural-iot` that links to the API
+root, the operator's per-jurisdiction water-rights binding,
+the published quality dossier, the equipment-OEM plug-in
+catalogue, and the livestock-traceability authority binding.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §14 Long-Term Archive Integration
 
-## Annex G — Test Vectors and Conformance Evidence
+Operators designate a long-term archive that holds
+operation records (observations, ISOBUS task archives,
+livestock records) beyond the operator's primary retention
+horizon. Quarterly deposits round-trip content-addresses;
+on operation wind-down, remaining records transfer to the
+archive with content-addresses preserved.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §15 Verifiable-Credential Re-Issuance (optional)
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Operators that wish to expose attestations (water-rights
+allocation, pesticide-applicator certification, organic
+certification, GAP certification, ISO 22000 conformance,
+ISO/IEC 27001 certification) to consumers of W3C
+Verifiable Credentials MAY re-issue the attestations as
+Verifiable Credentials under the Data Model 2.0
+specification. Re-issuance is optional; the canonical
+record remains the JSON evidence-package manifest.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §16 Streaming Heartbeat
 
-## Annex H — Versioning and Deprecation Policy
+SSE subscribers receive a heartbeat every 30 seconds with
+`Last-Event-ID` resume support. Subscribers that disconnect
+during long observation-stream windows resume from the last
+seen event identifier without losing visibility of
+priority-1 events (water-rights breach warnings, livestock
+RFID anomalies, climate-control SOP excursions).
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §17 Backwards-Compatibility Guarantee
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+PHASE-4 minor revisions remain backwards-compatible with
+prior-minor clients. Major revisions go through a
+deprecation window of at least one full ISO 11783 series
+revision cycle so that OEM and FMIS integrations have time
+to migrate.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §18 Cross-Standard Linkage
 
-## Annex I — Interoperability Profiles
+Operators that consume adjacent WIA standards (WIA-crop-
+monitoring, WIA-food-traceability, WIA-iot-m2m for the
+underlying IoT platform layer) emit cross-standard linkage
+records that name the consuming standard and the version
+under which the linkage is claimed.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §19 Public Catalogue and Aggregator Feeds
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Operators that publish a public catalogue (research
+collaboration, agricultural-policy reporting) emit a JSON
+Feed listing operation summaries, anonymised per-zone
+yield-driver statistics, and per-operation soil-
+classification summaries. The feed is intended for
+research consumers and never carries per-handler personal
+data or per-animal individual-welfare records.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §20 Sustainability Reporting Integration
 
-## Annex J — Reference Implementation Topology
+Operators that publish sustainability disclosures (CSRD-
+aligned, GRI, SASB, equivalent) consume per-operation GHG
+inventory aggregates per ISO 14064-1:2018 and emit per-
+disclosure period rollups. Integration carries the
+disclosure platform's identifier and the per-period
+aggregation methodology.
 
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
+## §21 Carbon Registry Integration
 
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-4-INTEGRATION validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
+Operators that participate in agricultural carbon programmes
+integrate with the chosen registry (US Climate Action
+Reserve, Verra, Gold Standard, Indigo Carbon, KR K-ETS).
+Integration carries the registry's identifier, the per-
+methodology binding, the per-project additionality
+attestation, and the per-vintage carbon-credit issuance
+record.
 
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+## §22 Crop-Insurance Carrier Integration
+
+Operators that bind crop-insurance to per-field practice
+records integrate with the crop-insurance carrier (USDA
+RMA-approved insurance providers in the US, EU national
+crop-insurance schemes, KR Agricultural Insurance
+operators). Integration carries the carrier's identifier,
+the per-policy field binding, and the per-loss-event
+adjustment workflow.
+
+## §23 Conformance and Sunset
+
+An operation conformant with PHASE-4 has integrated
+successfully with at least one FMIS vendor, at least one
+equipment OEM (where the operator runs ISOBUS equipment),
+the AgGateway ADAPT plug-in registry, the relevant water-
+rights administrator, the relevant livestock-traceability
+authority (where the operator handles livestock), and at
+least one long-term archive, and has published at least
+one externally citable evidence package.
+
+Sunsetting an integration is announced via the well-known
+discovery document at least 90 calendar days before
+removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-agricultural-iot
+- **Last Updated:** 2026-04-28

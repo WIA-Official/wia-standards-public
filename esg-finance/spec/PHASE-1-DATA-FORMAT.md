@@ -5,237 +5,507 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-esg-finance (Esg Finance).
+This document defines the canonical data-format layer
+for WIA-esg-finance. The standard covers persistent
+record shapes for the lifecycle of a corporate
+sustainability disclosure programme — the reporting
+entity and its consolidation perimeter; the materiality-
+assessment record (the EU CSRD double-materiality
+discipline); the ISSB IFRS S1 / S2 climate-related
+disclosure record; the EU CSRD / ESRS disclosure record
+across the environmental, social, and governance
+topical standards; the EU Taxonomy alignment record;
+the EU SFDR Article 6 / 8 / 9 product classification
+record (where the entity is a financial-market
+participant); the GHG Protocol Scope 1 / 2 / 3
+inventory; the SBTi target and progress record; the
+TCFD disclosure cross-walk; the GRI Universal +
+Sector + Topic disclosure cross-walk; the SASB Industry
+Standards disclosure cross-walk; the EU CSDDD
+(Corporate Sustainability Due Diligence Directive)
+due-diligence record; the assurance-and-audit record;
+and the supervisory-correspondence record. Records
+are consumed by the entity's board (including the
+audit committee), the entity's external assurance
+provider, the supervisory authority for the operating
+jurisdiction (ESMA + Member-State NCA in EU; SEC and
+state attorneys-general in the US; FSC + KCSE in KR),
+investors and lenders, capital-markets analysts, and —
+through the public-disclosure surface — civil society
+and affected-rights holders.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID) and IETF RFC 4122 (UUID URN)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 14064-1:2018 (organisation-level GHG inventory)
+- ISO 14064-3:2019 (GHG verification and validation)
+- ISO 14067:2018 (carbon footprint of products)
+- ISO 17442 (LEI)
+- IETF RFC 8259 (JSON), RFC 9457 (Problem Details)
+- IFRS Foundation ISSB IFRS S1 (General Requirements
+  for Disclosure of Sustainability-related Financial
+  Information) and IFRS S2 (Climate-related
+  Disclosures)
+- TCFD (Task Force on Climate-related Financial
+  Disclosures) Recommendations (now consolidated
+  into IFRS S2)
+- EU CSRD (Directive (EU) 2022/2464) amending the
+  Accounting Directive 2013/34/EU
+- EU ESRS (the European Sustainability Reporting
+  Standards adopted by Commission Delegated Regulation
+  (EU) 2023/2772 — ESRS 1 General requirements; ESRS
+  2 General disclosures; ESRS E1 Climate change; ESRS
+  E2 Pollution; ESRS E3 Water and marine resources;
+  ESRS E4 Biodiversity and ecosystems; ESRS E5
+  Resource use and circular economy; ESRS S1 Own
+  workforce; ESRS S2 Workers in the value chain;
+  ESRS S3 Affected communities; ESRS S4 Consumers
+  and end-users; ESRS G1 Business conduct)
+- EU Taxonomy Regulation (Regulation (EU) 2020/852)
+  and the Climate Delegated Act (Reg 2021/2139),
+  Disclosures Delegated Act (Reg 2021/2178), and
+  Environmental Delegated Act (Reg 2023/2486)
+- EU SFDR (Sustainable Finance Disclosure Regulation
+  (EU) 2019/2088) Articles 3, 4, 6, 8, 9, 10, 11
+- EU CSDDD (Corporate Sustainability Due Diligence
+  Directive (EU) 2024/1760) Articles 5 to 16 (due-
+  diligence obligations across the chain of
+  activities)
+- GHG Protocol Corporate Accounting and Reporting
+  Standard (revised) and Corporate Value Chain
+  (Scope 3) Accounting and Reporting Standard
+- SBTi (Science Based Targets initiative) Corporate
+  Net-Zero Standard v1.x and SBTi Financial Sector
+  guidance
+- CDP (Carbon Disclosure Project) Climate / Forests
+  / Water Security questionnaires
+- GRI Standards (the GRI Universal Standards 2021,
+  the Sector Standards programme, and the Topic
+  Standards)
+- SASB Industry Standards (now under the IFRS
+  Foundation umbrella as part of the ISSB)
+- UN PRI (Principles for Responsible Investment)
+  reporting framework
+- UNEP FI Principles for Responsible Banking and
+  Net-Zero Banking Alliance commitments
+- KR ESG 공시 의무화 (the KR FSC's phased ESG
+  disclosure mandate) and KR K-ESG 가이드라인 (the
+  Ministry of Trade, Industry and Energy's published
+  K-ESG framework)
+- US SEC climate-related disclosure rules (17 CFR
+  229.1500 to 229.1506; 17 CFR 232.405) where in
+  force after the Commission's adoption and any
+  judicial stay
+- US California SB-253 Climate Corporate Data
+  Accountability Act and SB-261 Climate-Related
+  Financial Risk Act
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-esg-finance
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts
+an ESG-disclosure operator (a corporate reporting
+entity, a financial-market participant subject to
+SFDR, a credit institution under the Net-Zero Banking
+Alliance, an asset manager subject to the UN PRI, or
+an assurance provider) maintains:
 
-## §2 Manifest
+- The reporting entity record and consolidation
+  perimeter.
+- The double-materiality assessment record.
+- The ISSB / IFRS S1 / S2 disclosure record.
+- The EU CSRD / ESRS disclosure record.
+- The EU Taxonomy alignment record.
+- The EU SFDR Article 6 / 8 / 9 product
+  classification record.
+- The GHG Protocol Scope 1 / 2 / 3 inventory.
+- The SBTi target and progress record.
+- The CSDDD due-diligence record.
+- The assurance and audit record.
+- The supervisory correspondence record.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "esg-finance"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Programme Identifier
 
-## §3 Conformance Tiers
+```
+programmeId          : string (uuidv7)
+entityName           : string (legal name)
+entityRole           : enum ("reporting-entity-eu-
+                       csrd" | "reporting-entity-issb"
+                       | "reporting-entity-sec" |
+                       "reporting-entity-kr" |
+                       "financial-market-participant-
+                       sfdr" | "asset-manager-pri" |
+                       "credit-institution-nzba" |
+                       "assurance-provider" |
+                       "user-defined")
+entityLei            : string (ISO 17442)
+entityJurisdiction   : array of string (ISO 3166-1)
+governingFrameworks  : array of enum ("ISSB-IFRS-S1"
+                       | "ISSB-IFRS-S2" |
+                       "TCFD" | "EU-CSRD-2022-2464"
+                       | "EU-ESRS-2023-2772" |
+                       "EU-TAXONOMY-2020-852" |
+                       "EU-TAXONOMY-CLIMATE-DEL-
+                       2021-2139" | "EU-TAXONOMY-
+                       DISCLOSURES-DEL-2021-2178" |
+                       "EU-TAXONOMY-ENVIRONMENTAL-
+                       DEL-2023-2486" |
+                       "EU-SFDR-2019-2088" |
+                       "EU-CSDDD-2024-1760" |
+                       "GHG-PROTOCOL-CORPORATE" |
+                       "GHG-PROTOCOL-SCOPE-3" |
+                       "ISO-14064-1" | "ISO-14064-3"
+                       | "ISO-14067" | "SBTi-NET-
+                       ZERO" | "CDP-CLIMATE" |
+                       "GRI-UNIVERSAL-2021" |
+                       "SASB-INDUSTRY" | "UN-PRI" |
+                       "UNEP-FI-PRB" |
+                       "KR-FSC-ESG-공시-의무화" |
+                       "KR-MOTIE-K-ESG-가이드라인" |
+                       "US-SEC-17-CFR-229-1500" |
+                       "US-CA-SB-253" |
+                       "US-CA-SB-261" |
+                       "user-defined")
+reportingPeriod      : object (the fiscal year start
+                       and end dates per the entity's
+                       financial reporting calendar)
+programmeStatus      : enum ("design" | "operating"
+                       | "limited-rollout" |
+                       "wind-down" | "archived")
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Consolidation Perimeter Record
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+consolidationPerimeter:
+  perimeterId        : string (uuidv7)
+  consolidationBasis : enum ("ifrs-control" |
+                       "operational-control" |
+                       "financial-control" |
+                       "equity-share" | "user-
+                       defined") (the GHG Protocol
+                       allows operational, financial,
+                       or equity-share consolidation;
+                       ISSB IFRS S1 follows IFRS
+                       Accounting Standards control)
+  entitiesIncluded   : array of object (legal-entity
+                       references with their LEI and
+                       inclusion percentage)
+  scopeBoundaryDescription : string (the entity's
+                       documented narrative for the
+                       scope of consolidation)
+```
 
-## §4 Discovery
+## §4 Double-Materiality Assessment Record (EU CSRD /
+       ESRS 1)
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/esg-finance`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The double-materiality discipline under ESRS 1 §3
+requires the entity to assess both impact materiality
+(the entity's impacts on people and the environment)
+and financial materiality (sustainability matters
+that affect the entity's financial performance,
+position, cash flows, cost of capital, or access to
+finance):
 
-## §5 Time and Identity
+```
+materialityAssessment:
+  assessmentId       : string (uuidv7)
+  conductedAt        : string (ISO 8601)
+  assessmentScope    : array of object (per-topic
+                       assessment — climate change,
+                       pollution, water, biodiversity,
+                       resource use, own workforce,
+                       value-chain workers, affected
+                       communities, consumers,
+                       business conduct)
+  impactMaterialityOutcome : array of object (per-
+                       topic impact-materiality
+                       conclusion with the supporting
+                       evidence reference)
+  financialMaterialityOutcome : array of object (per-
+                       topic financial-materiality
+                       conclusion with the supporting
+                       evidence reference)
+  stakeholderEngagementRef : string (URI of the
+                       stakeholder-engagement
+                       narrative; ESRS 1 requires the
+                       entity to engage affected
+                       stakeholders)
+  approvedBy         : string (the entity's audit
+                       committee or sustainability
+                       committee reference)
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 ISSB IFRS S1 / S2 Disclosure Record
 
-## §6 Versioning and Deprecation
+The ISSB disclosure record encodes the four-pillar
+TCFD-aligned IFRS S2 architecture (governance,
+strategy, risk management, metrics and targets) plus
+the IFRS S1 general requirements:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+issbDisclosureRecord:
+  disclosureId       : string (uuidv7)
+  reportingPeriodRef : string (PHASE-1 §2)
+  governanceNarrativeRef : string (URI of the IFRS
+                       S2 §6 governance disclosure
+                       narrative — board oversight,
+                       management's role)
+  strategyNarrativeRef : string (URI of the IFRS S2
+                       §9 strategy disclosure —
+                       climate-related risks and
+                       opportunities, business model
+                       and value chain, transition
+                       plan)
+  riskManagementNarrativeRef : string (URI of the
+                       IFRS S2 §25 risk-management
+                       disclosure)
+  metricsTargetsRef  : object (the IFRS S2 §29
+                       metrics and targets — Scope 1,
+                       2, 3 emissions; cross-industry
+                       metrics; industry-specific
+                       metrics from SASB Industry
+                       Standards)
+  scenarioAnalysisRef : string (URI of the climate-
+                       resilience scenario-analysis
+                       narrative under IFRS S2 §22)
+```
 
-## §7 Privacy and Security
+## §6 EU CSRD / ESRS Disclosure Record
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+esrsDisclosureRecord:
+  disclosureId       : string (uuidv7)
+  reportingPeriodRef : string
+  esrs1GeneralRequirementsRef : string
+  esrs2GeneralDisclosuresRef : string
+  topicalDisclosures : array of object (per-topical-
+                       standard disclosure reference
+                       — ESRS E1 climate, E2
+                       pollution, E3 water and marine,
+                       E4 biodiversity, E5 resource
+                       use and circular economy, S1
+                       own workforce, S2 value-chain
+                       workers, S3 affected
+                       communities, S4 consumers, G1
+                       business conduct)
+  digitalTaggingRef  : string (URI of the XBRL
+                       tagged digital report — ESRS
+                       2023/2772 mandates digital
+                       tagging per the ESEF Regulation)
+```
 
-## §8 Open Governance
+## §7 EU Taxonomy Alignment Record
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `esg-finance` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+taxonomyAlignment:
+  alignmentId        : string (uuidv7)
+  reportingPeriodRef : string
+  economicActivities : array of object (per-NACE
+                       activity reference; the
+                       Taxonomy Climate Delegated Act
+                       (Reg 2021/2139) and the
+                       Environmental Delegated Act
+                       (Reg 2023/2486) define the
+                       eligible activities for the
+                       six environmental objectives —
+                       climate-change mitigation,
+                       climate-change adaptation,
+                       water and marine resources,
+                       circular economy, pollution
+                       prevention and control,
+                       biodiversity protection)
+  taxonomyEligibleKpi : object (per-KPI eligible
+                       turnover, capex, opex
+                       fractions)
+  taxonomyAlignedKpi : object (per-KPI aligned
+                       turnover, capex, opex fractions
+                       — the substantial-contribution
+                       criterion, the do-no-significant-
+                       harm criterion, and the minimum
+                       safeguards under Article 18 of
+                       Regulation (EU) 2020/852 are
+                       all satisfied)
+  minSafeguardsAttestationRef : string (URI of the
+                       minimum-safeguards attestation
+                       narrative covering the OECD
+                       Guidelines for Multinational
+                       Enterprises, the UN Guiding
+                       Principles on Business and
+                       Human Rights, and the ILO
+                       Declaration on Fundamental
+                       Principles and Rights at Work)
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §8 EU SFDR Product-Classification Record
 
+For financial-market participants:
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+```
+sfdrProductRecord:
+  productId          : string (uuidv7)
+  productName        : string
+  classificationKind : enum ("art-6-mainstream" |
+                       "art-8-promoting-
+                       environmental-or-social" |
+                       "art-9-sustainable-
+                       investment-objective")
+  preContractualDisclosureRef : string (URI of the
+                       SFDR Article 6 / 8 / 9 pre-
+                       contractual disclosure)
+  periodicDisclosureRef : string (URI of the SFDR
+                       Article 11 periodic disclosure)
+  paiStatementRef    : string (URI of the principal-
+                       adverse-impacts statement under
+                       SFDR Article 4 + RTS Annex I;
+                       absent unless the FMP exceeds
+                       the 500-employee threshold or
+                       opts in)
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## §9 GHG Protocol Inventory and Verification Record
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+ghgInventory:
+  inventoryId        : string (uuidv7)
+  reportingPeriodRef : string
+  scope1Emissions    : object (tCO2e total + per
+                       facility / activity breakdown
+                       — direct emissions from owned
+                       or controlled sources)
+  scope2Emissions    : object (tCO2e total under
+                       both location-based and
+                       market-based methods — Scope
+                       2 Guidance Amendment requires
+                       both)
+  scope3Emissions    : object (tCO2e total + per-
+                       category-1-15 breakdown —
+                       purchased goods, capital
+                       goods, fuel-and-energy
+                       activities, upstream
+                       transportation, waste,
+                       business travel, employee
+                       commuting, upstream leased
+                       assets, downstream
+                       transportation, processing,
+                       use of sold products, end-
+                       of-life of sold products,
+                       downstream leased assets,
+                       franchises, investments)
+  consolidationApproach : enum ("operational-control"
+                       | "financial-control" |
+                       "equity-share")
+  verificationKind   : enum ("limited-assurance-iso-
+                       14064-3" | "reasonable-
+                       assurance-iso-14064-3" |
+                       "self-reported-no-assurance")
+  verificationProviderRef : string (the ISO 14064-3
+                       accredited verifier; absent if
+                       self-reported)
+  verifiedAt         : string (ISO 8601)
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §10 SBTi Target and Progress Record
 
-## Annex F — Adoption Roadmap
+```
+sbtiTarget:
+  targetId           : string (uuidv7)
+  targetKind         : enum ("near-term-1-5-2-c-
+                       aligned" | "near-term-well-
+                       below-2-c" | "long-term-net-
+                       zero-corporate-net-zero-
+                       standard" | "fls-financial-
+                       sector-target" | "user-
+                       defined")
+  baseYear           : integer (calendar year)
+  targetYear         : integer
+  scopesCovered      : array of enum ("scope-1" |
+                       "scope-2" | "scope-3")
+  reductionPercentage : number (vs. base year)
+  validationOutcome  : enum ("submitted" |
+                       "validated" | "needs-revision"
+                       | "expired")
+  progressRecord     : array of object (per-year
+                       actual emissions trajectory
+                       vs. linear path to target)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §11 CSDDD Due-Diligence Record
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+csdddDueDiligence:
+  dueDiligenceId     : string (uuidv7)
+  reportingPeriodRef : string
+  chainOfActivitiesScope : object (the entity's chain-
+                       of-activities scope per CSDDD
+                       Article 3(g))
+  riskIdentificationRef : string (URI of the adverse-
+                       human-rights-and-environmental-
+                       impact identification
+                       narrative — CSDDD Article 8)
+  preventionPlanRef  : string (URI of the prevention
+                       and minimisation plan — CSDDD
+                       Article 10)
+  remediationPlanRef : string (URI of the actual-
+                       impact remediation plan —
+                       CSDDD Article 11)
+  stakeholderEngagementRef : string (URI of the
+                       affected-stakeholder engagement
+                       — CSDDD Article 13)
+  complaintsChannelRef : string (URI of the
+                       complaints procedure — CSDDD
+                       Article 14)
+  monitoringRef      : string (URI of the periodic
+                       monitoring narrative — CSDDD
+                       Article 15)
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §12 Assurance and Audit Record
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```
+assuranceRecord:
+  assuranceId        : string (uuidv7)
+  reportingPeriodRef : string
+  assuranceProviderRef : string (the assurance
+                       provider's identity and ISAE
+                       3000 / ISAE 3410 / ISO 14064-3
+                       accreditation)
+  assuranceLevel     : enum ("limited-assurance" |
+                       "reasonable-assurance")
+  scope              : array of enum ("issb-ifrs-s2"
+                       | "esrs-environmental" |
+                       "esrs-social" | "esrs-
+                       governance" | "ghg-scope-1"
+                       | "ghg-scope-2" | "ghg-scope-
+                       3" | "taxonomy-alignment" |
+                       "user-defined")
+  reportRef          : string (URI of the assurance
+                       report)
+  issuedAt           : string (ISO 8601)
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+## §13 Conformance
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Implementations claiming PHASE-1 conformance maintain
+the records defined above for every reporting period,
+exercise the double-materiality discipline annually,
+emit the IFRS S1 / S2 / ESRS / Taxonomy / SFDR / GHG
+Protocol / SBTi disclosures within the operating
+jurisdiction's filing deadline, and preserve the
+records under the operating jurisdiction's
+recordkeeping discipline (EU CSRD ten-year archival;
+US SEC 17 CFR 232.405 retention; KR FSC 공시 보존
+discipline).
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+---
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+**Document Information:**
 
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-esg-finance
+- **Last Updated:** 2026-04-28

@@ -5,237 +5,322 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-ai-chip (Ai Chip).
+This document defines the HTTPS API contract that an
+AI-chip vendor or accelerator-fleet operator exposes for
+the records defined in PHASE-1. Consumers include MLPerf
+benchmark consumers, model-deployment platforms, hyperscale
+cloud providers ingesting per-tenant chip telemetry,
+security researchers consuming disclosures, and the
+operator's own audit and analytics platforms.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics)
+- IETF RFC 9111 (HTTP Caching)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 6901 / 6902 (JSON Pointer / Patch)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9421 (HTTP Message Signatures)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022 (information security management)
+- W3C Trace Context
+- MLCommons MLPerf submission format
+- ONNX
+- PCI-SIG / CXL Consortium reference materials
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-ai-chip
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by the
+operator. Versioning uses `/v1/` path segments. The
+OpenAPI 3.1 document at `/v1/openapi.json` is canonical.
 
-## §2 Manifest
+Per-inference runtime APIs (CUDA, ROCm, oneAPI runtime
+calls) are documented by the vendor's runtime stack and
+are not redefined here; this WIA facade is the metadata,
+benchmarks, telemetry, firmware, and security disclosure
+layer.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "ai-chip"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Root Discovery
 
-## §3 Conformance Tiers
+```
+GET /v1/
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```json
+{
+  "standard": "WIA-ai-chip",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":           "/v1/programmes",
+    "chips":                "/v1/chips",
+    "mlperfResults":        "/v1/mlperf-results",
+    "compilationLineages":  "/v1/compilation-lineages",
+    "runtimeTelemetry":     "/v1/runtime-telemetry",
+    "firmwareRevisions":    "/v1/firmware-revisions",
+    "securityDisclosures":  "/v1/security-disclosures",
+    "evidence":             "/v1/evidence",
+    "openapi":              "/v1/openapi.json"
+  }
+}
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Programme and Chip Lifecycle
 
-## §4 Discovery
+```
+POST   /v1/programmes              — register a programme
+GET    /v1/programmes/{pid}        — retrieve programme
+PATCH  /v1/programmes/{pid}/status — advance status
+POST   /v1/programmes/{pid}/chips  — register a chip
+PATCH  /v1/chips/{cid}/end-of-life — announce EOL
+GET    /v1/chips/{cid}             — retrieve chip
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/ai-chip`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Chip registrations cite the per-jurisdiction export-
+control attestation (PHASE-1 §2 `exportControlBinding`);
+submissions without the attestation for jurisdictions
+that require it return `409` with type
+`urn:wia:ai-chip:export-control-attestation-required`.
 
-## §5 Time and Identity
+## §4 MLPerf Benchmark Submissions
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST   /v1/chips/{cid}/mlperf-results       — submit a
+                                                benchmark
+                                                result
+PATCH  /v1/mlperf-results/{rid}/publication-status
+                                              — update
+                                                publication
+                                                status
+GET    /v1/mlperf-results/{rid}             — retrieve
+                                                result
+GET    /v1/chips/{cid}/mlperf-results?
+       suite={s}&workload={w}                  — query
+                                                results
+```
 
-## §6 Versioning and Deprecation
+Submissions cite the MLCommons submitter identifier;
+submissions without a registered submitter return `409`
+with type
+`urn:wia:ai-chip:mlcommons-submitter-not-registered`.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Compilation Lineage
 
-## §7 Privacy and Security
+```
+POST   /v1/programmes/{pid}/compilation-lineages
+                                              — register a
+                                                compilation
+                                                lineage
+GET    /v1/compilation-lineages/{lid}        — retrieve
+                                                lineage
+GET    /v1/chips/{cid}/compilation-lineages?
+       toolchain={t}                           — query lineage
+                                                by toolchain
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Lineage submissions whose `compiledDigest` does not match
+the actual compiled artefact return `422` with type
+`urn:wia:ai-chip:compiled-digest-mismatch`.
 
-## §8 Open Governance
+## §6 Runtime Telemetry Ingest
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `ai-chip` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST   /v1/chips/{cid}/runtime-telemetry     — append a
+                                                telemetry
+                                                interval
+POST   /v1/bulk/runtime-telemetry            — batched ingest
+GET    /v1/runtime-telemetry/{tid}           — retrieve
+                                                interval
+GET    /v1/chips/{cid}/runtime-telemetry?
+       from={t}&to={t}                          — query window
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Telemetry intervals whose `intervalDurationS` is below
+the operator's minimum aggregation window return `422`
+with type
+`urn:wia:ai-chip:telemetry-window-too-narrow` (the
+minimum window protects per-tenant privacy by aggregating
+beyond per-inference visibility).
 
+## §7 Firmware Revisions
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST   /v1/chips/{cid}/firmware-revisions    — register a
+                                                firmware
+                                                application
+GET    /v1/firmware-revisions/{fid}          — retrieve
+                                                revision
+GET    /v1/chips/{cid}/firmware-revisions?
+       kind={k}                                 — query by
+                                                firmware kind
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+Firmware applications whose artefact signature fails
+verification return `409` with type
+`urn:wia:ai-chip:firmware-signature-required`.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Security Disclosures
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+POST   /v1/programmes/{pid}/security-disclosures
+                                              — register a
+                                                disclosure
+PATCH  /v1/security-disclosures/{sid}/cve-ref
+                                              — attach CVE
+                                                identifier
+                                                once assigned
+PATCH  /v1/security-disclosures/{sid}/remediation-firmware
+                                              — attach
+                                                remediation
+                                                firmware
+                                                reference
+GET    /v1/security-disclosures/{sid}        — retrieve
+                                                disclosure
+```
 
-## Annex F — Adoption Roadmap
+Disclosures with `severityCvssV4 >= 9.0` automatically
+escalate to the operator's customer-notification workflow
+through the integration described in PHASE-4 §5.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Errors, Authentication, Caching, Audit
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Errors: `application/problem+json` per RFC 9457. Defined
+types include those above plus:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+- `urn:wia:ai-chip:precision-mismatch`
+- `urn:wia:ai-chip:thermal-budget-exceeded`
+- `urn:wia:ai-chip:slo-breach-per-tenant`
+- `urn:wia:ai-chip:evidence-mismatch`
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Authentication: mutually-authenticated TLS for fleet-
+operator, MLCommons, regulator, and partner consumers.
+Public read-only endpoints (programme summary, MLPerf
+verified-published results, security disclosures past
+embargo) are reachable without a client certificate.
+Caching: stable resources (verified MLPerf results,
+applied firmware revisions, signed evidence packages)
+cacheable with `Cache-Control: max-age=31536000,
+immutable`. Audit logs carry `chipId`, `programmeId`,
+`traceId`, the issuing client certificate's subject, and
+the operator's clock skew vs the operating jurisdiction's
+NTP service.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §10 Streaming Subscription
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Consumers subscribe via Server-Sent Events at:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- `/v1/programmes/{pid}/events` — programme-wide events
+  (chip EOL announcements, MLPerf-result publication,
+  security-disclosure embargo lift).
+- `/v1/chips/{cid}/events` — chip-scoped events (thermal
+  excursions, ECC fault rate spikes, firmware-application
+  outcomes).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Subscribers reconnect via the `Last-Event-ID` header.
 
-## Annex H — Versioning and Deprecation Policy
+## §11 Bulk and Pagination
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+```
+POST   /v1/bulk/runtime-telemetry           — batched
+                                                telemetry
+                                                ingest
+POST   /v1/bulk/firmware-revisions          — batched
+                                                firmware
+                                                rollouts
+GET    /v1/bulk/{operationId}               — operation
+                                                status
+```
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Cursor-based pagination uses the `cursor` query parameter
+and `Link` headers (RFC 8288).
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §12 Provenance and Aggregation
 
-## Annex I — Interoperability Profiles
+```
+GET    /v1/provenance/{recordId}    — provenance entry for
+                                       any PHASE-1 record
+GET    /v1/aggregate/mlperf-improvement?suite=...&period=...
+GET    /v1/aggregate/fault-rate-by-revision?period=...
+GET    /v1/aggregate/firmware-rollout-coverage?period=...
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §13 Worked Example: Chip to MLPerf to Disclosure
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+1. Vendor registers chip with silicon stepping and
+   precision-support set.
+2. Vendor compiles MLPerf workload via TVM / OpenXLA
+   and registers compilation lineage with input and
+   compiled digests.
+3. Vendor runs MLPerf Inference v4 and submits the
+   result to MLCommons; status advances to
+   `verified-published` on MLCommons verification.
+4. Field operators ingest runtime telemetry; firmware
+   revisions roll out to address ECC fault patterns
+   discovered through telemetry trend analysis.
+5. A coordinated security disclosure publishes with
+   severity, affected silicon revisions, and remediation
+   firmware reference; customer-notification workflow
+   triggers under §8.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §14 Fabric Topology and SLO Compliance Endpoints
+
+```
+POST   /v1/programmes/{pid}/fabric-topologies
+                                          — register a fabric
+                                            topology snapshot
+GET    /v1/fabric-topologies/{ftid}       — retrieve topology
+POST   /v1/chips/{cid}/slo-compliance     — register SLO
+                                            compliance interval
+GET    /v1/slo-compliance/{scid}          — retrieve SLO
+                                            interval
+GET    /v1/chips/{cid}/slo-compliance?
+       tenant={t}&from={t1}&to={t2}         — query SLO history
+```
+
+SLO interval submissions whose `slaCompliancePct` is below
+the operator's per-tenant breach threshold automatically
+register a breach event for downstream remediation
+workflow.
+
+## §15 Supply-Chain Provenance and Microcode Endpoints
+
+```
+POST   /v1/chips/{cid}/supply-chain-provenance
+                                          — register
+                                            provenance record
+GET    /v1/supply-chain-provenance/{spid} — retrieve
+                                            provenance
+POST   /v1/firmware-revisions/{fid}/microcode-update
+                                          — attach microcode
+                                            update detail
+GET    /v1/microcode-updates/{muid}       — retrieve update
+                                            detail
+```
+
+Provenance submissions whose `serialisedFingerprintRef`
+does not match the chip's runtime-presented PUF
+fingerprint return `409 Conflict` with type
+`urn:wia:ai-chip:provenance-fingerprint-mismatch` and
+the chip is quarantined pending counterfeit
+investigation.
+
+## §16 Conformance
+
+A conformant server passes the test vectors published
+under `tests/phase-vectors/phase-2-api-interface/`, emits
+an OpenAPI 3.1 document, signs evidence packages per RFC
+9421, and rejects MLPerf submissions citing a non-
+registered MLCommons submitter.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-ai-chip
+- **Last Updated:** 2026-04-28

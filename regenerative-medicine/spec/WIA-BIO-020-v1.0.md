@@ -863,8 +863,6 @@ Level 4: 5 × 10⁷ cells (3 patients)
 ### 10.1 Scientific Literature
 
 1. Takahashi, K., Yamanaka, S. (2006). "Induction of pluripotent stem cells from mouse embryonic and adult fibroblast cultures by defined factors." Cell 126(4): 663-676.
-2. 선행 연구. "Embryonic stem cell lines derived from human blastocysts." Science 282(5391): 1145-1147.
-3. 선행 연구. "Multilineage potential of adult human mesenchymal stem cells." Science 284(5411): 143-147.
 4. Langer, R., Vacanti, J.P. (1993). "Tissue engineering." Science 260(5110): 920-926.
 5. Khademhosseini, A., Langer, R. (2016). "A decade of progress in tissue engineering." Nature Protocols 11: 1775-1781.
 

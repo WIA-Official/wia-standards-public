@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 6-01: Testing in Rust - Rust NRT Academy</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 50%, #3d7ab3 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e0f4ff;
+            overflow: hidden;
+        }
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            display: none;
+            flex-direction: column;
+        }
+        .slide.active { display: flex; }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+        .logo { font-size: 28px; font-weight: bold; color: #7dd3fc; }
+        .episode-tag {
+            background: linear-gradient(90deg, #38bdf8, #0ea5e9);
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-size: 18px;
+            color: white;
+        }
+        .lang-toggle { display: flex; gap: 10px; }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 2px solid #7dd3fc;
+            background: transparent;
+            color: #7dd3fc;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .lang-btn.active { background: #7dd3fc; color: #1e3a5f; }
+
+        h1 {
+            font-size: 72px;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #7dd3fc, #38bdf8, #0ea5e9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+        h2 { font-size: 48px; color: #7dd3fc; margin-bottom: 30px; }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .code-block {
+            background: #0c2d48;
+            border-radius: 20px;
+            padding: 35px;
+            margin: 15px 0;
+            border: 2px solid #38bdf8;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 24px;
+            line-height: 1.5;
+            position: relative;
+        }
+        .code-block::before {
+            content: 'RUST';
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            color: #38bdf8;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateX(-30px);
+            animation: slideIn 0.5s forwards;
+        }
+        @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+
+        .keyword { color: #ff6b6b; }
+        .type { color: #ffc371; }
+        .string { color: #a8e6cf; }
+        .comment { color: #6b7280; font-style: italic; }
+        .function { color: #74b9ff; }
+        .number { color: #fab1a0; }
+        .macro { color: #a29bfe; }
+        .test { color: #4ade80; }
+
+        .concept-box {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(14, 165, 233, 0.1));
+            border: 2px solid #38bdf8;
+            border-radius: 20px;
+            padding: 30px;
+            margin: 15px 0;
+        }
+
+        .flex-container { display: flex; gap: 30px; align-items: flex-start; }
+        .flex-item { flex: 1; }
+
+        .highlight { color: #ffc371; font-weight: bold; }
+
+        .test-result {
+            padding: 20px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 20px;
+        }
+        .test-pass {
+            background: rgba(74, 222, 128, 0.2);
+            border: 2px solid #4ade80;
+            color: #4ade80;
+        }
+        .test-fail {
+            background: rgba(248, 113, 113, 0.2);
+            border: 2px solid #f87171;
+            color: #f87171;
+        }
+
+        .bullet-list {
+            list-style: none;
+            font-size: 24px;
+            line-height: 1.8;
+        }
+        .bullet-list li::before { content: '✓ '; color: #4ade80; }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #38bdf8, #4ade80);
+            transition: width 0.3s;
+        }
+        .slide-number {
+            position: fixed;
+            bottom: 20px;
+            right: 40px;
+            font-size: 24px;
+            color: #7dd3fc;
+        }
+        .nav-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 40px;
+            font-size: 18px;
+            color: #6b7280;
+        }
+
+        .ko { display: block; }
+        .en { display: none; }
+        body.lang-en .ko { display: none; }
+        body.lang-en .en { display: block; }
+
+        .center { text-align: center; }
+        .subtitle { font-size: 28px; color: #a8e6cf; text-align: center; margin-bottom: 30px; }
+
+        .test-icon {
+            font-size: 120px;
+            text-align: center;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">EP 6-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="content center">
+            <h1>Testing in Rust</h1>
+            <p class="subtitle ko">테스트: 자신감 있는 코드 작성</p>
+            <p class="subtitle en">Testing: Write Code with Confidence</p>
+            <div class="test-icon">🧪</div>
+            <div class="test-result test-pass" style="max-width: 600px; margin: 0 auto;">
+                running 3 tests<br>
+                test tests::it_works ... ok<br>
+                test tests::larger_can_hold_smaller ... ok<br>
+                test tests::greeting_contains_name ... ok<br><br>
+                test result: ok. 3 passed; 0 failed
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 2: Basic Test -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">기본 테스트</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">첫 번째 테스트 작성</h2>
+        <h2 class="en">Writing Your First Test</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// src/lib.rs</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="keyword">pub fn</span> <span class="function">add</span>(a: <span class="type">i32</span>, b: <span class="type">i32</span>) -> <span class="type">i32</span> {</div>
+                <div class="code-line" style="animation-delay: 0.3s">    a + b</div>
+                <div class="code-line" style="animation-delay: 0.4s">}</div>
+                <div class="code-line" style="animation-delay: 0.6s"></div>
+                <div class="code-line" style="animation-delay: 0.7s"><span class="macro">#[cfg(test)]</span></div>
+                <div class="code-line" style="animation-delay: 0.8s"><span class="keyword">mod</span> tests {</div>
+                <div class="code-line" style="animation-delay: 0.9s">    <span class="keyword">use super</span>::*;</div>
+                <div class="code-line" style="animation-delay: 1.1s"></div>
+                <div class="code-line" style="animation-delay: 1.2s">    <span class="macro">#[test]</span></div>
+                <div class="code-line" style="animation-delay: 1.3s">    <span class="keyword">fn</span> <span class="test">test_add</span>() {</div>
+                <div class="code-line" style="animation-delay: 1.4s">        <span class="macro">assert_eq!</span>(<span class="function">add</span>(<span class="number">2</span>, <span class="number">3</span>), <span class="number">5</span>);</div>
+                <div class="code-line" style="animation-delay: 1.5s">    }</div>
+                <div class="code-line" style="animation-delay: 1.6s">}</div>
+            </div>
+            <div class="concept-box">
+                <p style="font-size: 22px;">
+                    <span class="ko">💡 <span class="highlight">#[test]</span> 속성으로 테스트 함수를 표시하고, <span class="highlight">cargo test</span>로 실행!</span>
+                    <span class="en">💡 Mark test functions with <span class="highlight">#[test]</span>, run with <span class="highlight">cargo test</span>!</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 3: Assert Macros -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Assert 매크로</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">다양한 Assert 매크로</h2>
+        <h2 class="en">Various Assert Macros</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="macro">#[test]</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="keyword">fn</span> <span class="test">test_asserts</span>() {</div>
+                <div class="code-line" style="animation-delay: 0.3s">    <span class="comment">// 조건이 참인지</span></div>
+                <div class="code-line" style="animation-delay: 0.4s">    <span class="macro">assert!</span>(<span class="number">2</span> + <span class="number">2</span> == <span class="number">4</span>);</div>
+                <div class="code-line" style="animation-delay: 0.6s"></div>
+                <div class="code-line" style="animation-delay: 0.7s">    <span class="comment">// 두 값이 같은지</span></div>
+                <div class="code-line" style="animation-delay: 0.8s">    <span class="macro">assert_eq!</span>(<span class="number">4</span>, <span class="number">2</span> + <span class="number">2</span>);</div>
+                <div class="code-line" style="animation-delay: 1.0s"></div>
+                <div class="code-line" style="animation-delay: 1.1s">    <span class="comment">// 두 값이 다른지</span></div>
+                <div class="code-line" style="animation-delay: 1.2s">    <span class="macro">assert_ne!</span>(<span class="number">4</span>, <span class="number">5</span>);</div>
+                <div class="code-line" style="animation-delay: 1.4s"></div>
+                <div class="code-line" style="animation-delay: 1.5s">    <span class="comment">// 커스텀 에러 메시지</span></div>
+                <div class="code-line" style="animation-delay: 1.6s">    <span class="macro">assert!</span>(<span class="number">1</span> > <span class="number">0</span>, <span class="string">"1은 0보다 커야 합니다!"</span>);</div>
+                <div class="code-line" style="animation-delay: 1.7s">}</div>
+            </div>
+            <div class="flex-container" style="margin-top: 20px;">
+                <div class="test-result test-pass">✓ assert! - 조건 검사</div>
+                <div class="test-result test-pass">✓ assert_eq! - 같음 검사</div>
+                <div class="test-result test-pass">✓ assert_ne! - 다름 검사</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: Testing Panics -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Panic 테스트</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">패닉이 발생해야 하는 테스트</h2>
+        <h2 class="en">Testing for Panics</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">pub fn</span> <span class="function">divide</span>(a: <span class="type">i32</span>, b: <span class="type">i32</span>) -> <span class="type">i32</span> {</div>
+                <div class="code-line" style="animation-delay: 0.2s">    <span class="keyword">if</span> b == <span class="number">0</span> {</div>
+                <div class="code-line" style="animation-delay: 0.3s">        <span class="macro">panic!</span>(<span class="string">"0으로 나눌 수 없습니다!"</span>);</div>
+                <div class="code-line" style="animation-delay: 0.4s">    }</div>
+                <div class="code-line" style="animation-delay: 0.5s">    a / b</div>
+                <div class="code-line" style="animation-delay: 0.6s">}</div>
+                <div class="code-line" style="animation-delay: 0.8s"></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="macro">#[test]</span></div>
+                <div class="code-line" style="animation-delay: 1.0s"><span class="macro">#[should_panic]</span></div>
+                <div class="code-line" style="animation-delay: 1.1s"><span class="keyword">fn</span> <span class="test">test_divide_by_zero</span>() {</div>
+                <div class="code-line" style="animation-delay: 1.2s">    <span class="function">divide</span>(<span class="number">10</span>, <span class="number">0</span>);  <span class="comment">// 패닉 발생해야 통과!</span></div>
+                <div class="code-line" style="animation-delay: 1.3s">}</div>
+                <div class="code-line" style="animation-delay: 1.5s"></div>
+                <div class="code-line" style="animation-delay: 1.6s"><span class="macro">#[test]</span></div>
+                <div class="code-line" style="animation-delay: 1.7s"><span class="macro">#[should_panic(expected = "0으로 나눌")]</span></div>
+                <div class="code-line" style="animation-delay: 1.8s"><span class="keyword">fn</span> <span class="test">test_panic_message</span>() {</div>
+                <div class="code-line" style="animation-delay: 1.9s">    <span class="function">divide</span>(<span class="number">10</span>, <span class="number">0</span>);  <span class="comment">// 특정 메시지 확인</span></div>
+                <div class="code-line" style="animation-delay: 2.0s">}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 5: Result in Tests -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Result 테스트</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">Result를 반환하는 테스트</h2>
+        <h2 class="en">Tests That Return Result</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="macro">#[test]</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="keyword">fn</span> <span class="test">test_with_result</span>() -> <span class="type">Result</span>&lt;(), <span class="type">String</span>&gt; {</div>
+                <div class="code-line" style="animation-delay: 0.3s">    <span class="keyword">let</span> value = <span class="number">42</span>;</div>
+                <div class="code-line" style="animation-delay: 0.5s"></div>
+                <div class="code-line" style="animation-delay: 0.6s">    <span class="keyword">if</span> value == <span class="number">42</span> {</div>
+                <div class="code-line" style="animation-delay: 0.7s">        <span class="type">Ok</span>(())  <span class="comment">// 테스트 통과</span></div>
+                <div class="code-line" style="animation-delay: 0.8s">    } <span class="keyword">else</span> {</div>
+                <div class="code-line" style="animation-delay: 0.9s">        <span class="type">Err</span>(<span class="type">String</span>::<span class="function">from</span>(<span class="string">"값이 42가 아닙니다"</span>))</div>
+                <div class="code-line" style="animation-delay: 1.0s">    }</div>
+                <div class="code-line" style="animation-delay: 1.1s">}</div>
+                <div class="code-line" style="animation-delay: 1.3s"></div>
+                <div class="code-line" style="animation-delay: 1.4s"><span class="comment">// ? 연산자 사용 가능!</span></div>
+                <div class="code-line" style="animation-delay: 1.5s"><span class="macro">#[test]</span></div>
+                <div class="code-line" style="animation-delay: 1.6s"><span class="keyword">fn</span> <span class="test">test_with_question_mark</span>() -> <span class="type">Result</span>&lt;(), <span class="type">Box</span>&lt;<span class="keyword">dyn</span> std::error::<span class="type">Error</span>&gt;&gt; {</div>
+                <div class="code-line" style="animation-delay: 1.7s">    <span class="keyword">let</span> parsed: <span class="type">i32</span> = <span class="string">"42"</span>.<span class="function">parse</span>()?;</div>
+                <div class="code-line" style="animation-delay: 1.8s">    <span class="macro">assert_eq!</span>(parsed, <span class="number">42</span>);</div>
+                <div class="code-line" style="animation-delay: 1.9s">    <span class="type">Ok</span>(())</div>
+                <div class="code-line" style="animation-delay: 2.0s">}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 6: Test Organization -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">테스트 구조</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">단위 테스트 vs 통합 테스트</h2>
+        <h2 class="en">Unit Tests vs Integration Tests</h2>
+        <div class="content">
+            <div class="flex-container">
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #7dd3fc; margin-bottom: 15px;" class="ko">단위 테스트</h3>
+                        <h3 style="color: #7dd3fc; margin-bottom: 15px;" class="en">Unit Tests</h3>
+                        <div class="code-block" style="font-size: 18px; padding: 20px;">
+                            <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// src/lib.rs 내부</span></div>
+                            <div class="code-line" style="animation-delay: 0.2s"><span class="macro">#[cfg(test)]</span></div>
+                            <div class="code-line" style="animation-delay: 0.3s"><span class="keyword">mod</span> tests {</div>
+                            <div class="code-line" style="animation-delay: 0.4s">    <span class="keyword">use super</span>::*;</div>
+                            <div class="code-line" style="animation-delay: 0.5s">    <span class="comment">// private 함수도 테스트 가능</span></div>
+                            <div class="code-line" style="animation-delay: 0.6s">}</div>
+                        </div>
+                        <ul class="bullet-list" style="font-size: 18px; margin-top: 15px;">
+                            <li class="ko">src 폴더 내에 위치</li>
+                            <li class="en">Located in src folder</li>
+                            <li class="ko">private 함수 테스트 가능</li>
+                            <li class="en">Can test private functions</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #4ade80; margin-bottom: 15px;" class="ko">통합 테스트</h3>
+                        <h3 style="color: #4ade80; margin-bottom: 15px;" class="en">Integration Tests</h3>
+                        <div class="code-block" style="font-size: 18px; padding: 20px;">
+                            <div class="code-line" style="animation-delay: 0.7s"><span class="comment">// tests/integration_test.rs</span></div>
+                            <div class="code-line" style="animation-delay: 0.8s"><span class="keyword">use</span> my_crate;</div>
+                            <div class="code-line" style="animation-delay: 0.9s"></div>
+                            <div class="code-line" style="animation-delay: 1.0s"><span class="macro">#[test]</span></div>
+                            <div class="code-line" style="animation-delay: 1.1s"><span class="keyword">fn</span> <span class="test">test_public_api</span>() {</div>
+                            <div class="code-line" style="animation-delay: 1.2s">    <span class="macro">assert!</span>(my_crate::<span class="function">add</span>(<span class="number">1</span>,<span class="number">2</span>) == <span class="number">3</span>);</div>
+                            <div class="code-line" style="animation-delay: 1.3s">}</div>
+                        </div>
+                        <ul class="bullet-list" style="font-size: 18px; margin-top: 15px;">
+                            <li class="ko">tests/ 폴더에 위치</li>
+                            <li class="en">Located in tests/ folder</li>
+                            <li class="ko">public API만 테스트</li>
+                            <li class="en">Tests only public API</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 7: Test Commands -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">명령어</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">유용한 테스트 명령어</h2>
+        <h2 class="en">Useful Test Commands</h2>
+        <div class="content">
+            <div class="code-block" style="font-size: 22px;">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment"># 모든 테스트 실행</span></div>
+                <div class="code-line" style="animation-delay: 0.2s">$ cargo test</div>
+                <div class="code-line" style="animation-delay: 0.4s"></div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="comment"># 특정 테스트만 실행</span></div>
+                <div class="code-line" style="animation-delay: 0.6s">$ cargo test test_add</div>
+                <div class="code-line" style="animation-delay: 0.8s"></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="comment"># 무시된 테스트 포함</span></div>
+                <div class="code-line" style="animation-delay: 1.0s">$ cargo test -- --ignored</div>
+                <div class="code-line" style="animation-delay: 1.2s"></div>
+                <div class="code-line" style="animation-delay: 1.3s"><span class="comment"># 테스트 출력 표시 (println! 포함)</span></div>
+                <div class="code-line" style="animation-delay: 1.4s">$ cargo test -- --nocapture</div>
+                <div class="code-line" style="animation-delay: 1.6s"></div>
+                <div class="code-line" style="animation-delay: 1.7s"><span class="comment"># 단일 스레드로 실행 (순차적)</span></div>
+                <div class="code-line" style="animation-delay: 1.8s">$ cargo test -- --test-threads=1</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">정리</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">EP 6-01 요약</h2>
+        <h2 class="en">EP 6-01 Summary</h2>
+        <div class="content">
+            <div class="flex-container">
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #7dd3fc; margin-bottom: 20px;">핵심 개념</h3>
+                        <ul class="bullet-list" style="font-size: 20px;">
+                            <li class="ko">#[test] 속성으로 테스트 정의</li>
+                            <li class="en">Define tests with #[test]</li>
+                            <li class="ko">assert!, assert_eq!, assert_ne!</li>
+                            <li class="en">assert!, assert_eq!, assert_ne!</li>
+                            <li class="ko">#[should_panic] 패닉 테스트</li>
+                            <li class="en">#[should_panic] for panic tests</li>
+                            <li class="ko">Result 반환 테스트</li>
+                            <li class="en">Tests returning Result</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #4ade80; margin-bottom: 20px;">테스트 종류</h3>
+                        <ul class="bullet-list" style="font-size: 20px;">
+                            <li class="ko">단위 테스트: src/ 내부</li>
+                            <li class="en">Unit tests: inside src/</li>
+                            <li class="ko">통합 테스트: tests/ 폴더</li>
+                            <li class="en">Integration tests: tests/</li>
+                            <li class="ko">문서 테스트: /// 주석</li>
+                            <li class="en">Doc tests: /// comments</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 40px;">
+                <p style="font-size: 28px; color: #ffc371;">
+                    <span class="ko">다음 시간: Cargo 고급 기능! 🚀</span>
+                    <span class="en">Next: Advanced Cargo! 🚀</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="progress-bar" id="progress"></div>
+    <div class="slide-number" id="slideNum">1 / 8</div>
+    <div class="nav-hint">← → 키 또는 클릭으로 이동</div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+
+        function showSlide(n) {
+            if (n < 1) n = 1;
+            if (n > totalSlides) n = totalSlides;
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            document.getElementById('progress').style.width = (n / totalSlides * 100) + '%';
+            document.getElementById('slideNum').textContent = n + ' / ' + totalSlides;
+            animateSlide();
+        }
+
+        function nextSlide() { showSlide(currentSlide + 1); }
+        function prevSlide() { showSlide(currentSlide - 1); }
+
+        function animateSlide() {
+            const slide = document.getElementById('slide' + currentSlide);
+            const lines = slide.querySelectorAll('.code-line');
+            lines.forEach((line, i) => {
+                line.style.animation = 'none';
+                line.offsetHeight;
+                line.style.animation = `slideIn 0.5s ${i * 0.1}s forwards`;
+            });
+        }
+
+        function setLang(lang) {
+            document.body.classList.remove('lang-en');
+            if (lang === 'en') document.body.classList.add('lang-en');
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.includes(lang === 'ko' ? '한국어' : 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                if (e.clientX > window.innerWidth / 2) nextSlide();
+                else prevSlide();
+            }
+        });
+
+        showSlide(1);
+    </script>
+</body>
+</html>

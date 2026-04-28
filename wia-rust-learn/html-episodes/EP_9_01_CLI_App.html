@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 9-01: CLI Application - Rust NRT Academy</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #064e3b 0%, #047857 50%, #059669 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #ecfdf5;
+            overflow: hidden;
+        }
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            display: none;
+            flex-direction: column;
+        }
+        .slide.active { display: flex; }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+        .logo { font-size: 28px; font-weight: bold; color: #6ee7b7; }
+        .episode-tag {
+            background: linear-gradient(90deg, #10b981, #059669);
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-size: 18px;
+            color: white;
+        }
+        .lang-toggle { display: flex; gap: 10px; }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 2px solid #6ee7b7;
+            background: transparent;
+            color: #6ee7b7;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .lang-btn.active { background: #6ee7b7; color: #064e3b; }
+
+        h1 {
+            font-size: 72px;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #6ee7b7, #a7f3d0, #d1fae5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+        h2 { font-size: 48px; color: #6ee7b7; margin-bottom: 30px; }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .code-block {
+            background: #022c22;
+            border-radius: 20px;
+            padding: 35px;
+            margin: 15px 0;
+            border: 2px solid #10b981;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 22px;
+            line-height: 1.5;
+            position: relative;
+        }
+        .code-block::before {
+            content: 'RUST';
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            color: #10b981;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .code-block.toml::before { content: 'TOML'; }
+        .code-block.bash::before { content: 'BASH'; }
+
+        .code-line {
+            opacity: 0;
+            transform: translateX(-30px);
+            animation: slideIn 0.5s forwards;
+        }
+        @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+
+        .keyword { color: #ff6b6b; }
+        .type { color: #ffc371; }
+        .string { color: #a8e6cf; }
+        .comment { color: #6b7280; font-style: italic; }
+        .function { color: #74b9ff; }
+        .number { color: #fab1a0; }
+        .macro { color: #a29bfe; }
+        .attr { color: #10b981; }
+
+        .concept-box {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.1));
+            border: 2px solid #10b981;
+            border-radius: 20px;
+            padding: 30px;
+            margin: 15px 0;
+        }
+
+        .flex-container { display: flex; gap: 30px; align-items: flex-start; }
+        .flex-item { flex: 1; }
+
+        .highlight { color: #a7f3d0; font-weight: bold; }
+
+        .bullet-list {
+            list-style: none;
+            font-size: 24px;
+            line-height: 1.8;
+        }
+        .bullet-list li::before { content: '⚡ '; }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #10b981, #6ee7b7);
+            transition: width 0.3s;
+        }
+        .slide-number {
+            position: fixed;
+            bottom: 20px;
+            right: 40px;
+            font-size: 24px;
+            color: #6ee7b7;
+        }
+        .nav-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 40px;
+            font-size: 18px;
+            color: #6b7280;
+        }
+
+        .ko { display: block; }
+        .en { display: none; }
+        body.lang-en .ko { display: none; }
+        body.lang-en .en { display: block; }
+
+        .center { text-align: center; }
+        .subtitle { font-size: 28px; color: #a7f3d0; text-align: center; margin-bottom: 30px; }
+
+        .terminal-icon { font-size: 100px; text-align: center; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">EP 9-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="content center">
+            <h1>CLI Application</h1>
+            <p class="subtitle ko">실전 프로젝트: 명령줄 도구 만들기</p>
+            <p class="subtitle en">Real Project: Building CLI Tools</p>
+            <div class="terminal-icon">💻</div>
+            <p style="font-size: 26px; color: #a7f3d0;">
+                <span class="ko">clap + 실용적인 CLI 앱 개발</span>
+                <span class="en">clap + Practical CLI App Development</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Slide 2: Project Setup -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">프로젝트 설정</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">프로젝트 설정</h2>
+        <h2 class="en">Project Setup</h2>
+        <div class="content">
+            <div class="code-block bash">
+                <div class="code-line" style="animation-delay: 0.1s">$ cargo new my-cli</div>
+                <div class="code-line" style="animation-delay: 0.2s">$ cd my-cli</div>
+            </div>
+            <div class="code-block toml">
+                <div class="code-line" style="animation-delay: 0.4s"><span class="comment"># Cargo.toml</span></div>
+                <div class="code-line" style="animation-delay: 0.5s">[package]</div>
+                <div class="code-line" style="animation-delay: 0.6s">name = <span class="string">"my-cli"</span></div>
+                <div class="code-line" style="animation-delay: 0.7s">version = <span class="string">"0.1.0"</span></div>
+                <div class="code-line" style="animation-delay: 0.8s">edition = <span class="string">"2021"</span></div>
+                <div class="code-line" style="animation-delay: 1.0s"></div>
+                <div class="code-line" style="animation-delay: 1.1s">[dependencies]</div>
+                <div class="code-line" style="animation-delay: 1.2s">clap = { version = <span class="string">"4"</span>, features = [<span class="string">"derive"</span>] }</div>
+                <div class="code-line" style="animation-delay: 1.3s">anyhow = <span class="string">"1"</span></div>
+                <div class="code-line" style="animation-delay: 1.4s">colored = <span class="string">"2"</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 3: Clap Derive -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Clap</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">Clap으로 인자 파싱</h2>
+        <h2 class="en">Parsing Arguments with Clap</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">use</span> clap::<span class="type">Parser</span>;</div>
+                <div class="code-line" style="animation-delay: 0.3s"></div>
+                <div class="code-line" style="animation-delay: 0.4s"><span class="macro">#[derive(Parser)]</span></div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="attr">#[command(name = "greet")]</span></div>
+                <div class="code-line" style="animation-delay: 0.6s"><span class="attr">#[command(about = "A friendly greeter")]</span></div>
+                <div class="code-line" style="animation-delay: 0.7s"><span class="keyword">struct</span> <span class="type">Args</span> {</div>
+                <div class="code-line" style="animation-delay: 0.8s">    <span class="attr">/// Name to greet</span></div>
+                <div class="code-line" style="animation-delay: 0.9s">    name: <span class="type">String</span>,</div>
+                <div class="code-line" style="animation-delay: 1.1s"></div>
+                <div class="code-line" style="animation-delay: 1.2s">    <span class="attr">/// Number of times</span></div>
+                <div class="code-line" style="animation-delay: 1.3s">    <span class="attr">#[arg(short, long, default_value_t = 1)]</span></div>
+                <div class="code-line" style="animation-delay: 1.4s">    count: <span class="type">u8</span>,</div>
+                <div class="code-line" style="animation-delay: 1.5s">}</div>
+                <div class="code-line" style="animation-delay: 1.7s"></div>
+                <div class="code-line" style="animation-delay: 1.8s"><span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                <div class="code-line" style="animation-delay: 1.9s">    <span class="keyword">let</span> args = <span class="type">Args</span>::<span class="function">parse</span>();</div>
+                <div class="code-line" style="animation-delay: 2.0s">    <span class="keyword">for</span> _ <span class="keyword">in</span> <span class="number">0</span>..args.count {</div>
+                <div class="code-line" style="animation-delay: 2.1s">        <span class="macro">println!</span>(<span class="string">"Hello, {}!"</span>, args.name);</div>
+                <div class="code-line" style="animation-delay: 2.2s">    }</div>
+                <div class="code-line" style="animation-delay: 2.3s">}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: Subcommands -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">서브커맨드</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">서브커맨드 구현</h2>
+        <h2 class="en">Implementing Subcommands</h2>
+        <div class="content">
+            <div class="code-block" style="font-size: 20px;">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">use</span> clap::{<span class="type">Parser</span>, <span class="type">Subcommand</span>};</div>
+                <div class="code-line" style="animation-delay: 0.3s"></div>
+                <div class="code-line" style="animation-delay: 0.4s"><span class="macro">#[derive(Parser)]</span></div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="keyword">struct</span> <span class="type">Cli</span> {</div>
+                <div class="code-line" style="animation-delay: 0.6s">    <span class="attr">#[command(subcommand)]</span></div>
+                <div class="code-line" style="animation-delay: 0.7s">    command: <span class="type">Commands</span>,</div>
+                <div class="code-line" style="animation-delay: 0.8s">}</div>
+                <div class="code-line" style="animation-delay: 1.0s"></div>
+                <div class="code-line" style="animation-delay: 1.1s"><span class="macro">#[derive(Subcommand)]</span></div>
+                <div class="code-line" style="animation-delay: 1.2s"><span class="keyword">enum</span> <span class="type">Commands</span> {</div>
+                <div class="code-line" style="animation-delay: 1.3s">    <span class="type">Add</span> { name: <span class="type">String</span> },</div>
+                <div class="code-line" style="animation-delay: 1.4s">    <span class="type">List</span>,</div>
+                <div class="code-line" style="animation-delay: 1.5s">    <span class="type">Remove</span> { id: <span class="type">u32</span> },</div>
+                <div class="code-line" style="animation-delay: 1.6s">}</div>
+                <div class="code-line" style="animation-delay: 1.8s"></div>
+                <div class="code-line" style="animation-delay: 1.9s"><span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                <div class="code-line" style="animation-delay: 2.0s">    <span class="keyword">match</span> <span class="type">Cli</span>::<span class="function">parse</span>().command {</div>
+                <div class="code-line" style="animation-delay: 2.1s">        <span class="type">Commands</span>::<span class="type">Add</span> { name } => <span class="macro">println!</span>(<span class="string">"Adding {}"</span>, name),</div>
+                <div class="code-line" style="animation-delay: 2.2s">        <span class="type">Commands</span>::<span class="type">List</span> => <span class="macro">println!</span>(<span class="string">"Listing all"</span>),</div>
+                <div class="code-line" style="animation-delay: 2.3s">        <span class="type">Commands</span>::<span class="type">Remove</span> { id } => <span class="macro">println!</span>(<span class="string">"Removing {}"</span>, id),</div>
+                <div class="code-line" style="animation-delay: 2.4s">    }</div>
+                <div class="code-line" style="animation-delay: 2.5s">}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 5: File Operations -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">파일 작업</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">파일 읽기/쓰기</h2>
+        <h2 class="en">Reading/Writing Files</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">use</span> std::fs;</div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="keyword">use</span> anyhow::<span class="type">Result</span>;</div>
+                <div class="code-line" style="animation-delay: 0.4s"></div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="keyword">fn</span> <span class="function">read_file</span>(path: &amp;<span class="type">str</span>) -> <span class="type">Result</span>&lt;<span class="type">String</span>&gt; {</div>
+                <div class="code-line" style="animation-delay: 0.6s">    <span class="keyword">let</span> content = fs::<span class="function">read_to_string</span>(path)?;</div>
+                <div class="code-line" style="animation-delay: 0.7s">    <span class="type">Ok</span>(content)</div>
+                <div class="code-line" style="animation-delay: 0.8s">}</div>
+                <div class="code-line" style="animation-delay: 1.0s"></div>
+                <div class="code-line" style="animation-delay: 1.1s"><span class="keyword">fn</span> <span class="function">write_file</span>(path: &amp;<span class="type">str</span>, data: &amp;<span class="type">str</span>) -> <span class="type">Result</span>&lt;()&gt; {</div>
+                <div class="code-line" style="animation-delay: 1.2s">    fs::<span class="function">write</span>(path, data)?;</div>
+                <div class="code-line" style="animation-delay: 1.3s">    <span class="type">Ok</span>(())</div>
+                <div class="code-line" style="animation-delay: 1.4s">}</div>
+                <div class="code-line" style="animation-delay: 1.6s"></div>
+                <div class="code-line" style="animation-delay: 1.7s"><span class="comment">// 라인별 읽기</span></div>
+                <div class="code-line" style="animation-delay: 1.8s"><span class="keyword">use</span> std::io::{<span class="type">BufRead</span>, <span class="type">BufReader</span>};</div>
+                <div class="code-line" style="animation-delay: 1.9s"><span class="keyword">let</span> file = fs::<span class="type">File</span>::<span class="function">open</span>(<span class="string">"data.txt"</span>)?;</div>
+                <div class="code-line" style="animation-delay: 2.0s"><span class="keyword">for</span> line <span class="keyword">in</span> <span class="type">BufReader</span>::<span class="function">new</span>(file).<span class="function">lines</span>() {</div>
+                <div class="code-line" style="animation-delay: 2.1s">    <span class="macro">println!</span>(<span class="string">"{}"</span>, line?);</div>
+                <div class="code-line" style="animation-delay: 2.2s">}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 6: Colored Output -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">컬러 출력</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">터미널 컬러 출력</h2>
+        <h2 class="en">Colored Terminal Output</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">use</span> colored::*;</div>
+                <div class="code-line" style="animation-delay: 0.3s"></div>
+                <div class="code-line" style="animation-delay: 0.4s"><span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                <div class="code-line" style="animation-delay: 0.5s">    <span class="macro">println!</span>(<span class="string">"{}"</span>, <span class="string">"성공!"</span>.<span class="function">green</span>().<span class="function">bold</span>());</div>
+                <div class="code-line" style="animation-delay: 0.6s">    <span class="macro">println!</span>(<span class="string">"{}"</span>, <span class="string">"경고!"</span>.<span class="function">yellow</span>());</div>
+                <div class="code-line" style="animation-delay: 0.7s">    <span class="macro">println!</span>(<span class="string">"{}"</span>, <span class="string">"에러!"</span>.<span class="function">red</span>().<span class="function">bold</span>());</div>
+                <div class="code-line" style="animation-delay: 0.9s"></div>
+                <div class="code-line" style="animation-delay: 1.0s">    <span class="comment">// 진행률 표시</span></div>
+                <div class="code-line" style="animation-delay: 1.1s">    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="number">0</span>..=<span class="number">100</span> {</div>
+                <div class="code-line" style="animation-delay: 1.2s">        <span class="macro">print!</span>(<span class="string">"\r처리 중: {}%"</span>, i);</div>
+                <div class="code-line" style="animation-delay: 1.3s">        std::io::stdout().<span class="function">flush</span>().<span class="function">unwrap</span>();</div>
+                <div class="code-line" style="animation-delay: 1.4s">    }</div>
+                <div class="code-line" style="animation-delay: 1.5s">    <span class="macro">println!</span>();</div>
+                <div class="code-line" style="animation-delay: 1.6s">}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 7: Complete Example -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">완성 예제</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">단어 카운터 CLI</h2>
+        <h2 class="en">Word Counter CLI</h2>
+        <div class="content">
+            <div class="code-block" style="font-size: 18px;">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">use</span> clap::<span class="type">Parser</span>;</div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="keyword">use</span> std::fs;</div>
+                <div class="code-line" style="animation-delay: 0.4s"></div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="macro">#[derive(Parser)]</span></div>
+                <div class="code-line" style="animation-delay: 0.6s"><span class="keyword">struct</span> <span class="type">Args</span> {</div>
+                <div class="code-line" style="animation-delay: 0.7s">    <span class="attr">/// File to count words</span></div>
+                <div class="code-line" style="animation-delay: 0.8s">    file: <span class="type">String</span>,</div>
+                <div class="code-line" style="animation-delay: 0.9s">    <span class="attr">#[arg(short, long)]</span></div>
+                <div class="code-line" style="animation-delay: 1.0s">    lines: <span class="type">bool</span>,</div>
+                <div class="code-line" style="animation-delay: 1.1s">}</div>
+                <div class="code-line" style="animation-delay: 1.3s"></div>
+                <div class="code-line" style="animation-delay: 1.4s"><span class="keyword">fn</span> <span class="function">main</span>() -> anyhow::<span class="type">Result</span>&lt;()&gt; {</div>
+                <div class="code-line" style="animation-delay: 1.5s">    <span class="keyword">let</span> args = <span class="type">Args</span>::<span class="function">parse</span>();</div>
+                <div class="code-line" style="animation-delay: 1.6s">    <span class="keyword">let</span> content = fs::<span class="function">read_to_string</span>(&amp;args.file)?;</div>
+                <div class="code-line" style="animation-delay: 1.8s"></div>
+                <div class="code-line" style="animation-delay: 1.9s">    <span class="keyword">if</span> args.lines {</div>
+                <div class="code-line" style="animation-delay: 2.0s">        <span class="macro">println!</span>(<span class="string">"Lines: {}"</span>, content.<span class="function">lines</span>().<span class="function">count</span>());</div>
+                <div class="code-line" style="animation-delay: 2.1s">    } <span class="keyword">else</span> {</div>
+                <div class="code-line" style="animation-delay: 2.2s">        <span class="macro">println!</span>(<span class="string">"Words: {}"</span>, content.<span class="function">split_whitespace</span>().<span class="function">count</span>());</div>
+                <div class="code-line" style="animation-delay: 2.3s">    }</div>
+                <div class="code-line" style="animation-delay: 2.4s">    <span class="type">Ok</span>(())</div>
+                <div class="code-line" style="animation-delay: 2.5s">}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">정리</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">EP 9-01 요약</h2>
+        <h2 class="en">EP 9-01 Summary</h2>
+        <div class="content">
+            <div class="flex-container">
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #6ee7b7; margin-bottom: 20px;">핵심 크레이트</h3>
+                        <ul class="bullet-list" style="font-size: 20px;">
+                            <li class="ko">clap - 인자 파싱</li>
+                            <li class="en">clap - Argument parsing</li>
+                            <li class="ko">anyhow - 에러 처리</li>
+                            <li class="en">anyhow - Error handling</li>
+                            <li class="ko">colored - 컬러 출력</li>
+                            <li class="en">colored - Colored output</li>
+                            <li class="ko">indicatif - 진행률</li>
+                            <li class="en">indicatif - Progress bars</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #a7f3d0; margin-bottom: 20px;">핵심 패턴</h3>
+                        <ul class="bullet-list" style="font-size: 20px;">
+                            <li class="ko">#[derive(Parser)]로 선언</li>
+                            <li class="en">Declarative with #[derive(Parser)]</li>
+                            <li class="ko">서브커맨드로 구조화</li>
+                            <li class="en">Structure with subcommands</li>
+                            <li class="ko">anyhow::Result 반환</li>
+                            <li class="en">Return anyhow::Result</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 40px;">
+                <p style="font-size: 28px; color: #a7f3d0;">
+                    <span class="ko">다음: Web API 서버 구축! 🚀</span>
+                    <span class="en">Next: Building Web API Server! 🚀</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="progress-bar" id="progress"></div>
+    <div class="slide-number" id="slideNum">1 / 8</div>
+    <div class="nav-hint">← → 키 또는 클릭으로 이동</div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+
+        function showSlide(n) {
+            if (n < 1) n = 1;
+            if (n > totalSlides) n = totalSlides;
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            document.getElementById('progress').style.width = (n / totalSlides * 100) + '%';
+            document.getElementById('slideNum').textContent = n + ' / ' + totalSlides;
+            animateSlide();
+        }
+
+        function nextSlide() { showSlide(currentSlide + 1); }
+        function prevSlide() { showSlide(currentSlide - 1); }
+
+        function animateSlide() {
+            const slide = document.getElementById('slide' + currentSlide);
+            const lines = slide.querySelectorAll('.code-line');
+            lines.forEach((line, i) => {
+                line.style.animation = 'none';
+                line.offsetHeight;
+                line.style.animation = `slideIn 0.5s ${i * 0.1}s forwards`;
+            });
+        }
+
+        function setLang(lang) {
+            document.body.classList.remove('lang-en');
+            if (lang === 'en') document.body.classList.add('lang-en');
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.includes(lang === 'ko' ? '한국어' : 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                if (e.clientX > window.innerWidth / 2) nextSlide();
+                else prevSlide();
+            }
+        });
+
+        showSlide(1);
+    </script>
+</body>
+</html>

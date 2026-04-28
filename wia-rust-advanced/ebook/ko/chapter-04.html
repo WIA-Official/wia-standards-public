@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 04: 컴파일러 & 임베디드 - WIA-RUST-ADVANCED</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.8; color: #333; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; }
+        header { background: linear-gradient(135deg, #F39C12 0%, #E67E22 100%); color: white; padding: 40px; }
+        .chapter-label { font-size: 1em; opacity: 0.9; margin-bottom: 10px; }
+        h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .level-badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 8px 20px; border-radius: 20px; font-size: 0.9em; margin-top: 10px; }
+        nav { background: #2c3e50; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; }
+        nav a { color: white; text-decoration: none; padding: 8px 20px; border-radius: 5px; transition: background 0.3s; }
+        nav a:hover { background: rgba(255,255,255,0.1); }
+        .content { padding: 40px; }
+        h2 { color: #F39C12; font-size: 2em; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 3px solid #F39C12; }
+        h3 { color: #E67E22; font-size: 1.5em; margin: 30px 0 15px 0; }
+        p { margin-bottom: 15px; font-size: 1.05em; color: #555; }
+        .info-box { background: #fff3cd; border-left: 4px solid #F39C12; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .warning-box { background: #f8d7da; border-left: 4px solid #dc3545; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .success-box { background: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        pre { background: #2d2d2d; color: #f8f8f2; padding: 20px; border-radius: 10px; overflow-x: auto; margin: 20px 0; border-left: 4px solid #F39C12; }
+        code { font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 0.95em; }
+        .keyword { color: #ff79c6; } .string { color: #f1fa8c; } .comment { color: #6272a4; } .function { color: #50fa7b; } .number { color: #bd93f9; } .type { color: #8be9fd; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; color: #555; }
+        .example-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin: 20px 0; }
+        .example-card { background: #f8f9fa; padding: 20px; border-radius: 10px; border: 2px solid #e0e0e0; }
+        .example-card h4 { color: #F39C12; margin-bottom: 15px; }
+        footer { background: #2c3e50; color: white; padding: 30px; text-align: center; }
+        @media (max-width: 768px) { .content { padding: 20px; } h1 { font-size: 1.8em; } h2 { font-size: 1.5em; } nav { flex-direction: column; gap: 10px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-label">Chapter 04</div>
+            <h1>⚙️ 컴파일러 & 임베디드</h1>
+            <div class="level-badge">Level 3-4: Compiler & Embedded Systems</div>
+        </header>
+
+        <div class="content">
+            <h2>📖 학습 목표</h2>
+            <ul>
+                <li>Rust 컴파일 과정 이해 (HIR, MIR, LLVM IR)</li>
+                <li>컴파일러 최적화 기법</li>
+                <li>임베디드 시스템 프로그래밍 기초</li>
+                <li>no_std 환경에서 개발하기</li>
+                <li>Bare-metal 프로그래밍</li>
+                <li>ARM Cortex-M 개발</li>
+                <li>인터럽트와 하드웨어 추상화</li>
+            </ul>
+
+            <h2>🔬 Rust 컴파일러 내부</h2>
+            <p>
+                Rust 코드가 실행 파일이 되기까지 여러 단계를 거칩니다. 각 단계를 이해하면
+                최적화와 디버깅에 큰 도움이 됩니다.
+            </p>
+
+            <h3>컴파일 파이프라인</h3>
+            <div class="example-grid">
+                <div class="example-card">
+                    <h4>1. Lexing & Parsing</h4>
+                    <p>소스 코드를 토큰으로 분해하고 AST(추상 구문 트리)로 변환</p>
+                </div>
+                <div class="example-card">
+                    <h4>2. HIR (High-level IR)</h4>
+                    <p>타입 체킹과 트레잇 해결을 위한 고수준 중간 표현</p>
+                </div>
+                <div class="example-card">
+                    <h4>3. MIR (Mid-level IR)</h4>
+                    <p>차용 검사와 최적화를 위한 중간 수준 표현</p>
+                </div>
+                <div class="example-card">
+                    <h4>4. LLVM IR</h4>
+                    <p>LLVM 백엔드로 전달되는 저수준 표현</p>
+                </div>
+                <div class="example-card">
+                    <h4>5. 머신 코드</h4>
+                    <p>타겟 아키텍처의 네이티브 코드 생성</p>
+                </div>
+            </div>
+
+            <h3>MIR 살펴보기</h3>
+            <pre><code><span class="keyword">fn</span> <span class="function">add</span>(a: <span class="type">i32</span>, b: <span class="type">i32</span>) -> <span class="type">i32</span> {
+    a + b
+}
+
+<span class="comment">// MIR 보기</span>
+<span class="comment">// rustc --emit mir source.rs</span>
+</code></pre>
+
+            <pre><code><span class="comment">// 생성된 MIR (간소화)</span>
+fn add(_1: i32, _2: i32) -> i32 {
+    let mut _0: i32;
+
+    bb0: {
+        _0 = Add(move _1, move _2);
+        return;
+    }
+}
+</code></pre>
+
+            <h3>LLVM IR 확인하기</h3>
+            <pre><code>$ rustc --emit llvm-ir source.rs
+$ cat source.ll
+
+<span class="comment">; 생성된 LLVM IR</span>
+define i32 @add(i32 %a, i32 %b) {
+start:
+  %0 = add i32 %a, %b
+  ret i32 %0
+}
+</code></pre>
+
+            <h2>⚡ 컴파일러 최적화</h2>
+
+            <h3>인라인 최적화</h3>
+            <pre><code><span class="keyword">#[inline]</span>
+<span class="keyword">fn</span> <span class="function">small_function</span>() -> <span class="type">i32</span> {
+    <span class="number">42</span>
+}
+
+<span class="keyword">#[inline(always)]</span>
+<span class="keyword">fn</span> <span class="function">always_inline</span>() -> <span class="type">i32</span> {
+    <span class="number">100</span>
+}
+
+<span class="keyword">#[inline(never)]</span>
+<span class="keyword">fn</span> <span class="function">never_inline</span>() -> <span class="type">i32</span> {
+    <span class="number">200</span>
+}
+</code></pre>
+
+            <h3>Link Time Optimization (LTO)</h3>
+            <pre><code><span class="comment"># Cargo.toml</span>
+[profile.release]
+lto = <span class="keyword">true</span>           <span class="comment"># 전체 LTO</span>
+lto = <span class="string">"thin"</span>        <span class="comment"># Thin LTO (더 빠름)</span>
+codegen-units = <span class="number">1</span>   <span class="comment"># 최적화 증가</span>
+</code></pre>
+
+            <h3>코드 크기 최적화</h3>
+            <pre><code>[profile.release]
+opt-level = <span class="string">"z"</span>     <span class="comment"># 크기 최적화</span>
+lto = <span class="keyword">true</span>
+strip = <span class="keyword">true</span>        <span class="comment"># 심볼 제거</span>
+panic = <span class="string">"abort"</span>     <span class="comment"># 언와인딩 비활성화</span>
+</code></pre>
+
+            <h2>🔧 no_std 환경</h2>
+            <p>
+                표준 라이브러리 없이 Rust를 사용하는 환경입니다. 임베디드 시스템이나
+                운영체제 개발에 필수적입니다.
+            </p>
+
+            <h3>no_std 프로젝트 시작</h3>
+            <pre><code><span class="keyword">#![no_std]</span>
+<span class="keyword">#![no_main]</span>
+
+<span class="keyword">use</span> core::panic::PanicInfo;
+
+<span class="keyword">#[panic_handler]</span>
+<span class="keyword">fn</span> <span class="function">panic</span>(_info: &<span class="type">PanicInfo</span>) -> <span class="type">!</span> {
+    <span class="keyword">loop</span> {}
+}
+
+<span class="keyword">#[no_mangle]</span>
+<span class="keyword">pub extern</span> <span class="string">"C"</span> <span class="keyword">fn</span> <span class="function">_start</span>() -> <span class="type">!</span> {
+    <span class="keyword">loop</span> {}
+}
+</code></pre>
+
+            <h3>core vs std</h3>
+            <div class="info-box">
+                <strong>💡 core 라이브러리</strong>
+                <ul>
+                    <li>힙 할당 없음 (Box, Vec, String 사용 불가)</li>
+                    <li>I/O 기능 없음</li>
+                    <li>스레딩 없음</li>
+                    <li>대신 사용 가능: Option, Result, Iterator, 기본 타입들</li>
+                </ul>
+            </div>
+
+            <h3>alloc 크레이트 사용</h3>
+            <pre><code><span class="keyword">#![no_std]</span>
+
+<span class="keyword">extern crate</span> alloc;
+
+<span class="keyword">use</span> alloc::vec::Vec;
+<span class="keyword">use</span> alloc::string::String;
+
+<span class="keyword">#[global_allocator]</span>
+<span class="keyword">static</span> ALLOCATOR: MyAllocator = MyAllocator;
+
+<span class="keyword">struct</span> <span class="type">MyAllocator</span>;
+
+<span class="keyword">unsafe impl</span> GlobalAlloc <span class="keyword">for</span> <span class="type">MyAllocator</span> {
+    <span class="comment">// 할당자 구현</span>
+}
+</code></pre>
+
+            <h2>🤖 ARM Cortex-M 개발</h2>
+            <p>
+                가장 인기있는 임베디드 프로세서인 ARM Cortex-M에서 Rust를 사용해봅시다.
+            </p>
+
+            <h3>프로젝트 설정</h3>
+            <pre><code><span class="comment"># .cargo/config.toml</span>
+[build]
+target = <span class="string">"thumbv7em-none-eabihf"</span>  <span class="comment"># Cortex-M4F</span>
+
+[target.thumbv7em-none-eabihf]
+runner = <span class="string">"probe-run --chip STM32F407VGTx"</span>
+rustflags = [
+  <span class="string">"-C"</span>, <span class="string">"link-arg=-Tlink.x"</span>,
+]
+</code></pre>
+
+            <pre><code><span class="comment"># Cargo.toml</span>
+[dependencies]
+cortex-m = <span class="string">"0.7"</span>
+cortex-m-rt = <span class="string">"0.7"</span>
+embedded-hal = <span class="string">"0.2"</span>
+panic-halt = <span class="string">"0.2"</span>
+</code></pre>
+
+            <h3>LED 깜박이기 (Blinky)</h3>
+            <pre><code><span class="keyword">#![no_std]</span>
+<span class="keyword">#![no_main]</span>
+
+<span class="keyword">use</span> cortex_m_rt::entry;
+<span class="keyword">use</span> panic_halt <span class="keyword">as</span> _;
+<span class="keyword">use</span> stm32f4xx_hal::{pac, prelude::*};
+
+<span class="keyword">#[entry]</span>
+<span class="keyword">fn</span> <span class="function">main</span>() -> <span class="type">!</span> {
+    <span class="comment">// 주변장치 초기화</span>
+    <span class="keyword">let</span> dp = pac::Peripherals::<span class="function">take</span>().<span class="function">unwrap</span>();
+    <span class="keyword">let</span> gpioa = dp.GPIOA.<span class="function">split</span>();
+
+    <span class="comment">// LED 핀 설정</span>
+    <span class="keyword">let</span> <span class="keyword">mut</span> led = gpioa.pa5.<span class="function">into_push_pull_output</span>();
+
+    <span class="keyword">loop</span> {
+        led.<span class="function">set_high</span>();
+        cortex_m::asm::<span class="function">delay</span>(<span class="number">8_000_000</span>);
+
+        led.<span class="function">set_low</span>();
+        cortex_m::asm::<span class="function">delay</span>(<span class="number">8_000_000</span>);
+    }
+}
+</code></pre>
+
+            <h3>인터럽트 처리</h3>
+            <pre><code><span class="keyword">use</span> cortex_m::interrupt::Mutex;
+<span class="keyword">use</span> core::cell::RefCell;
+
+<span class="keyword">static</span> COUNTER: Mutex<RefCell<<span class="type">u32</span>>> =
+    Mutex::<span class="function">new</span>(RefCell::<span class="function">new</span>(<span class="number">0</span>));
+
+<span class="keyword">#[interrupt]</span>
+<span class="keyword">fn</span> <span class="function">TIM2</span>() {
+    cortex_m::interrupt::<span class="function">free</span>(|cs| {
+        <span class="keyword">let</span> <span class="keyword">mut</span> counter = COUNTER.<span class="function">borrow</span>(cs).<span class="function">borrow_mut</span>();
+        *counter += <span class="number">1</span>;
+    });
+}
+
+<span class="keyword">#[entry]</span>
+<span class="keyword">fn</span> <span class="function">main</span>() -> <span class="type">!</span> {
+    <span class="comment">// 타이머 설정</span>
+    <span class="keyword">let</span> dp = pac::Peripherals::<span class="function">take</span>().<span class="function">unwrap</span>();
+    <span class="keyword">let</span> <span class="keyword">mut</span> timer = dp.TIM2.<span class="function">timer</span>();
+
+    <span class="comment">// 인터럽트 활성화</span>
+    timer.<span class="function">listen</span>(Event::Update);
+    <span class="keyword">unsafe</span> {
+        cortex_m::peripheral::NVIC::<span class="function">unmask</span>(Interrupt::TIM2);
+    }
+
+    <span class="keyword">loop</span> {
+        cortex_m::asm::<span class="function">wfi</span>(); <span class="comment">// Wait For Interrupt</span>
+    }
+}
+</code></pre>
+
+            <h2>🎛️ 메모리 맵 I/O</h2>
+            <p>
+                하드웨어 레지스터에 직접 접근하여 제어합니다.
+            </p>
+
+            <pre><code><span class="keyword">use</span> core::ptr;
+
+<span class="comment">// GPIO 포트 A 주소</span>
+<span class="keyword">const</span> GPIOA_BASE: <span class="type">u32</span> = <span class="number">0x4002_0000</span>;
+<span class="keyword">const</span> GPIOA_MODER: <span class="type">u32</span> = GPIOA_BASE + <span class="number">0x00</span>;
+<span class="keyword">const</span> GPIOA_ODR: <span class="type">u32</span> = GPIOA_BASE + <span class="number">0x14</span>;
+
+<span class="keyword">unsafe fn</span> <span class="function">init_led</span>() {
+    <span class="comment">// PA5를 출력 모드로 설정</span>
+    <span class="keyword">let</span> moder = GPIOA_MODER <span class="keyword">as</span> <span class="type">*mut u32</span>;
+    ptr::<span class="function">write_volatile</span>(moder, <span class="number">0x0000_0400</span>);
+}
+
+<span class="keyword">unsafe fn</span> <span class="function">set_led</span>(on: <span class="type">bool</span>) {
+    <span class="keyword">let</span> odr = GPIOA_ODR <span class="keyword">as</span> <span class="type">*mut u32</span>;
+    <span class="keyword">if</span> on {
+        ptr::<span class="function">write_volatile</span>(odr, <span class="number">0x0020</span>);
+    } <span class="keyword">else</span> {
+        ptr::<span class="function">write_volatile</span>(odr, <span class="number">0x0000</span>);
+    }
+}
+</code></pre>
+
+            <h3>안전한 레지스터 접근</h3>
+            <pre><code><span class="keyword">use</span> volatile_register::{RW, RO};
+
+<span class="keyword">#[repr(C)]</span>
+<span class="keyword">struct</span> <span class="type">GpioRegisters</span> {
+    moder: RW<<span class="type">u32</span>>,
+    otyper: RW<<span class="type">u32</span>>,
+    ospeedr: RW<<span class="type">u32</span>>,
+    pupdr: RW<<span class="type">u32</span>>,
+    idr: RO<<span class="type">u32</span>>,
+    odr: RW<<span class="type">u32</span>>,
+}
+
+<span class="keyword">fn</span> <span class="function">control_gpio</span>() {
+    <span class="keyword">let</span> gpio = <span class="keyword">unsafe</span> { &(*(<span class="number">0x4002_0000</span> <span class="keyword">as</span> <span class="type">*const GpioRegisters</span>)) };
+
+    <span class="keyword">unsafe</span> {
+        gpio.moder.<span class="function">write</span>(<span class="number">0x0000_0400</span>);
+        gpio.odr.<span class="function">write</span>(<span class="number">0x0020</span>);
+    }
+}
+</code></pre>
+
+            <h2>🚀 실전 프로젝트: UART 통신</h2>
+            <pre><code><span class="keyword">use</span> embedded_hal::serial::Write;
+
+<span class="keyword">#[entry]</span>
+<span class="keyword">fn</span> <span class="function">main</span>() -> <span class="type">!</span> {
+    <span class="keyword">let</span> dp = pac::Peripherals::<span class="function">take</span>().<span class="function">unwrap</span>();
+    <span class="keyword">let</span> rcc = dp.RCC.<span class="function">constrain</span>();
+    <span class="keyword">let</span> clocks = rcc.cfgr.<span class="function">freeze</span>();
+
+    <span class="keyword">let</span> gpioa = dp.GPIOA.<span class="function">split</span>();
+    <span class="keyword">let</span> tx = gpioa.pa2.<span class="function">into_alternate</span>();
+    <span class="keyword">let</span> rx = gpioa.pa3.<span class="function">into_alternate</span>();
+
+    <span class="keyword">let</span> <span class="keyword">mut</span> serial = dp.USART2
+        .<span class="function">serial</span>((tx, rx), <span class="number">115200</span>.bps(), &clocks)
+        .<span class="function">unwrap</span>();
+
+    <span class="keyword">loop</span> {
+        <span class="keyword">for</span> byte <span class="keyword">in</span> <span class="string">b"Hello from Rust!\r\n"</span> {
+            <span class="function">block!</span>(serial.<span class="function">write</span>(*byte)).<span class="function">unwrap</span>();
+        }
+
+        cortex_m::asm::<span class="function">delay</span>(<span class="number">8_000_000</span>);
+    }
+}
+</code></pre>
+
+            <h2>🔍 디버깅 도구</h2>
+
+            <div class="example-grid">
+                <div class="example-card">
+                    <h4>probe-run</h4>
+                    <p>cargo run으로 MCU에 직접 플래시</p>
+                    <pre><code>$ cargo install probe-run
+$ cargo run --release</code></pre>
+                </div>
+                <div class="example-card">
+                    <h4>defmt</h4>
+                    <p>임베디드용 효율적인 로깅</p>
+                    <pre><code>defmt::info!("Value: {}", x);</code></pre>
+                </div>
+                <div class="example-card">
+                    <h4>QEMU</h4>
+                    <p>ARM 에뮬레이터로 테스트</p>
+                    <pre><code>$ qemu-system-arm \
+  -machine lm3s6965evb \
+  -kernel target/thumbv7m-none-eabi/debug/app</code></pre>
+                </div>
+                <div class="example-card">
+                    <h4>GDB</h4>
+                    <p>하드웨어 디버거</p>
+                    <pre><code>$ arm-none-eabi-gdb target/debug/app</code></pre>
+                </div>
+            </div>
+
+            <h2>✅ 모범 사례</h2>
+
+            <div class="success-box">
+                <strong>✅ 임베디드 개발 체크리스트</strong>
+                <ol>
+                    <li><strong>메모리 제약:</strong> 스택/힙 사용량 모니터링</li>
+                    <li><strong>실시간성:</strong> 인터럽트 우선순위 설정</li>
+                    <li><strong>전력 관리:</strong> Sleep 모드 활용</li>
+                    <li><strong>안전성:</strong> Watchdog 타이머 사용</li>
+                    <li><strong>테스트:</strong> QEMU로 CI 파이프라인 구축</li>
+                    <li><strong>최적화:</strong> 릴리스 빌드에서 코드 크기 확인</li>
+                </ol>
+            </div>
+
+            <div class="warning-box">
+                <strong>⚠️ 주의사항</strong>
+                <ul>
+                    <li>인터럽트 컨텍스트에서 blocking 연산 금지</li>
+                    <li>스택 오버플로우 조심 (깊은 재귀 피하기)</li>
+                    <li>volatile 접근 필요 시 확실히 사용</li>
+                    <li>하드웨어 특성 (타이밍, 전력) 고려</li>
+                </ul>
+            </div>
+
+            <h2>🎯 실습 프로젝트</h2>
+
+            <div class="example-grid">
+                <div class="example-card">
+                    <h4>프로젝트 1: 온도 센서</h4>
+                    <p>I2C/SPI로 센서 읽고 UART로 출력</p>
+                </div>
+                <div class="example-card">
+                    <h4>프로젝트 2: PWM LED</h4>
+                    <p>타이머 PWM으로 LED 밝기 조절</p>
+                </div>
+                <div class="example-card">
+                    <h4>프로젝트 3: RTOS</h4>
+                    <p>RTIC 프레임워크로 실시간 시스템 구축</p>
+                </div>
+            </div>
+
+            <h2>📚 추가 학습 자료</h2>
+            <ul>
+                <li><strong>Embedded Rust Book:</strong> 공식 임베디드 가이드</li>
+                <li><strong>Discovery Book:</strong> 실습 중심 학습</li>
+                <li><strong>embedded-hal:</strong> 하드웨어 추상화 레이어</li>
+                <li><strong>RTIC:</strong> Real-Time Interrupt-driven Concurrency</li>
+            </ul>
+
+            <div class="info-box">
+                <strong>🎓 다음 단계</strong><br>
+                컴파일러와 임베디드 시스템을 이해했다면, 이제 운영체제 개발에 도전할 차례입니다.
+                Rust로 직접 OS를 만들어보며 시스템 프로그래밍의 정점에 도달해봅시다!
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -5,270 +5,390 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-agricultural-iot (Agricultural Iot).
+This document defines the canonical data-format layer for
+WIA-agricultural-iot. The standard covers persistent record
+shapes for IoT-instrumented agriculture — field sensor
+networks (soil moisture, soil temperature, soil EC,
+canopy temperature, leaf wetness, microclimate, water-level,
+tank-level), variable-rate application controllers (spray,
+fertiliser, seed), greenhouse climate controllers,
+livestock RFID and behaviour monitors, irrigation
+controllers, and the agricultural management software
+(FMIS) that consumes the records. The format is consumed by
+farm operators, agronomy advisors, equipment OEMs (per
+ISOBUS task controllers), agricultural software vendors,
+and the regulators that oversee water-rights, pesticide
+application, and animal welfare.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO 3166-1 (country codes)
+- ISO/IEC 11578 (UUID)
+- ISO 11783 series (Tractors and machinery for agriculture
+  and forestry — serial control and communications data
+  network — known as ISOBUS)
+  - ISO 11783-1 (general standard for mobile data
+    communication)
+  - ISO 11783-7 (implement messages application layer)
+  - ISO 11783-10 (task controller and management
+    information system data interchange)
+  - ISO 11783-11 (mobile data element dictionary)
+- ISO 19156:2011 (Geographic information — Observations and
+  measurements — O&M)
+- ISO 19115-1 (Geographic information — Metadata)
+- ISO 19111 (Geographic information — Referencing by
+  coordinates)
+- ISO/IEC 27001:2022 (information security management)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 7252 (CoAP)
+- IETF RFC 7390 (Group Communication for CoAP)
+- IETF RFC 8949 (CBOR)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- OASIS MQTT v5.0
+- OASIS MQTT-SN (sensor-network MQTT for constrained
+  agricultural devices)
+- OGC SensorThings API 1.1 (canonical IoT data model for
+  sensor observations)
+- OGC SOS 2.0 (Sensor Observation Service legacy
+  reference)
+- W3C SSN / SOSA (Semantic Sensor Network ontology /
+  Sensor, Observation, Sample, Actuator)
+- AgGateway ADAPT (Agricultural Data Application
+  Programming Toolkit; canonical interchange envelope for
+  ISOBUS task data, OEM telemetry, FMIS-side ingest)
+- FAO AGROVOC multilingual thesaurus (cited as the
+  canonical agricultural-vocabulary reference for crop /
+  livestock / activity classification)
+- USDA Soil Taxonomy / Keys to Soil Taxonomy (cited as the
+  reference soil-classification vocabulary; FAO World
+  Reference Base for Soil Resources is the international
+  alternative)
+- LoRa Alliance LoRaWAN 1.1
+- 3GPP TS 36.300 / TS 38.300 (NB-IoT / Cat-M)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-agricultural-iot
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts an
+agricultural-IoT operator manages. Implementations covered
+include:
 
-## §2 Manifest
+- Field-sensor networks (soil-moisture probes, weather
+  stations, leaf-wetness sensors, tank-level sensors,
+  flow meters on irrigation lines).
+- Variable-rate application controllers (sprayer
+  controllers, fertiliser-spreader controllers, planter
+  population-control modules, all communicating ISOBUS).
+- Greenhouse climate controllers (vent / heat / shade /
+  CO2-injection / irrigation controllers).
+- Livestock monitoring (RFID ear-tag readers, rumen-bolus
+  sensors, accelerometer-based behaviour monitors,
+  in-line milk-quality analysers).
+- Irrigation controllers (centre-pivot, drip-irrigation
+  zone controllers, gate-and-canal controllers).
+- Farm Management Information Systems (FMIS) ingesting the
+  above through AgGateway ADAPT.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "agricultural-iot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Direct chemistry of crop protection and food-safety
+traceability after farm-gate are addressed in adjacent WIA
+standards (WIA-crop-monitoring, WIA-food-traceability) and
+are out of scope here.
 
-## §3 Conformance Tiers
+## §2 Operation Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+operationId          : string (uuidv7)
+operationOperator    : string (institutional identifier of
+                         the farm operator or co-operative)
+operationRegistered  : string (ISO 8601 / RFC 3339)
+operatingDomain      : array of enum ("row-crop-grain" |
+                         "row-crop-oilseed" |
+                         "specialty-crop-vegetable" |
+                         "specialty-crop-fruit" |
+                         "viticulture-vineyard" |
+                         "greenhouse-protected" |
+                         "vertical-farming-indoor" |
+                         "rangeland-livestock" |
+                         "intensive-livestock-dairy" |
+                         "intensive-livestock-poultry" |
+                         "intensive-livestock-swine" |
+                         "aquaculture-pond" |
+                         "aquaculture-marine-net-pen" |
+                         "user-defined")
+jurisdictionScope    : array of string (ISO 3166-1 / 3166-2)
+operationStatus      : enum ("draft" | "operating" |
+                         "fallow-suspended" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Field / Zone Geographic Reference
 
-## §4 Discovery
+Geographic features (fields, irrigation zones, livestock
+enclosures, sensor locations) follow ISO 19115-1 / 19111
+referencing.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/agricultural-iot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+geoReference:
+  refId              : string (uuidv7)
+  operationId        : string (uuidv7)
+  refKind            : enum ("field-boundary" |
+                         "management-zone" |
+                         "irrigation-block" |
+                         "livestock-enclosure" |
+                         "sensor-point" |
+                         "structure-greenhouse")
+  crsRef             : string (EPSG code or per-jurisdiction
+                         CRS identifier)
+  geometryEncoding   : enum ("geojson-rfc7946" |
+                         "wkt" | "gml-3.2" |
+                         "isoxml-iso-11783-10")
+  geometryArtefactRef: string (content-addressed URI of
+                         the geometry artefact)
+```
 
-## §5 Time and Identity
+## §4 Device Record
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+device:
+  deviceId           : string (uuidv7)
+  operationId        : string (uuidv7)
+  manufacturerRef    : string (institutional identifier)
+  modelNumber        : string
+  hardwareRevision   : string
+  firmwareRef        : string (content-addressed firmware URI)
+  deviceClass        : enum ("soil-probe" |
+                         "weather-station" |
+                         "leaf-wetness-sensor" |
+                         "tank-level-sensor" |
+                         "flow-meter" |
+                         "isobus-controller-implement" |
+                         "isobus-task-controller-tractor" |
+                         "greenhouse-controller-climate" |
+                         "rfid-ear-tag-reader" |
+                         "livestock-behaviour-collar" |
+                         "irrigation-pivot-controller" |
+                         "drip-zone-valve")
+  radioStack         : array of enum ("lorawan-1.1" |
+                         "nb-iot-cat-m" |
+                         "5g-redcap" |
+                         "wi-fi-classic" |
+                         "wi-fi-halow" |
+                         "ieee-802-15-4-zigbee" |
+                         "wired-rs-485" |
+                         "wired-isobus-can" |
+                         "user-defined")
+  ssnSosaProfileRef  : string (URI of the W3C SSN / SOSA
+                         profile that describes the
+                         device's properties / actions /
+                         events)
+  deviceStatus       : enum ("manufactured" | "provisioned"
+                         | "deployed-active" | "fault" |
+                         "decommissioned")
+```
 
-## §6 Versioning and Deprecation
+## §5 Observation Record (OGC SensorThings / O&M Aligned)
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Observations follow OGC SensorThings API 1.1 and the
+underlying ISO 19156:2011 Observations and Measurements
+data model.
 
-## §7 Privacy and Security
+```
+observation:
+  observationId      : string (uuidv7)
+  deviceRef          : string (device UUID)
+  observedAt         : string (ISO 8601)
+  observedProperty   : enum ("soil-moisture-vwc" |
+                         "soil-temperature-celsius" |
+                         "soil-electrical-conductivity" |
+                         "soil-ph" |
+                         "canopy-temperature-celsius" |
+                         "air-temperature-celsius" |
+                         "relative-humidity-percent" |
+                         "leaf-wetness-binary" |
+                         "leaf-wetness-minutes" |
+                         "rainfall-mm" |
+                         "wind-speed-ms" |
+                         "wind-direction-deg" |
+                         "solar-radiation-wm2" |
+                         "tank-level-percent" |
+                         "tank-level-litres" |
+                         "irrigation-flow-lpm" |
+                         "user-defined")
+  numericValue       : number
+  unitCode           : string (UN/CEFACT recommendation 20
+                         common code or operator-extension)
+  geoRef             : string (geo-reference UUID; absent
+                         when the device's permanent
+                         location is recorded against the
+                         device record)
+  qualityFlag        : enum ("nominal" | "estimated" |
+                         "uncertain" | "out-of-range" |
+                         "device-fault")
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 ISOBUS Task and TaskData Record
 
-## §8 Open Governance
+ISOBUS task controllers (per ISO 11783-10) exchange task
+data with FMIS through AgGateway ADAPT envelopes that wrap
+the ISOXML representation of the task.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `agricultural-iot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+isobusTask:
+  taskId             : string (uuidv7)
+  operationId        : string (uuidv7)
+  taskKind           : enum ("planting" | "fertiliser-application"
+                         | "spraying" | "harvesting" |
+                         "tillage" | "irrigation" |
+                         "soil-sampling")
+  plannedStart       : string (ISO 8601)
+  plannedEnd         : string (ISO 8601)
+  actualStart        : string (ISO 8601; absent until
+                         started)
+  actualEnd          : string (ISO 8601; absent until
+                         completed)
+  prescriptionMapRef : string (content-addressed URI of
+                         the ISOXML PRESCRIPTION-MAP for
+                         variable-rate application; absent
+                         for non-VR tasks)
+  asAppliedMapRef    : string (content-addressed URI of
+                         the ISOXML AS-APPLIED map after
+                         completion)
+  agroVocCropRef     : string (FAO AGROVOC URI for the
+                         crop being managed)
+  agroVocActivityRef : string (FAO AGROVOC URI for the
+                         activity classification)
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Livestock Animal Record
 
+```
+animal:
+  animalId           : string (uuidv7)
+  operationId        : string (uuidv7)
+  rfidTag            : string (ISO 11784 / 11785 RFID code)
+  speciesRef         : string (FAO AGROVOC URI for the
+                         species)
+  breedClassification: string (national breed-registry
+                         identifier where applicable)
+  sex                : enum ("female" | "male" |
+                         "intersex" | "unknown")
+  birthdate          : string (ISO 8601 date; precision
+                         MAY be reduced when unknown)
+  damRef             : string (animal UUID of the dam;
+                         absent for foundation animals)
+  sireRef            : string (animal UUID of the sire;
+                         absent for foundation animals)
+  registrationStatus : enum ("registered-pedigree" |
+                         "commercial-only" |
+                         "rescued-unknown-pedigree")
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+## §8 Irrigation Plan and Application Record
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```
+irrigationPlan:
+  planId             : string (uuidv7)
+  operationId        : string (uuidv7)
+  zoneRef            : string (geo-reference UUID; the
+                         zone that the plan irrigates)
+  plannedStart       : string (ISO 8601)
+  plannedDurationS   : integer
+  plannedRateMmPerHr : number (water depth applied per
+                         hour over the zone)
+  appliedAt          : string (ISO 8601; absent until
+                         applied)
+  appliedDurationS   : integer
+  appliedDepthMm     : number
+  waterRightRef      : string (URI of the water-rights
+                         allocation citation; the operator's
+                         water-rights administrator binds
+                         this to the operating jurisdiction's
+                         water-rights register)
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §9 Soil Classification Record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+soilClassification:
+  classificationId   : string (uuidv7)
+  geoRef             : string (geo-reference UUID; the
+                         soil-sample point)
+  classifiedAt       : string (ISO 8601)
+  taxonomyScheme     : enum ("usda-soil-taxonomy-13ed" |
+                         "fao-world-reference-base-2014" |
+                         "national-soil-classification")
+  taxonomyClass      : string (per-scheme taxonomic
+                         classification; e.g.
+                         "Mollisols / Hapludolls" for
+                         USDA, "Chernozems" for WRB)
+  observerRef        : string (operator-internal observer
+                         token)
+```
 
-## Annex F — Adoption Roadmap
+## §10 Pesticide Application Detail Record
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+pesticideApplication:
+  applicationId      : string (uuidv7)
+  isobusTaskRef      : string (ISOBUS task UUID this
+                         application implements)
+  productRegistrationRef : string (URI of the regulator's
+                         product registration record)
+  rateUnitCode       : string (UN/CEFACT rec.20 — e.g.
+                         "L_per_HA" for litres per hectare,
+                         "KGM_per_HA" for kg per hectare)
+  rateValue          : number
+  bufferZoneMetres   : number (per-product buffer distance
+                         from sensitive receptors)
+  reentryIntervalHours : number (per-product re-entry
+                         interval)
+  applicatorTokenRef : string (operator-internal applicator
+                         certification token; clinical
+                         identity in operator HR)
+  applicatorCertificationRef : string (URI of the regulator's
+                         applicator certification record)
+  driftCardRefs      : array of string (URIs of drift card
+                         placement and assessment records)
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §11 Animal Health Event Record
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+animalHealthEvent:
+  eventId            : string (uuidv7)
+  animalRef          : string (animal UUID)
+  observedAt         : string (ISO 8601)
+  eventKind          : enum ("vaccination" |
+                         "treatment-administered" |
+                         "veterinary-examination" |
+                         "diagnostic-test" |
+                         "calving-or-parturition" |
+                         "weaning" | "movement-on-farm" |
+                         "transport-off-farm" |
+                         "death-on-farm" |
+                         "slaughter")
+  productRef         : string (URI of the registered
+                         veterinary product where applicable)
+  withdrawalPeriodDays : number (per-product withdrawal
+                         period before slaughter or milk
+                         use)
+  veterinarianRef    : string (operator-internal vet token)
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §12 Conformance
 
-## Annex G — Test Vectors and Conformance Evidence
+Implementations claiming PHASE-1 conformance emit each of
+the records defined above for every operating field and
+honour the AgGateway ADAPT envelope per §6.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+---
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+**Document Information:**
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
-
-## Annex J — Reference Implementation Topology
-
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
-
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-1-DATA-FORMAT validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
-
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-agricultural-iot
+- **Last Updated:** 2026-04-28

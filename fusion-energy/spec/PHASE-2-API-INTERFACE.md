@@ -5,237 +5,388 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-fusion-energy (Fusion Energy).
+This document defines the HTTPS API contract that a
+fusion-energy facility exposes for the records defined
+in PHASE-1. Consumers include the operating
+jurisdiction's nuclear-or-radiation-safety regulator
+(US NRC, UK ONR, EU national regulators per Council
+Directive 2009/71/Euratom and 2013/59/Euratom basic-
+safety-standards, JP NRA, KR NSSC), the IAEA where the
+operating jurisdiction reports voluntary fusion-safety
+information, the host site's safety committee, the
+facility's external technical-safety reviewer, the
+facility's contracted ASME Code Section III nuclear-
+component-quality-assurance auditor, and the
+facility's plasma-physics community partners under the
+operating jurisdiction's data-sharing rules.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics)
+- IETF RFC 9111 (HTTP Caching)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 6901 / 6902 (JSON Pointer / Patch)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9421 (HTTP Message Signatures)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022 (information security management)
+- W3C Trace Context
+- IAEA Safety Standards GSR Part 1 to 7 + fusion-
+  specific Specific Safety Guides (SSG-77 / SSG-78 /
+  SSG-79 in publication tracking)
+- ASME BPVC Section III + ASME NQA-1
+- IEC 61508 + IEC 60880
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-fusion-energy
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by the
+facility. Versioning uses `/v1/` path segments. The
+OpenAPI 3.1 document at `/v1/openapi.json` is canonical.
 
-## §2 Manifest
+This API is the facility-facing facade for fusion-
+safety records. Real-time plasma diagnostic data flows
+through the facility's plasma-control surface; this
+API records the artefacts of regulatory-grade
+significance (safety case, postulated initiating
+events, safety-classified components, operating
+limits, tritium accountancy, reportable events).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "fusion-energy"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Root Discovery
 
-## §3 Conformance Tiers
+```
+GET /v1/
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```json
+{
+  "standard": "WIA-fusion-energy",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":               "/v1/programmes",
+    "safetyCases":              "/v1/safety-cases",
+    "tritiumInventory":         "/v1/tritium-inventory",
+    "postulatedEvents":         "/v1/postulated-events",
+    "safetyClassifiedComponents": "/v1/safety-classified-components",
+    "operatingLimits":          "/v1/operating-limits",
+    "plasmaOperations":         "/v1/plasma-operations",
+    "reportableEvents":         "/v1/reportable-events",
+    "decommissioning":          "/v1/decommissioning",
+    "evidence":                 "/v1/evidence",
+    "openapi":                  "/v1/openapi.json"
+  }
+}
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Programme Lifecycle
 
-## §4 Discovery
+```
+POST   /v1/programmes              — register a programme
+GET    /v1/programmes/{pid}        — retrieve programme
+PATCH  /v1/programmes/{pid}/operating-phase
+                                   — advance operating
+                                     phase
+PATCH  /v1/programmes/{pid}/fuel-cycle
+                                   — record fuel-cycle
+                                     transition (e.g.
+                                     hydrogen-only-
+                                     research → deuterium
+                                     -only-research →
+                                     deuterium-tritium-
+                                     low-inventory)
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/fusion-energy`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Programmes whose `fuelCycle` is `deuterium-tritium-
+full-inventory` without an `effectiveSafetyCaseId`
+return `409` with type
+`urn:wia:fusion-energy:safety-case-required-for-
+tritium`.
 
-## §5 Time and Identity
+## §4 Safety Cases
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST   /v1/programmes/{pid}/safety-cases
+                                   — register a safety
+                                     case
+PATCH  /v1/safety-cases/{scid}/regulator-approval
+                                   — record regulator
+                                     approval reference
+PATCH  /v1/safety-cases/{scid}/superseded-by
+                                   — record successor
+                                     safety case
+GET    /v1/safety-cases/{scid}     — retrieve safety
+                                     case
+GET    /v1/safety-cases/{scid}/public-summary
+                                   — fetch the public
+                                     summary version
+                                     where the
+                                     operating
+                                     jurisdiction
+                                     publishes one
+```
 
-## §6 Versioning and Deprecation
+Safety-case submissions whose `hazardCategorisation`
+is `significant-tritium-or-activation-inventory`
+without a regulator-approval reference cannot serve
+as the `effectiveSafetyCaseId` and return `409` on
+operating-phase advance with type
+`urn:wia:fusion-energy:regulator-approval-required-
+for-significant-hazard`.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Tritium-Inventory Records
 
-## §7 Privacy and Security
+For programmes whose `fuelCycle` includes tritium:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+POST   /v1/programmes/{pid}/tritium-inventory
+                                   — register a
+                                     tritium-inventory
+                                     measurement
+GET    /v1/tritium-inventory/{tid} — retrieve record
+GET    /v1/programmes/{pid}/tritium-inventory?location={l}&period={p}
+                                   — query tritium
+                                     accountancy
+```
 
-## §8 Open Governance
+Tritium-inventory submissions whose
+`uncertaintyClass` is `greater-than-10-percent`
+return `422` with type
+`urn:wia:fusion-energy:tritium-accountancy-uncertainty-
+out-of-bound`. The accountancy is the central record-
+keeping under the operating jurisdiction's safeguards
+regime; the API enforces a per-period mass-balance
+check across the fuel-cycle locations.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `fusion-energy` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Postulated Initiating Events
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+POST   /v1/programmes/{pid}/postulated-events
+                                   — register a
+                                     postulated
+                                     initiating event
+PATCH  /v1/postulated-events/{eid}/protection-functions
+                                   — link protection
+                                     functions per
+                                     PHASE-1 §6
+GET    /v1/postulated-events/{eid} — retrieve record
+```
 
+The postulated-events register frames the safety case
+and is the cross-reference point for safety-classified-
+component qualification.
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+## §7 Safety-Classified Components
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+```
+POST   /v1/programmes/{pid}/safety-classified-components
+                                   — register a
+                                     safety-classified
+                                     component
+PATCH  /v1/safety-classified-components/{cid}/qualification
+                                   — record
+                                     qualification
+                                     reference
+GET    /v1/safety-classified-components/{cid}
+                                   — retrieve record
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Components declared `safety-class-1` or `safety-class-
+2` without an ASME BPVC Section III design-code
+declaration (where the operating jurisdiction adopts
+ASME BPVC for fusion components) return `409` with
+type `urn:wia:fusion-energy:asme-bpvc-design-code-
+required-for-safety-class`. Computer-based components
+performing category A functions per IEC 60880 without
+the IEC 60880 categorisation field return `422` with
+type
+`urn:wia:fusion-energy:iec-60880-category-required`.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 Operating Limits
 
-## Annex F — Adoption Roadmap
+```
+POST   /v1/programmes/{pid}/operating-limits
+                                   — register an
+                                     operating limit
+PATCH  /v1/operating-limits/{lid}/surveillance
+                                   — record
+                                     surveillance
+                                     completion
+GET    /v1/operating-limits/{lid}  — retrieve record
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Limits declared `safety-limit` without a `responseOn
+Excursion` field return `422` with type
+`urn:wia:fusion-energy:safety-limit-response-required`.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §9 Plasma Operations
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+POST   /v1/programmes/{pid}/plasma-operations
+                                   — register a
+                                     discharge
+PATCH  /v1/plasma-operations/{sid}/protection-invocation
+                                   — record protection-
+                                     function
+                                     invocation
+                                     during the shot
+GET    /v1/plasma-operations/{sid} — retrieve record
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Plasma operations on a programme whose effective
+safety case has been superseded without a successor
+safety case in force return `409` on `POST` with type
+`urn:wia:fusion-energy:no-effective-safety-case-cannot-
+operate`.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §10 Reportable Events
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```
+POST   /v1/programmes/{pid}/reportable-events
+                                   — register a
+                                     reportable event
+PATCH  /v1/reportable-events/{eid}/regulator-notification
+                                   — record regulator
+                                     notification
+PATCH  /v1/reportable-events/{eid}/root-cause
+                                   — record root-cause
+                                     analysis
+GET    /v1/reportable-events/{eid} — retrieve record
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Reportable events of classification
+`abnormal-tritium-release-above-permit` or
+`personnel-dose-above-investigation-level` without a
+`regulatorNotifiedAt` field within the operating
+jurisdiction's reportable-event deadline return `409`
+on `PATCH /root-cause` with type
+`urn:wia:fusion-energy:regulator-notification-required-
+for-classification`.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §11 Decommissioning
 
-## Annex H — Versioning and Deprecation Policy
+```
+POST   /v1/programmes/{pid}/decommissioning
+                                   — register
+                                     decommissioning
+                                     phase
+PATCH  /v1/decommissioning/{did}/phase
+                                   — advance
+                                     decommissioning
+                                     phase
+GET    /v1/decommissioning/{did}   — retrieve record
+```
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+The waste-route reference is canonical at the
+operating jurisdiction's radioactive-waste regulator;
+this endpoint cites the regulator's record reference
+rather than carrying the route inline.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §12 Errors, Authentication, Caching, Audit
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Errors: `application/problem+json` per RFC 9457 with
+the types named above plus
+`urn:wia:fusion-energy:evidence-mismatch`.
+Authentication: mutually-authenticated TLS for
+regulator, IAEA, ASME-NQA-1 auditor, technical-safety
+reviewer, and partner consumers. Caching: stable
+resources (superseded safety cases, closed reportable
+events, completed decommissioning phases, archived
+programmes) cacheable with `Cache-Control: max-age=
+31536000, immutable`. Audit logs carry `programmeId`,
+`shotId`, `traceId`, the issuing client certificate's
+subject, and the facility's clock skew vs the
+operating jurisdiction's NTP service.
 
-## Annex I — Interoperability Profiles
+## §13 Streaming Subscription, Bulk, Pagination, Provenance
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+SSE at `/v1/programmes/{pid}/events` for programme-
+wide events (safety case approved, tritium inventory
+out-of-band, protection-function invocation,
+reportable-event detected). Subscribers reconnect via
+`Last-Event-ID`. Bulk endpoints: `/v1/bulk/plasma-
+operations`, `/v1/bulk/operating-limits`,
+`/v1/bulk/safety-classified-components`. Cursor-based
+pagination via `cursor` and `Link` headers. Provenance
+via `/v1/provenance/{recordId}` emits the in-toto
+attestation chain for any record.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §14 Worked Example: Tritium Fuel-Cycle Transition
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+1. Facility operating in `deuterium-only-research`
+   prepares for transition to `deuterium-tritium-low-
+   inventory`.
+2. Operator registers an updated safety case via
+   `POST /safety-cases` with revised hazard
+   categorisation `significant-tritium-or-activation-
+   inventory` and the design-basis-events analysis
+   updated to include tritium-bypass and tritium-
+   release scenarios.
+3. Regulator review per the operating jurisdiction's
+   regulatory pathway (`us-nrc-risk-informed-
+   performance-based-fusion`, `uk-onr-fusion-safety`,
+   etc.); on approval, the regulator-approval
+   reference is recorded via `PATCH /regulator-
+   approval`.
+4. Tritium-inventory baseline measurement is recorded
+   via `POST /tritium-inventory` for each fuel-cycle
+   location.
+5. Safety-classified-component qualifications updated
+   for the tritium-handling components (per ASME BPVC
+   Section III where adopted, with IEC 61508 / IEC
+   60880 evidence for the protection system).
+6. Fuel-cycle transition executed via `PATCH /fuel-
+   cycle`; first tritium-introducing shot recorded
+   via `POST /plasma-operations`.
+
+## §15 Data-Sharing-Partner Endpoint
+
+```
+GET    /v1/programmes/{pid}/plasma-operations?shareable=true
+                                   — list discharges
+                                     marked shareable
+                                     under the
+                                     operating
+                                     jurisdiction's
+                                     data-sharing
+                                     rules
+```
+
+The plasma-physics community shares reduced datasets
+under the operating jurisdiction's data-sharing rules
+and the IAEA's data-exchange guidance; tritium and
+safety-classified data are NOT shared through this
+endpoint.
+
+## §16 Aggregate and Provenance Endpoints
+
+```
+GET    /v1/provenance/{recordId}
+GET    /v1/aggregate/discharge-count?period=...
+GET    /v1/aggregate/protection-invocation-count?period=...
+GET    /v1/aggregate/tritium-inventory-mass-balance?period=...
+```
+
+## §17 Conformance
+
+A conformant server passes the test vectors published
+under `tests/phase-vectors/phase-2-api-interface/`,
+emits an OpenAPI 3.1 document, signs evidence packages
+per RFC 9421, refuses operation under a superseded
+safety case without successor in force, refuses
+tritium-fuel-cycle programmes without a regulator-
+approved safety case, and refuses safety-class-1 / 2
+components without ASME BPVC Section III design-code
+declarations.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-fusion-energy
+- **Last Updated:** 2026-04-28

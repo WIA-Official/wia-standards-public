@@ -5,270 +5,261 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-automated-trading (Automated Trading).
+This document defines how an automated-trading
+operator integrates with the systems that surround
+algorithmic order flow: the trading venue and its
+conformance-test, market-data, and surveillance
+endpoints; the post-trade infrastructure (CCP,
+clearing house, settlement system); the supervisory
+authority for the operating jurisdiction (ESMA +
+Member-State NCA in EU; SEC + FINRA + CFTC in US;
+KR FSC + FSS); the consolidated tape provider (CTP);
+the SEC Consolidated Audit Trail (CAT); the FINRA
+TRACE channel for fixed-income; the operator's ARM
+and APA channels for MiFIR Article 26 / 27 reporting;
+the operator's ICT-third-party providers under DORA;
+and the long-term archive that preserves trading
+records past the active retention horizon.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- FIX 5.0 SP2, FIX FAST, FIX Orchestra
+- ISO 20022, ISO 10383 MIC, ISO 17442 LEI
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17021-1:2015, ISO/IEC 17065:2012
+- ISO 8601
+- W3C Verifiable Credentials Data Model 2.0
+  (optional)
+- EU MiFID II + MiFIR + RTS 6 + RTS 7 + RTS 25
+- EU MAR + EU MiCA
+- EU DORA Regulation (EU) 2022/2554
+- EU EMIR Regulation (EU) 648/2012 for OTC-derivative
+  clearing
+- EU CSDR Regulation (EU) 909/2014 for settlement
+  discipline
+- US SEC Reg SCI, SEC Rule 15c3-5, SEC Reg ATS, SEC
+  Reg NMS, SEC Rule 613 CAT, SEC Rule 17a-4
+- US FINRA Rules 3110, 4511, 5210, 6140
+- US CFTC 17 CFR 1.81
+- US Dodd-Frank for OTC-derivative clearing
+- KR 자본시장법 + KRX 회원규정 + KSD (한국예탁결제원)
+  settlement
+- TIBER-EU framework
 
 ---
 
-## §1 Scope
+## §1 Trading Venue Integration
 
-This PHASE document is one of four that together define the WIA-automated-trading
-standard. It addresses the integration layer of the standard.
+The operator's venue integration covers:
 
-## §2 Manifest
+- The FIX session establishment with the venue's
+  SenderCompID / TargetCompID negotiation, message-
+  rate budget, and resilience profile (MiFID II RTS
+  7).
+- The market-data feed subscription (level 1 / level
+  2 / depth-of-book).
+- The conformance-test environment access for
+  algorithm certification (RTS 6 Article 5).
+- The venue's market-abuse surveillance feedback
+  channel — the venue surfaces patterns it
+  identifies and the operator engages with the
+  venue's market-control function.
+- The venue's emergency-stop discipline under RTS 7
+  Article 18.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "automated-trading"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+For US-jurisdiction venues (NYSE, Nasdaq, CBOE,
+IEX, Members Exchange) the equivalent SEC Reg ATS /
+Reg NMS / Reg SCI integration applies. For KR-
+jurisdiction venues the KRX 회원규정 + 자동화 매매
+시스템 점검 discipline applies. For crypto-asset
+trading platforms the EU MiCA + the platform's
+operating rules apply.
 
-## §3 Conformance Tiers
+## §2 Post-Trade Clearing and Settlement Integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+For cleared trades the operator integrates with:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- The central counterparty (CCP) for clearing
+  discipline (EMIR for EU; Dodd-Frank Title VII for
+  US; KR KRX 청산결제 for KR-listed derivatives).
+- The clearing-house margining and default-fund
+  contributions.
+- The settlement system (T2S in EU; DTC, NSCC, OCC
+  in US; KSD in KR) under CSDR (Regulation (EU)
+  909/2014) for EU-jurisdiction settlement.
+- The custodian for asset segregation and reconcili-
+  ation.
 
-## §4 Discovery
+## §3 Supervisory-Authority Integration
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/automated-trading`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+For EU-regulated operators:
 
-## §5 Time and Identity
+- ESMA — for EU-wide thematic reviews, Q&A
+  guidance, and direct supervision of certain
+  CCPs / TRs.
+- Member-State NCA — for the firm's authorisation,
+  ongoing supervision, transaction-report
+  consumption (MiFIR Article 26), market-abuse
+  enforcement (MAR), and DORA supervision.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+For US-regulated operators:
 
-## §6 Versioning and Deprecation
+- SEC — for Reg SCI, Reg NMS, Reg ATS, Rule 15c3-5,
+  Rule 17a-4, Rule 613 CAT, Rule 605 / 606 best-
+  execution reports.
+- FINRA — for member-firm supervision (Rule 3110),
+  recordkeeping (Rule 4511), publication of trades
+  (Rule 5210), surveillance (Rule 6140).
+- CFTC — for futures and swap-dealer-related
+  algorithmic trading (17 CFR 1.81; Part 38 / 40
+  designated-contract-market rules).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+For KR-regulated operators:
 
-## §7 Privacy and Security
+- KR FSC — for the firm's authorisation under
+  자본시장법 and the FSC's published guidance.
+- KR FSS — for ongoing supervision and inspection.
+- KRX — for member-firm conformance.
+- KOFIA (한국금융투자협회) — for industry guidance
+  and self-regulation.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §4 Consolidated Tape Provider (CTP) Integration
 
-## §8 Open Governance
+For EU-regulated equity flows the consolidated tape
+provider (under MiFIR Article 27d once authorised)
+publishes the post-trade tape; the operator's
+APA channel feeds the CTP. For US equity flows the
+NYSE / Nasdaq / FINRA SIP feeds the consolidated
+tape under Reg NMS Rules 600 to 612.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `automated-trading` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 SEC Consolidated Audit Trail (CAT) Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+For US-jurisdiction operators the SEC CAT under
+Rule 613 is the canonical recordkeeper for orders
+in NMS securities and OTC equity securities. The
+operator's CAT reporter integration follows the
+CAT NMS Plan technical specifications; data is
+reported by the operator's reporting agent or
+directly to the CAT processor.
 
+## §6 ARM and APA Integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+For MiFIR Article 26 transaction reporting and
+Article 27 reference-data reporting the operator
+integrates with an Approved Reporting Mechanism
+(ARM) and (for pre-trade / post-trade publication)
+an Approved Publication Arrangement (APA). The
+ARM forwards transaction reports to the Member-
+State NCA on the operator's behalf; the APA
+publishes pre-trade quotes and post-trade
+transactions for transparency.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## §7 ICT Third-Party Provider Integration (DORA)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+For EU-regulated operators DORA Articles 28 to 30
+require the operator to:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+- Map ICT third-party providers (cloud providers,
+  market-data vendors, FIX engine vendors,
+  surveillance vendors).
+- Identify ICT third-party providers supporting
+  critical or important functions and place them
+  in the contractual register.
+- Apply the DORA contractual minima (data
+  protection, security, business continuity,
+  audit access, exit strategies).
+- Report critical ICT third-party providers to the
+  Member-State NCA so that ESMA / EBA / EIOPA can
+  designate critical ICT third-party providers
+  under DORA Title V for direct supervision.
 
-## Annex F — Adoption Roadmap
+## §8 Threat-Led Penetration Testing Integration
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+The operator's threat-led penetration testing
+(TIBER-EU framework in EU, the equivalent programmes
+elsewhere) is exercised on the supervisor's cadence:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+- The lead threat intelligence provider is
+  contracted under the operator's TIBER-EU process.
+- The red team performs the test under the
+  TIBER-EU rules of engagement.
+- The findings feed the operator's remediation
+  cycle and the DORA Article 26 advanced-resilience-
+  testing report.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §9 External Audit and ISMS Certification
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The operator's ISMS is certified against ISO/IEC
+27001:2022 with the scope explicitly extending to
+the FIX, ISO 20022, market-data, and surveillance
+endpoints. The certification body operates under
+ISO/IEC 17021-1; the conformity-assessment body for
+WIA-automated-trading operates under ISO/IEC 17065.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §10 Long-Term Archival Integration
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Records governed by the operator's retention
+horizons (MiFID II RTS 6 Article 8 / RTS 25 /
+MiFIR Article 26 five years; SEC Rule 17a-4 three-
+or six-year WORM retention; FINRA Rule 4511 six
+years; KR 자본시장법 보존 의무) are migrated to
+the long-term archive at the close of the active
+retention window. The archive preserves the
+algorithm registry snapshot, the order-and-
+execution record, the FIX message stream, the
+transaction-report record, the surveillance-alert
+record, the conformance-test report, the resilience-
+drill record, and the audit-event trail.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §11 Crypto-Asset Trading Platform Integration (MiCA)
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+For operators operating crypto-asset trading
+platforms under EU MiCA Regulation (EU) 2023/1114:
 
-## Annex H — Versioning and Deprecation Policy
+- The crypto-asset trading platform's authorisation
+  is granted by the Member-State NCA under MiCA
+  Title V.
+- The white-paper-based admission discipline applies
+  for asset-referenced and e-money tokens (MiCA
+  Title III + IV).
+- Market-abuse rules under MiCA Title VI extend the
+  EU MAR discipline.
+- ESMA register entry under MiCA Article 110 makes
+  the platform discoverable to clients and other
+  authorities.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Member-Firm Resilience Reporting Integration
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+The operator's resilience-reporting integration
+covers:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+- DORA Article 19 major-ICT-incident reporting to
+  the Member-State NCA.
+- SEC Reg SCI Rule 1002 immediate notification and
+  Rule 1003 disclosure to members.
+- FINRA Rule 4530 reportable events.
+- KR FSS 전자금융 사고 보고 (electronic-financial-
+  incident reporting under KR 전자금융거래법).
 
-## Annex I — Interoperability Profiles
+## §13 Conformance
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Implementations claiming PHASE-4 conformance maintain
+the venue and post-trade-infrastructure integrations,
+exercise the supervisory-authority filing
+obligations, integrate with the operator's chosen
+ARM / APA / CAT / TRACE channels, hold the ISO/IEC
+27001 certification, exercise the DORA ICT-third-
+party-risk management discipline (where applicable),
+and operate the long-term archival integration
+described above.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+---
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+**Document Information:**
 
-## Annex J — Reference Implementation Topology
-
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
-
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-4-INTEGRATION validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
-
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-automated-trading
+- **Last Updated:** 2026-04-28

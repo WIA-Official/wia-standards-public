@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 1-02: bindgen & cbindgen | WIA-RUST-ADVANCED</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { width: 1920px; height: 1080px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%); font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; color: #fff; overflow: hidden; }
+        .slide { display: none; width: 100%; height: 100%; padding: 60px; position: relative; }
+        .slide.active { display: flex; flex-direction: column; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        .episode-badge { background: linear-gradient(135deg, #F39C12, #FFD700); padding: 12px 30px; border-radius: 30px; font-size: 24px; font-weight: bold; }
+        .lang-toggle { display: flex; gap: 10px; }
+        .lang-btn { padding: 10px 25px; border: 2px solid #F39C12; background: transparent; color: #fff; border-radius: 20px; cursor: pointer; font-size: 18px; transition: all 0.3s; }
+        .lang-btn.active { background: #F39C12; }
+        .title { font-size: 72px; font-weight: bold; text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #F39C12, #FFD700); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .content { flex: 1; display: flex; justify-content: center; align-items: center; gap: 60px; }
+        .code-block { background: #0d1117; border-radius: 15px; padding: 30px; font-family: 'Consolas', monospace; font-size: 24px; line-height: 1.6; border: 2px solid #30363d; width: 900px; }
+        .code-line { opacity: 0; transform: translateY(10px); transition: all 0.3s; }
+        .code-line.show { opacity: 1; transform: translateY(0); }
+        .keyword { color: #ff7b72; } .function { color: #d2a8ff; } .string { color: #a5d6ff; } .comment { color: #8b949e; } .type { color: #ffa657; }
+        .navigation { position: absolute; bottom: 40px; left: 0; right: 0; display: flex; justify-content: center; gap: 20px; }
+        .nav-btn { padding: 15px 40px; background: rgba(243, 156, 18, 0.8); border: none; border-radius: 30px; color: white; font-size: 20px; cursor: pointer; transition: all 0.3s; }
+        .nav-btn:hover { background: #F39C12; transform: scale(1.05); }
+        .progress-bar { position: absolute; bottom: 0; left: 0; height: 8px; background: #F39C12; transition: width 0.5s; }
+        .slide-number { position: absolute; bottom: 100px; right: 60px; font-size: 24px; color: #888; }
+        .subtitle { font-size: 36px; color: #aaa; text-align: center; margin-bottom: 40px; }
+        .center-content { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; }
+        .big-emoji { font-size: 150px; margin-bottom: 30px; }
+        .channel-info { background: rgba(255, 0, 0, 0.1); border: 2px solid #FF0000; border-radius: 20px; padding: 30px 60px; margin-top: 40px; font-size: 32px; }
+        .channel-info a { color: #FF6B6B; text-decoration: none; }
+        .highlight-box { background: rgba(243, 156, 18, 0.15); border: 2px solid #F39C12; border-radius: 20px; padding: 50px; margin: 30px 0; }
+        .highlight-box h3 { color: #F39C12; font-size: 40px; margin-bottom: 25px; }
+        .highlight-box p { font-size: 30px; line-height: 1.8; }
+        .step-box { background: rgba(243, 156, 18, 0.1); border-left: 5px solid #F39C12; padding: 30px; margin: 20px 0; border-radius: 0 15px 15px 0; }
+        .step-box h4 { color: #F39C12; font-size: 30px; margin-bottom: 15px; }
+        .step-box p { font-size: 24px; line-height: 1.8; }
+        .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; width: 100%; }
+    </style>
+</head>
+<body>
+    <div class="slide active" id="slide1">
+        <div class="header"><div class="episode-badge">EP 1-02</div><div class="lang-toggle"><button class="lang-btn active" onclick="setLang('ko')">한국어</button><button class="lang-btn" onclick="setLang('en')">English</button></div></div>
+        <div class="center-content"><div class="big-emoji">🤖</div><h1 class="title">bindgen & cbindgen</h1><p class="subtitle"><span class="ko">자동 바인딩 생성 도구</span><span class="en" style="display:none;">Automatic Binding Generation Tools</span></p><div class="channel-info">📺 YouTube: <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a></div></div>
+        <div class="navigation"><button class="nav-btn" onclick="nextSlide()"><span class="ko">시작하기 →</span><span class="en" style="display:none;">Start →</span></button></div>
+        <div class="slide-number">1 / 8</div><div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <div class="slide" id="slide2">
+        <div class="header"><div class="episode-badge">EP 1-02</div><div class="lang-toggle"><button class="lang-btn active" onclick="setLang('ko')">한국어</button><button class="lang-btn" onclick="setLang('en')">English</button></div></div>
+        <h1 class="title"><span class="ko">bindgen이란?</span><span class="en" style="display:none;">What is bindgen?</span></h1>
+        <div class="content"><div style="width: 100%;"><div class="highlight-box"><h3><span class="ko">🤖 bindgen - C → Rust</span><span class="en" style="display:none;">🤖 bindgen - C → Rust</span></h3><p class="ko">C 헤더 파일을 읽어서 Rust FFI 바인딩 자동 생성<br><br>✅ 수천 개의 함수도 자동 변환<br>✅ 구조체, 열거형, 매크로 지원<br>✅ 빌드 스크립트 통합<br>✅ 타입 안전성 보장</p><p class="en" style="display:none;">Reads C header files and auto-generates Rust FFI bindings<br><br>✅ Auto-converts thousands of functions<br>✅ Supports structs, enums, macros<br>✅ Integrates with build scripts<br>✅ Ensures type safety</p></div></div></div>
+        <div class="navigation"><button class="nav-btn" onclick="prevSlide()">←</button><button class="nav-btn" onclick="nextSlide()">→</button></div>
+        <div class="slide-number">2 / 8</div><div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <div class="slide" id="slide3">
+        <div class="header"><div class="episode-badge">EP 1-02</div><div class="lang-toggle"><button class="lang-btn active" onclick="setLang('ko')">한국어</button><button class="lang-btn" onclick="setLang('en')">English</button></div></div>
+        <h1 class="title"><span class="ko">bindgen 사용법</span><span class="en" style="display:none;">Using bindgen</span></h1>
+        <div class="content"><div style="width: 100%;"><div class="code-block"><div class="code-line"><span class="comment">// build.rs</span></div><div class="code-line"><span class="keyword">use</span> bindgen;</div><div class="code-line"></div><div class="code-line"><span class="keyword">fn</span> <span class="function">main</span>() {</div><div class="code-line">    <span class="keyword">let</span> bindings = bindgen::<span class="type">Builder</span>::<span class="function">default</span>()</div><div class="code-line">        .<span class="function">header</span>(<span class="string">"wrapper.h"</span>)</div><div class="code-line">        .<span class="function">generate</span>()</div><div class="code-line">        .<span class="function">expect</span>(<span class="string">"Unable to generate bindings"</span>);</div><div class="code-line"></div><div class="code-line">    bindings.<span class="function">write_to_file</span>(<span class="string">"src/bindings.rs"</span>)</div><div class="code-line">        .<span class="function">expect</span>(<span class="string">"Couldn't write bindings!"</span>);</div><div class="code-line">}</div></div><div class="step-box"><h4><span class="ko">📝 Cargo.toml</span></h4><p>[build-dependencies]<br>bindgen = "0.69"</p></div></div></div>
+        <div class="navigation"><button class="nav-btn" onclick="prevSlide()">←</button><button class="nav-btn" onclick="nextSlide()">→</button></div>
+        <div class="slide-number">3 / 8</div><div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <div class="slide" id="slide4">
+        <div class="header"><div class="episode-badge">EP 1-02</div><div class="lang-toggle"><button class="lang-btn active" onclick="setLang('ko')">한국어</button><button class="lang-btn" onclick="setLang('en')">English</button></div></div>
+        <h1 class="title"><span class="ko">cbindgen이란?</span><span class="en" style="display:none;">What is cbindgen?</span></h1>
+        <div class="content"><div style="width: 100%;"><div class="highlight-box"><h3><span class="ko">🔄 cbindgen - Rust → C</span><span class="en" style="display:none;">🔄 cbindgen - Rust → C</span></h3><p class="ko">Rust 코드로부터 C/C++ 헤더 파일 생성<br><br>✅ Rust 라이브러리를 C에서 사용 가능<br>✅ 구조체, 함수, 상수 자동 변환<br>✅ C와 C++ 모두 지원<br>✅ 문서 주석도 변환</p><p class="en" style="display:none;">Generates C/C++ header files from Rust code<br><br>✅ Makes Rust libraries usable from C<br>✅ Auto-converts structs, functions, constants<br>✅ Supports both C and C++<br>✅ Converts doc comments too</p></div></div></div>
+        <div class="navigation"><button class="nav-btn" onclick="prevSlide()">←</button><button class="nav-btn" onclick="nextSlide()">→</button></div>
+        <div class="slide-number">4 / 8</div><div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <div class="slide" id="slide5">
+        <div class="header"><div class="episode-badge">EP 1-02</div><div class="lang-toggle"><button class="lang-btn active" onclick="setLang('ko')">한국어</button><button class="lang-btn" onclick="setLang('en')">English</button></div></div>
+        <h1 class="title"><span class="ko">cbindgen 사용법</span><span class="en" style="display:none;">Using cbindgen</span></h1>
+        <div class="content"><div style="width: 100%;"><div class="code-block"><div class="code-line"><span class="comment">// lib.rs</span></div><div class="code-line">#[<span class="function">no_mangle</span>]</div><div class="code-line"><span class="keyword">pub</span> <span class="keyword">extern</span> <span class="string">"C"</span> <span class="keyword">fn</span> <span class="function">add</span>(a: <span class="type">i32</span>, b: <span class="type">i32</span>) -&gt; <span class="type">i32</span> {</div><div class="code-line">    a + b</div><div class="code-line">}</div></div><div class="code-block" style="margin-top: 20px; font-size: 22px;"><div class="code-line"><span class="comment">// Generated header (mylib.h)</span></div><div class="code-line"><span class="type">int32_t</span> <span class="function">add</span>(<span class="type">int32_t</span> a, <span class="type">int32_t</span> b);</div></div><div class="step-box"><h4><span class="ko">🚀 빌드 명령어</span><span class="en" style="display:none;">🚀 Build Command</span></h4><p>cbindgen --lang c --output mylib.h</p></div></div></div>
+        <div class="navigation"><button class="nav-btn" onclick="prevSlide()">←</button><button class="nav-btn" onclick="nextSlide()">→</button></div>
+        <div class="slide-number">5 / 8</div><div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <div class="slide" id="slide6">
+        <div class="header"><div class="episode-badge">EP 1-02</div><div class="lang-toggle"><button class="lang-btn active" onclick="setLang('ko')">한국어</button><button class="lang-btn" onclick="setLang('en')">English</button></div></div>
+        <h1 class="title"><span class="ko">고급 설정</span><span class="en" style="display:none;">Advanced Configuration</span></h1>
+        <div class="content"><div style="width: 100%;"><div class="code-block"><div class="code-line"><span class="comment">// bindgen customization</span></div><div class="code-line">bindgen::<span class="type">Builder</span>::<span class="function">default</span>()</div><div class="code-line">    .<span class="function">header</span>(<span class="string">"wrapper.h"</span>)</div><div class="code-line">    .<span class="function">allowlist_function</span>(<span class="string">"my_.*"</span>)</div><div class="code-line">    .<span class="function">blocklist_type</span>(<span class="string">"internal_.*"</span>)</div><div class="code-line">    .<span class="function">derive_default</span>(<span class="keyword">true</span>)</div><div class="code-line">    .<span class="function">generate</span>()</div></div><div class="code-block" style="margin-top: 20px;"><div class="code-line"><span class="comment"># cbindgen.toml</span></div><div class="code-line">language = <span class="string">"C"</span></div><div class="code-line">style = <span class="string">"both"</span></div><div class="code-line">documentation = <span class="keyword">true</span></div></div></div></div>
+        <div class="navigation"><button class="nav-btn" onclick="prevSlide()">←</button><button class="nav-btn" onclick="nextSlide()">→</button></div>
+        <div class="slide-number">6 / 8</div><div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <div class="slide" id="slide7">
+        <div class="header"><div class="episode-badge">EP 1-02</div><div class="lang-toggle"><button class="lang-btn active" onclick="setLang('ko')">한국어</button><button class="lang-btn" onclick="setLang('en')">English</button></div></div>
+        <h1 class="title"><span class="ko">활용 사례</span><span class="en" style="display:none;">Use Cases</span></h1>
+        <div class="content"><div style="width: 100%;"><div class="step-box"><h4><span class="ko">🔧 bindgen 활용</span><span class="en" style="display:none;">🔧 bindgen Use Cases</span></h4><p class="ko">• 대규모 C 라이브러리 래핑 (OpenSSL, SQLite)<br>• 시스템 API 접근<br>• 레거시 C 코드 통합</p><p class="en" style="display:none;">• Wrapping large C libraries (OpenSSL, SQLite)<br>• Accessing system APIs<br>• Integrating legacy C code</p></div><div class="step-box"><h4><span class="ko">🔄 cbindgen 활용</span><span class="en" style="display:none;">🔄 cbindgen Use Cases</span></h4><p class="ko">• Rust 라이브러리를 C/C++에 노출<br>• 플러그인 시스템 구축<br>• 임베디드 시스템 통합</p><p class="en" style="display:none;">• Exposing Rust libraries to C/C++<br>• Building plugin systems<br>• Embedded systems integration</p></div></div></div>
+        <div class="navigation"><button class="nav-btn" onclick="prevSlide()">←</button><button class="nav-btn" onclick="nextSlide()">→</button></div>
+        <div class="slide-number">7 / 8</div><div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <div class="slide" id="slide8">
+        <div class="header"><div class="episode-badge">EP 1-02</div><div class="lang-toggle"><button class="lang-btn active" onclick="setLang('ko')">한국어</button><button class="lang-btn" onclick="setLang('en')">English</button></div></div>
+        <div class="center-content"><div class="big-emoji">🤖✨</div><div class="highlight-box" style="max-width: 1400px;"><h3><span class="ko">핵심 요약</span><span class="en" style="display:none;">Key Takeaways</span></h3><p class="ko">✅ bindgen: C → Rust 바인딩 자동 생성<br>✅ cbindgen: Rust → C 헤더 생성<br>✅ build.rs에서 빌드 타임 통합<br>✅ 타입 안전성과 자동화 모두 확보<br>✅ 대규모 프로젝트에 필수 도구<br>✅ 설정으로 세밀한 제어 가능</p><p class="en" style="display:none;">✅ bindgen: Auto-generates C → Rust bindings<br>✅ cbindgen: Generates Rust → C headers<br>✅ Integrate at build time with build.rs<br>✅ Ensures both type safety and automation<br>✅ Essential tools for large projects<br>✅ Fine-grained control via configuration</p></div><div style="margin-top: 40px; text-align: center;"><p style="font-size: 36px; margin-bottom: 20px;"><span class="ko">다음 에피소드: Python/Node.js 연동</span><span class="en" style="display:none;">Next Episode: Python/Node.js Integration</span></p><p style="font-size: 28px; color: #888;">EP 1-03 →</p></div><div class="channel-info">📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a> | <span class="ko">弘益人間</span><span class="en" style="display:none;">Benefit All Humanity</span></div></div>
+        <div class="navigation"><button class="nav-btn" onclick="prevSlide()">←</button><button class="nav-btn" onclick="location.href='EP_1_03_PyO3.html'"><span class="ko">다음 에피소드 →</span><span class="en" style="display:none;">Next Episode →</span></button></div>
+        <div class="slide-number">8 / 8</div><div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1; const totalSlides = 8; let currentLang = 'ko';
+        function showSlide(n) { document.querySelectorAll('.slide').forEach(s => s.classList.remove('active')); document.getElementById('slide' + n).classList.add('active'); currentSlide = n; animateSlide(n); }
+        function nextSlide() { if (currentSlide < totalSlides) showSlide(currentSlide + 1); }
+        function prevSlide() { if (currentSlide > 1) showSlide(currentSlide - 1); }
+        function setLang(lang) { currentLang = lang; document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active')); document.querySelectorAll('.lang-btn').forEach(btn => { if ((lang === 'ko' && btn.textContent === '한국어') || (lang === 'en' && btn.textContent === 'English')) btn.classList.add('active'); }); document.querySelectorAll('.ko').forEach(el => el.style.display = lang === 'ko' ? '' : 'none'); document.querySelectorAll('.en').forEach(el => el.style.display = lang === 'en' ? '' : 'none'); }
+        function animateSlide(n) { setTimeout(() => { document.querySelectorAll('#slide' + n + ' .code-line').forEach((line, i) => setTimeout(() => line.classList.add('show'), i * 100)); }, 100); }
+        document.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === ' ') nextSlide(); if (e.key === 'ArrowLeft') prevSlide(); });
+        animateSlide(1);
+    </script>
+</body>
+</html>

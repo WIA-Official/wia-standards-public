@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Ownership - WIA-RUST-LEARN</title>
+    <style>
+        :root { --rust-orange: #f97316; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; --yellow: #eab308; --red: #ef4444; --purple: #8b5cf6; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-orange); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-orange); }
+        h2 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); border-bottom: 2px solid var(--rust-orange); padding-bottom: 10px; }
+        h3 { font-size: 1.2rem; margin: 25px 0 15px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-orange); }
+        code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; font-family: monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-orange); }
+        .success-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .warning-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--yellow); }
+        .danger-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--red); }
+        table { width: 100%; margin: 20px 0; border-collapse: collapse; background: var(--bg-card); border-radius: 8px; overflow: hidden; }
+        th { background: var(--rust-orange); color: white; padding: 15px; text-align: left; }
+        td { padding: 12px 15px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+        tr:last-child td { border-bottom: none; }
+        .rule { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 15px 0; border-left: 4px solid var(--green); }
+        .rule-num { background: var(--green); color: white; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 10px; }
+        .memory-diagram { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .memory-section h4 { color: var(--rust-orange); margin-bottom: 15px; text-align: center; }
+        .mem-item { background: var(--bg); padding: 10px 15px; border-radius: 6px; margin: 8px 0; font-family: monospace; display: flex; justify-content: space-between; }
+        .questions-box { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; }
+        .questions-box h3 { color: var(--blue); margin-top: 0; }
+        .questions-box ol { padding-left: 25px; }
+        .questions-box li { color: var(--text-muted); margin-bottom: 15px; }
+        .summary-box { background: linear-gradient(135deg, #1a2f1a 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--green); }
+        .summary-box h3 { color: var(--green); margin-top: 0; }
+        .summary-box ul { padding-left: 25px; }
+        .summary-box li { color: var(--text-muted); margin-bottom: 10px; }
+        .looking-ahead { background: linear-gradient(135deg, #2d1f3d 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--purple); }
+        .looking-ahead h3 { color: var(--purple); margin-top: 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 3: Ownership - The Heart of Rust</h1>
+
+        <p>Ownership is Rust's most distinctive feature and the foundation of its memory safety guarantees. Understanding ownership is the key to unlocking Rust's power. This chapter explains how ownership works, why it matters, and how to use it effectively.</p>
+
+        <div class="highlight">
+            <strong>The Central Idea</strong>
+            <p style="margin-top: 10px;">In Rust, every value has exactly one owner. When the owner goes out of scope, the value is automatically freed. This simple rule eliminates entire categories of bugs: memory leaks, dangling pointers, and use-after-free errors.</p>
+        </div>
+
+        <h2>3.1 Understanding Memory: Stack vs Heap</h2>
+
+        <p>Before diving into ownership, you need to understand where data lives in memory. This fundamental knowledge applies to all programming languages, but Rust makes you think about it explicitly.</p>
+
+        <div class="memory-diagram">
+            <div class="memory-section">
+                <h4>Stack (Fast)</h4>
+                <div class="mem-item"><span style="color: var(--blue);">x</span><span style="color: var(--green);">42</span></div>
+                <div class="mem-item"><span style="color: var(--blue);">y</span><span style="color: var(--green);">3.14</span></div>
+                <div class="mem-item"><span style="color: var(--blue);">flag</span><span style="color: var(--green);">true</span></div>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 15px;">Fixed size, LIFO, automatic cleanup</p>
+            </div>
+            <div class="memory-section">
+                <h4>Heap (Flexible)</h4>
+                <div class="mem-item"><span style="color: var(--blue);">[0x7f..]</span><span style="color: var(--green);">"hello world"</span></div>
+                <div class="mem-item"><span style="color: var(--blue);">[0x8a..]</span><span style="color: var(--green);">[1, 2, 3, 4, 5]</span></div>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 15px;">Dynamic size, requires manual or automatic management</p>
+            </div>
+        </div>
+
+        <h3>The Stack</h3>
+
+        <p>The stack is a region of memory that operates like a stack of plates: last in, first out (LIFO). It's incredibly fast because:</p>
+
+        <ul style="padding-left: 25px; color: var(--text-muted); margin: 15px 0;">
+            <li>Adding data is just incrementing a pointer</li>
+            <li>Removing data is just decrementing a pointer</li>
+            <li>No searching required—data is always on top</li>
+            <li>All data must have a known, fixed size at compile time</li>
+        </ul>
+
+        <pre>fn main() {
+    let x = 42;        // x is pushed onto the stack
+    let y = 3.14;      // y is pushed onto the stack
+    let z = true;      // z is pushed onto the stack
+}  // z, y, x are popped off the stack (in that order)</pre>
+
+        <h3>The Heap</h3>
+
+        <p>The heap is for data that can grow or shrink at runtime, or whose size isn't known at compile time:</p>
+
+        <ul style="padding-left: 25px; color: var(--text-muted); margin: 15px 0;">
+            <li>Allocator finds an empty spot big enough</li>
+            <li>Returns a pointer to that location</li>
+            <li>Accessing heap data requires following a pointer</li>
+            <li>Must be explicitly freed when no longer needed</li>
+        </ul>
+
+        <pre>fn main() {
+    let s = String::from("hello");  // String data is on the heap
+    // s variable (with pointer) is on the stack
+    // The actual "hello" bytes are on the heap
+}</pre>
+
+        <table>
+            <tr>
+                <th>Type</th>
+                <th>Location</th>
+                <th>Size</th>
+            </tr>
+            <tr>
+                <td>Integers (<code>i32</code>, <code>u64</code>, etc.)</td>
+                <td>Stack</td>
+                <td>Fixed</td>
+            </tr>
+            <tr>
+                <td>Floats (<code>f32</code>, <code>f64</code>)</td>
+                <td>Stack</td>
+                <td>Fixed</td>
+            </tr>
+            <tr>
+                <td>Booleans (<code>bool</code>)</td>
+                <td>Stack</td>
+                <td>Fixed</td>
+            </tr>
+            <tr>
+                <td>Characters (<code>char</code>)</td>
+                <td>Stack</td>
+                <td>Fixed (4 bytes)</td>
+            </tr>
+            <tr>
+                <td>Tuples (of fixed types)</td>
+                <td>Stack</td>
+                <td>Fixed</td>
+            </tr>
+            <tr>
+                <td><code>String</code></td>
+                <td>Stack (metadata) + Heap (data)</td>
+                <td>Dynamic</td>
+            </tr>
+            <tr>
+                <td><code>Vec&lt;T&gt;</code></td>
+                <td>Stack (metadata) + Heap (data)</td>
+                <td>Dynamic</td>
+            </tr>
+        </table>
+
+        <h2>3.2 The Three Rules of Ownership</h2>
+
+        <p>Rust's ownership system is governed by three fundamental rules. These rules are enforced at compile time, meaning violations are caught before your code ever runs.</p>
+
+        <div class="rule">
+            <span class="rule-num">1</span>
+            <strong>Each value in Rust has exactly one owner.</strong>
+            <pre style="margin-top: 15px;">let s = String::from("hello");  // s owns the String
+// There is exactly one variable that owns this string data</pre>
+        </div>
+
+        <div class="rule">
+            <span class="rule-num">2</span>
+            <strong>There can only be one owner at a time.</strong>
+            <pre style="margin-top: 15px;">let s1 = String::from("hello");
+let s2 = s1;  // Ownership MOVES from s1 to s2
+// s1 is no longer valid - s2 is now the sole owner</pre>
+        </div>
+
+        <div class="rule">
+            <span class="rule-num">3</span>
+            <strong>When the owner goes out of scope, the value is dropped.</strong>
+            <pre style="margin-top: 15px;">{
+    let s = String::from("hello");
+    // s is valid here
+}  // s goes out of scope, "drop" is called
+   // Memory is automatically freed</pre>
+        </div>
+
+        <div class="success-box">
+            <strong>Why This Matters</strong>
+            <p style="margin-top: 10px;">These three rules eliminate:</p>
+            <ul style="padding-left: 20px; margin-top: 10px; color: var(--text-muted);">
+                <li><strong>Memory leaks:</strong> Memory is always freed when the owner goes out of scope</li>
+                <li><strong>Double free:</strong> Only one owner means only one drop</li>
+                <li><strong>Dangling pointers:</strong> The compiler tracks when data is valid</li>
+            </ul>
+        </div>
+
+        <h2>3.3 Move Semantics</h2>
+
+        <p>When you assign a value to another variable, ownership can <strong>move</strong>. This is fundamental to understanding Rust.</p>
+
+        <h3>Stack Types: Copy</h3>
+
+        <p>Simple types that live entirely on the stack are copied:</p>
+
+        <pre>let x = 5;
+let y = x;  // x is COPIED to y
+
+println!("x = {}, y = {}", x, y);  // Both are valid!</pre>
+
+        <p>This works because copying an integer is cheap—it's just copying a few bytes on the stack.</p>
+
+        <h3>Heap Types: Move</h3>
+
+        <p>For types that use heap memory, assignment <strong>moves</strong> ownership:</p>
+
+        <pre>let s1 = String::from("hello");
+let s2 = s1;  // Ownership MOVES from s1 to s2
+
+println!("{}", s2);  // OK: s2 owns the data
+// println!("{}", s1);  // ERROR: s1 is no longer valid!</pre>
+
+        <div class="memory-diagram">
+            <div class="memory-section">
+                <h4>Before Move</h4>
+                <div class="mem-item"><span style="color: var(--blue);">s1</span><span style="color: var(--green);">ptr → "hello"</span></div>
+            </div>
+            <div class="memory-section">
+                <h4>After Move</h4>
+                <div class="mem-item" style="opacity: 0.4;"><span style="color: var(--blue);">s1</span><span style="color: #666;">invalid</span></div>
+                <div class="mem-item"><span style="color: var(--blue);">s2</span><span style="color: var(--green);">ptr → "hello"</span></div>
+            </div>
+        </div>
+
+        <div class="danger-box">
+            <strong>Why Not Just Copy?</strong>
+            <p style="margin-top: 10px;">Copying heap data would require allocating new memory and copying all the bytes. For large data structures, this could be slow and wasteful. By default, Rust moves ownership instead, which is a constant-time operation.</p>
+        </div>
+
+        <h2>3.4 Clone: Explicit Deep Copy</h2>
+
+        <p>When you actually need a deep copy of heap data, use the <code>clone</code> method:</p>
+
+        <pre>let s1 = String::from("hello");
+let s2 = s1.clone();  // Deep copy - both are independent
+
+println!("s1 = {}, s2 = {}", s1, s2);  // Both valid!</pre>
+
+        <div class="warning-box">
+            <strong>Clone is Expensive</strong>
+            <p style="margin-top: 10px;">Cloning copies all heap data. For large data structures, this can be slow and use significant memory. Use <code>clone()</code> intentionally, not as a way to avoid learning ownership.</p>
+        </div>
+
+        <h3>Copy vs Clone</h3>
+
+        <table>
+            <tr>
+                <th>Aspect</th>
+                <th>Copy</th>
+                <th>Clone</th>
+            </tr>
+            <tr>
+                <td>When it happens</td>
+                <td>Implicit, automatic</td>
+                <td>Explicit, must call <code>.clone()</code></td>
+            </tr>
+            <tr>
+                <td>Performance</td>
+                <td>Cheap (stack only)</td>
+                <td>Potentially expensive (heap copy)</td>
+            </tr>
+            <tr>
+                <td>Types</td>
+                <td>Integers, floats, bool, char, tuples</td>
+                <td>String, Vec, custom types</td>
+            </tr>
+            <tr>
+                <td>Trait</td>
+                <td><code>Copy</code></td>
+                <td><code>Clone</code></td>
+            </tr>
+        </table>
+
+        <h2>3.5 Ownership and Functions</h2>
+
+        <p>Passing a value to a function follows the same rules as assignment:</p>
+
+        <h3>Moving into Functions</h3>
+
+        <pre>fn main() {
+    let s = String::from("hello");
+    takes_ownership(s);  // s is MOVED into the function
+
+    // println!("{}", s);  // ERROR: s is no longer valid here
+
+    let x = 5;
+    makes_copy(x);  // x is COPIED (integers implement Copy)
+
+    println!("{}", x);  // OK: x is still valid
+}
+
+fn takes_ownership(some_string: String) {
+    println!("{}", some_string);
+}  // some_string goes out of scope, memory is freed
+
+fn makes_copy(some_integer: i32) {
+    println!("{}", some_integer);
+}  // some_integer goes out of scope, nothing special happens</pre>
+
+        <h3>Returning Values</h3>
+
+        <p>Functions can return ownership:</p>
+
+        <pre>fn main() {
+    let s1 = gives_ownership();  // Ownership moves to s1
+
+    let s2 = String::from("hello");
+    let s3 = takes_and_gives_back(s2);  // s2 moves in, result moves to s3
+
+    // s2 is invalid here, s1 and s3 are valid
+}
+
+fn gives_ownership() -> String {
+    let s = String::from("yours");
+    s  // Ownership moves to the caller
+}
+
+fn takes_and_gives_back(a_string: String) -> String {
+    a_string  // Ownership moves back to the caller
+}</pre>
+
+        <h2>3.6 The Drop Trait</h2>
+
+        <p>When a value goes out of scope, Rust calls the <code>drop</code> function. This is where cleanup happens:</p>
+
+        <pre>struct CustomSmartPointer {
+    data: String,
+}
+
+impl Drop for CustomSmartPointer {
+    fn drop(&mut self) {
+        println!("Dropping CustomSmartPointer with data: {}", self.data);
+    }
+}
+
+fn main() {
+    let c = CustomSmartPointer {
+        data: String::from("my stuff"),
+    };
+    println!("CustomSmartPointer created.");
+}  // c goes out of scope here, "Dropping..." is printed</pre>
+
+        <div class="success-box">
+            <strong>RAII: Resource Acquisition Is Initialization</strong>
+            <p style="margin-top: 10px;">Rust uses RAII (from C++) - resources are acquired when an object is created and released when it's destroyed. This guarantees cleanup even if errors occur. Files are closed, locks are released, memory is freed - all automatically.</p>
+        </div>
+
+        <h2>3.7 Common Ownership Patterns</h2>
+
+        <h3>Pattern 1: Transfer and Use</h3>
+
+        <pre>fn process_data(data: String) -> String {
+    // Process the data
+    data.to_uppercase()
+}
+
+fn main() {
+    let input = String::from("hello");
+    let output = process_data(input);  // input moved, output received
+    println!("{}", output);
+}</pre>
+
+        <h3>Pattern 2: Return Multiple Values</h3>
+
+        <pre>fn calculate_length(s: String) -> (String, usize) {
+    let length = s.len();
+    (s, length)  // Return both the string and its length
+}
+
+fn main() {
+    let s = String::from("hello");
+    let (s, len) = calculate_length(s);
+    println!("'{}' has length {}", s, len);
+}</pre>
+
+        <div class="warning-box">
+            <strong>Awkward Pattern Alert</strong>
+            <p style="margin-top: 10px;">Having to return values just to give them back is tedious. In the next chapter, you'll learn about <strong>borrowing</strong>, which lets you use values without taking ownership.</p>
+        </div>
+
+        <h2>3.8 Chapter Summary</h2>
+
+        <div class="summary-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>Stack vs Heap:</strong> Stack is for fixed-size data (fast); heap is for dynamic data (flexible)</li>
+                <li><strong>Three Rules:</strong> Each value has one owner; only one owner at a time; drop when owner goes out of scope</li>
+                <li><strong>Move Semantics:</strong> Heap values move ownership on assignment; stack values are copied</li>
+                <li><strong>Clone:</strong> Use <code>.clone()</code> for explicit deep copies (be aware of performance cost)</li>
+                <li><strong>Functions:</strong> Passing values follows the same ownership rules as assignment</li>
+            </ul>
+        </div>
+
+        <h2>3.9 Review Questions</h2>
+
+        <div class="questions-box">
+            <h3>Test Your Understanding</h3>
+            <ol>
+                <li>What are the three rules of ownership in Rust?</li>
+                <li>Explain the difference between stack and heap memory. Give examples of types stored in each.</li>
+                <li>What happens when you assign a <code>String</code> to another variable? Why is this different from assigning an <code>i32</code>?</li>
+                <li>When would you use <code>.clone()</code> on a String? What are the performance implications?</li>
+                <li>What happens to ownership when you pass a String to a function? How can you continue using the value after the function call?</li>
+                <li>What is the Drop trait and when is it called?</li>
+            </ol>
+        </div>
+
+        <h2>3.10 Looking Ahead</h2>
+
+        <div class="looking-ahead">
+            <h3>What's Next: Chapter 4 - Borrowing & Lifetimes</h3>
+            <p>Having to transfer ownership every time you want to use a value is cumbersome. The next chapter introduces borrowing—a way to use values without taking ownership:</p>
+            <ul style="padding-left: 25px; color: var(--text-muted);">
+                <li>References and the borrow operator (&)</li>
+                <li>Immutable vs mutable borrows</li>
+                <li>The borrowing rules</li>
+                <li>Lifetime annotations</li>
+                <li>The 'static lifetime</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

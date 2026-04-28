@@ -5,237 +5,426 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-fusion-energy (Fusion Energy).
+This document defines the protocols that govern a
+fusion-energy facility: the IAEA fusion-safety
+discipline (the IAEA Safety Standards GSR Part 1 to 7
+applied as adopted by the operating jurisdiction's
+regulator, augmented by the IAEA fusion-specific
+Specific Safety Guides SSG-77 / SSG-78 / SSG-79); the
+operating jurisdiction's regulatory-pathway discipline
+(US NRC's risk-informed performance-based fusion
+framework, UK ONR's fusion-safety adoption, EU national
+basic-safety-standards transposition under Council
+Directive 2009/71/Euratom and 2013/59/Euratom, JP NRA
+discipline, KR NSSC discipline); the safety-case
+discipline; the tritium-accountancy discipline (where
+the fuel cycle includes tritium); the protection-
+system discipline aligned to IEC 61508 / IEC 61511 /
+IEC 60880; the ASME BPVC Section III + ASME NQA-1
+discipline (where the operating jurisdiction adopts
+ASME for fusion components); the operating-limit and
+condition discipline; the plasma-operation conduct
+discipline; the reportable-event discipline; and the
+decommissioning discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17021-1:2015 (management-system audit and
+  certification)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 9457 (Problem Details)
+- IAEA Safety Standards Series — General Safety
+  Requirements (GSR Part 1 Governmental, Legal and
+  Regulatory Framework for Safety; Part 2 Leadership
+  and Management; Part 3 Radiation Protection and
+  Safety of Radiation Sources; Part 4 Safety
+  Assessment for Facilities and Activities; Part 5
+  Predisposal Management of Radioactive Waste; Part
+  6 Decommissioning of Facilities; Part 7 Emergency
+  Preparedness and Response)
+- IAEA fusion-specific Specific Safety Guides
+  (SSG-77 / SSG-78 / SSG-79 in publication tracking,
+  cited as the fusion-safety project's authoritative
+  guidance on facility-and-activity safety
+  considerations specific to fusion)
+- IAEA INSAG and TECDOC documents on fusion safety
+- ASME BPVC Section III (rules for construction of
+  nuclear facility components)
+- ASME B31.1 (power piping)
+- ASME NQA-1 (quality assurance requirements for
+  nuclear facility applications)
+- ANS-58 series (American Nuclear Society safety
+  standards for nuclear facilities)
+- IEC 61508-1 to -7 (functional safety of E/E/PE
+  safety-related systems)
+- IEC 61511-1 to -3 (functional safety — safety
+  instrumented systems for the process industry)
+- IEC 60880 (computer-based systems performing
+  category A functions)
+- IEC 60709 (separation of redundant safety-classified
+  channels)
+- ICRP Publication 103 (radiation-protection
+  recommendations) and ICRP Publication 119 (data
+  for use in protection against external radiation)
+- US 10 CFR Part 20 (standards for protection against
+  radiation) where the operating jurisdiction is the
+  US
+- Council Directive 2013/59/Euratom (basic-safety-
+  standards for protection against the dangers
+  arising from exposure to ionising radiation) where
+  the operating jurisdiction is an EU Member State
+- US NRC Regulatory Guide framework for fusion (where
+  the operating jurisdiction is the US and the NRC
+  has issued risk-informed performance-based
+  guidance)
 
 ---
 
-## §1 Scope
+## §1 IAEA Fusion-Safety Discipline
 
-This PHASE document is one of four that together define the WIA-fusion-energy
-standard. It addresses the protocol layer of the standard.
+The IAEA Safety Standards Series provides the over-
+arching framework that operating jurisdictions adapt
+for fusion. The discipline:
 
-## §2 Manifest
+- per-programme alignment to GSR Part 1 (governmental,
+  legal and regulatory framework for safety) — the
+  operating jurisdiction's regulator establishes the
+  fusion regulatory pathway;
+- per-programme alignment to GSR Part 2 (leadership
+  and management for safety) — the facility operator
+  establishes the safety-management system, safety
+  committee, and safety culture;
+- per-programme alignment to GSR Part 3 (radiation
+  protection and safety of radiation sources) —
+  worker dose limits, public dose limits, ALARA
+  optimisation, emergency-exposure provisions;
+- per-programme alignment to GSR Part 4 (safety
+  assessment for facilities and activities) — the
+  safety case (PHASE-1 §3) is the deliverable of the
+  Part 4 assessment;
+- per-programme alignment to GSR Part 5 (predisposal
+  management of radioactive waste) — fusion-derived
+  activated materials are managed under Part 5;
+- per-programme alignment to GSR Part 6 (decommissioning
+  of facilities) — the decommissioning record (PHASE-
+  1 §10) tracks the Part 6 obligations;
+- per-programme alignment to GSR Part 7 (emergency
+  preparedness and response) — the emergency plan,
+  on-site and off-site provisions, public-information
+  arrangements.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "fusion-energy"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Fusion-specific Specific Safety Guides SSG-77 /
+SSG-78 / SSG-79 (in publication tracking) augment GSR
+Parts 4, 5, and 6 with fusion-specific topics —
+tritium fuel cycle, fusion-derived activation, plasma-
+disruption events, magnet quench, vacuum-vessel-
+breach scenarios.
 
-## §3 Conformance Tiers
+## §2 Operating-Jurisdiction Regulatory-Pathway Discipline
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Per-jurisdiction regulatory pathway:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- US NRC: risk-informed performance-based regulatory
+  framework for fusion energy systems, formally
+  adopted following the NRC's 10 CFR Part 53 / fusion
+  rulemaking; the framework distinguishes fusion
+  facilities from fission reactors and applies a
+  graded approach proportional to the facility's
+  hazard potential. Above-threshold facilities are
+  licensed under the framework's pathway; below-
+  threshold facilities operate under state byproduct-
+  material licensing under Agreement-State arrangements.
+- UK ONR: fusion-safety pathway under the Office for
+  Nuclear Regulation framework, recognising fusion
+  as a non-fission nuclear hazard with proportionate
+  regulation;
+- EU Member States: Council Directive 2009/71/Euratom
+  (basic safety standards for nuclear safety of
+  nuclear installations) and Council Directive
+  2013/59/Euratom (basic safety standards for
+  protection against ionising radiation) transposed
+  into national law; the operating Member State's
+  regulator (e.g. ASN-FR in France, BfS / BMUV in
+  Germany, NRC-NL, etc.) adapts the framework for
+  fusion;
+- JP NRA: operating Japanese regulatory body;
+- KR NSSC: Korea Nuclear Safety and Security
+  Commission and the operating ministry's adaptation
+  for fusion.
 
-## §4 Discovery
+The facility's safety case cites the operating
+jurisdiction's regulatory-pathway reference at the
+programme level (PHASE-1 §3 `regulatoryPathway`).
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/fusion-energy`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Safety-Case Discipline
 
-## §5 Time and Identity
+The safety case is the central deliverable. The
+discipline:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- per-case enumeration of postulated initiating
+  events (PHASE-1 §5) with frequency and consequence
+  classification;
+- per-case identification of safety functions the
+  facility provides to prevent or mitigate the events;
+- per-case allocation of safety functions to safety-
+  classified components (PHASE-1 §6);
+- per-case description of operating limits (PHASE-1
+  §7) that maintain the design assumptions;
+- per-case demonstration of compliance with the
+  operating jurisdiction's dose targets and risk
+  targets;
+- per-case independent technical review (the operator's
+  internal review plus, for higher-hazard programmes,
+  external review by the regulator's technical-
+  safety reviewer or the operating jurisdiction's
+  designated review body).
 
-## §6 Versioning and Deprecation
+## §4 Tritium-Accountancy Discipline
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Where the fuel cycle includes tritium:
 
-## §7 Privacy and Security
+- per-location tritium-inventory measurement on the
+  operator's measurement cadence (continuous
+  monitoring at primary-confinement boundaries with
+  periodic confirmation by independent methodology);
+- per-period mass balance across the fuel cycle (the
+  difference between the period's start-and-end
+  inventories and the period's net additions / off-
+  takes is reconciled within the per-method
+  uncertainty);
+- per-shipment chain of custody for tritium transfers
+  between facilities (including transfers from the
+  operating jurisdiction's tritium-extraction facility
+  to the fusion facility, and shipments off-site for
+  storage or disposition);
+- per-period reporting to the operating jurisdiction's
+  safeguards-and-accountancy regulator.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Tritium accountancy is the central record-keeping
+under the operating jurisdiction's safeguards regime;
+the operating jurisdiction may delegate accountancy to
+the EURATOM safeguards inspectorate (EU Member States),
+to the IAEA safeguards inspectorate (additional-
+protocol arrangements), or to the operating
+jurisdiction's domestic regulator.
 
-## §8 Open Governance
+## §5 Protection-System Discipline (IEC 61508 / IEC 61511 / IEC 60880)
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `fusion-energy` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Protection systems performing safety functions are
+designed and qualified per:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- IEC 61508 for E/E/PE safety-related systems —
+  systematic capability, hardware-fault-tolerance, and
+  the SIL allocation per the per-function safety-
+  requirements specification;
+- IEC 61511 for the process-industry application of
+  IEC 61508 (tritium fuel-cycle process-control
+  applications often follow IEC 61511);
+- IEC 60880 for computer-based instrumentation and
+  control performing category A functions (the
+  highest-importance functions) — the standard
+  requires high-integrity software-development
+  practices, V&V, independent verification, and
+  pre-developed software qualification.
 
+The ITER design choices for protection-system
+functional safety provide a community-recognised
+baseline for tokamak protection systems; the operating
+jurisdiction's regulator adapts the baseline to the
+facility's specific risk profile.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §6 ASME BPVC Section III + ASME NQA-1 Discipline
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Where the operating jurisdiction adopts ASME BPVC for
+fusion components, the discipline:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+- per-component classification under Section III
+  Subsection NB / NC / ND (Class 1 / 2 / 3) or
+  Section VIII Division 1 / 2 (non-nuclear pressure
+  vessels) per the safety-classification of the
+  component;
+- per-component design, fabrication, examination,
+  testing, and stamping per the applicable Subsection;
+- per-facility ASME NQA-1 quality-assurance programme
+  scoping the controls applied to safety-classified
+  procurement, fabrication, and operation.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Where the operating jurisdiction does not adopt ASME
+BPVC (e.g. EU jurisdictions adopting EN 13445 for
+non-fusion-specific pressure equipment, or KR adopting
+KEPIC for nuclear components), the discipline maps to
+the equivalent national or community-recognised
+standard.
 
-## Annex F — Adoption Roadmap
+## §7 Operating-Limit and Condition Discipline
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Operating limits and conditions are the conditions
+within which the facility operates safely:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+- safety limits — quantitative bounds on critical
+  parameters (e.g. plasma stored energy, magnet
+  current, vacuum-vessel pressure) the protection
+  system enforces;
+- limiting conditions for operation — bounds on
+  configurations and operations (e.g. the minimum
+  operable channels of a redundant protection
+  function);
+- surveillance requirements — the cadence and method
+  for confirming the limits are met;
+- design-feature declarations — features that the
+  safety case relies on (e.g. minimum-leak-tightness
+  of the primary confinement);
+- administrative controls — procedures, staffing, and
+  training requirements.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §8 Plasma-Operation Conduct Discipline
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Plasma operations follow the conduct discipline:
 
-## Annex G — Test Vectors and Conformance Evidence
+- per-shot pre-operation review against the operating-
+  limits register;
+- per-shot in-progress monitoring with the protection
+  system armed and the operations team monitoring
+  protection-function status;
+- per-shot post-operation data capture and review;
+- per-campaign operational-experience feedback into
+  the operating-limits register and safety-case
+  refresh.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Off-normal plasma disruption events that invoke
+protection functions are reportable per the operating
+jurisdiction's reportable-event threshold (PHASE-1 §9).
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §9 Reportable-Event Discipline
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+Reportable events follow the operating jurisdiction's
+reportable-threshold and notification-deadline rules.
+The discipline:
 
-## Annex H — Versioning and Deprecation Policy
+- per-event detection through the facility's detection
+  channels (radiation monitor, tritium monitor,
+  protection-function activation, personnel-dose
+  investigation alarm);
+- per-event classification against the operating
+  jurisdiction's classification table (the operator's
+  pre-defined classification taxonomy);
+- per-event regulator notification within the
+  notification deadline;
+- per-event root-cause analysis using the operating
+  jurisdiction's investigation framework (e.g. the
+  IAEA's INSAG-7 or operator's adopted framework);
+- per-event lessons-learned narrative feeding the
+  facility's preventive-maintenance and design-review
+  cycles.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §10 Records Retention
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Programme records — every safety case revision,
+postulated-event analysis, safety-classified-
+component qualification, operating-limit register,
+plasma operation, tritium-inventory measurement, and
+reportable-event record — retain for the operating
+life of the facility plus the operating jurisdiction's
+records-retention horizon (typically the facility life
+plus thirty years for nuclear safety records, with
+some classes — tritium accountancy and reportable-
+event root-cause records — retained longer).
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §11 Time Synchronisation
 
-## Annex I — Interoperability Profiles
+Operator clocks synchronise per RFC 5905 (NTPv4) so
+that protection-function timing analyses, reportable-
+event regulator notification deadlines, and tritium-
+mass-balance period closures are consistent across
+the facility's runtime fleet.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §12 Decommissioning Discipline
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Per IAEA GSR Part 6:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- per-facility decommissioning planning prior to
+  cessation of operations (planning starts during
+  design and is updated through the operating life);
+- per-facility decommissioning-phase declarations
+  (planning, preparation, active decommissioning,
+  post-decommissioning monitoring, site release);
+- per-facility activated-component inventory derived
+  from the fusion-derived neutron-fluence analysis
+  through the operating life;
+- per-facility waste-route declaration with the
+  operating jurisdiction's radioactive-waste regulator;
+- per-facility site-release acceptance per the
+  operating jurisdiction's site-release criteria.
+
+## §13 Emergency-Preparedness Discipline (GSR Part 7)
+
+Per IAEA GSR Part 7 the facility's emergency plan
+covers:
+
+- on-site emergency response (the operator's safety
+  organisation, the operator's emergency-control-
+  centre, the facility's emergency-equipment cache);
+- off-site emergency response (interface with the
+  operating jurisdiction's off-site emergency
+  agencies and the host community's emergency
+  services);
+- public-information arrangements (the operating
+  jurisdiction's public-information protocol during
+  the emergency);
+- exercise programme (per-cycle drills of the on-site
+  and off-site response);
+- post-event review (the operator's post-emergency
+  lessons-learned).
+
+## §14 Per-Device-Class Operating Discipline
+
+Device-class adaptations:
+
+- magnetic-confinement (tokamak, stellarator): per-
+  shot toroidal-field-and-plasma-current ramps,
+  magnet-quench-protection arming, plasma-disruption-
+  mitigation system arming;
+- inertial-confinement (laser-direct-drive, laser-
+  indirect-drive): per-shot target-and-laser
+  alignment, target-bay radiation-and-debris
+  containment;
+- magnetised-target-fusion: per-shot pulse-power
+  protection, lithium-handling protection where
+  applicable;
+- pilot-plant-net-energy-research: per-cycle
+  operating-experience feedback into the design-basis
+  refresh as the facility approaches commercial-
+  scale operating envelopes.
+
+## §15 Quality Dossier and Conformance
+
+The facility's quality dossier records the governing
+frameworks, the safety case revisions, the regulator-
+correspondence history, the tritium-accountancy
+history, the reportable-event history, the protection-
+system functional-safety dossier, the ASME / NQA-1
+quality-assurance programme (where adopted), and the
+emergency-preparedness exercise history. The dossier
+is reviewed at least annually by the facility's safety
+manager and is provided to the regulator on request.
+
+A programme conformant with WIA-fusion-energy
+publishes its safety-case public summary (where the
+operating jurisdiction publishes one), its regulator-
+correspondence summary, and the aggregate reportable-
+event count; and answers an annual self-assessment
+that maps each clause of this PHASE to the facility's
+implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-fusion-energy
+- **Last Updated:** 2026-04-28

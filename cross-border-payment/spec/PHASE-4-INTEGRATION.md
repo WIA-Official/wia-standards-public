@@ -5,237 +5,314 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-cross-border-payment (Cross Border Payment).
+This document defines how a cross-border payment
+operator integrates with the systems that surround the
+cross-border value-transfer lifecycle: the SWIFT
+network and SWIFT GPI; the major large-value-payment
+systems (TARGET2 / T2-T2S, CHIPS, Fedwire) and the
+operating jurisdictions' RTGS systems; the operator's
+correspondent-bank network and the bilateral CBDDQ
+exchange; the financial-intelligence units (FIUs) for
+SAR / STR filing; the supervisory financial-services
+authority and the central bank for the operating
+jurisdiction; the customer channels (corporate cash-
+management portal, retail remittance app); the
+external auditor and the ISO/IEC 27001 certification
+body; the central counterparty for FX-funding leg
+where the cross-border path uses CLS or an equivalent
+PvP settlement mechanism; and the long-term archive
+that preserves wire-message and SAR / STR records past
+the active retention horizon.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 20022, ISO 4217, ISO 3166-1, ISO 9362, ISO
+  13616, ISO 17442
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17021-1:2015 (audit and certification)
+- ISO/IEC 17065:2012 (conformity-assessment bodies)
+- ISO 8601 (date and time)
+- W3C Verifiable Credentials Data Model 2.0 (optional
+  for re-issuance of attestations)
+- CPMI Principles for Financial Market
+  Infrastructures
+- CPMI cross-border payments roadmap
+- FATF Recommendations 13, 16, 20, 21
+- Wolfsberg CBDDQ + AML Principles for Correspondent
+  Banking
+- US BSA + 31 CFR Chapter X, OFAC programmes
+- EU AMLR (EU) 2024/1624, AMLA Reg (EU) 2024/1620,
+  EU Wire Transfer Reg (EU) 2023/1113, EU SEPA
+  Reg 260/2012, EU Cross-Border Payments Reg
+  2021/1230
+- KR 특정금융정보법 + KoFIU
+- UK MLR 2017 + NCA-UKFIU
+- TARGET2 + T2-T2S, CHIPS, Fedwire, CLS
 
 ---
 
-## §1 Scope
+## §1 SWIFT Network and GPI Integration
 
-This PHASE document is one of four that together define the WIA-cross-border-payment
-standard. It addresses the integration layer of the standard.
+The operator integrates with the SWIFT network through:
 
-## §2 Manifest
+- The operator's BIC and SWIFTNet connectivity
+  (Alliance Access / Alliance Lite2 / SWIFT
+  Microgateway, depending on the operator's
+  scale).
+- The SWIFT FIN service for legacy MT 103 / 202 /
+  202 COV exchange.
+- The SWIFT InterAct service for ISO 20022 pacs /
+  camt / pain message exchange (the SWIFT MT-to-
+  ISO-20022 industry coexistence cutover programme
+  governs the operator's migration path).
+- The SWIFT GPI tracker for end-to-end customer-
+  credit-transfer status (UETR-keyed).
+- The SWIFT GPI Customer Credit Transfer Inst
+  (CCT Inst) discipline for instant cross-border
+  payments where the corridor and the correspondent
+  support the service.
+- The SWIFT Sanctions Screening service (where
+  subscribed) as an external screening engine
+  feeding PHASE-1 §7.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "cross-border-payment"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Large-Value Payment System Integration
 
-## §3 Conformance Tiers
+The operator integrates with the relevant large-value
+payment systems for settlement:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- TARGET2 / T2-T2S (the Eurosystem's consolidated
+  platform) for euro-denominated settlement; the
+  operator's TARGET2 participation requires
+  Eurosystem central-bank account access.
+- CHIPS for US-dollar large-value clearing among
+  US-banking participants.
+- Fedwire (Federal Reserve) for US-dollar real-time
+  gross settlement; Fedwire Operating Circular 6
+  governs the participation.
+- The jurisdictional RTGS systems (BOK-Wire+ in KR,
+  CHAPS in the UK, BOJ-NET in JP, etc.) for the
+  domestic leg of the cross-border path.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+The operator's PFMI compliance — Principles 1, 7, 8,
+9, 20, 21, 22, 23 — is documented per system.
 
-## §4 Discovery
+## §3 Correspondent-Bank Integration
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/cross-border-payment`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+For each correspondent the operator maintains:
 
-## §5 Time and Identity
+- The bilateral correspondent-banking agreement.
+- The correspondent's BIC and LEI.
+- The correspondent's CBDDQ v1.4 response (PHASE-1
+  §8) and the operator's review record.
+- The bilateral channel — SWIFT, ISO 20022 over
+  bilateral connectivity, or a third-party multi-
+  bank network.
+- The reconciliation cadence — daily for high-
+  volume correspondents, weekly or monthly for
+  lower-volume.
+- The communication-procedure agreement for
+  exception handling and investigations.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Financial-Intelligence Unit Integration
 
-## §6 Versioning and Deprecation
+The operator's SAR / STR filing surface integrates
+with the operating jurisdiction's FIU:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+- US FinCEN — SAR filing through the BSA E-Filing
+  System.
+- KR KoFIU — STR filing through the KoFIU electronic
+  reporting channel under 특정금융정보법.
+- UK NCA-UKFIU — SAR filing through the SAR Online
+  channel under POCA 2002.
+- EU AMLA — for EU-wide cross-border patterns the
+  AMLA cross-border filing channel applies after
+  AMLA Regulation (EU) 2024/1620 takes effect.
+- Other jurisdictions — the operator's compliance
+  procedure documents the per-jurisdiction filing
+  channel.
 
-## §7 Privacy and Security
+The FATF Recommendation 21 tipping-off discipline
+restricts the operator's downstream disclosure.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Supervisory Authority and Central-Bank
+       Integration
 
-## §8 Open Governance
+The supervisory financial-services authority and the
+central bank for the operating jurisdiction are the
+integration counterparties for examination, payment-
+system access, and incident reporting:
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `cross-border-payment` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+- US — Office of the Comptroller of the Currency
+  (OCC), Federal Reserve, FDIC, FinCEN,
+  state banking regulators.
+- EU — the Member-State NCA, the European Central
+  Bank where the operator is significant, EBA where
+  cross-border payment-services scope applies,
+  AMLA for AML supervision under Regulation (EU)
+  2024/1620.
+- KR — Financial Services Commission (FSC), Financial
+  Supervisory Service (FSS), Bank of Korea.
+- UK — PRA / FCA, Bank of England.
+- Other — the relevant prudential and conduct
+  supervisor.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+The operator's incident-reporting discipline (cyber-
+incident, payment-system outage, sanctions-violation)
+follows the supervisory authority's published
+notification timeframes.
 
+## §6 Customer-Channel Integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+The operator's customer channels include:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+- The corporate cash-management portal (host-to-
+  host file-based instruction submission, ISO 20022
+  pain.001 customer-credit-transfer-initiation, and
+  the corporate-portal browser surface).
+- The retail remittance app (mobile-channel
+  initiation, KYC capture, beneficiary management,
+  and status visibility).
+- The agent-network channel for cash-out scenarios
+  (where the operator partners with money-services
+  businesses to deliver beneficiary-side cash).
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Customer authentication aligns with the operating
+jurisdiction's strong-customer-authentication
+requirements (PSD2 SCA in the EU, the equivalent
+authentication discipline elsewhere).
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §7 CLS and PvP Settlement Integration
 
-## Annex F — Adoption Roadmap
+For FX-funding legs where payment-versus-payment
+(PvP) settlement is used the operator integrates
+with CLS (Continuous Linked Settlement) or the
+equivalent PvP arrangement. CLS settlement reduces
+Herstatt risk on the FX leg of the cross-border
+payment path; the operator's settlement record
+references the CLS settlement-instruction
+identifier.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §8 External Audit and ISMS Certification
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The operator's information security management
+system is certified against ISO/IEC 27001:2022 with
+the scope explicitly extending to the SWIFT, ISO
+20022, and customer-channel endpoints. The
+certification body operates under ISO/IEC 17021-1;
+the conformity-assessment body operates under ISO/
+IEC 17065. The SWIFT Customer Security Programme
+(CSP) self-attestation against the SWIFT Customer
+Security Controls Framework (CSCF) applies for
+SWIFT-connected operators.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §9 Long-Term Archival Integration
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Records governed by the operator's retention horizons
+(FATF Recommendation 11 five years from the date of
+transaction; US 31 CFR 1010.430 five years; EU AMLR
+Article 46 five years extendable to ten; KR 특정금융
+정보법 retention discipline) are migrated to the
+long-term archive at the close of the active
+retention window. The archive preserves the wire-
+message record (with cryptographic digest), the
+travel-rule record, the screening record, the CBDDQ
+record, the SAR / STR record (preserving FATF
+Recommendation 21 access restrictions), the
+settlement record, and the audit-event trail.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §10 Cross-Border Payments Roadmap and CBDC
+        Interoperability
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+For operators participating in the CPMI cross-border
+payments roadmap initiatives (the BIS-coordinated
+programme on cross-border payment cost, speed,
+access, and transparency) the operator's integration
+includes:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- The Project mBridge multi-CBDC platform pilot
+  participation, where applicable.
+- Bilateral CBDC interoperability arrangements with
+  the issuing central bank, where the operator
+  integrates a wholesale-CBDC settlement leg.
+- Conditional-payment / programmable-payment
+  pilots, where the operator integrates a
+  jurisdiction-specific CBDC programmable layer.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+CBDC integration is governed by the issuing central
+bank's published technical and policy framework; the
+operator's records preserve the CBDC settlement
+identifier alongside the conventional settlement
+record.
 
-## Annex H — Versioning and Deprecation Policy
+## §11 ISO 20022 Migration and Coexistence
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+The operator's ISO 20022 migration discipline manages
+the SWIFT industry coexistence cutover for cross-
+border payments:
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+- The operator's migration plan documents the cutover
+  date for outbound pacs.008 / pacs.009 (replacing
+  outbound MT 103 / MT 202 / MT 202 COV) and the
+  inbound translation shim that the operator
+  operates while correspondents complete their own
+  migrations.
+- The translation shim preserves the Recommendation
+  16 travel-rule fields without truncation; the EU
+  Wire Transfer Regulation 2023/1113 Article 4
+  fields are preserved end-to-end.
+- The operator's SWIFT MT-to-ISO-20022 mapping
+  follows the SWIFT-published market-practice
+  guidance for charges, remittance information, and
+  party identification.
+- Reconciliation between the inbound MT-translated-
+  to-ISO-20022 record and the operator's downstream
+  ISO 20022 path is exercised on the daily
+  reconciliation pass.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §12 Operational Resilience and Cyber-Resilience
 
-## Annex I — Interoperability Profiles
+The operator's operational and cyber-resilience
+discipline aligns with the operating jurisdiction's
+supervisory expectations:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- US operators apply the Federal Banking Agencies
+  Sound Practices to Strengthen Operational
+  Resilience.
+- EU operators apply the Digital Operational
+  Resilience Act (DORA, Regulation (EU) 2022/2554)
+  for ICT-third-party-risk management, incident
+  reporting, threat-led penetration testing, and
+  resilience testing.
+- KR operators apply the Financial Information Act
+  (전자금융거래법) and the FSC's electronic financial
+  supervision regulations.
+- SWIFT-connected operators apply the SWIFT Customer
+  Security Programme (CSP) and submit annual self-
+  attestations against the Customer Security
+  Controls Framework (CSCF).
+- Threat-led penetration testing on the cross-border
+  payment estate is exercised on the supervisor's
+  cadence (TIBER-EU framework in EU, the equivalent
+  programme elsewhere).
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §13 Conformance
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations claiming PHASE-4 conformance maintain
+the SWIFT / payment-system / correspondent-bank
+integrations, exercise the FIU and supervisory-
+authority filing obligations, expose the customer
+channels with the operating jurisdiction's strong-
+customer-authentication discipline, hold the ISO/IEC
+27001 certification, and operate the long-term
+archival integration described above.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-cross-border-payment
+- **Last Updated:** 2026-04-28

@@ -5,237 +5,344 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-digital-citizenship (Digital Citizenship).
+This document defines the protocols that govern a
+digital-citizenship programme: the operating
+jurisdiction's curriculum-framework discipline; the
+UNESCO Digital Literacy Global Framework adoption
+discipline; the WCAG 2.2 Level AA accessibility
+discipline; the operating jurisdiction's children's-
+privacy discipline (US COPPA, UK Age-Appropriate
+Design Code, EU GDPR Article 8); the operating
+jurisdiction's accessibility-law discipline (US
+Section 508, EU Web Accessibility Directive
+2016/2102, EU European Accessibility Act 2019/882);
+the safeguarding-lead role discipline for online-
+safety incident handling; the inclusive-access
+provision discipline; and the funder-reporting
+discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 19796-1:2005 (learning, education and
+  training — quality management)
+- ISO/IEC 24751-1:2008 (individualised adaptability
+  and accessibility in e-learning)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 9457 (Problem Details)
+- W3C Web Content Accessibility Guidelines (WCAG)
+  2.2 Level AA
+- W3C Authoring Tool Accessibility Guidelines (ATAG)
+  2.0
+- W3C User Agent Accessibility Guidelines (UAAG) 2.0
+- UNESCO Digital Literacy Global Framework
+- UN Convention on the Rights of the Child Article
+  17 + General Comment No. 25 on children's rights
+  in relation to the digital environment
+- US COPPA + 16 CFR Part 312 (FTC's COPPA Rule)
+- UK Age-Appropriate Design Code (the ICO's code)
+- EU GDPR Articles 7, 8, 12-14 (consent, child-of-
+  information-society-services discipline,
+  transparency)
+- EU Digital Education Action Plan 2021-2027
+- US Section 508 of the Rehabilitation Act + 36 CFR
+  Part 1194
+- EU Web Accessibility Directive 2016/2102
+- EU European Accessibility Act 2019/882
 
 ---
 
-## §1 Scope
+## §1 Curriculum-Framework Discipline
 
-This PHASE document is one of four that together define the WIA-digital-citizenship
-standard. It addresses the protocol layer of the standard.
+The programme's curriculum is calibrated to the
+operating jurisdiction's curriculum framework. The
+discipline:
 
-## §2 Manifest
+- per-jurisdiction curriculum-framework adoption (the
+  national or subnational education authority's
+  digital-citizenship competency framework);
+- per-module mapping from the framework's competencies
+  to the module's learner outcomes;
+- per-cycle review against framework revisions
+  (curriculum frameworks are typically reviewed every
+  three to five years; the programme's review cycle
+  aligns to the framework's revision cadence);
+- per-jurisdiction adaptation for cultural and
+  linguistic context (a digital-citizenship module
+  written for one operating jurisdiction is rarely
+  appropriate for another without adaptation).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "digital-citizenship"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 UNESCO Digital Literacy Global Framework Discipline
 
-## §3 Conformance Tiers
+Programmes that adopt the UNESCO Digital Literacy
+Global Framework as a community-recognised baseline
+follow the discipline:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- per-module competency-area mapping to the UNESCO
+  framework's competence-areas (information and data
+  literacy, communication and collaboration, digital
+  content creation, safety, problem solving);
+- per-cycle UNESCO publication consumption (the
+  programme team consumes UNESCO updates and
+  national-level operationalisations of the
+  framework);
+- per-programme alignment statement in funder reports.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+The UNESCO framework is operating-jurisdiction-agnostic
+and serves as a cross-border communication
+infrastructure; each operating jurisdiction's
+curriculum framework remains the binding reference
+for what the programme delivers.
 
-## §4 Discovery
+## §3 WCAG 2.2 Level AA Accessibility Discipline
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/digital-citizenship`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+All programme artefacts (curriculum modules, online
+delivery surfaces, assessment activities, learner
+portals) conform to W3C WCAG 2.2 Level AA. The
+discipline:
 
-## §5 Time and Identity
+- per-artefact authoring against WCAG success
+  criteria (perceivable, operable, understandable,
+  robust);
+- per-artefact authoring-tool conformance to W3C ATAG
+  2.0 (the authoring tool itself is accessible and
+  produces accessible output);
+- per-artefact user-agent compatibility per W3C UAAG
+  2.0 (the artefacts work with assistive technologies);
+- per-cycle WCAG conformance audit by an accessibility
+  auditor;
+- per-disability adaptation evidence (captioning,
+  sign-language interpretation, large-print, braille,
+  plain-language summary, audio description);
+- per-modification re-audit when the artefact is
+  materially revised.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Children's-Privacy Discipline
 
-## §6 Versioning and Deprecation
+For programmes serving learners below the operating
+jurisdiction's age-of-consent threshold:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+- US (COPPA): operators of online services directed
+  to children under 13, or that have actual knowledge
+  of collecting personal information from children
+  under 13, follow the FTC's COPPA Rule — verifiable
+  parental consent before collection, transparency
+  notice, parental access and deletion rights,
+  retention limit;
+- UK (Age-Appropriate Design Code): operators of
+  online services likely to be accessed by children
+  follow the 15 standards of the ICO's code (data-
+  minimisation, default settings, geolocation off
+  by default, profiling restricted, transparency in
+  age-appropriate language, etc.);
+- EU (GDPR Article 8): operators of information-
+  society services processing children's personal
+  data on the basis of consent require parental
+  consent below the operating Member State's age
+  threshold (13 to 16 per Article 8(1));
+- KR (PIPA): operators serving children below the
+  threshold follow the operating Ministry of Personal
+  Information Protection's children-of-information-
+  society-services discipline.
 
-## §7 Privacy and Security
+## §5 Accessibility-Law Discipline
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+Per-jurisdiction accessibility-law adoption:
+
+- US Section 508: federal-agency-funded programmes
+  conform to the Section 508 standards (the
+  Information and Communication Technology rule,
+  which adopts WCAG 2.0 Level AA as the baseline);
+- EU Web Accessibility Directive 2016/2102: public-
+  sector-body programmes conform to the harmonised
+  accessibility standard EN 301 549 (which currently
+  references WCAG 2.1 Level AA and tracks WCAG 2.2
+  adoption);
+- EU European Accessibility Act 2019/882: programmes
+  whose product surface is in scope of the EAA
+  conform to the EAA's accessibility requirements,
+  in force June 2025;
+- KR Anti-Discrimination Against and Remedies for
+  Persons with Disabilities Act + Act on the
+  Promotion of the Information Industry: programmes
+  conform to KR's Web Content Accessibility Guidelines
+  (the KCC's national guideline aligned to WCAG).
+
+## §6 Safeguarding Discipline for Minor Learners
+
+For programmes serving minor learners:
+
+- per-programme designated safeguarding lead with
+  the seniority and access to escalate effectively;
+- per-programme safeguarding policy mapping the
+  operating jurisdiction's child-protection legal
+  framework to the programme's procedures (e.g.
+  US mandatory-reporter laws, UK safeguarding-and-
+  protecting-children policy framework, EU
+  Convention on the Protection of Children against
+  Sexual Exploitation and Sexual Abuse — the Lanzarote
+  Convention);
+- per-incident triage with documented outcomes
+  (PHASE-1 §8);
+- per-cycle safeguarding training for instructors
+  and adult volunteers;
+- per-volunteer background-check discipline per the
+  operating jurisdiction's vetting regime (e.g. US
+  state-level background checks, UK DBS check, EU
+  Member State criminal-record-check schemes).
+
+## §7 Inclusive-Access Provision Discipline
+
+The programme's inclusive-access provisions enable
+learners with declared accessibility needs to
+participate fully:
+
+- per-cohort assistive-technology loan inventory
+  (screen reader-equipped computers, Braille
+  displays, hearing-loop equipment);
+- per-cohort transport-support coordination for
+  learners with mobility limitations or for whom
+  transport cost is a barrier;
+- per-cohort on-site interpreter (sign-language
+  interpreter, foreign-language interpreter, or
+  pictorial-language interpreter for cognitively
+  diverse learners);
+- per-cohort childcare provision for parent learners;
+- per-cohort refreshment provision where the
+  programme runs across mealtime windows;
+- per-cohort timing accommodation for learners whose
+  scheduling constraints (work, caring responsibilities,
+  worship) require flexibility.
+
+## §8 Funder-Reporting Discipline
+
+Per-funder reporting follows the funder's reporting
+template:
+
+- per-period enrolled and completed counts;
+- per-period age-band and competency-area breakdowns;
+- per-period inclusive-access provision use;
+- per-period online-safety incident counts (aggregate;
+  per-incident detail is the safeguarding lead's
+  internal record);
+- per-period budget execution against the funder's
+  budget categories;
+- per-period narrative report describing programme
+  experience and lessons learned;
+- per-cycle external evaluation (where the funder
+  commissions an independent evaluator).
+
+## §9 Records Retention
+
+Programme records — every cohort, learner, module
+completion, online-safety incident, and funder
+reporting cycle — retain per the operating
+jurisdiction's records-retention rules. Public-school
+records typically retain for seven years per the
+operating jurisdiction's education-records rule;
+public-library records typically retain for shorter
+periods per the operator's data-retention policy;
+NGO records typically retain per the funder's
+agreement and the operating jurisdiction's privacy
 regime.
 
-## §8 Open Governance
+## §10 Time Synchronisation
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `digital-citizenship` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Operator clocks synchronise per RFC 5905 (NTPv4) so
+that cohort schedules, online-safety incident
+detection timestamps, parental-consent capture
+timestamps, and funder-reporting period closures are
+consistent across the programme's runtime fleet.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §11 Civic-Participation Literacy Discipline
 
+Programmes that include civic-participation literacy
+adapt to the operating jurisdiction's civic
+infrastructure:
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+- per-jurisdiction electoral system overview (the
+  programme teaches the operating jurisdiction's
+  voter-registration process, polling-day mechanics,
+  and post-election complaint and observation
+  channels — without endorsing any party or
+  candidate);
+- per-jurisdiction freedom-of-information-request
+  process (the operating jurisdiction's FOI law and
+  the agencies that respond);
+- per-jurisdiction public-consultation channels (e-
+  petitions, public-hearing participation, public-
+  comment portals);
+- per-jurisdiction civic-tech ecosystem awareness
+  (the operating jurisdiction's open-data portals,
+  civic-tech NGOs, journalist-supported civic data
+  projects).
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## §12 Mis- and Dis-information Literacy Discipline
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Programmes that teach mis- and dis-information
+literacy:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+- per-jurisdiction local-news ecosystem awareness;
+- per-cohort source-evaluation framework (questions
+  the learner asks of a source — who, when, why,
+  what evidence);
+- per-cohort cross-checking discipline (the learner
+  cross-checks against multiple independent sources);
+- per-cohort generative-AI awareness (the operating
+  jurisdiction's generative-AI prevalence in news
+  and social-media content informs the discipline);
+- per-cohort emotional-regulation discipline
+  (recognising emotional triggers as a signal to
+  pause before sharing).
 
-## Annex F — Adoption Roadmap
+## §13 Per-Operator-Class Operating Discipline
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Operator-class adaptations:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+- public-school: per-school principal accountability,
+  per-class instructor delivery, integration with
+  the operating jurisdiction's school-records system;
+- public-library: per-branch programme delivery,
+  walk-in enrolment, integration with the operating
+  jurisdiction's library-card identity;
+- ngo-civil-society: per-cohort grant-funded delivery,
+  partner-NGO coordination, integration with the
+  operating jurisdiction's civil-society funding
+  schemes;
+- public-sector-e-government: per-portal task-
+  oriented delivery, integration with the operating
+  jurisdiction's e-government identity-and-access-
+  management infrastructure.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §14 Quality Dossier and Conformance
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The programme's quality dossier records the governing
+frameworks, the curriculum-framework adoption, the
+WCAG 2.2 conformance evidence, the safeguarding
+policy, the parental-consent discipline, the
+inclusive-access provision history, the funder-
+reporting history, the online-safety-incident
+history, and the external-evaluation outcomes. The
+dossier is reviewed at least annually by the programme
+manager.
 
-## Annex G — Test Vectors and Conformance Evidence
+A programme conformant with WIA-digital-citizenship
+publishes its public privacy notice (Articles 13 and
+14 of GDPR or equivalent), its public WCAG
+conformance statement, the aggregate enrolled and
+completed counts, and the aggregate inclusive-access
+provision use; and answers an annual self-assessment
+that maps each clause of this PHASE to the programme's
+implementation.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+---
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+**Document Information:**
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-digital-citizenship
+- **Last Updated:** 2026-04-28

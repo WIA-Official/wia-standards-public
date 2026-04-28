@@ -5,237 +5,297 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-hydrogen-energy (Hydrogen Energy).
+This document defines the protocols that govern a hydrogen-
+energy programme: jurisdictional licensing, ISO 14687 fuel-
+quality discipline, ISO 19880-1 refuelling-station
+operation, ISO 22734 electrolyser operation, IEC 60079
+explosive-atmosphere governance, IEC 62282 fuel-cell
+component conformance, life-cycle carbon-intensity
+accounting, guarantee-of-origin issuance, transport
+incident response, and end-of-life decommissioning.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO 14001:2015 (environmental management)
+- ISO 14064-1:2018 (greenhouse gas accounting at the
+  organisation level)
+- ISO 14687:2019 (hydrogen fuel quality)
+- ISO 19880-1:2020 (HRS general requirements)
+- ISO 22734:2019 (water electrolysis hydrogen generators)
+- ISO 26142:2010 (hydrogen detection)
+- ISO 45001:2018 (occupational health and safety)
+- ISO/IEC 17025:2017 (calibration laboratories)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 9457 (Problem Details)
+- IEC 60079 series (explosive atmospheres)
+- IEC 62282 series (fuel cell technologies)
+- SAE J2601 / J2719 / J2799
+- NFPA 2 (Hydrogen Technologies Code; cited where US
+  jurisdictions apply)
+- KGS Code FP216 / FP217 / FP218 (Korean hydrogen-handling
+  rules)
+- CertifHy guarantee-of-origin scheme
+- IPHE Working Group on Hydrogen Production Analysis
+  (methodology reference)
 
 ---
 
-## §1 Scope
+## §1 Jurisdictional Licensing
 
-This PHASE document is one of four that together define the WIA-hydrogen-energy
-standard. It addresses the protocol layer of the standard.
+A hydrogen-energy operator MAY claim conformance to
+WIA-hydrogen-energy only after the operating jurisdiction's
+energy / industrial-safety regulator has issued a valid
+operating licence for the value-chain segments the
+operator runs (KOSHA + KGS in Korea, ARB / DOE / FAA-
+HMS in the US, EU PED + ATEX directives + national fuels
+regulator, METI / HPGS in Japan, equivalent authorities
+elsewhere). Licences are recorded against the programme;
+revocation freezes the affected segment.
 
-## §2 Manifest
+## §2 ISO 14687 Quality Discipline
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "hydrogen-energy"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Hydrogen for fuel-cell vehicle use follows ISO 14687:2019
+Type I Grade D limits per impurity (water, CO, CO2, sulphur
+species, formaldehyde, formic acid, ammonia, particulates,
+total hydrocarbons, halogenated compounds, oxygen, nitrogen,
+argon, helium). Per-batch quality records (PHASE-1 §4)
+cite an ISO/IEC 17025-accredited laboratory; assays whose
+results breach Grade D limits trigger the operator's
+quality-deviation workflow, and the affected batch cannot
+ship for FCEV refuelling until requalified or downgraded.
 
-## §3 Conformance Tiers
+## §3 ISO 19880-1 Refuelling Station Operation
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Refuelling stations operate per ISO 19880-1:2020 and the
+SAE J2601 fueling protocol family (T20 / T40 / H70 / A70
+profiles per vehicle tank capacity and pressure class).
+Station SOP covers:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- per-vehicle communication negotiation per SAE J2799
+  (where supported);
+- per-fill precooling envelope per SAE J2601;
+- per-fill quality-certificate citation per ISO 19880-8
+  / SAE J2719 (PHASE-1 §6);
+- per-fill abort criteria (pressure overshoot, temperature
+  rise, vehicle-side fault, station-side fault).
 
-## §4 Discovery
+Aborted fills are recorded with rationale and feed the
+operator's reliability-improvement process.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/hydrogen-energy`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 ISO 22734 Electrolyser Operation
 
-## §5 Time and Identity
+Electrolyser plants operate per ISO 22734:2019 for
+water-electrolysis hydrogen generators. Operating discipline:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- per-stack performance baseline at commissioning and at
+  the operator's revalidation cadence;
+- per-stack degradation tracking (voltage rise at fixed
+  current, efficiency degradation curve);
+- per-stack stop-and-start cycle counting (relevant for
+  PEM / AEM stacks where dynamic cycling drives membrane
+  degradation);
+- per-batch product-water consumption and per-batch
+  oxygen co-product handling (oxygen vent or oxygen
+  monetisation for adjacent industrial use).
 
-## §6 Versioning and Deprecation
+## §5 IEC 60079 Explosive Atmospheres
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Hydrogen-handling areas are zoned per IEC 60079 (Zone 0 /
+1 / 2 for gas atmospheres). The operator's per-zone
+electrical-equipment rating (Ex d / e / i / nA / nC) follows
+the zone classification. Hydrogen detection per ISO 26142
+covers fixed-point detectors at vent stacks, dispenser
+canopies, compression skids, and storage areas; alarm
+thresholds follow the operator's per-zone alarm matrix.
 
-## §7 Privacy and Security
+## §6 IEC 62282 Fuel-Cell Component Conformance
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Fuel-cell modules and stacks consumed at offtake sites
+(stationary CHP, vehicle propulsion) follow IEC 62282
+series (Part 2 stationary modules, Part 3 stationary
+applications, Part 6 micro fuel cell power systems, Part
+7 single-cell test methods, Part 8 energy storage systems
+for primary use). Operators record component identifiers
+and conformance certificates in the offtake record.
 
-## §8 Open Governance
+## §7 Life-Cycle Carbon-Intensity Accounting
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `hydrogen-energy` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Per-batch carbon intensity (PHASE-1 §3 `carbonIntensity`)
+follows the operator's published LCA boundary, aligned
+with ISO 14064-1:2018 organisation-level GHG accounting
+and the IPHE Working Group on Hydrogen Production Analysis
+methodology. Boundary choices are recorded in the
+operator's quality dossier:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- well-to-gate boundary for production-only operators;
+- well-to-tank boundary for operators that also carry
+  midstream and dispensing;
+- per-segment attribution for operators that jointly
+  operate production and downstream segments.
 
+Carbon intensity values are not aggregated across batches
+without consumer awareness of the boundary choice; the
+guarantee-of-origin issuance cites the specific batch and
+boundary.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §8 Guarantee-of-Origin Issuance
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Operators that participate in CertifHy (or the operating
+jurisdiction's equivalent low-carbon / renewable hydrogen
+disclosure scheme — UK Low-Carbon Hydrogen Standard, US
+DOE 45V, KEA H2 GoO in Korea, equivalent rules) emit
+per-batch guarantees that downstream offtakers cite in
+their own LCA reporting. The operator's GoO issuance
+discipline records:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+- per-batch eligibility criteria check (carbon intensity
+  threshold, source-mix composition);
+- per-batch issuance and per-batch retirement (when the
+  offtaker consumes the guarantee);
+- per-period reconciliation with the GoO registry to
+  prevent double-counting.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §9 Transport Incident Response
 
-## Annex F — Adoption Roadmap
+Hydrogen transport incidents (tube-trailer rupture,
+liquid-tanker spill, pipeline rupture, ammonia or LOHC
+carrier event) follow the operating jurisdiction's
+hazardous-materials response framework (US DOT 49 CFR,
+EU ADR, Korean KGS Code, equivalent rules). The operator's
+incident-response SOP covers immediate notification,
+exclusion-zone establishment, source-control procedure,
+and post-event investigation. Records flow into the safety
+incident record (PHASE-1 §8).
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §10 End-of-Life Decommissioning
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+End-of-life decommissioning follows the operating
+jurisdiction's industrial-decommissioning regime: site
+characterisation, equipment de-energisation, hydrogen and
+adjacent-gas inventory drainage, equipment dismantling,
+contaminated-material disposal, and site release. For
+salt-cavern storage, the operator's cavern-abandonment
+plan follows the jurisdiction's well-abandonment rules.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §11 Records Retention
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Programme records — every production / quality / inventory /
+refuelling / transport / safety incident record, the API
+audit logs, the regulator submissions, the GoO issuance
+register, and the LCA boundary documentation — retain per
+the operating jurisdiction's commercial- and industrial-
+safety records-retention rules. Safety-incident records
+that involved injury, fatality, or major release retain
+indefinitely.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §12 Time Synchronisation
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Operator clocks synchronise per RFC 5905 (NTPv4) so that
+production / inventory / refuelling / transport timestamps
+are consistent across the operator's facility fleet and
+the partner-operator integrations.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §13 Cross-Jurisdictional Operation
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+Multi-jurisdiction operators (cross-border pipeline
+operators, marine ammonia carrier operators, multinational
+refuelling-network operators) honour each jurisdiction's
+licensing and safety rules. Per-record governing-
+jurisdiction tagging supports downstream regulator-specific
+reporting.
 
-## Annex H — Versioning and Deprecation Policy
+## §14 Quality Dossier
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+The operator's quality dossier records the licensing
+references, the ISO 14687 quality programme, the ISO
+19880-1 / 22734 operating SOPs, the IEC 60079 zone map,
+the GoO scheme membership, the LCA boundary documentation,
+and the operator's incident history. The dossier is
+reviewed at least annually by the operator's quality
+manager.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §15 Pipeline-Embrittlement and Material-Compatibility Discipline
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Operators that transport hydrogen through dedicated H2
+pipelines or that blend hydrogen into the existing natural-
+gas network manage hydrogen-induced embrittlement risk per
+the operator's material-compatibility study. The study
+covers:
 
-## Annex I — Interoperability Profiles
+- per-pipeline-grade material classification (X52 / X60 /
+  X65 / X70 / X80 carbon steels are most vulnerable to
+  hydrogen embrittlement; austenitic stainless and certain
+  polymers are more tolerant);
+- per-blending-percentage embrittlement-risk envelope
+  derived from operator-side coupon-testing or recognised
+  industry test programmes;
+- per-pipeline integrity-management cadence including
+  inline inspection (smart-pig runs), pressure-testing,
+  and per-section embrittlement-coupon retrieval and
+  destructive testing.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Operators that operate dedicated H2 pipelines record their
+embrittlement-management programme in the quality dossier;
+operators that blend record both their network operator's
+material-compatibility study reference and the per-blending-
+point sequence ramp.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §16 Cryogenic Handling Discipline (Liquid Hydrogen)
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Liquid hydrogen handling carries low-temperature exposure
+risk (LH2 boils at 20.3 K at 1 atm) and oxygen-displacement
+asphyxiation risk. The operator's cryogenic-handling SOP
+covers:
+
+- per-vessel cryogenic-rated material certification (per
+  ISO 13985 for vehicle tanks; per the operator's pressure-
+  vessel standard for storage and transport vessels);
+- per-task PPE (cryogenic gloves, face shield, oxygen
+  monitor on the operator);
+- per-area oxygen monitoring with alarm thresholds aligned
+  with the ASHRAE-equivalent indoor-air-quality discipline;
+- per-vessel boil-off venting design (vent stacks at safe
+  height with no vent-hood reignition risk);
+- per-spill rapid-warming procedure for any uncontrolled
+  release.
+
+Cryogenic incidents (PHASE-1 §8 classification
+`low-temperature-exposure` or `spill-cryogenic`) follow the
+incident-response protocol of §9 plus the operator's
+cryogenic medical-response procedure for any worker
+exposure.
+
+## §17 Tube-Trailer Loading and Unloading Discipline
+
+Tube-trailer operations follow the operator's loading-and-
+unloading SOP:
+
+- per-shift driver qualification verification;
+- per-load loading-station leak test;
+- per-load tube-trailer pressure record at fill and at
+  delivery (mass discrepancy investigation per PHASE-2 §8);
+- per-load tube-trailer maintenance status check (annual
+  pressure-vessel inspection, periodic ultrasonic testing
+  per the operator's vessel-management programme).
+
+## §18 Conformance and Auditing
+
+A programme conformant with WIA-hydrogen-energy publishes
+its operating licences, the catalogue of operating
+facilities, the per-batch quality summary, the safety-
+incident summary at major and above, and the GoO issuance
+register, and answers an annual self-assessment that maps
+each clause of this PHASE to the operator's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-hydrogen-energy
+- **Last Updated:** 2026-04-28

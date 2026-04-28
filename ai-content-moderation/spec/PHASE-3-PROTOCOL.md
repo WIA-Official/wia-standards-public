@@ -5,270 +5,306 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-ai-content-moderation (Ai Content Moderation).
+This document defines the protocols that govern an
+AI-content-moderation operator: EU DSA compliance
+discipline, EU AI Act 2024 alignment for moderation
+systems classified under Annex III, NIST AI RMF +
+AI 600-1 GenAI Profile alignment, classifier model
+governance, human-reviewer wellness governance, statutory
+escalation discipline (CSAM, terrorism, imminent
+violence), trusted-flagger handling, transparency-report
+discipline, and out-of-court dispute resolution.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 22989:2022 (AI concepts and terminology)
+- ISO/IEC TR 24028:2020 (trustworthiness in AI)
+- ISO/IEC 42001:2023 (AI management system)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27701:2019 (privacy information management)
+- ISO/IEC 24029-1:2021 (robustness)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 9457 (Problem Details)
+- EU Digital Services Act (Regulation (EU) 2022/2065)
+- EU AI Act 2024 (Regulation (EU) 2024/1689)
+- US 18 U.S.C. § 2258A (CSAM mandatory reporting)
+- UK Online Safety Act 2023
+- KR Information and Communications Network Act +
+  Telecommunications Business Act intermediary
+  provisions
+- NIST AI Risk Management Framework + AI 600-1 GenAI
+  Profile
+- ETSI TS 104 224 (trusted AI for online services)
+- C2PA Content Credentials specification
+- Santa Clara Principles on Transparency and
+  Accountability in Content Moderation (cited as
+  community-recognised baseline reference)
 
 ---
 
-## §1 Scope
+## §1 EU DSA Compliance Discipline
 
-This PHASE document is one of four that together define the WIA-ai-content-moderation
-standard. It addresses the protocol layer of the standard.
+Operators that distribute services in EU jurisdictions
+honour the EU Digital Services Act (Regulation (EU)
+2022/2065). Per-Article alignment:
 
-## §2 Manifest
+- Article 14 transparency in terms and conditions →
+  policy version (PHASE-1 §3) publication discipline;
+- Article 15 transparency reporting → transparency
+  report (PHASE-1 §9) at the cadence the regulation
+  requires;
+- Article 16 notice-and-action mechanism → content-item
+  registration on user notice;
+- Article 17 statement of reasons → reviewer-decision
+  rationale (PHASE-1 §6 `rationaleRef`);
+- Article 20 internal complaint-handling system →
+  appeal (PHASE-1 §7);
+- Article 21 out-of-court dispute settlement →
+  appeal `outOfCourtBodyRef` cite;
+- Article 22 trusted flaggers → operator's trusted-
+  flagger registration discipline (PHASE-3 §6);
+- Article 33 VLOP designation → programme record
+  `vlopDesignation` flag;
+- Article 34/35 VLOP risk assessment and mitigation →
+  for designated programmes;
+- Article 42 VLOP transparency report (additional
+  content beyond Article 15) for designated programmes.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "ai-content-moderation"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 EU AI Act 2024 Alignment
 
-## §3 Conformance Tiers
+Content-moderation systems may classify as high-risk under
+Annex III (specifically point 8 for systems used by
+online platforms classified as VLOPs, where the AI Act
+intersects with DSA-side obligations). Operators record
+the per-classifier AI Act risk classification and the
+per-classification obligations:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- conformity assessment per Article 43;
+- post-market monitoring per Article 72;
+- incident-reporting per Article 73 to the operating
+  jurisdiction's AI Office.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 NIST AI RMF + AI 600-1 GenAI Profile Alignment
 
-## §4 Discovery
+The operator's AI RMF alignment covers the four functions
+(Govern, Map, Measure, Manage) applied to the moderation
+classifiers. The GenAI Profile addresses risks specific
+to generative-AI output moderation: hallucinated content,
+synthetic-content provenance, watermark integrity (per
+C2PA Content Credentials).
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/ai-content-moderation`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Classifier Model Governance
 
-## §5 Time and Identity
+Classifier models (PHASE-1 §5 `classifierVersion`) follow
+the operator's model-governance discipline:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- per-model model card (intended use, training-data
+  summary, evaluation results, known limitations,
+  per-protected-class fairness analysis);
+- per-model robustness evaluation per ISO/IEC 24029-1;
+- per-model adversarial-input evaluation against the
+  operator's red-team scenarios;
+- per-model jurisdiction-specific calibration (a hate-
+  speech classifier calibrated for one language /
+  cultural context may overfit or underfit when applied
+  to another without recalibration).
 
-## §6 Versioning and Deprecation
+Classifier upgrades trigger A/B-test deployment under the
+operator's gradual-rollout policy with appeal-rate
+monitoring as a regression indicator.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Human-Reviewer Wellness Governance
 
-## §7 Privacy and Security
+Content moderation exposes human reviewers to potentially
+traumatic content. The operator's reviewer-wellness
+discipline:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- per-reviewer queue-rotation cadence so that reviewers
+  do not concentrate on traumatic categories;
+- per-reviewer mandatory wellness check-ins at the
+  operator's published cadence;
+- per-reviewer access to clinical mental-health support;
+- per-reviewer wellness-flag (PHASE-1 §6) tracking that
+  triggers temporary rotation or extended leave;
+- per-cohort reviewer turnover monitoring as an
+  indicator of programme-level wellness pressure.
 
-## §8 Open Governance
+## §6 Trusted-Flagger Handling
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `ai-content-moderation` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Per DSA Article 22, trusted flaggers (civil-society
+organisations awarded trusted-flagger status by EU
+Digital Services Coordinators) submit notices that
+the operator processes with priority. The operator's
+trusted-flagger discipline:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- per-flagger registration with the awarding DSC;
+- per-flagger queue-priority binding;
+- per-flagger feedback loop on flag-decision outcomes
+  so that flaggers can refine their submission quality.
 
+## §7 CSAM Statutory Discipline
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+CSAM detection and reporting follow the operating
+jurisdiction's statutory regime:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+- US: 18 U.S.C. § 2258A mandates electronic
+  communications service providers to report apparent
+  CSAM to the NCMEC CyberTipline. The operator's
+  pipeline routes detections to NCMEC without
+  operator-discretionary delay;
+- EU: Regulation (EU) 2021/1232 (interim derogation
+  from ePrivacy for CSAM detection) and the in-process
+  EU CSAM Regulation;
+- KR: KCSC and Korean National Police Agency reporting
+  channels per the operating jurisdiction's law;
+- UK: NCA-CEOP reporting channel.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+CSAM records receive the operator's strictest access
+controls; only the statutory escalation team handles
+the records, and the records are preserved per the
+authority's required retention.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 Other Statutory Escalations
 
-## Annex F — Adoption Roadmap
+- Imminent violence threats: routed per the operating
+  jurisdiction's imminent-violence reporting
+  expectation (typically local law enforcement);
+- Credible self-harm threats: routed per the operating
+  jurisdiction's mental-health-crisis reporting
+  expectation;
+- Terrorism content: routed per the EU Regulation
+  (EU) 2021/784 on addressing the dissemination of
+  terrorist content online for EU jurisdictions, or
+  equivalent national rules;
+- Court-order takedowns: processed per the order's
+  legal authority and the operator's legal-review
+  discipline.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Transparency Report Discipline
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Transparency reports (PHASE-1 §9) follow:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+- per-jurisdiction transparency-report obligations
+  (DSA Article 15 EU; Santa Clara Principles for
+  voluntary disclosures elsewhere);
+- per-VLOP additional content per DSA Article 42;
+- per-period publication cadence (typically biannual
+  for DSA Article 15, voluntary cadence for non-EU
+  jurisdictions);
+- per-report publication in the operator's supported
+  languages.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Out-of-Court Dispute Resolution
 
-## Annex G — Test Vectors and Conformance Evidence
+Per DSA Article 21, users may escalate appeals to
+out-of-court dispute settlement bodies certified by
+EU DSCs. The operator records the escalation in the
+appeal record (PHASE-1 §7 `outOfCourtBodyRef`) and
+participates in the body's procedure under the body's
+certified rules.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Records Retention
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Programme records — every policy version / content item /
+classifier output / reviewer decision / appeal /
+statutory escalation / transparency report / API audit
+log — retain per the operating jurisdiction's records-
+retention rules. CSAM records retain per the statutory
+authority's required retention. DSA-required records
+retain per Article 24 obligations.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §12 Time Synchronisation
 
-## Annex H — Versioning and Deprecation Policy
+Operator clocks synchronise per RFC 5905 (NTPv4) so that
+moderation event timestamps and audit logs are
+consistent across the operator's runtime fleet.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §13 Per-Jurisdiction Cultural-Context Discipline
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Moderation classifiers calibrated for one jurisdiction
+may misclassify content in another due to language,
+cultural-context, and political-context differences.
+The operator's per-jurisdiction discipline:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+- per-language classifier calibration with native-
+  speaker review;
+- per-culture political-speech discipline (the line
+  between protected speech and prohibited speech
+  varies dramatically across jurisdictions);
+- per-jurisdiction adaptation of borderline categories
+  (e.g. cannabis-related content legal in some
+  jurisdictions, prohibited in others; alcohol
+  marketing similarly varies);
+- per-jurisdiction reviewer cohort with cultural
+  competence (a Korean-language reviewer for Korean-
+  language content is not interchangeable with an
+  English-language reviewer who happens to speak
+  Korean as a second language).
 
-## Annex I — Interoperability Profiles
+## §14 Crisis-Period Operating Discipline
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+During crisis periods (election periods, mass-violence
+events, public-health emergencies, natural disasters),
+the operator's crisis-operating discipline:
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+- per-crisis surge-capacity activation (additional
+  reviewer hours, expedited classifier-update cadence);
+- per-crisis policy-clarification publication so that
+  users understand how the operator interprets policy
+  during the crisis;
+- per-crisis escalation-channel availability (24-hour
+  contact for regulators, trusted flaggers, and
+  affected communities);
+- per-crisis post-event review with public reporting
+  on the operator's transparency cycle.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §15 Generative-AI Output Moderation Discipline
 
-## Annex J — Reference Implementation Topology
+For programmes that moderate generative-AI outputs
+(PHASE-1 §2 `platformClass=generative-ai-output`),
+additional discipline applies:
 
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
+- per-output watermark / C2PA Content Credentials
+  manifest verification at the moderation gate;
+- per-output synthetic-content disclosure check (the
+  output declares its synthetic provenance per the
+  operator's disclosure policy);
+- per-output factual-claim review for outputs in
+  regulated domains (medical, legal, financial advice);
+- per-output personality-impersonation check (the
+  output does not impersonate a specific real person
+  without consent and disclosure).
 
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-3-PROTOCOL validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
+Generative-AI moderation feeds the operator's NIST AI
+600-1 GenAI Profile alignment (PHASE-3 §3).
 
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+## §16 Quality Dossier and Conformance
+
+The operator's quality dossier records the governing
+frameworks, the policy-governance committee composition,
+the classifier-governance discipline, the reviewer-
+wellness programme, the trusted-flagger register, the
+statutory-authority bindings, the transparency-report
+schedule, and the operator's incident history. The
+dossier is reviewed at least annually by the operator's
+trust-and-safety quality manager.
+
+A programme conformant with WIA-ai-content-moderation
+publishes its policy-version register, its transparency
+reports, the statutory-escalation summary (aggregate
+counts), the appeal volume and reversal-rate, and its
+classifier-governance attestation, and answers an annual
+self-assessment that maps each clause of this PHASE to
+the operator's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-ai-content-moderation
+- **Last Updated:** 2026-04-28

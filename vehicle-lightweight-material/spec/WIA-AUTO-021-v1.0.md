@@ -1443,7 +1443,6 @@ interface CrashSimulationResponse {
 1. Ashby, M. F. (2011). *Materials Selection in Mechanical Design* (4th ed.). Butterworth-Heinemann.
 2. Hirsch, J. (2011). "Aluminum in Innovative Light-Weight Car Design." *Materials Transactions*, 52(5), 818-824.
 3. Czerwinski, F. (2021). *Current Trends in Automotive Lightweighting Strategies and Materials*. Materials, 14(21), 6631.
-4. 선행 연구. "Innovative and Highly Productive Joining Technologies for Multi-Material Lightweight Car Body Structures." *Journal of Materials Engineering and Performance*, 23(5), 1515-1523.
 5. Elmarakbi, A. (2014). *Advanced Composite Materials for Automotive Applications: Structural Integrity and Crashworthiness*. Wiley.
 
 ### 12.3 Industry Reports

@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 0-03: Miri | WIA-RUST-ADVANCED</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            position: relative;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .episode-badge {
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 10px 25px;
+            border: 2px solid #F39C12;
+            background: transparent;
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: #F39C12;
+        }
+
+        .title {
+            font-size: 72px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border-radius: 15px;
+            padding: 30px;
+            font-family: 'Consolas', 'D2Coding', monospace;
+            font-size: 24px;
+            line-height: 1.6;
+            border: 2px solid #30363d;
+            width: 900px;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+
+        .code-line.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .keyword { color: #ff7b72; }
+        .function { color: #d2a8ff; }
+        .string { color: #a5d6ff; }
+        .macro { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .type { color: #ffa657; }
+        .success { color: #4CAF50; }
+        .error { color: #ff4444; }
+
+        .terminal-output {
+            background: #000;
+            border-radius: 15px;
+            padding: 30px;
+            font-family: 'Consolas', monospace;
+            font-size: 22px;
+            border: 2px solid #F39C12;
+            max-width: 1200px;
+        }
+
+        .terminal-line {
+            opacity: 0;
+            transform: translateX(-20px);
+            transition: all 0.5s;
+            margin: 8px 0;
+        }
+
+        .terminal-line.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            width: 100%;
+        }
+
+        .feature-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 40px;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 0.5s;
+            border: 2px solid rgba(243, 156, 18, 0.3);
+        }
+
+        .feature-item.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .feature-item h3 {
+            color: #F39C12;
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .feature-item p {
+            font-size: 24px;
+            line-height: 1.8;
+        }
+
+        .step-box {
+            background: rgba(243, 156, 18, 0.1);
+            border-left: 5px solid #F39C12;
+            padding: 30px;
+            margin: 20px 0;
+            border-radius: 0 15px 15px 0;
+            opacity: 0;
+            transform: translateX(-20px);
+            transition: all 0.5s;
+        }
+
+        .step-box.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .step-box h4 {
+            color: #F39C12;
+            font-size: 30px;
+            margin-bottom: 15px;
+        }
+
+        .step-box p {
+            font-size: 24px;
+            line-height: 1.8;
+        }
+
+        .navigation {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(243, 156, 18, 0.8);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: #F39C12;
+            transform: scale(1.05);
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 8px;
+            background: #F39C12;
+            transition: width 0.5s;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 100px;
+            right: 60px;
+            font-size: 24px;
+            color: #888;
+        }
+
+        .subtitle {
+            font-size: 36px;
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .big-emoji {
+            font-size: 150px;
+            margin-bottom: 30px;
+        }
+
+        .channel-info {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid #FF0000;
+            border-radius: 20px;
+            padding: 30px 60px;
+            margin-top: 40px;
+            font-size: 32px;
+        }
+
+        .channel-info a {
+            color: #FF6B6B;
+            text-decoration: none;
+        }
+
+        .highlight-box {
+            background: rgba(243, 156, 18, 0.15);
+            border: 2px solid #F39C12;
+            border-radius: 20px;
+            padding: 50px;
+            margin: 30px 0;
+        }
+
+        .highlight-box h3 {
+            color: #F39C12;
+            font-size: 40px;
+            margin-bottom: 25px;
+        }
+
+        .highlight-box p {
+            font-size: 30px;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">🔍</div>
+            <h1 class="title">Miri</h1>
+            <p class="subtitle">
+                <span class="ko">Miri로 unsafe 코드 검증하기</span>
+                <span class="en" style="display:none;">Verifying unsafe Code with Miri</span>
+            </p>
+            <div class="channel-info">
+                📺 YouTube: <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">
+                <span class="ko">시작하기 →</span>
+                <span class="en" style="display:none;">Start →</span>
+            </button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: What is Miri? -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Miri란?</span>
+            <span class="en" style="display:none;">What is Miri?</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="highlight-box">
+                    <h3>
+                        <span class="ko">🔍 Miri = MIR Interpreter</span>
+                        <span class="en" style="display:none;">🔍 Miri = MIR Interpreter</span>
+                    </h3>
+                    <p class="ko">
+                        Rust의 중간 표현(MIR)을 인터프리트하며 실행하는 도구<br><br>
+                        ✅ Undefined Behavior 탐지<br>
+                        ✅ 메모리 안전성 위반 검출<br>
+                        ✅ 동시성 버그 발견<br>
+                        ✅ unsafe 코드 검증
+                    </p>
+                    <p class="en" style="display:none;">
+                        Tool that interprets and executes Rust's Mid-level IR (MIR)<br><br>
+                        ✅ Detects Undefined Behavior<br>
+                        ✅ Finds memory safety violations<br>
+                        ✅ Discovers concurrency bugs<br>
+                        ✅ Validates unsafe code
+                    </p>
+                </div>
+                <div class="highlight-box" style="background: rgba(76, 175, 80, 0.1); border-color: #4CAF50;">
+                    <h3 style="color: #4CAF50;">
+                        <span class="ko">💡 핵심 아이디어</span>
+                        <span class="en" style="display:none;">💡 Key Idea</span>
+                    </h3>
+                    <p class="ko">
+                        일반적인 실행은 UB를 놓칠 수 있지만,<br>
+                        Miri는 모든 메모리 접근을 추적하여 UB를 즉시 탐지합니다.
+                    </p>
+                    <p class="en" style="display:none;">
+                        Normal execution may miss UB,<br>
+                        but Miri tracks all memory accesses to detect UB immediately.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: Installing Miri -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Miri 설치</span>
+            <span class="en" style="display:none;">Installing Miri</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="terminal-output">
+                    <div class="terminal-line"><span style="color: #4CAF50;">$</span> rustup +nightly component add miri</div>
+                    <div class="terminal-line" style="color: #888;">info: downloading component 'miri'</div>
+                    <div class="terminal-line" style="color: #888;">info: installing component 'miri'</div>
+                    <div class="terminal-line"><span class="success">✓ Miri installed successfully</span></div>
+                    <div class="terminal-line"></div>
+                    <div class="terminal-line"><span style="color: #4CAF50;">$</span> cargo +nightly miri --version</div>
+                    <div class="terminal-line">miri 0.1.0 (nightly-2024-01-15)</div>
+                </div>
+                <div class="step-box">
+                    <h4>
+                        <span class="ko">📝 참고사항</span>
+                        <span class="en" style="display:none;">📝 Notes</span>
+                    </h4>
+                    <p class="ko">
+                        • Miri는 nightly 채널에서만 사용 가능<br>
+                        • 프로젝트에서 `cargo +nightly miri test` 실행<br>
+                        • 일부 외부 함수(syscall 등)는 실행 불가
+                    </p>
+                    <p class="en" style="display:none;">
+                        • Miri is only available on nightly channel<br>
+                        • Run `cargo +nightly miri test` in your project<br>
+                        • Some external functions (syscalls, etc.) cannot run
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: Example - UB Detection -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">UB 탐지 예제</span>
+            <span class="en" style="display:none;">UB Detection Example</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                    <div class="code-line">    <span class="keyword">unsafe</span> {</div>
+                    <div class="code-line">        <span class="keyword">let</span> ptr = <span class="number">0x1234</span> <span class="keyword">as</span> *<span class="keyword">const</span> <span class="type">i32</span>;</div>
+                    <div class="code-line">        <span class="macro">println!</span>(<span class="string">"{}"</span>, *ptr);  <span class="comment">// UB!</span></div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                </div>
+                <div class="terminal-output" style="margin-top: 40px;">
+                    <div class="terminal-line"><span style="color: #4CAF50;">$</span> cargo +nightly miri run</div>
+                    <div class="terminal-line"></div>
+                    <div class="terminal-line"><span class="error">error: Undefined Behavior: dereferencing pointer failed:</span></div>
+                    <div class="terminal-line"><span class="error">0x1234 is not a valid pointer</span></div>
+                    <div class="terminal-line"></div>
+                    <div class="terminal-line" style="color: #888;">  --> src/main.rs:4:27</div>
+                    <div class="terminal-line" style="color: #888;">   |</div>
+                    <div class="terminal-line" style="color: #888;">4  |         println!("{}", *ptr);</div>
+                    <div class="terminal-line" style="color: #888;">   |                           ^^^^ <span class="error">invalid pointer</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: Use-After-Free Detection -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Use-After-Free 탐지</span>
+            <span class="en" style="display:none;">Use-After-Free Detection</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                    <div class="code-line">    <span class="keyword">unsafe</span> {</div>
+                    <div class="code-line">        <span class="keyword">let</span> ptr = Box::<span class="function">into_raw</span>(Box::<span class="function">new</span>(<span class="number">42</span>));</div>
+                    <div class="code-line">        drop(Box::<span class="function">from_raw</span>(ptr));</div>
+                    <div class="code-line">        <span class="macro">println!</span>(<span class="string">"{}"</span>, *ptr);  <span class="comment">// Use after free!</span></div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                </div>
+                <div class="terminal-output" style="margin-top: 40px;">
+                    <div class="terminal-line"><span style="color: #4CAF50;">$</span> cargo +nightly miri run</div>
+                    <div class="terminal-line"></div>
+                    <div class="terminal-line"><span class="error">error: Undefined Behavior: pointer to alloc was dereferenced</span></div>
+                    <div class="terminal-line"><span class="error">after this allocation got freed</span></div>
+                    <div class="terminal-line"></div>
+                    <div class="terminal-line" style="color: #888;">  --> src/main.rs:5:27</div>
+                    <div class="terminal-line" style="color: #888;">   |</div>
+                    <div class="terminal-line" style="color: #888;">5  |         println!("{}", *ptr);</div>
+                    <div class="terminal-line" style="color: #888;">   |                           ^^^^ <span class="error">use-after-free</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: Miri Features -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Miri가 탐지하는 것들</span>
+            <span class="en" style="display:none;">What Miri Detects</span>
+        </h1>
+        <div class="content">
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h3>
+                        <span class="ko">🎯 메모리 안전성</span>
+                        <span class="en" style="display:none;">🎯 Memory Safety</span>
+                    </h3>
+                    <p class="ko">
+                        • Use-after-free<br>
+                        • Double-free<br>
+                        • Buffer overflow<br>
+                        • Invalid pointer dereference
+                    </p>
+                    <p class="en" style="display:none;">
+                        • Use-after-free<br>
+                        • Double-free<br>
+                        • Buffer overflow<br>
+                        • Invalid pointer dereference
+                    </p>
+                </div>
+                <div class="feature-item">
+                    <h3>
+                        <span class="ko">🔒 동시성 버그</span>
+                        <span class="en" style="display:none;">🔒 Concurrency Bugs</span>
+                    </h3>
+                    <p class="ko">
+                        • Data races<br>
+                        • 잘못된 Atomic 순서<br>
+                        • 데드락 (일부)<br>
+                        • Send/Sync 위반
+                    </p>
+                    <p class="en" style="display:none;">
+                        • Data races<br>
+                        • Invalid Atomic ordering<br>
+                        • Deadlocks (some)<br>
+                        • Send/Sync violations
+                    </p>
+                </div>
+                <div class="feature-item">
+                    <h3>
+                        <span class="ko">📏 정렬 문제</span>
+                        <span class="en" style="display:none;">📏 Alignment Issues</span>
+                    </h3>
+                    <p class="ko">
+                        • Misaligned reads/writes<br>
+                        • 잘못된 타입 캐스팅<br>
+                        • 정렬 위반<br>
+                        • Packed struct 접근
+                    </p>
+                    <p class="en" style="display:none;">
+                        • Misaligned reads/writes<br>
+                        • Invalid type casting<br>
+                        • Alignment violations<br>
+                        • Packed struct access
+                    </p>
+                </div>
+                <div class="feature-item">
+                    <h3>
+                        <span class="ko">⚡ 기타 UB</span>
+                        <span class="en" style="display:none;">⚡ Other UB</span>
+                    </h3>
+                    <p class="ko">
+                        • 초기화 안 된 메모리<br>
+                        • 잘못된 enum 값<br>
+                        • Invalid bool/char<br>
+                        • Stack overflow
+                    </p>
+                    <p class="en" style="display:none;">
+                        • Uninitialized memory<br>
+                        • Invalid enum values<br>
+                        • Invalid bool/char<br>
+                        • Stack overflow
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Best Practices -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Miri 활용 모범 사례</span>
+            <span class="en" style="display:none;">Miri Best Practices</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="step-box">
+                    <h4>
+                        <span class="ko">1️⃣ CI/CD에 통합</span>
+                        <span class="en" style="display:none;">1️⃣ Integrate into CI/CD</span>
+                    </h4>
+                    <p class="ko">
+                        모든 PR에서 `cargo miri test` 실행하여 UB 조기 발견
+                    </p>
+                    <p class="en" style="display:none;">
+                        Run `cargo miri test` on all PRs to catch UB early
+                    </p>
+                </div>
+                <div class="step-box">
+                    <h4>
+                        <span class="ko">2️⃣ unsafe 코드는 필수 검증</span>
+                        <span class="en" style="display:none;">2️⃣ Mandatory for unsafe Code</span>
+                    </h4>
+                    <p class="ko">
+                        unsafe 블록이 있는 모든 코드는 Miri로 테스트
+                    </p>
+                    <p class="en" style="display:none;">
+                        Test all code with unsafe blocks using Miri
+                    </p>
+                </div>
+                <div class="step-box">
+                    <h4>
+                        <span class="ko">3️⃣ 포괄적인 테스트 작성</span>
+                        <span class="en" style="display:none;">3️⃣ Write Comprehensive Tests</span>
+                    </h4>
+                    <p class="ko">
+                        엣지 케이스를 포함한 다양한 시나리오 테스트
+                    </p>
+                    <p class="en" style="display:none;">
+                        Test various scenarios including edge cases
+                    </p>
+                </div>
+                <div class="step-box">
+                    <h4>
+                        <span class="ko">4️⃣ 한계 인지</span>
+                        <span class="en" style="display:none;">4️⃣ Know the Limitations</span>
+                    </h4>
+                    <p class="ko">
+                        Miri는 모든 UB를 잡지 못함. 추가 도구(Sanitizers)도 함께 사용
+                    </p>
+                    <p class="en" style="display:none;">
+                        Miri doesn't catch all UB. Use additional tools (Sanitizers) too
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 0-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">🔍✨</div>
+            <div class="highlight-box" style="max-width: 1400px;">
+                <h3>
+                    <span class="ko">핵심 요약</span>
+                    <span class="en" style="display:none;">Key Takeaways</span>
+                </h3>
+                <p class="ko">
+                    ✅ Miri는 MIR 인터프리터로 UB 탐지<br>
+                    ✅ 메모리 안전성, 동시성, 정렬 문제 검출<br>
+                    ✅ nightly에서만 사용 가능 (`cargo +nightly miri test`)<br>
+                    ✅ unsafe 코드는 반드시 Miri로 검증<br>
+                    ✅ CI/CD에 통합하여 자동화<br>
+                    ✅ 한계를 인지하고 다른 도구와 병행
+                </p>
+                <p class="en" style="display:none;">
+                    ✅ Miri is a MIR interpreter that detects UB<br>
+                    ✅ Finds memory safety, concurrency, alignment issues<br>
+                    ✅ Only available on nightly (`cargo +nightly miri test`)<br>
+                    ✅ Always validate unsafe code with Miri<br>
+                    ✅ Integrate into CI/CD for automation<br>
+                    ✅ Know limitations and use with other tools
+                </p>
+            </div>
+            <div style="margin-top: 40px; text-align: center;">
+                <p style="font-size: 36px; margin-bottom: 20px;">
+                    <span class="ko">다음 에피소드: C 라이브러리 바인딩</span>
+                    <span class="en" style="display:none;">Next Episode: C Library Bindings</span>
+                </p>
+                <p style="font-size: 28px; color: #888;">EP 1-01 →</p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a> |
+                <span class="ko">弘益人間 - 널리 인간을 이롭게 하라</span>
+                <span class="en" style="display:none;">Benefit All Humanity</span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_1_01_C_Bindings.html'">
+                <span class="ko">다음 에피소드 →</span>
+                <span class="en" style="display:none;">Next Episode →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') ||
+                    (lang === 'en' && btn.textContent === 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.ko').forEach(el => {
+                el.style.display = lang === 'ko' ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = lang === 'en' ? '' : 'none';
+            });
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                if (n === 3) {
+                    const lines = document.querySelectorAll('#slide3 .terminal-line');
+                    lines.forEach((line, i) => {
+                        setTimeout(() => line.classList.add('show'), i * 200);
+                    });
+                }
+                if (n === 4) {
+                    const lines = document.querySelectorAll('#slide4 .code-line');
+                    lines.forEach((line, i) => {
+                        setTimeout(() => line.classList.add('show'), i * 150);
+                    });
+                    setTimeout(() => {
+                        const termLines = document.querySelectorAll('#slide4 .terminal-line');
+                        termLines.forEach((line, i) => {
+                            setTimeout(() => line.classList.add('show'), i * 100);
+                        });
+                    }, 1000);
+                }
+                if (n === 5) {
+                    const lines = document.querySelectorAll('#slide5 .code-line');
+                    lines.forEach((line, i) => {
+                        setTimeout(() => line.classList.add('show'), i * 150);
+                    });
+                    setTimeout(() => {
+                        const termLines = document.querySelectorAll('#slide5 .terminal-line');
+                        termLines.forEach((line, i) => {
+                            setTimeout(() => line.classList.add('show'), i * 100);
+                        });
+                    }, 1000);
+                }
+                if (n === 6) {
+                    const items = document.querySelectorAll('#slide6 .feature-item');
+                    items.forEach((item, i) => {
+                        setTimeout(() => item.classList.add('show'), i * 200);
+                    });
+                }
+                if (n === 7) {
+                    const boxes = document.querySelectorAll('#slide7 .step-box');
+                    boxes.forEach((box, i) => {
+                        setTimeout(() => box.classList.add('show'), i * 200);
+                    });
+                }
+            }, 100);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Initialize
+        animateSlide(1);
+    </script>
+</body>
+</html>

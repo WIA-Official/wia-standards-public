@@ -1,0 +1,10 @@
+# DALL-E Prompts for WIA-BIO-006 Press Materials
+
+## Prompt 1: Hero Image - Bioengineered Tissue Creation
+A cutting-edge tissue engineering laboratory with teal (#14B8A6) biotech accents: 3D bioprinter precisely depositing living cells and biomaterials to create complex tissue structures layer by layer, bioreactor systems maintaining optimal conditions for tissue maturation with controlled temperature/oxygen/pH, biocompatible scaffolds with 80% porosity supporting cell growth, and microscopic view showing vascularization with blood vessels forming throughout engineered tissue. Scientists monitoring tissue quality. Futuristic regenerative medicine laboratory, clean room biomedical photography.
+
+## Prompt 2: Problem Scenario - Organ Shortage Crisis
+A heartbreaking hospital scene showing the organ transplantation crisis: patients on dialysis waiting years for kidney transplants, heart failure patients running out of time on transplant lists showing 100,000+ people waiting, children needing organ transplants with limited pediatric donors, chronic wound patients suffering from non-healing injuries, and families devastated by organ shortage. Display statistics: 17 people dying daily waiting for organs, only 30% donor match rate. Documentary medical photography emphasizing the desperate need for organ alternatives and tissue repair solutions.
+
+## Prompt 3: Solution Visualization - Regenerative Medicine Future
+A hopeful medical breakthrough scene powered by WIA-BIO-006 tissue engineering: bioprinted skin grafts saving burn victims with 95% success rate, engineered cartilage repairing damaged joints allowing athletes to return to sport, lab-grown organs being transplanted successfully eliminating waitlists, cardiac patches treating heart attack damage and restoring function, and 3D-printed bone scaffolds healing critical defects. Patient recovering with new tissue integration. Dashboard shows 80% cell viability, tissue matching native properties within 20%, accelerated healing. Clean, life-saving, revolutionary regenerative medicine. Medical photography celebrating biotechnology restoring health and saving lives.

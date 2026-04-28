@@ -5,237 +5,304 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-hospital-info-system (Hospital Info System).
+This document defines the protocols that govern a
+hospital information system: the inter-subsystem
+messaging discipline that ties ADT ↔ CPOE ↔ pharmacy ↔
+LIS ↔ RIS ↔ billing ↔ EMR; the medication-use safety
+discipline (CPOE, pharmacy verification, eMAR closed-
+loop); the clinical decision-support discipline; the
+break-the-glass discipline that authorises emergency
+access outside the ordinary consent pattern; the
+medical-record curation discipline (KR Medical Service
+Act Article 22 / 23 and the KR EMR-certification
+discipline; HIPAA Privacy Rule 45 CFR 164.530(j)
+retention discipline; GDPR Article 5(1)(e) storage-
+limitation discipline); and the audit-and-disclosure
+discipline that produces the disclosure-account record
+the supervisory authority and the patient can both
+read.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 27799:2016 (information security in health using
+  ISO/IEC 27002)
+- ISO 13606-1:2019 / 13606-2:2019
+- HL7 v2.5.1 / v2.8.2 messaging conformance
+- HL7 FHIR R5 conformance and search specifications
+- IHE LAB profiles
+- IHE PCC profiles
+- DICOM PS3.4 (service classes), PS3.18 (DICOMweb)
+- IETF RFC 5905 (NTPv4), RFC 9421 (HTTP Message
+  Signatures), RFC 9457 (Problem Details), RFC 8259
+  (JSON), RFC 8615 (well-known URIs)
+- US HIPAA Privacy Rule (45 CFR Part 164, Subpart E,
+  including 164.502 minimum necessary, 164.506
+  treatment-payment-operations, 164.508 authorization,
+  164.510 use and disclosure for involvement, 164.512
+  public-interest exceptions, 164.522 access
+  restrictions, 164.524 access right, 164.526
+  amendment right, 164.528 accounting of disclosures,
+  164.530 administrative safeguards)
+- US HIPAA Security Rule (45 CFR Part 164, Subpart C,
+  including 164.308 administrative, 164.310 physical,
+  164.312 technical safeguards, 164.314 organisational
+  safeguards, 164.316 documentation)
+- KR Medical Service Act Article 21 (medical-record
+  inspection right), Article 22 (medical-record
+  curation), Article 23 (electronic medical-record
+  curation discipline), Article 23-2 (EMR
+  certification programme)
+- KR PIPA Articles 17 (third-party disclosure), 23
+  (sensitive information)
+- EU GDPR Articles 5, 9, 12 to 22, 32, 33 to 34
 
 ---
 
-## §1 Scope
+## §1 Inter-Subsystem Messaging Discipline
 
-This PHASE document is one of four that together define the WIA-hospital-info-system
-standard. It addresses the protocol layer of the standard.
+The hospital's interface engine routes messages
+between subsystems on a defined conformance profile:
 
-## §2 Manifest
+- ADT message routing — every ADT event (admit,
+  transfer, discharge, registration update,
+  cancellation) is fanned out from the ADT system to
+  CPOE, pharmacy, LIS, RIS, billing, and EMR.
+- Order routing — the ORM message produced by CPOE is
+  routed to pharmacy (for medication orders), LIS
+  (for laboratory orders), RIS (for radiology
+  orders), and the consult-request system (for
+  consultation orders).
+- Result routing — the ORU message produced by LIS is
+  routed back to CPOE for the placer to view, to the
+  EMR for longitudinal record-keeping, and (where a
+  critical-value alert is configured) to the
+  alerting system.
+- Charge routing — DFT messages produced by ancillary
+  subsystems are routed to billing for chargemaster
+  reconciliation; the EMR receives a notification so
+  that the encounter's financial summary stays
+  current.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "hospital-info-system"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Each routed message is acknowledged by the receiver;
+the integration-engine audit log records the message-
+handling chain for every routed message.
 
-## §3 Conformance Tiers
+## §2 Medication Closed-Loop Safety Discipline
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Medication safety is enforced at four discrete checkpoints:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+1. CPOE order entry — the medication-order ORM
+   message carries the patient identifier, the
+   medication code, the dose, the route, the
+   frequency, and the duration. The CPOE engine
+   evaluates allergy / drug-drug-interaction / dose-
+   range alerts at this checkpoint.
+2. Pharmacy verification — a registered pharmacist
+   reviews the order in the pharmacy subsystem and
+   produces the dispense record (PHASE-1 §9). Order
+   modification at this checkpoint is recorded with
+   the pharmacist's identifier.
+3. eMAR administration — the administering nurse
+   scans the patient's wristband and the medication's
+   barcode (the hospital's IHE-LAB-LBL-aligned
+   labelling discipline); the eMAR engine confirms
+   the five-rights match (right patient, right
+   medication, right dose, right route, right time)
+   before recording the administration.
+4. Outcome surveillance — adverse-drug-reaction
+   surveillance (the hospital's pharmacovigilance
+   discipline) reviews administration outcomes and
+   produces incident records that loop back into the
+   formulary-and-protocol committee.
 
-## §4 Discovery
+## §3 Clinical Decision-Support Discipline
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/hospital-info-system`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Clinical decision-support fires at well-defined
+moments:
 
-## §5 Time and Identity
+- Order entry — allergy / interaction / dose / age-
+  appropriateness alerts.
+- Result review — out-of-range and critical-value
+  alerts on laboratory results, with the operating
+  policy for time-bound critical-value
+  acknowledgement.
+- Encounter check-in — protocol prompts (immunisation
+  due, screening due, preventive-care due) drawn from
+  the patient's longitudinal record.
+- Order set — protocol-driven order sets (sepsis,
+  stroke, acute coronary syndrome) that bundle the
+  evidence-based ordering pattern.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Decision-support firings are logged so that the
+quality-improvement committee can review alert burden
+(false-positive rate) and modify thresholds.
 
-## §6 Versioning and Deprecation
+## §4 Consent and Access Discipline
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Access to the patient's record is gated by:
 
-## §7 Privacy and Security
+- The provider's privileges (PHASE-1 §6) — the
+  privilege-and-credentialling record determines what
+  order classes and what record sections the
+  provider may access.
+- The patient's consent directives — captured under
+  HIPAA 45 CFR 164.508 authorisation, GDPR Article
+  9(2)(a) explicit consent, KR PIPA Article 23
+  sensitive-information consent, or KR Medical
+  Service Act Article 21 inspection-right rule, as
+  applicable.
+- The relationship between the provider and the
+  patient — the hospital's encounter-context
+  discipline restricts access to providers with an
+  active care-team relationship to the patient
+  (treatment-payment-operations under HIPAA 45 CFR
+  164.506).
+- Break-the-glass — emergency access outside the
+  ordinary discipline carries the rationale URI and
+  triggers the audit event.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Break-the-Glass Discipline
 
-## §8 Open Governance
+Break-the-glass access requires:
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `hospital-info-system` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+- The provider's role to be one of the break-the-
+  glass-eligible roles declared in the hospital's
+  policy.
+- The OAuth scope `launch/break-the-glass` to be
+  present.
+- The free-text rationale URI to be supplied.
+- The audit event to be emitted with `eventKind =
+  "break-the-glass"` and the rationale captured.
+- The patient (or authorised representative) to be
+  notified within the operating site's break-the-
+  glass review cadence.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §6 Identity and Time Discipline
 
+Patient identifiers are unique within the hospital's
+master-patient-index. Cross-source identifier
+reconciliation (a v2 A04 register message bringing in
+an identifier from a regional health-information
+exchange) is handled by the hospital's PIX manager.
+Provider identifiers are issued from the hospital's
+provider-master and bound to the OAuth identity at
+authentication time. Time is NTPv4 stratum-2 or
+better; v2 timestamps and FHIR `instant` values are
+emitted in the operating-site time zone with the
+offset declared per ISO 8601.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §7 Data-Quality Discipline
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+The hospital applies ISO 9001 quality discipline to
+the master-file and clinical-record content:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+- Master-file reviews — the chargemaster, the
+  service-master, the test-master, and the formulary
+  are reviewed on the operating cadence (typically
+  quarterly) so that code-system updates (LOINC,
+  RxNorm, ICD-11, CPT) are reflected.
+- Reconciliation — automated reconciliation between
+  the LIS bench codes and the LOINC mapping; between
+  the chargemaster and the jurisdictional billing-
+  code system; between the formulary and the
+  hospital's drug master.
+- Inter-rater reliability — coder discipline checks
+  on ICD-11 / CPT abstraction.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 Audit and Accounting-of-Disclosures Discipline
 
-## Annex F — Adoption Roadmap
+Every action against PHI generates an audit event;
+the audit log is the source-of-record for:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- The HIPAA Privacy Rule 45 CFR 164.528 accounting-
+  of-disclosures the patient may request.
+- The GDPR Article 15(1)(c) right-of-access response.
+- The KR Medical Service Act Article 21 right-of-
+  inspection response.
+- The supervisory data-protection authority's
+  inspection.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The audit log is integrity-protected per HIPAA
+Security Rule 45 CFR 164.312(c); the operating site
+MAY append-only-log the audit events with the chosen
+tamper-evident mechanism.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §9 Retention Discipline
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The hospital's retention discipline aligns with:
 
-## Annex G — Test Vectors and Conformance Evidence
+- KR Medical Service Act Article 22(2) — ten years
+  for medical records, three years for prescriptions
+  and nursing records.
+- HIPAA 45 CFR 164.530(j) — six years for
+  policy / procedure / authorisation records.
+- GDPR Article 5(1)(e) — no longer than necessary;
+  the hospital documents the per-record-class
+  horizon in the retention schedule.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Records past the retention horizon are migrated to
+the long-term archive (PHASE-4 §6) or deleted per
+the retention schedule.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §10 Adverse-Event and Patient-Safety Discipline
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+The hospital's patient-safety committee operates an
+adverse-event surveillance loop:
 
-## Annex H — Versioning and Deprecation Policy
+- Sentinel events (events resulting in death or
+  permanent harm) are reported to the operating
+  jurisdiction's reporting authority on the published
+  cadence.
+- Near-misses are recorded in the hospital's incident-
+  reporting system with the de-identified narrative.
+- Root-cause analyses are produced for every sentinel
+  event; the analysis identifies the system contributors
+  and the corrective actions.
+- Corrective actions feed back into the CPOE
+  configuration, the formulary, the order-set
+  protocols, and the staff-credentialling
+  discipline.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+The discipline operates within the operating
+jurisdiction's patient-safety regulatory framework
+(US Patient Safety Quality Improvement Act, KR Patient
+Safety Act 환자안전법, EU Member-State equivalents).
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §11 Infection-Prevention and Antimicrobial-Stewardship Discipline
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+The hospital's antimicrobial-stewardship discipline
+runs across CPOE / pharmacy / LIS:
 
-## Annex I — Interoperability Profiles
+- Antimicrobial-order CPOE alerts incorporate the
+  patient's culture results, the local antibiogram,
+  and the formulary-restricted-agent rules.
+- Pharmacy verification escalates broad-spectrum or
+  restricted agents to the stewardship pharmacist
+  for review.
+- LIS culture-result delivery triggers prompts for
+  de-escalation review when a narrower agent is
+  indicated.
+- Surveillance reporting feeds the operating
+  jurisdiction's antimicrobial-resistance surveillance
+  programme on the published cadence.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §12 Conformance
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Implementations claiming PHASE-3 conformance enforce
+the discipline at the policy-decision point, emit
+the audit event for every action, satisfy the
+medication closed-loop discipline at the four
+checkpoints, and preserve the records for the
+operating retention horizon.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-hospital-info-system
+- **Last Updated:** 2026-04-28

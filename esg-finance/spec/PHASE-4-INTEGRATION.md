@@ -5,237 +5,274 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-esg-finance (Esg Finance).
+This document defines how an ESG-disclosure operator
+integrates with the systems that surround the
+sustainability-disclosure lifecycle: the operating
+jurisdiction's officially appointed mechanism for
+storage of regulated information (OAM in EU, EDGAR
+in US, KIND / DART in KR); the supervisory authority
+(ESMA + Member-State NCA in EU, SEC in US, KR FSC +
+KCSE in KR); the assurance provider; the SBTi public
+dashboard; the CDP scoring platform; the ratings-
+agency feeds (MSCI ESG, Sustainalytics, ISS ESG,
+Refinitiv); the financial-product distribution chain
+(SFDR Article 8 / 9 product factories and
+distributors); the investor-engagement channel; the
+operator's chain-of-activities partner integration
+under CSDDD; and the long-term archive that preserves
+disclosure artefacts past the active retention
+horizon.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17021-1:2015 (audit and certification)
+- ISO/IEC 17065:2012 (conformity-assessment bodies)
+- ISO 14064-1 + 14064-3 + 14067
+- ISO 8601, ISO 17442 LEI
+- W3C Verifiable Credentials Data Model 2.0
+- IFRS Foundation ISSB IFRS S1 + S2
+- EU CSRD (2022/2464) + ESRS (2023/2772) + ESEF
+  Regulation (Reg 2018/815) for digital-tagging
+- EU Taxonomy Regulation (2020/852) + the three
+  delegated acts (2021/2139, 2021/2178, 2023/2486)
+- EU SFDR (2019/2088) + RTS (2022/1288)
+- EU CSDDD (2024/1760)
+- EU Green Claims Directive (proposed) and
+  Empowering Consumers (2024/825)
+- ISAE 3000 + ISAE 3410 + ISSA 5000
+- GHG Protocol Corporate + Scope 3
+- SBTi Corporate Net-Zero Standard
+- CDP Climate / Forests / Water Security
+  questionnaires
+- GRI Standards (Universal 2021 + Sector + Topic)
+- SASB Industry Standards
+- UN PRI Reporting Framework
+- UNEP FI Principles for Responsible Banking + NZBA
+- KR FSC ESG 공시 의무화 + KIND + DART + KCSE
+- US SEC EDGAR + 17 CFR 229.1500 to 1506
+- US California SB-253 + SB-261
 
 ---
 
-## §1 Scope
+## §1 Officially Appointed Mechanism (OAM) Integration
 
-This PHASE document is one of four that together define the WIA-esg-finance
-standard. It addresses the integration layer of the standard.
+The entity's regulated information is filed with the
+Member-State officially appointed mechanism (OAM) under
+the EU Transparency Directive 2004/109/EC + ESEF
+Regulation 2018/815. The integration carries:
 
-## §2 Manifest
+- The OAM's filing endpoint and authentication
+  credential.
+- The ESEF + ESRS 2023/2772 digital-tagging XBRL
+  payload (the entity's annual financial report and
+  sustainability statement combined).
+- The operator's filing acknowledgement and the
+  OAM-published reference identifier.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "esg-finance"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+For US-jurisdiction filers the equivalent EDGAR
+filing channel + 17 CFR 232.405 retention; for KR-
+jurisdiction filers the KIND (Korea Investor's
+Network for Disclosure) / DART (Data Analysis,
+Retrieval and Transfer) channels.
 
-## §3 Conformance Tiers
+## §2 Supervisory-Authority Integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+For EU-regulated operators:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- ESMA — for EU-wide ESG-disclosure thematic
+  reviews, Q&A guidance, common supervisory action
+  on SFDR, and direct supervision of certain
+  EU-level activities.
+- Member-State NCA — for the operator's authorisation,
+  ongoing supervision, CSRD enforcement (under the
+  Member-State implementation of Directive (EU)
+  2022/2464), and SFDR enforcement.
 
-## §4 Discovery
+For US-regulated operators:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/esg-finance`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- SEC — for the climate-related disclosure rules
+  (17 CFR 229.1500 to 229.1506), the SEC examination
+  staff (Division of Corporation Finance), and the
+  SEC's enforcement function.
+- State attorneys-general — for state-level UDAAP
+  and consumer-protection enforcement (notably
+  state-level greenwashing complaints).
 
-## §5 Time and Identity
+For KR-regulated operators:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- KR FSC — for the FSC's ESG disclosure mandate
+  (phased coverage of KOSPI-listed companies).
+- KR KCSE (Korea Council for Sustainability
+  Standards) — for the KR-jurisdiction sustainability
+  standard-setting and enforcement.
 
-## §6 Versioning and Deprecation
+## §3 Assurance-Provider Integration
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The operator's assurance provider integrates with:
 
-## §7 Privacy and Security
+- The materiality-assessment record (PHASE-1 §4)
+  for the CSRD assurance scope.
+- The ISSB / ESRS disclosure record (PHASE-1 §5 +
+  §6) for the assurance opinion.
+- The GHG inventory (PHASE-1 §9) for the ISAE 3410
+  / ISO 14064-3 verification.
+- The taxonomy alignment (PHASE-1 §7) for the
+  taxonomy-alignment-eligibility opinion.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The assurance opinion is recorded in PHASE-1 §12
+and published alongside the entity's annual report.
 
-## §8 Open Governance
+## §4 SBTi and CDP Integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `esg-finance` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+For SBTi-validated targets the operator integrates
+with the SBTi public dashboard — target submission,
+validation correspondence, annual progress disclosure,
+and the SBTi Net-Zero recommitment workflow.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+For CDP the operator integrates with the CDP
+disclosure platform — the climate questionnaire,
+the forests questionnaire, the water-security
+questionnaire — and feeds the CDP scoring algorithm.
 
+## §5 Ratings-Agency Integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+The operator's investor-facing data feed integrates
+with the major ESG ratings agencies:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+- MSCI ESG Ratings — the entity's MSCI ESG profile
+  is updated through the entity's CDP submission,
+  the entity's public-disclosure surface, and the
+  entity's MSCI ESG manager engagement.
+- Sustainalytics ESG Risk Ratings — the entity's
+  Sustainalytics profile is updated through similar
+  channels.
+- ISS ESG Corporate Rating — through the ISS ESG
+  data-collection process.
+- Refinitiv ESG Scores — through the Refinitiv data
+  ingestion.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The entity's investor-relations function manages
+the bilateral data-quality dialogue with each agency.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §6 SFDR Product-Distribution Integration
 
-## Annex F — Adoption Roadmap
+For financial-market participants distributing
+SFDR Article 8 / 9 financial products:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- The pre-contractual disclosure template feeds the
+  distribution channel (KID, prospectus).
+- The website disclosure feeds the entity's product
+  marketing pages.
+- The periodic disclosure is published with the
+  fund's annual report.
+- The MiFID II suitability assessment uses the SFDR
+  classification to match the product to the
+  client's sustainability preferences.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §7 CSDDD Chain-of-Activities Integration
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+For in-scope CSDDD entities:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+- Tier-1 supplier engagement — the operator's
+  supplier-onboarding process collects the supplier's
+  human-rights and environmental due-diligence
+  evidence.
+- Tier-2-and-beyond engagement — the operator
+  applies the CSDDD risk-prioritisation discipline
+  to extend due-diligence beyond Tier 1 where
+  identified risks warrant.
+- Complaints channel — the CSDDD Article 14
+  notification mechanism is integrated with the
+  operator's whistleblower programme (under EU
+  Whistleblower Directive 2019/1937 implementation).
+- Remediation tracker — the operator's remediation
+  plan execution is tracked across the chain-of-
+  activities partners.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §8 ICT Third-Party Provider Integration (DORA where
+       applicable)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+For ESG-disclosure operators that are also financial
+entities subject to DORA Regulation (EU) 2022/2554:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- Map ICT third-party providers supporting the
+  ESG-disclosure pipeline (sustainability-data
+  vendors, GHG-calculation engines, XBRL-tagging
+  tools).
+- Apply the DORA contractual minima.
+- Report critical ICT third-party providers to the
+  Member-State NCA.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §9 External Audit and ISMS Certification
 
-## Annex H — Versioning and Deprecation Policy
+The operator's ISMS is certified against ISO/IEC
+27001:2022 with the scope explicitly extending to
+the disclosure-pipeline, public-disclosure, and
+examination endpoints. The certification body
+operates under ISO/IEC 17021-1; the conformity-
+assessment body for WIA-esg-finance operates under
+ISO/IEC 17065. ISO 14064-3 verification body
+accreditation is held by the entity's GHG verifier.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §10 Long-Term Archival Integration
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Records governed by the operator's retention
+horizons (EU CSRD ten-year archival; SFDR five-year;
+US SEC 17 CFR 232.405; KR FSC 공시 보존) are
+migrated to the long-term archive at the close of
+the active retention window. The archive preserves
+the materiality-assessment record, the ISSB / ESRS /
+Taxonomy / SFDR / GHG / SBTi / CSDDD records, the
+assurance reports, the supervisory correspondence,
+and the audit-event trail.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §11 Investor-Engagement Channel
 
-## Annex I — Interoperability Profiles
+The operator's investor-engagement channel covers:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- Annual investor presentation on the entity's
+  sustainability strategy and progress.
+- Q1 / Q3 update calls referencing the entity's
+  transition-plan execution.
+- Bilateral engagement on shareholder resolutions
+  and proxy-vote outcomes (under UK Stewardship
+  Code, EU Shareholder Rights Directive II, KR
+  스튜어드십 코드).
+- Climate-and-biodiversity transition-plan engagement
+  under the UK Transition Plan Taskforce / EU
+  Sustainable Finance Disclosure framework.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §12 Public-Disclosure Surface Integration
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The operator's public-disclosure surface (the
+entity's investor-relations website, the entity's
+annual report PDF, the entity's ESEF-tagged XBRL)
+is integrated with:
+
+- The European Single Access Point (ESAP) once in
+  force under the EU Capital Markets Union initiative.
+- The KR DART central disclosure repository.
+- The US SEC EDGAR central repository.
+- The entity's own corporate website.
+
+## §13 Conformance
+
+Implementations claiming PHASE-4 conformance maintain
+the OAM and supervisory-authority integrations,
+exercise the SBTi / CDP / ratings-agency feeds where
+the operator participates, hold the ISO/IEC 27001
+certification + ISO 14064-3 verifier accreditation,
+and operate the long-term archival integration
+described above.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-esg-finance
+- **Last Updated:** 2026-04-28

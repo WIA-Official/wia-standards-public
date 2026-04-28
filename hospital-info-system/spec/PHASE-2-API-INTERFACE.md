@@ -5,237 +5,316 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-hospital-info-system (Hospital Info System).
+This document defines the API contract that a hospital
+information system (HIS) exposes for the records defined
+in PHASE-1. Two complementary surfaces are defined: the
+HL7 v2.x messaging surface — the operating substrate for
+most in-hospital subsystem boundaries — and the HL7
+FHIR R5 RESTful surface, which is the modern facade for
+EMR access, patient-portal access, and external-partner
+integration.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- HL7 v2.5.1 / v2.8.2 (the operating-site messaging
+  substrate; the Minimal Lower Layer Protocol over
+  TCP is the wire format for inbound and outbound v2
+  messaging)
+- HL7 FHIR Release 5 RESTful API
+- IHE LAB transactions LTW (laboratory testing
+  workflow), LCSD (laboratory code-set distribution),
+  LBL (laboratory barcode labelling), LPOCT (point-of-
+  care testing)
+- IHE PCC profiles for clinical-document content
+- DICOM PS3.4 (service classes — query/retrieve,
+  storage, MWL, MPPS) and DICOM PS3.18 DICOMweb (QIDO-
+  RS, WADO-RS, STOW-RS) for the radiology subsystem
+- IETF RFC 9110 (HTTP Semantics), RFC 9111 (HTTP
+  Caching), RFC 9457 (Problem Details), RFC 6901 /
+  6902 (JSON Pointer / Patch), RFC 8288 (Web Linking),
+  RFC 8259 (JSON), RFC 9421 (HTTP Message Signatures)
+- ISO 8601, ISO/IEC 27001:2022, ISO 27799:2016
+- W3C Trace Context
+- US HIPAA Security Rule (45 CFR Part 164, Subpart C)
+  technical-safeguards clauses
+- KR Medical Service Act Article 23 electronic-medical-
+  record curation discipline
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-hospital-info-system
-standard. It addresses the api-interface layer of the standard.
+The HIS exposes:
 
-## §2 Manifest
+- HL7 v2.x messaging endpoints (TCP/IP / MLLP) for the
+  in-hospital subsystem boundaries (ADT ↔ LIS, ADT ↔
+  RIS, ADT ↔ pharmacy, CPOE ↔ pharmacy / LIS / RIS,
+  pharmacy ↔ eMAR, billing ↔ EMR).
+- HL7 FHIR R5 RESTful endpoints (HTTPS) for the EMR
+  facade, patient-portal, and external-partner
+  integration.
+- DICOM endpoints for the radiology subsystem.
+- HIS-specific WIA endpoints under `/v1/` for
+  programme, charge, and audit access.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "hospital-info-system"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The FHIR `CapabilityStatement` at `/fhir/r5/metadata`
+is canonical for the FHIR resources; the OpenAPI 3.1
+document at `/v1/openapi.json` is canonical for the
+WIA endpoints; the v2 conformance profile at
+`/messaging/conformance.xml` is canonical for the v2
+messaging interfaces.
 
-## §3 Conformance Tiers
+## §2 HL7 v2 Messaging Surface
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+The v2 endpoints accept:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- ADT (admit-discharge-transfer) — `A01` admit,
+  `A02` transfer, `A03` discharge, `A04` register,
+  `A05` pre-admit, `A08` update, `A11` cancel admit,
+  `A12` cancel transfer, `A13` cancel discharge.
+- ORM (orders) — `O01` general order message; the
+  hospital's CPOE → pharmacy / LIS / RIS routing.
+- ORU (observations) — `R01` unsolicited
+  observation message; the LIS → CPOE / EMR
+  laboratory-result feed.
+- DFT (charge transactions) — `P03` post-detail-
+  financial-transaction; the hospital's billing-
+  to-EMR feed.
+- BAR (billing account record) — `P01` add patient
+  account, `P02` purge.
+- MFN (master file notification) — `M02` staff /
+  practitioner master, `M04` charge description
+  master, `M08` test / observation master, `M09`
+  test / observation batteries master.
+- SIU (scheduling information unsolicited) — `S12`
+  add appointment, `S13` reschedule, `S15` cancel.
 
-## §4 Discovery
+Each message is acknowledged with an `ACK` (or `MFK`
+for master-file messages); the hospital's interface
+engine routes between the subsystems and persists each
+message to the integration-layer audit log.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/hospital-info-system`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 FHIR R5 RESTful Surface
 
-## §5 Time and Identity
+```
+GET  /fhir/r5/metadata
+GET  /fhir/r5/Patient/{patientId}
+GET  /fhir/r5/Patient?identifier=urn:oid:1.2.3|MRN-123
+GET  /fhir/r5/Encounter?subject=Patient/{patientId}
+POST /fhir/r5/Encounter
+GET  /fhir/r5/Observation?subject=Patient/{patientId}&code=http://loinc.org|2160-0
+GET  /fhir/r5/MedicationRequest?subject=Patient/{patientId}
+POST /fhir/r5/MedicationRequest
+GET  /fhir/r5/MedicationAdministration?subject=Patient/{patientId}
+GET  /fhir/r5/DiagnosticReport?subject=Patient/{patientId}
+GET  /fhir/r5/ImagingStudy?subject=Patient/{patientId}
+POST /fhir/r5/Consent
+GET  /fhir/r5/AuditEvent?patient=Patient/{patientId}
+GET  /fhir/r5/Patient/{patientId}/$everything
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The FHIR `CapabilityStatement` declares the supported
+search parameters per resource and the supported
+interactions (read, vread, search, history, create,
+update, patch, delete) per resource.
 
-## §6 Versioning and Deprecation
+## §4 DICOM Endpoints
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+DICOM C-FIND-RQ     — query the modality worklist
+DICOM C-MOVE-RQ     — retrieve a study from the PACS
+DICOM C-STORE-RQ    — store a study to the PACS
+DICOM N-CREATE-RQ   — modality performed procedure step
+DICOM N-SET-RQ      — modality performed procedure step
+                      update
+```
 
-## §7 Privacy and Security
+DICOMweb endpoints are the modern wire format:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+GET  /dicomweb/studies?PatientID={mrn}            (QIDO-RS)
+GET  /dicomweb/studies/{study-uid}/series         (QIDO-RS)
+GET  /dicomweb/studies/{study-uid}/series/{series-uid}/instances/{instance-uid}/frames/{frame}  (WADO-RS)
+POST /dicomweb/studies                            (STOW-RS)
+```
 
-## §8 Open Governance
+## §5 WIA Programme and Audit Endpoints
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `hospital-info-system` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+GET  /v1/
+GET  /v1/programmes
+GET  /v1/programmes/{programmeId}
+GET  /v1/charge-records?encounter={encounterId}
+GET  /v1/audit-events?patient={patientId}&from={iso}&to={iso}
+GET  /v1/audit-events/{eventId}
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+The audit-event endpoint exposes the FHIR R5
+`AuditEvent` resource for compliance-and-audit roles;
+the patient sees only their own audit trail through
+the patient-portal `/$everything` operation, filtered
+by the patient identity bound to the bearer token.
 
+## §6 Patient-Portal Endpoints
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+GET  /portal/v1/me
+GET  /portal/v1/me/encounters
+GET  /portal/v1/me/observations
+GET  /portal/v1/me/medications
+GET  /portal/v1/me/imaging-studies
+GET  /portal/v1/me/consents
+POST /portal/v1/me/consents
+PATCH /portal/v1/me/consents/{consentId}    (withdraw)
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+The patient's identity is bound to the bearer token
+through the hospital's IdP; the portal surface enforces
+the patient-only scope on every request.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §7 Authentication and Authorisation
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Bearer tokens conform to OAuth 2.1; the FHIR R5
+SMART-on-FHIR profile is the recommended baseline for
+external applications. Internal subsystem-to-subsystem
+calls use mutual TLS (mTLS) with the hospital's
+internal certificate authority. The token's audience
+is the FHIR base URL or the WIA `/v1/` base URL;
+scopes follow the SMART-on-FHIR `patient/`, `user/`,
+and `system/` syntax. Break-the-glass access uses an
+additional scope claim and triggers the audit event of
+type `break-the-glass`.
 
-## Annex F — Adoption Roadmap
+## §8 HTTP Status Codes
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- `200 OK` — read or search success
+- `201 Created` — create success (Location header
+  carries the new resource URL)
+- `204 No Content` — delete success
+- `400 Bad Request` — malformed FHIR payload (FHIR
+  `OperationOutcome` body)
+- `401 Unauthorized` — missing or invalid bearer token
+- `403 Forbidden` — access-discipline rejection
+- `404 Not Found` — resource not registered
+- `409 Conflict` — version-mismatch on update (FHIR
+  optimistic-locking via `If-Match`)
+- `412 Precondition Failed` — `If-None-Match` mismatch
+- `422 Unprocessable Content` — FHIR validation
+  failure with `OperationOutcome` issue details
+- `429 Too Many Requests` — rate-limit exceeded
+- `503 Service Unavailable` — downstream subsystem
+  unavailable
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §9 Caching and Conditional Requests
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+`ETag` carries the FHIR `Resource.meta.versionId`. The
+client uses `If-None-Match` for conditional reads and
+`If-Match` for conditional updates. PHI-bearing
+responses use `Cache-Control: private, max-age=0,
+must-revalidate`; HIPAA Privacy Rule 45 CFR 164.502
+minimum-necessary applies.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Content Negotiation and Encoding
 
-## Annex G — Test Vectors and Conformance Evidence
+The FHIR endpoints accept and produce
+`application/fhir+json` (the FHIR R5 default) and
+`application/fhir+xml` for clients that require the
+XML serialisation. The DICOMweb endpoints follow the
+PS3.18 content negotiation discipline:
+`application/dicom+json` for QIDO-RS responses,
+`multipart/related` with the appropriate sub-type for
+WADO-RS instance retrieval, and the DICOM PS3.10 file
+format for STOW-RS upload. The HL7 v2.x messaging
+surface uses the v2.5.1 or v2.8.2 ER7 encoding (vertical
+bar / caret / tilde / backslash / ampersand delimiters)
+over the Minimal Lower Layer Protocol.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Rate Limiting and Throttling
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Each subsystem-to-subsystem v2 messaging interface has
+a per-second message-rate budget declared in the v2
+conformance profile; exceeding the budget produces
+`AR` (application reject) acknowledgements with the
+overload reason in MSA-3 and triggers the operating
+site's flow-control discipline. The FHIR endpoints
+publish a per-client `RateLimit` header (RFC 9110)
+declaring the remaining budget and the reset window;
+exceeding the budget produces `429 Too Many Requests`.
+The DICOM endpoints' worklist-query and study-
+retrieve operations are limited per the operating
+site's PACS capacity declaration.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §12 Webhook and Subscription Surface
 
-## Annex H — Versioning and Deprecation Policy
+The FHIR R5 `Subscription` resource and the FHIR
+`SubscriptionTopic` resource publish the hospital's
+event surface (encounter-status change, result
+finalisation, admission-discharge-transfer) to
+external applications that subscribe under the
+SMART-on-FHIR backend-services pattern. The
+`Subscription.channel` carries the webhook endpoint
+URL and the bearer-token reference; the hospital's
+event router fans subscribed events to the registered
+endpoints and re-tries on transient failures per the
+declared retry budget.
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §13 Bulk-Data Export Surface
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+The FHIR R5 Bulk Data export operation is exposed at:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+```
+GET /fhir/r5/Group/{groupId}/$export
+GET /fhir/r5/Patient/$export
+GET /fhir/r5/$export
+```
 
-## Annex I — Interoperability Profiles
+Group-level export targets a defined population
+(payer-covered members, research-cohort enrolment,
+public-health surveillance cohort). Patient-level
+export targets the patient's record for a HIPAA
+45 CFR 164.524 access-right or GDPR Article 20
+portability response. System-level export targets the
+hospital's full data set and is available only with
+the explicit governance approval recorded in the
+operating site's bulk-data-governance register.
+Export status is tracked through a `Content-Location`
+URL polled by the requesting client; on completion
+the manifest URL lists the NDJSON resource files
+produced.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Trace-Context and Correlation Discipline
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Every FHIR / WIA request and v2 message carries a
+trace-context identifier (W3C Trace Context
+`traceparent`) propagated end-to-end through the
+hospital's interface engine, FHIR server, ancillary
+subsystems, and audit log. Correlated identifiers
+allow the operating site to reconstruct the order /
+result / administration chain across the subsystems
+that participated in the patient's encounter.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §15 Conformance
+
+Implementations claiming PHASE-2 conformance publish
+the v2 conformance profile at
+`/messaging/conformance.xml`, the FHIR
+`CapabilityStatement` at `/fhir/r5/metadata`, the
+DICOM SCP / SCU declarations the operating site
+exposes, and the OpenAPI document for the WIA
+endpoints. The portal surface enforces the patient-
+only scope on every request; the v2 messaging surface
+acknowledges every received message; the FHIR surface
+emits the `AuditEvent` for every action; the bulk-
+data export surface is governed by the operating
+site's bulk-data-governance register; trace-context
+identifiers are propagated end to end.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-hospital-info-system
+- **Last Updated:** 2026-04-28

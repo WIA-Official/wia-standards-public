@@ -5,237 +5,324 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-ddos-protection (Ddos Protection).
+This document defines the protocols that govern a
+DDoS-protection operator: the traffic-baseline and
+anomaly-detection discipline; the volumetric /
+protocol-state-exhaustion / application-layer attack-
+classification discipline; the DOTS signal-and-data
+channel discipline (RFC 9132 + RFC 8783); the
+mitigation-application discipline (rate-limiting,
+scrubbing-centre diversion, BGP FlowSpec, BGP
+blackhole, anycast diversion, captcha challenge);
+the BCP 38 + BCP 84 ingress-filtering discipline
+that prevents the operator's network from being a
+source of spoofed traffic; the RPKI / BGPsec
+discipline (NIST SP 800-189) that mitigates BGP
+hijack and route-leak attacks against the operator's
+prefixes; the post-incident analysis discipline
+under NIST SP 800-61 Rev 3 + ISO/IEC 27035; the
+threat-intelligence integration discipline (MITRE
+ATT&CK); and the supervisory / CERT cooperation
+discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022 + 27002:2022 + 27035-1/-2/-3
+- IETF RFC 4732, 8499, 8612, 8782, 9132, 8783, 8973
+- IETF RFC 8955, 5575, 7039, 7011 (IPFIX)
+- IETF RFC 7999 (BGP Blackhole Community), RFC 9234
+- IETF BCP 38 / RFC 2827, BCP 84 / RFC 3704
+- NIST SP 800-61 Rev 3 (Computer Security Incident
+  Handling Guide)
+- NIST SP 800-189 (Resilient Interdomain Traffic
+  Exchange — RPKI / ROA / BGPsec)
+- NIST SP 800-53 Rev 5 (controls)
+- NIST SP 800-150 (Cyber Threat Information Sharing)
+- US CISA DDoS guide
+- ENISA Threat Landscape, ENISA NIS2 Directive
+  guidance
+- MITRE ATT&CK Enterprise (T1498, T1499 sub-
+  techniques)
+- MANRS (Mutually Agreed Norms for Routing Security)
+- KR ISMS-P, KR 정보통신망법, KR-CERT (KrCERT/CC)
 
 ---
 
-## §1 Scope
+## §1 Traffic-Baseline and Detection Discipline
 
-This PHASE document is one of four that together define the WIA-ddos-protection
-standard. It addresses the protocol layer of the standard.
+The operator maintains traffic baselines (PHASE-1 §4)
+on a rolling window. Detection is layered:
 
-## §2 Manifest
+- Network-layer detection — pps / bps / cps anomalies
+  against the baseline trigger the network-layer
+  alert.
+- Application-layer detection — rps anomalies, error-
+  rate anomalies, latency spikes, and per-URL
+  anomalies trigger the application-layer alert.
+- DNS-layer detection — query-rate anomalies and the
+  signatures of DNS amplification and DNS water-
+  torture attacks per RFC 8499 trigger the DNS
+  alert.
+- Multi-tenant cross-correlation — anomalies
+  observed across multiple protected services with
+  shared upstream-transit fingerprints raise a
+  carpet-bombing alert.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "ddos-protection"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Detection thresholds are documented and reviewed
+on the operator's published cadence so that
+threshold-decay does not produce missed alerts.
 
-## §3 Conformance Tiers
+## §2 Attack-Classification Discipline
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+The classification discipline maps detected anomalies
+to one of the canonical attack classes:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- Volumetric — UDP flood, ICMP flood, SYN flood,
+  amplification-reflection (DNS, NTP, memcached,
+  CLDAP, SSDP). The operator applies the published
+  amplification-factor ranges to estimate the
+  reflector population.
+- Protocol-state-exhaustion — TCP-state exhaustion,
+  TLS-handshake exhaustion, QUIC-flood, HTTP/2
+  Rapid Reset (CVE-2023-44487).
+- Application-layer — HTTP flood, slowloris,
+  application-specific resource exhaustion (search-
+  query flooding, login-form flooding, cart-flood-
+  on-checkout).
+- Low-and-slow — sub-baseline rate sustained over
+  long windows that exhausts state.
+- Carpet-bombing — fragmented attacks against many
+  small targets across the operator's prefix.
 
-## §4 Discovery
+Each classification routes to the appropriate
+mitigation chain (PHASE-3 §4).
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/ddos-protection`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 DOTS Signal-and-Data-Channel Discipline
 
-## §5 Time and Identity
+The DOTS protocol orchestrates upstream mitigation
+(RFC 9132 + RFC 8783):
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+1. The operator's DOTS client maintains a long-lived
+   data-channel session with each upstream
+   mitigation provider, declaring aliases (named
+   target prefixes / port ranges) and baseline
+   ACLs.
+2. At attack detection the DOTS client raises a
+   signal-channel mitigation request referencing the
+   alias (or directly the target prefix), the
+   requested lifetime, and the trigger event.
+3. The DOTS server returns the mitigation-status
+   reports; the operator monitors `mitigation-
+   start`, `mitigation-active`, and `mitigation-
+   terminating` transitions.
+4. When the attack ends the operator withdraws the
+   request via DELETE on the signal channel; the
+   provider releases the mitigation.
+5. The exchange is recorded in PHASE-1 §6 with the
+   audit-event for forensic reconstruction.
 
-## §6 Versioning and Deprecation
+## §4 Mitigation-Application Discipline
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Mitigation chains by attack class:
 
-## §7 Privacy and Security
+- Volumetric → upstream scrubbing-centre divert
+  (BGP-redirect via /24 or /32 anycast announcement,
+  GRE / VxLAN tunnel back), BGP FlowSpec rules
+  (RFC 8955) at upstream transit, BGP blackhole
+  community (RFC 7999) for /32 source-of-attack
+  preferences.
+- Protocol-state-exhaustion → SYN cookies (RFC 4987-
+  era, now baseline), TCP-state limits, QUIC initial-
+  RTT validation, TLS handshake rate-limiting.
+- Application-layer → edge rate-limiting per source-
+  IP / per-cookie / per-fingerprint, CDN edge JS
+  challenge, captcha challenge, TLS-fingerprint
+  blocklists, web-application-firewall rules.
+- Low-and-slow → connection-time-limit enforcement,
+  per-source state-track limits.
+- Carpet-bombing → /24-aware FlowSpec rules,
+  upstream provider direct intervention.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The operator's policy-decision point evaluates the
+classification, the mitigation chain, the false-
+positive risk, and the legitimate-traffic impact
+before applying. Four-eyes approval applies for
+mitigations that affect more than the attacked
+prefix.
 
-## §8 Open Governance
+## §5 BCP 38 / BCP 84 Ingress-Filtering Discipline
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `ddos-protection` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The operator enforces source-address validation on
+ingress to prevent spoofed traffic from leaving the
+operator's network:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- BCP 38 (RFC 2827) — at the customer-aggregation
+  interface, the operator enforces uRPF strict-mode
+  or ACL-based ingress filtering matching the
+  customer's allocated prefix.
+- BCP 84 (RFC 3704) — for multihomed customers the
+  operator applies uRPF feasible-path mode or
+  explicit ACL.
+- SAVI (RFC 7039) — at IPv6 host-edge interfaces
+  the operator enforces source-address validation
+  against the host-binding table.
 
+The MANRS programme provides the multi-operator
+attestation framework; the operator's MANRS
+participant identifier (where applicable) is recorded
+in PHASE-1 §9.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §6 RPKI / BGPsec Discipline
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Per NIST SP 800-189 the operator's BGP-route hygiene
+covers:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+- ROA (Route Origin Authorisation) — every prefix
+  the operator originates is covered by a ROA in
+  the relevant Regional Internet Registry's
+  repository (ARIN, RIPE NCC, APNIC, AFRINIC,
+  LACNIC).
+- ROV (Route Origin Validation) — the operator's
+  ingress eBGP filters out RPKI-invalid
+  announcements at the AS-edge.
+- BGPsec rollout — the operator advances the BGPsec
+  rollout per the NIST SP 800-189 phased-rollout
+  guidance where the operator's BGP speakers
+  support BGPsec.
+- RFC 9234 BGP Roles + ASPA (when ratified) extend
+  the discipline.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §7 Post-Incident Analysis Discipline
 
-## Annex F — Adoption Roadmap
+Post-incident analysis follows NIST SP 800-61 Rev 3
++ ISO/IEC 27035-3:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- Detection and analysis — the operator
+  reconstructs the attack signature, the source-ASN
+  distribution, the mitigation effectiveness, and
+  the legitimate-traffic false-positive rate.
+- Containment, eradication, recovery — the operator
+  documents each step taken and the elapsed time.
+- Post-incident activity — lessons-learned review
+  with the operator's incident-response team,
+  the upstream mitigation provider, and the affected
+  customer.
+- The findings feed corrective-action items in
+  PHASE-1 §8 with documented owners and due dates.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §8 Threat-Intelligence Integration Discipline
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The operator integrates with threat-intelligence
+sources to enrich detection and attribution:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+- MITRE ATT&CK Enterprise mappings — every
+  detected attack is mapped to T1498 / T1499 sub-
+  techniques where applicable.
+- Sector ISAC feeds (FS-ISAC, H-ISAC, Auto-ISAC,
+  K-ISAC) where the operator is a member.
+- National CERT advisories (KrCERT-CC, US-CERT,
+  JPCERT-CC, NCSC) — the operator subscribes and
+  applies advisory-driven blocklists.
+- Open-source feeds (Spamhaus DROP / EDROP, Team
+  Cymru bogon list, the operator's own honeypot
+  observations).
 
-## Annex G — Test Vectors and Conformance Evidence
+## §9 Supervisory and CERT Cooperation Discipline
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+The operator's cooperation discipline:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- National CERT — the operator notifies the national
+  CERT (KrCERT-CC for KR; CISA for US; ENISA-
+  coordinated CSIRTs Network for EU) when an
+  incident exceeds the jurisdictional notification
+  threshold.
+- NIS2 Directive (Directive (EU) 2022/2555) — for
+  EU-essential and important entities, significant
+  incidents are reported under NIS2 Articles 23 to
+  24 within the published timeframes (early
+  warning within 24 hours; incident notification
+  within 72 hours; final report within one month).
+- KR 정보통신망법 + 전자금융감독규정 — for KR-
+  jurisdiction operators the relevant incident-
+  reporting timeline applies.
+- Law-enforcement cooperation — the operator's
+  legal function manages disclosure under MLAT or
+  the operating jurisdiction's data-disclosure
+  regime.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §10 Identity, Time and Audit Discipline
 
-## Annex H — Versioning and Deprecation Policy
+NTPv4 stratum-2 or better is the operator's clock
+baseline. Audit-events are emitted for every
+detection, DOTS exchange, mitigation-action,
+mitigation-release, BCP-attestation update, and
+cooperation correspondence. Audit logs are integrity-
+protected per the operator's tamper-evident
+mechanism.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 Operational-Resilience and Drill Discipline
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+The operator's drill discipline:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+- Quarterly tabletop exercises against canonical
+  attack scenarios.
+- Annual full-stack drill exercising the DOTS
+  exchange, the scrubbing-centre divert, the BGP
+  FlowSpec rule, and the application-layer
+  mitigation.
+- Red-team / purple-team engagements where the
+  operator's security team simulates a DDoS
+  campaign to test detection and response.
 
-## Annex I — Interoperability Profiles
+## §12 Anycast and Geographic-Diversity Discipline
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+The operator's anycast deployment discipline:
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+- Anycast is exercised at the operator's edge — the
+  same prefix is announced from geographically-
+  diverse PoPs so that volumetric traffic is
+  fragmented across ingress nodes.
+- Per-PoP capacity ratios are documented; a PoP-
+  level failure must not cascade.
+- Anycast-divergence monitoring detects suboptimal
+  routing and triggers operator action.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §13 Bot-Pattern and Application-Surface Discipline
+
+For operators with significant application-layer
+exposure:
+
+- Bot-fingerprint surveillance — TLS-fingerprint
+  (JA3 / JA4 / JA4H), HTTP-header signature, and
+  behaviour signature feed the classification.
+- Account-takeover resistance — credential-stuffing
+  surveillance is layered on top of the DDoS
+  detection so that the operator's identity stack
+  is not the single point of failure under
+  application-layer attack.
+- Web-application-firewall integration — OWASP
+  ModSecurity Core Rule Set + the operator's custom
+  rules feed the application-layer mitigation.
+
+## §14 Conformance
+
+Implementations claiming PHASE-3 conformance enforce
+the discipline at every relevant decision point,
+maintain the BCP 38 / BCP 84 + RPKI ROA + ROV
+posture on the operator's network, exercise the DOTS
+signal and data channels with at least one upstream
+mitigation provider, satisfy the NIS2 / national-
+CERT notification timelines (where applicable), and
+exercise the drill discipline on the published
+cadence.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-ddos-protection
+- **Last Updated:** 2026-04-28

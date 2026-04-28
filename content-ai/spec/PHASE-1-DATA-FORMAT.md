@@ -5,237 +5,442 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-content-ai (Content Ai).
+This document defines the canonical data-format
+layer for WIA-content-ai. The standard covers
+persistent record shapes for the lifecycle of an
+AI-assisted content production, distribution, and
+moderation programme — the content provider's
+identity and platform inventory; the AI-assisted
+content-generation transcript; the content-
+provenance record under C2PA Content Credentials;
+the synthetic-and-deepfake disclosure record under
+EU AI Act Article 50; the content-moderation
+classifier-and-decision record; the appeals and
+out-of-court dispute settlement record under EU DSA
+Articles 20 to 21; the trusted-flagger record under
+EU DSA Article 22; the transparency-report record
+under EU DSA Article 24; the child-safety record
+under COPPA / UK AADC / KR Online Safety; the
+accessibility record under WCAG 2.2 + EU EAA + ADA
+Title III; the model-evaluation and red-team record;
+the rights-holder copyright record; and the
+supervisory and law-enforcement correspondence
+record. WIA-content-ai is distinct from WIA-
+generative-ai (which governs the model substrate);
+this standard governs the deployed content-platform
+surface that distributes AI-assisted content to
+end-users at scale.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID) and IETF RFC 4122 (UUID URN)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 22989:2022 (AI concepts and terminology)
+- ISO/IEC 23053:2022 (framework for AI systems
+  using ML)
+- ISO/IEC 42001:2023 (AI management system)
+- IETF RFC 8259 (JSON), RFC 9457 (Problem Details)
+- C2PA (Coalition for Content Provenance and
+  Authenticity) Content Credentials specification
+  v1.4 + Trust List + Manifest Store
+- W3C Verifiable Credentials Data Model 2.0
+- EU AI Act (Regulation (EU) 2024/1689) Articles 5
+  (prohibited practices including manipulative AI),
+  50 (transparency obligations for AI systems
+  intended to interact with natural persons /
+  generate synthetic content / emotion-recognition /
+  deepfake), 51 to 55 (general-purpose AI models)
+- EU Digital Services Act (Regulation (EU) 2022/2065)
+  Articles 14 (transparency reporting), 16 (notice-
+  and-action), 17 (statement of reasons), 20 (internal
+  complaint-handling), 21 (out-of-court dispute
+  settlement), 22 (trusted flaggers), 23 (suspension
+  of users), 24 (transparency reporting), 25 (online
+  interface design — dark-patterns), 26 (advertising
+  transparency), 27 (recommender systems), 28 (online
+  protection of minors), 33 to 43 (very-large-online-
+  platform / very-large-online-search-engine
+  obligations), 70 to 88 (enforcement)
+- EU Empowering Consumers for the Green Transition
+  Directive ((EU) 2024/825) for AI-assisted green-
+  claims content
+- US Section 230 of the Communications Decency Act
+  (47 USC 230) — the safe-harbour baseline for US-
+  jurisdiction platforms
+- US COPPA (Children's Online Privacy Protection
+  Act, 15 USC 6501-6506; 16 CFR Part 312)
+- US California SB-1001 (Bot Disclosure)
+- US California Online Privacy Protection Act
+  (CalOPPA) and CCPA / CPRA
+- UK Age Appropriate Design Code (the ICO's
+  Children's Code)
+- UK Online Safety Act 2023 + Ofcom enforcement
+- KR PIPA (개인정보 보호법) and KR 청소년보호법
+  (Youth Protection Act)
+- KR 정보통신망법 + KR 방송통신심의위원회 + KR
+  방송통신위원회 (KCC) deliberation regime
+- W3C WCAG 2.2 + ATAG 2.0 + UAAG 2.0
+- EU European Accessibility Act (Directive (EU)
+  2019/882) + EN 301 549
+- US ADA Title III + US Section 508 (29 USC 794d)
+- ETSI TS 104 224 (AI in media — manifest format
+  for AI-generated content)
+- IPTC Photo Metadata 2024 (the news-industry
+  metadata schema for AI-generated imagery)
+- NIST AI 600-1 (Generative AI Profile of NIST AI
+  RMF 1.0)
+- UNESCO Recommendation on the Ethics of Artificial
+  Intelligence (2021)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-content-ai
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts
+a content-platform operator (a social-media platform,
+a video-sharing platform, a news publisher, an online
+marketplace, a search engine, a chat / messaging
+service, a creator-tool platform, an AI-assisted
+content production studio, or an aggregator-of-creator
+content) maintains:
 
-## §2 Manifest
+- The platform-and-inventory record.
+- The AI-assisted content-generation transcript.
+- The content-provenance manifest (C2PA).
+- The synthetic / deepfake disclosure record.
+- The content-moderation decision record.
+- The notice-and-action record (DSA Article 16).
+- The appeals and out-of-court dispute settlement
+  record (DSA Articles 20-21).
+- The trusted-flagger record (DSA Article 22).
+- The transparency-report record (DSA Article 24).
+- The child-safety record.
+- The accessibility-conformance record.
+- The model-evaluation, red-team, and incident
+  record.
+- The rights-holder copyright correspondence record.
+- The supervisory and law-enforcement correspondence
+  record.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "content-ai"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Programme Identifier
 
-## §3 Conformance Tiers
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name)
+operatorRole         : enum ("social-media-platform"
+                       | "video-sharing-platform" |
+                       "news-publisher" | "online-
+                       marketplace" | "search-engine"
+                       | "chat-messaging-service" |
+                       "creator-tool-platform" |
+                       "ai-content-studio" |
+                       "aggregator" | "user-defined")
+operatorJurisdiction : array of string (ISO 3166-1)
+governingFrameworks  : array of enum ("EU-AI-ACT-
+                       2024-1689" | "EU-AI-ACT-ART-
+                       50-TRANSPARENCY" |
+                       "EU-DSA-2022-2065" |
+                       "EU-DSA-VLOP-VLOSE" |
+                       "EU-EMPOWERING-CONSUMERS-
+                       2024-825" |
+                       "US-SECTION-230-47-USC-230"
+                       | "US-COPPA-15-USC-6501" |
+                       "US-CA-SB-1001-BOT-
+                       DISCLOSURE" | "US-CCPA-CPRA"
+                       | "UK-AADC" |
+                       "UK-ONLINE-SAFETY-ACT-2023"
+                       | "KR-PIPA" |
+                       "KR-청소년보호법" |
+                       "KR-정보통신망법" |
+                       "KR-KCC-방송통신위원회" |
+                       "C2PA-CONTENT-CREDENTIALS-
+                       1-4" | "ETSI-TS-104-224" |
+                       "IPTC-PHOTO-METADATA-2024" |
+                       "NIST-AI-600-1" |
+                       "ISO-IEC-42001" |
+                       "WCAG-2-2-LEVEL-AA" |
+                       "EU-EAA-2019-882" |
+                       "US-ADA-TITLE-III" |
+                       "user-defined")
+vlopVloseDesignation : enum ("not-designated" |
+                       "vlop-designated" | "vlose-
+                       designated")
+                       (per EU DSA Article 33 Very
+                       Large Online Platform / Very
+                       Large Online Search Engine
+                       designation by the Commission
+                       above the 45-million-monthly-
+                       active-users threshold)
+programmeStatus      : enum ("design" | "operating"
+                       | "limited-rollout" |
+                       "wind-down" | "archived")
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Content Generation Transcript Record
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+contentTranscript:
+  transcriptId       : string (uuidv7)
+  programmeRef       : string
+  authoringIdentity  : string (the human author or
+                       AI-system identity that
+                       produced the content)
+  generationKind     : enum ("human-only" | "ai-
+                       assisted" | "ai-fully-
+                       generated" | "ai-modified-
+                       human-supplied" | "user-
+                       defined")
+  modelRef           : string (the WIA-generative-ai
+                       model reference where AI was
+                       used; absent for human-only)
+  generatedAt        : string (ISO 8601)
+  promptList         : array of object (the prompts
+                       supplied by the author)
+  outputList         : array of object (the outputs
+                       returned by the model)
+  retainedSafetyDecisions : array of object (the
+                       upstream-model safety-filter
+                       decisions surfaced)
+```
 
-## §4 Discovery
+## §4 C2PA Content Credentials Manifest Record
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/content-ai`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+contentCredentials:
+  credentialId       : string (uuidv7)
+  contentRef         : string (the content asset
+                       reference — image, video,
+                       audio, or text URI)
+  c2paManifestRef    : string (URI of the C2PA
+                       Content Credentials manifest
+                       v1.4)
+  claimGeneratorRef  : string (the operator's claim
+                       generator identity)
+  contentBindings    : array of object (the
+                       cryptographic binding between
+                       the manifest and the content
+                       — for images / video this is
+                       embedded JUMBF / XMP; for
+                       text this is the side-car
+                       URL)
+  signingKeyRef      : string (the operator's
+                       signing key registered with
+                       the C2PA trust list)
+  parentManifestRef  : string (the upstream
+                       manifest the operator's
+                       content was derived from;
+                       absent for original content)
+```
 
-## §5 Time and Identity
+## §5 Synthetic and Deepfake Disclosure Record
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The disclosure record encodes the EU AI Act Article
+50 transparency obligations:
 
-## §6 Versioning and Deprecation
+```
+disclosureRecord:
+  disclosureId       : string (uuidv7)
+  contentRef         : string
+  disclosureKind     : enum ("ai-generated" |
+                       "ai-modified" | "deepfake" |
+                       "emotion-recognition" |
+                       "biometric-categorisation" |
+                       "user-defined")
+  art50Subparagraph  : enum ("art-50-1-interaction-
+                       with-ai" | "art-50-2-
+                       generative-ai-output" |
+                       "art-50-3-emotion-recognition
+                       -biometric-categorisation" |
+                       "art-50-4-deepfake-or-
+                       artificially-generated-
+                       content")
+  disclosureLanguage : array of string (BCP 47
+                       language codes the disclosure
+                       is delivered in — the
+                       operator emits in the user's
+                       UI locale)
+  disclosurePresentation : object (the visual /
+                       auditory disclosure — banner,
+                       watermark, label,
+                       voiceover annotation)
+  effectiveFrom      : string (ISO 8601)
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 Content-Moderation Decision Record (DSA Article
+       17 statement of reasons)
 
-## §7 Privacy and Security
+```
+moderationDecision:
+  decisionId         : string (uuidv7)
+  contentRef         : string
+  triggerKind        : enum ("user-report-art-16-
+                       notice" | "trusted-flagger-
+                       art-22" | "automated-detection"
+                       | "law-enforcement-order-
+                       art-9" | "voluntary-review" |
+                       "user-defined")
+  classifierVersion  : string (the operator's
+                       classifier model version)
+  classifierLabel    : string (the classifier's
+                       label and confidence)
+  decisionKind       : enum ("no-action" | "remove-
+                       or-disable-access" |
+                       "restrict-visibility" |
+                       "demote-rank" | "interstitial-
+                       warning" | "age-gate" |
+                       "monetisation-suspended" |
+                       "account-suspension" |
+                       "user-defined")
+  legalGroundRef     : string (the legal-basis-
+                       and-policy reference the
+                       operator relies on — DSA Art
+                       9 / Member-State law / the
+                       operator's terms-of-service
+                       clause)
+  statementOfReasonsRef : string (URI of the DSA
+                       Article 17 statement of
+                       reasons delivered to the
+                       affected user)
+  decidedAt          : string (ISO 8601)
+  reviewerRef        : string (absent for fully
+                       automated decisions)
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 Notice-and-Action Record (DSA Article 16)
 
-## §8 Open Governance
+```
+noticeRecord:
+  noticeId           : string (uuidv7)
+  contentRef         : string
+  noticeKind         : enum ("art-16-user-notice" |
+                       "art-22-trusted-flagger" |
+                       "art-9-removal-order" |
+                       "user-defined")
+  noticeSubmittedBy  : string (the user identity or
+                       the trusted-flagger identity
+                       or the issuing authority)
+  noticeReceivedAt   : string (ISO 8601)
+  noticeBody         : object (the structured-notice
+                       payload per DSA Article 16(2))
+  outcomeKind        : enum ("acted-on-content" |
+                       "rejected-as-baseless" |
+                       "forwarded-to-authority" |
+                       "pending-review")
+  resolutionAt       : string (ISO 8601; absent
+                       until resolved)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `content-ai` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §8 Internal Appeal and Out-of-Court Dispute Record
+       (DSA Articles 20 + 21)
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+appealRecord:
+  appealId           : string (uuidv7)
+  underlyingDecisionRef : string
+  appellantIdentity  : string
+  appealLodgedAt     : string (ISO 8601)
+  internalReviewOutcomeRef : string (URI of the DSA
+                       Article 20 internal-review
+                       outcome)
+  internalReviewDecidedAt : string (ISO 8601)
+  oodsBody           : string (DSA Article 21
+                       certified out-of-court
+                       dispute settlement body
+                       reference; absent unless
+                       escalated)
+  oodsOutcomeRef     : string (URI of the OODS
+                       outcome; absent until
+                       received)
+```
 
+## §9 Trusted-Flagger and Transparency-Report Record
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+```
+trustedFlagger:
+  flaggerId          : string (uuidv7)
+  flaggerLegalEntity : string
+  certifyingDscRef   : string (the Digital Services
+                       Coordinator that certified the
+                       trusted flagger)
+  domainsCovered     : array of string (the
+                       categories of illegal content
+                       the flagger is certified for)
+  registeredAt       : string (ISO 8601)
+  suspendedAt        : string (ISO 8601; absent
+                       until suspended)
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+transparencyReport:
+  reportId           : string (uuidv7)
+  reportingPeriod    : object (the H1 / H2 reporting
+                       window per DSA Article 24)
+  reportPublishedAt  : string (ISO 8601)
+  reportRef          : string (URI of the DSA
+                       Article 24 / Article 42
+                       transparency report)
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §10 Child-Safety and Accessibility Records
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+childSafetyRecord:
+  recordId           : string (uuidv7)
+  applicableRegime   : enum ("us-coppa-13-and-under"
+                       | "uk-aadc" |
+                       "kr-청소년보호법" |
+                       "eu-dsa-art-28-online-
+                       protection-of-minors" |
+                       "user-defined")
+  ageVerificationRef : string (URI of the age-
+                       verification or assurance
+                       evidence; for COPPA verifiable
+                       parental consent record;
+                       for UK AADC the age-assurance
+                       evidence)
+  defaultPrivacySettings : object (the default
+                       privacy and safety settings
+                       applied to minor accounts)
 
-## Annex F — Adoption Roadmap
+accessibilityRecord:
+  recordId           : string (uuidv7)
+  conformanceLevel   : enum ("wcag-2-2-level-a" |
+                       "wcag-2-2-level-aa" |
+                       "wcag-2-2-level-aaa")
+  applicableRegime   : array of enum ("us-ada-title-
+                       iii" | "us-section-508" |
+                       "eu-eaa-2019-882" |
+                       "eu-en-301-549" |
+                       "kr-장애인차별금지법" |
+                       "user-defined")
+  conformanceReportRef : string (URI of the
+                       accessibility-conformance
+                       report)
+  remediationLogRef  : string (URI of the
+                       remediation log for non-
+                       conformant items)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §11 Conformance
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Implementations claiming PHASE-1 conformance maintain
+the records defined above for the operator's content-
+platform surface, exercise the C2PA Content
+Credentials manifest emission for AI-generated
+content, exercise the EU AI Act Article 50
+transparency obligations, exercise the DSA Article
+14-28 obligations where the operator is in scope,
+and preserve the records under the operating
+jurisdiction's recordkeeping discipline (DSA
+Article 24 transparency-report retention; KR PIPA
+retention; the operator's internal three-to-five-
+year retention).
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+---
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+**Document Information:**
 
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-content-ai
+- **Last Updated:** 2026-04-28

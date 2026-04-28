@@ -5,258 +5,287 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-a11y-wiabooks.
+This document defines how a wiabooks accessibility programme
+integrates with the systems that surround it: accessibility-
+metadata aggregators (Bookshare, Vital Source, Accessible
+Books Consortium / ABC, Library of Congress NLS BARD,
+National Library service for the Blind in the operator's
+jurisdiction); EPUB reading-system vendors; assistive-
+technology vendors; library and education-procurement
+platforms; the W3C EPUB Working Group's accessibility-
+techniques registry; statutory regulators (US Access Board,
+EU EAA conformity-assessment bodies, KR National Information
+Society Agency); and long-term archives that preserve
+accessible publications for the long-term reading record.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17065:2012 (conformity-assessment bodies)
+- ISO 8601 (date and time)
+- W3C EPUB Accessibility 1.1
+- W3C Verifiable Credentials Data Model 2.0 (optional)
+- Schema.org Accessibility properties
+- Marrakesh Treaty (cross-border exchange of accessible
+  copies for blind and print-disabled persons)
 
 ---
 
-## §1 Scope
+## §1 Accessibility Metadata Aggregator Integration
 
-This PHASE document is one of four that together define the WIA-a11y-wiabooks
-standard. Schemas use JSON Schema 2020-12; APIs use OpenAPI 3.1.
+Aggregators (Bookshare, ABC, Vital Source, NLS BARD,
+operator-specific national libraries for the blind)
+ingest publisher accessibility statements and alternative-
+format catalogues so that disabled readers can discover
+accessible titles through the aggregator's interface.
+Integration carries each aggregator's identifier, the per-
+title metadata-deposit schedule, and the aggregator's
+conformance criteria for ingest acceptance.
 
-## §2 Manifest
+## §2 EPUB Reading System Vendor Integration
 
-Implementations publish a signed manifest containing standardSlug,
-version, implementation (name + build digest + SBOM URL), profile
-(named + version), per-requirement support status, and a Sigstore
-DSSE signature. The manifest is anchored to a Sigstore Rekor entry.
+Reading systems (Apple Books, Google Play Books, Kobo,
+Thorium, Readium-2, Voice Dream, Adobe Digital Editions,
+Calibre Reader) consume publisher accessibility statements
+to surface accessibility metadata in the reader UI.
+Integration carries each vendor's identifier, the vendor's
+EPUB Accessibility 1.1 implementation profile, and the
+operator's per-vendor compatibility test results.
 
-## §3 Conformance Tiers
+## §3 Assistive-Technology Vendor Integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+AT vendors (NV Access for NVDA, Vispero for JAWS, Apple
+for VoiceOver, Google for TalkBack, Acapela / ReadSpeaker
+for TTS engines, refreshable-Braille hardware vendors
+including HumanWare, Freedom Scientific, BraillePen)
+consume per-publication AT compatibility test results so
+that AT vendor support and roadmap planning can prioritise
+defects affecting publisher catalogues. Integration carries
+each vendor's identifier, the per-AT-version support window,
+and the AT-side defect-intake reference.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 Library and Education-Procurement Platform Integration
 
-## §4 Discovery
+Library platforms (OverDrive, Hoopla, RBdigital, Scribd
+education tier, OPAC integrations) and education-
+procurement platforms (university library digital
+collections, K-12 textbook adoption systems) filter
+catalogue by accessibility conformance level. Integration
+carries each platform's identifier, the per-platform
+filter taxonomy, and the operator's catalogue-feed
+update cadence.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/a11y-wiabooks`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key.
+## §5 W3C EPUB Working Group Integration
 
-## §5 Time and Identity
+The W3C EPUB Working Group maintains the EPUB
+Accessibility 1.1 + Techniques 1.1 specifications.
+Integration is one-way (operator consumes the
+specifications); the operator records the spec revision
+in force per published title so that downstream consumers
+can resolve the conformance-claim to the spec version
+the publisher targeted at publication time.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better). Time-bound tokens (RFC 9700) are verified against the TLS
-session's exporter value (RFC 8446 §7.5).
+## §6 Statutory Regulator Integration
 
-## §6 Versioning and Deprecation
+Statutory regulators (US Access Board for Section 508,
+EU national EAA conformity-assessment bodies, KR
+National Information Society Agency for KS X 6308
+conformance, equivalent national authorities) consume
+per-title compliance evidence. Integration carries the
+regulator's identifier, the per-jurisdiction submission
+template, and the regulator's complaint-intake endpoint
+through which disabled readers may file accessibility
+complaints.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version.
-Patch releases are editorial only. Deprecation enters a 12-month
-sunset window during which the registry marks the version as
-Deprecated with a migration note.
+## §7 Marrakesh Treaty Cross-Border Exchange Integration
 
-## §7 Privacy and Security
+The Marrakesh Treaty enables cross-border exchange of
+accessible copies for blind and print-disabled persons
+through authorised entities. Operators that participate
+as an authorised entity (or that supply authorised
+entities) integrate with the Marrakesh Treaty exchange
+network. Integration carries the operator's authorised-
+entity status reference, the per-title eligibility
+declaration, and the per-cross-border-recipient
+acknowledgement record.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446)
-and at rest (AES-256-GCM or stronger), apply role-based access
-controls, and maintain tamper-evident audit logs (Merkle tree per
-RFC 9162-style transparency log pattern).
+## §8 Evidence Package Format
 
-## §8 Open Governance
+```
+evidence/
+  manifest.json                — package manifest (signed)
+  programme.json               — programme record
+  publications/                — per-publication records
+  accessibility-statements/    — per-publication conformance
+                                  statements
+  alternative-formats/         — per-publication alternative
+                                  format references (artefact
+                                  bodies content-addressed)
+  media-overlays/              — per-publication overlay
+                                  metadata
+  at-compatibility-tests/      — per-publication AT test
+                                  results
+  audit/                       — API audit log excerpts
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `a11y-wiabooks` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle.
+The package is content-addressable; the manifest is signed
+by the operator's HTTP-message-signature key (RFC 9421)
+and counter-signed by the accessibility-certification body
+when the package supports a regulator submission or a
+Marrakesh-Treaty cross-border declaration.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §9 Manifest and Signatures
 
+Verification tools recompute file digests, compare to the
+manifest, and reject the package on mismatch with type
+`urn:wia:a11y-wiabooks:evidence-mismatch`.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §10 well-known URI Discovery
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+A conformant operator exposes a discovery document at
+`/.well-known/wia-a11y-wiabooks` that links to the API
+root, the operator's accessibility-framework enrolments,
+the published quality dossier, the per-jurisdiction
+statutory framework binding, and the catalogue of
+released publications with their accessibility-conformance
+profiles.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §11 Long-Term Archive Integration
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Operators designate a long-term archive that holds
+publications and their alternative formats beyond the
+operator's primary distribution horizon (commercial
+deletion is not equivalent to accessibility withdrawal —
+already-distributed accessible copies remain available
+to readers). Quarterly deposits round-trip content-
+addresses; on programme wind-down, remaining records
+transfer to the archive with content-addresses preserved.
 
-## Annex F — Adoption Roadmap
+## §12 Verifiable-Credential Re-Issuance (optional)
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Operators that wish to expose attestations (EPUB
+Accessibility 1.1 conformance, accessibility-
+certification body credentials, ISO/IEC 27001
+certification) to consumers of W3C Verifiable Credentials
+MAY re-issue the attestations as Verifiable Credentials
+under the Data Model 2.0 specification. Re-issuance is
+optional; the canonical record remains the JSON evidence-
+package manifest.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §13 Streaming Heartbeat
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+SSE subscribers receive a heartbeat every 30 seconds with
+`Last-Event-ID` resume support. Subscribers that disconnect
+during long publication-batch ingest or AT-test reporting
+windows resume from the last seen event identifier without
+losing visibility of priority-1 events (statement
+revisions affecting distribution, regulator-notified
+complaints, AT-compatibility regressions).
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §14 Backwards-Compatibility Guarantee
 
-## Annex G — Test Vectors and Conformance Evidence
+PHASE-4 minor revisions remain backwards-compatible with
+prior-minor clients. Major revisions go through a
+deprecation window of at least one full W3C EPUB
+Accessibility specification revision cycle so that
+aggregator and reading-system integrations have time to
+migrate.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §15 Cross-Standard Linkage
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Operators that consume adjacent WIA standards (WIA-
+i18n for translation-pipeline integration, WIA-images
+for accessibility-aware image alt-text production, WIA-
+braille for refreshable-Braille rendering, WIA-tts for
+text-to-speech voice management) emit cross-standard
+linkage records that name the consuming standard and
+the version under which the linkage is claimed.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §16 Public Catalogue Feed
 
-## Annex H — Versioning and Deprecation Policy
+Operators publish a public catalogue feed (Atom or JSON
+Feed) listing distributed publications with their
+accessibility-statement digests, alternative-format
+catalogue, and AT compatibility summary. The feed enables
+discovery by disabled readers using assistive
+technologies; aggregators ingest the feed at the
+operator's published cadence.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §17 Reader Tooling for Accessibility Reviewers
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Accessibility reviewers (publisher-internal QA, external
+certification bodies, regulator inspectors) benefit from
+visualisation tools that surface accessibility statement
+diff views, AT compatibility matrices, and known-
+limitation evolution timelines. Operators MAY publish
+reader tools alongside the canonical evidence package;
+the tools are non-normative.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §18 Migration from Pre-Standard Records
 
-## Annex I — Interoperability Profiles
+Operators of pre-standard accessible publishing
+programmes MAY migrate historical records by emitting
+synthetic publication records with a `legacyImport`
+flag. Synthetic publications are accepted by the
+public catalogue but require contemporaneous EPUB
+Accessibility 1.1 re-validation before the publication
+can advance past `ready-for-distribution`.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §19 TTS Voice Vendor Integration
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Operators that bind TTS narration to per-vendor voices
+(ReadSpeaker, Acapela, Polly, Google Cloud TTS, Azure
+Speech) integrate with each TTS vendor's voice
+inventory. Integration carries the vendor's identifier,
+the per-voice licensing terms, and the voice-revision
+notification endpoint that triggers regeneration of
+TTS-narrated alternative formats when a voice is
+revised or retired.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §20 Accessibility-Complaint Intake Integration
 
-## Annex J — Reference Implementation Topology
+The operator's accessibility-complaint intake (through
+the operator's website, the operating jurisdiction's
+regulator, and Marrakesh-Treaty-aligned authorised
+entities) ingests reader complaints and routes them to
+the operator's remediation workflow. Integration carries
+the intake-channel identifier, the per-complaint
+classification (defect, missing format, statement
+inaccuracy, AT incompatibility), and the response SLA
+the operator commits to.
 
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
+## §21 Authoring-Tool Plug-in Integration
 
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-4-INTEGRATION validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
+Operators integrate accessibility-checking plug-ins into
+the publisher's authoring workflow (InDesign accessibility
+plug-ins, Word accessibility checker integrations, custom
+markdown-to-EPUB pipelines with built-in WCAG validation).
+Integration carries the plug-in's identifier, the per-
+revision check capability matrix, and the per-issue
+severity classification that flows back into the
+publisher's editorial review.
 
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+## §22 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated
+successfully with at least one accessibility-metadata
+aggregator, at least one EPUB reading-system vendor,
+the relevant statutory regulator (where the operating
+jurisdiction has one), and at least one long-term
+archive, and has published at least one externally
+citable evidence package.
+
+Sunsetting an integration is announced via the well-
+known discovery document at least 90 calendar days
+before removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-a11y-wiabooks
+- **Last Updated:** 2026-04-28

@@ -5,237 +5,379 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-hydrogen-energy (Hydrogen Energy).
+This document defines the canonical data-format layer for
+WIA-hydrogen-energy. The standard covers persistent record
+shapes for the hydrogen energy value chain — production
+(electrolytic, steam-methane-reforming, autothermal-reforming,
+biomass gasification, by-product), purification, compression,
+liquefaction, transport (tube trailer, pipeline, marine
+carrier, ammonia carrier, LOHC carrier), storage (compressed,
+liquid, metal hydride, salt cavern), distribution (refuelling
+stations, industrial offtake, residential blending), and
+end-use (fuel cell vehicles, industrial heat, refining,
+fertilizer, steel reduction). The format is consumed by
+hydrogen producers, midstream operators, refuellers, gas
+network operators, hydrogen-vehicle OEMs, and the regulators
+that license the value chain.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO 4217 (currency codes)
+- ISO 3166-1 (country codes)
+- ISO/IEC 11578 (UUID)
+- ISO 14687:2019 (hydrogen fuel quality — product
+  specification)
+- ISO 19880-1:2020 (gaseous hydrogen — fuelling stations —
+  general requirements)
+- ISO 19880-3 (gaseous hydrogen — fuelling stations —
+  valves)
+- ISO 19880-5 (gaseous hydrogen — fuelling stations —
+  dispensers)
+- ISO 19880-8 (gaseous hydrogen — fuelling stations — fuel
+  quality control)
+- ISO 22734:2019 (hydrogen generators using water electrolysis
+  — industrial, commercial, and residential applications)
+- ISO 13985:2006 (liquid hydrogen — land vehicle fuel tanks)
+- ISO 13984:1999 (liquid hydrogen — land vehicle fuelling
+  system interface)
+- ISO 17268:2020 (gaseous hydrogen land vehicle refuelling
+  connection devices)
+- ISO 26142:2010 (hydrogen detection apparatus — stationary
+  applications)
+- IEC 60079 series (explosive atmospheres equipment)
+- IEC 62282 series (fuel cell technologies — modules,
+  stationary, portable, road-vehicle)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- SAE J2601:2020 (fueling protocols for light-duty gaseous
+  hydrogen surface vehicles)
+- SAE J2799:2019 (hydrogen surface vehicle to station
+  communications hardware and software)
+- SAE J2719:2020 (hydrogen fuel quality for fuel cell
+  vehicles)
+- IEA Global Hydrogen Review (technology benchmark
+  reference)
+- CertifHy guarantee-of-origin scheme (cited as the
+  reference low-carbon and renewable hydrogen disclosure
+  framework adopted across the EU)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-hydrogen-energy
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts a
+hydrogen-energy value chain operator manages.
+Implementations covered include:
 
-## §2 Manifest
+- Electrolyser plants (alkaline, PEM, AEM, solid-oxide).
+- SMR / ATR plants with optional carbon capture.
+- Hydrogen purification and compression facilities.
+- Liquefaction and re-gasification terminals.
+- Tube-trailer, pipeline, ammonia, and LOHC transport.
+- Hydrogen storage facilities (compressed, liquid, metal
+  hydride, salt cavern).
+- Hydrogen refuelling stations (HRS) per ISO 19880-1.
+- Industrial offtake operators (refining, ammonia, methanol,
+  steel direct-reduction).
+- Hydrogen-vehicle OEMs and fuel-cell-stack manufacturers.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "hydrogen-energy"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+End-use combustion in transport (rail, marine, aviation) is
+out of scope where adjacent WIA standards already cover the
+mode-specific records.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+programmeOperator    : string (institutional identifier of
+                         the operator)
+programmeRegistered  : string (ISO 8601 / RFC 3339)
+valueChainSegments   : array of enum ("production-electrolysis"
+                         | "production-smr-atr" |
+                         "production-by-product" |
+                         "purification" | "compression" |
+                         "liquefaction" |
+                         "transport-tube-trailer" |
+                         "transport-pipeline" |
+                         "transport-marine-cryogenic" |
+                         "transport-ammonia-carrier" |
+                         "transport-lohc-carrier" |
+                         "storage-compressed" |
+                         "storage-liquid" |
+                         "storage-metal-hydride" |
+                         "storage-salt-cavern" |
+                         "refuelling-station" |
+                         "industrial-offtake" |
+                         "blending-into-gas-network")
+jurisdictionScope    : array of string (ISO 3166-1)
+guaranteeOfOriginRef : string (CertifHy or local equivalent
+                         scheme reference for the operator's
+                         registered hydrogen)
+programmeStatus      : enum ("design" | "construction" |
+                         "commissioning" | "operating" |
+                         "decommissioning" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Production Record
 
-## §4 Discovery
+```
+productionRecord:
+  recordId           : string (uuidv7)
+  programmeId        : string (uuidv7)
+  facilityRef        : string (operator's facility identifier)
+  productionPath     : enum ("alkaline-electrolysis" |
+                         "pem-electrolysis" |
+                         "aem-electrolysis" |
+                         "solid-oxide-electrolysis" |
+                         "smr-without-ccs" |
+                         "smr-with-ccs" |
+                         "atr-with-ccs" |
+                         "biomass-gasification" |
+                         "chlor-alkali-by-product" |
+                         "user-defined")
+  intervalStart      : string (ISO 8601)
+  intervalEnd        : string (ISO 8601)
+  hydrogenMassKg     : number (kg of H2 produced over the
+                         interval)
+  electricityInputMWh: number (for electrolysis paths)
+  electricitySourceMix : object (per ISO 14064-1 emissions
+                         accounting; renewable / nuclear /
+                         grid-mix breakdown with per-source
+                         MWh and per-source emissions
+                         intensity)
+  feedstockMassKg    : object (for SMR/ATR/biomass paths;
+                         per-feedstock mass)
+  capturedCo2Mass    : number (kg CO2 captured at the source;
+                         present for CCS-equipped paths)
+  carbonIntensity    : number (kgCO2eq per kgH2 over the full
+                         well-to-gate scope per the operator's
+                         declared LCA boundary)
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/hydrogen-energy`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Hydrogen Quality Record
 
-## §5 Time and Identity
+Hydrogen for fuel-cell vehicle use follows ISO 14687:2019
+Type I Grade D (gaseous hydrogen for road vehicles); other
+end-uses follow lower or higher purity grades per the
+end-user's specification.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+hydrogenQuality:
+  qualityId          : string (uuidv7)
+  productionRecordRef: string (URI of the production batch
+                         the assay characterises)
+  sampledAt          : string (ISO 8601)
+  qualityGrade       : enum ("ISO-14687-Type-I-Grade-A" |
+                         "ISO-14687-Type-I-Grade-B" |
+                         "ISO-14687-Type-I-Grade-C" |
+                         "ISO-14687-Type-I-Grade-D" |
+                         "ISO-14687-Type-II-Grade-D" |
+                         "ISO-14687-Type-III" |
+                         "industrial-99.5" |
+                         "industrial-99.9" |
+                         "user-defined")
+  measuredImpurities : object (per-impurity ppm or ppb —
+                         water, total hydrocarbons, oxygen,
+                         helium, nitrogen, argon, carbon
+                         dioxide, carbon monoxide, sulphur,
+                         formaldehyde, formic acid, ammonia,
+                         particulates per ISO 14687 limits)
+  laboratoryRef      : string (ISO/IEC 17025-accredited
+                         laboratory identifier)
+  certificateRef     : string (URI of the test certificate)
+```
 
-## §6 Versioning and Deprecation
+## §5 Storage and Inventory Record
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+storageInventory:
+  inventoryId        : string (uuidv7)
+  facilityRef        : string (storage facility identifier)
+  capturedAt         : string (ISO 8601)
+  storageMode        : enum ("compressed-tube-bank" |
+                         "compressed-vessel-700-bar" |
+                         "compressed-vessel-350-bar" |
+                         "liquid-bulk-cryogenic" |
+                         "metal-hydride-bed" |
+                         "salt-cavern" |
+                         "lined-rock-cavern" |
+                         "ammonia-carrier-bulk" |
+                         "lohc-carrier-bulk")
+  inventoryMassKg    : number
+  workingPressureMpa : number
+  temperatureKelvin  : number
+  boilOffMassKg      : number (cumulative boil-off since
+                         last reset; relevant for liquid
+                         storage)
+  boilOffRecaptureRef: string (URI of the boil-off recapture
+                         record where applicable)
+```
 
-## §7 Privacy and Security
+## §6 Refuelling Event Record (HRS)
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Hydrogen refuelling stations operate under ISO 19880-1 and
+follow SAE J2601 fueling protocols with SAE J2799 station-
+to-vehicle communication.
 
-## §8 Open Governance
+```
+refuellingEvent:
+  eventId            : string (uuidv7)
+  hrsFacilityRef     : string (refuelling station identifier)
+  vehicleTokenRef    : string (opaque vehicle token; clinical
+                         vehicle identity held in the
+                         operator's CRM, never on this API)
+  startedAt          : string (ISO 8601 / RFC 3339)
+  endedAt            : string (ISO 8601)
+  protocolUsed       : enum ("J2601-A70-MC-default" |
+                         "J2601-A70-non-comm" |
+                         "J2601-H70-comm" |
+                         "J2601-T20-MC" |
+                         "J2601-T40-MC" |
+                         "user-defined")
+  initialPressureMpa : number
+  finalPressureMpa   : number
+  dispensedMassKg    : number
+  ambientTempCelsius : number
+  precooledTempCelsius : number (precooler outlet temperature
+                         per SAE J2601 envelope)
+  qualityCertificateRef : string (URI of the per-batch
+                         quality certificate per ISO 19880-8
+                         and SAE J2719)
+  outcome            : enum ("nominal" | "early-stop-pressure" |
+                         "early-stop-temperature" |
+                         "early-stop-fault" | "aborted")
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `hydrogen-energy` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §7 Transport Record
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+transportEvent:
+  eventId            : string (uuidv7)
+  programmeId        : string (uuidv7)
+  carrierKind        : enum ("tube-trailer-200-bar" |
+                         "tube-trailer-500-bar" |
+                         "liquid-tanker-cryogenic" |
+                         "pipeline-shared-natural-gas" |
+                         "pipeline-dedicated-h2" |
+                         "ammonia-marine-carrier" |
+                         "lohc-marine-carrier" |
+                         "ammonia-rail-tanker")
+  loadedAt           : string (ISO 8601)
+  loadedMassKg       : number
+  originFacilityRef  : string
+  destinationFacilityRef : string
+  unloadedAt         : string (ISO 8601; absent until
+                         unloaded)
+  unloadedMassKg     : number (absent until unloaded; should
+                         match loaded mass less in-transit
+                         losses)
+  routeHazardClass   : enum ("UN-class-2-1-flammable-gas" |
+                         "UN-class-2-3-toxic-gas-ammonia" |
+                         "UN-class-9-misc-lohc")
+```
 
+## §8 Safety Incident Record
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+Hydrogen handling carries deflagration / detonation risk per
+the operating jurisdiction's industrial-safety regime
+(IEC 60079 explosive atmospheres equipment, NFPA 2 in the
+US, Korean KGS Code in Korea, equivalent rules elsewhere).
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```
+safetyIncident:
+  incidentId         : string (uuidv7)
+  programmeId        : string (uuidv7)
+  occurredAt         : string (ISO 8601)
+  facilityRef        : string
+  classification     : enum ("leak-detected-no-ignition" |
+                         "leak-with-deflagration" |
+                         "detonation" |
+                         "low-temperature-exposure" |
+                         "asphyxiation-hazard" |
+                         "equipment-failure-no-release" |
+                         "spill-cryogenic" |
+                         "near-miss")
+  severity           : enum ("informational" | "minor" |
+                         "major" | "critical")
+  releaseQuantityKg  : number (estimated H2 released; absent
+                         where the incident did not involve
+                         release)
+  rootCauseRef       : string (URI of the root-cause
+                         investigation report)
+  regulatorNotificationRef : string (URI of the regulator
+                         notification artefact)
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §9 Carrier-Conversion Record (Ammonia / LOHC)
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Hydrogen carriers (ammonia, methylcyclohexane and other
+LOHCs, methanol-as-carrier) move hydrogen across long
+distances more economically than compressed or liquefied
+H2. The carrier-conversion record captures the conversion
+events at the originating and receiving terminals.
 
-## Annex F — Adoption Roadmap
+```
+carrierConversion:
+  conversionId       : string (uuidv7)
+  programmeId        : string (uuidv7)
+  facilityRef        : string (terminal identifier)
+  capturedAt         : string (ISO 8601)
+  conversionDirection: enum ("hydrogen-to-ammonia" |
+                         "ammonia-to-hydrogen-cracking" |
+                         "hydrogen-to-lohc-loading" |
+                         "lohc-to-hydrogen-dehydrogenation" |
+                         "hydrogen-to-methanol-synthesis" |
+                         "methanol-to-hydrogen-reforming")
+  inputHydrogenMassKg: number (when input is H2; absent
+                         when input is the carrier)
+  outputHydrogenMassKg : number (when output is H2; absent
+                         when output is the carrier)
+  carrierMassKg      : number (mass of the carrier on the
+                         carrier side of the conversion)
+  energyInputMWh     : number (process energy input;
+                         dehydrogenation is endothermic and
+                         requires significant heat)
+  catalystRef        : string (URI of the catalyst-management
+                         record where conversion uses
+                         catalysts requiring lifetime
+                         tracking)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §10 Embrittlement-Coupon Record (Pipelines)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+embrittlementCoupon:
+  couponId           : string (uuidv7)
+  pipelineRef        : string (pipeline segment identifier)
+  installedAt        : string (ISO 8601)
+  retrievedAt        : string (ISO 8601; absent until
+                         retrieved)
+  materialGrade      : string (per the pipeline's material
+                         classification, e.g. "API 5L X60")
+  exposureProfile    : object (per-period H2 partial pressure,
+                         blending percentage, temperature)
+  destructiveTestRef : string (URI of the laboratory's
+                         destructive test report; absent
+                         until tested)
+  embrittlementVerdict : enum ("within-design-envelope" |
+                         "envelope-exceeded-investigation" |
+                         "remediation-required")
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §11 Conformance
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Implementations claiming PHASE-1 conformance emit each of
+the records defined above for every operating facility and
+honour the ISO 14687:2019 quality grade in §4.
 
-## Annex G — Test Vectors and Conformance Evidence
+---
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+**Document Information:**
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-hydrogen-energy
+- **Last Updated:** 2026-04-28

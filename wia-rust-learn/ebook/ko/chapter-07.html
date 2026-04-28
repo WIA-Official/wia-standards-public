@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: 두려움 없는 동시성 - WIA-RUST-LEARN</title>
+    <style>
+        :root { --rust-orange: #f97316; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --yellow: #eab308; --blue: #0EA5E9; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-orange); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-orange); }
+        h2 { font-size: 1.5rem; margin: 30px 0 15px; color: var(--text); }
+        h3 { font-size: 1.2rem; margin: 20px 0 10px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-orange); }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .warning { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--yellow); }
+        .tip { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--blue); }
+        code { background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+        ul { padding-left: 25px; color: var(--text-muted); margin-bottom: 15px; }
+        li { margin-bottom: 8px; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>7장: 두려움 없는 동시성</h1>
+
+        <p>Rust의 소유권 시스템은 컴파일 타임에 데이터 레이스를 방지합니다. 멀티스레딩 버그를 걱정하지 않고 자신감 있게 동시성 코드를 작성할 수 있습니다.</p>
+
+        <div class="highlight">
+            <strong>왜 "두려움 없는" 동시성인가?</strong>
+            <p style="margin-top: 10px;">C나 C++에서는 동시성 버그(데이터 레이스, 데드락)가 런타임에만 발견됩니다. Rust는 컴파일러가 많은 문제를 사전에 차단하여, 안전한 동시성 코드를 작성할 수 있게 해줍니다.</p>
+        </div>
+
+        <h2>7.1 스레드 생성과 관리</h2>
+
+        <p>Rust의 스레드는 운영체제 스레드를 직접 사용합니다 (1:1 모델).</p>
+
+        <h3>기본 스레드 생성</h3>
+        <pre>use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let handle = thread::spawn(|| {
+        for i in 1..10 {
+            println!("생성된 스레드에서: {}", i);
+            thread::sleep(Duration::from_millis(1));
+        }
+    });
+
+    for i in 1..5 {
+        println!("메인 스레드에서: {}", i);
+        thread::sleep(Duration::from_millis(1));
+    }
+
+    // 스레드가 완료될 때까지 대기
+    handle.join().unwrap();
+    println!("모든 스레드 완료!");
+}</pre>
+
+        <h3>join()의 중요성</h3>
+        <pre>use std::thread;
+
+fn main() {
+    let handle = thread::spawn(|| {
+        for i in 1..10 {
+            println!("스레드: {}", i);
+        }
+    });
+
+    // join()을 호출하지 않으면 메인이 끝날 때 스레드가 중단될 수 있음
+    // handle.join().unwrap();
+
+    println!("메인 종료");
+    // 스레드가 아직 실행 중일 수 있음!
+}
+
+// 올바른 방법
+fn proper_way() {
+    let handle = thread::spawn(|| {
+        for i in 1..10 {
+            println!("스레드: {}", i);
+        }
+    });
+
+    println!("메인 작업 중...");
+
+    // 스레드 완료 대기
+    match handle.join() {
+        Ok(_) => println!("스레드가 성공적으로 완료됨"),
+        Err(e) => println!("스레드 에러: {:?}", e),
+    }
+}</pre>
+
+        <h3>여러 스레드 관리</h3>
+        <pre>use std::thread;
+
+fn main() {
+    let mut handles = vec![];
+
+    for i in 0..10 {
+        let handle = thread::spawn(move || {
+            println!("스레드 {} 시작", i);
+            // 작업 수행
+            i * 2
+        });
+        handles.push(handle);
+    }
+
+    // 모든 스레드의 결과 수집
+    let results: Vec&lt;_&gt; = handles
+        .into_iter()
+        .map(|h| h.join().unwrap())
+        .collect();
+
+    println!("결과: {:?}", results);
+}</pre>
+
+        <h2>7.2 Move 클로저와 소유권</h2>
+
+        <p>스레드에서 외부 변수를 사용하려면 소유권을 이동시켜야 합니다.</p>
+
+        <h3>소유권 이동의 필요성</h3>
+        <pre>use std::thread;
+
+fn main() {
+    let v = vec![1, 2, 3];
+
+    // 에러! v의 생명주기가 불확실
+    // let handle = thread::spawn(|| {
+    //     println!("벡터: {:?}", v);
+    // });
+
+    // move로 소유권 이동
+    let handle = thread::spawn(move || {
+        println!("벡터: {:?}", v); // v가 스레드로 이동됨
+    });
+
+    // println!("{:?}", v); // 에러! v가 이동됨
+
+    handle.join().unwrap();
+}</pre>
+
+        <h3>데이터 복제 vs 이동</h3>
+        <pre>use std::thread;
+
+fn main() {
+    let s = String::from("안녕하세요");
+
+    // clone()으로 복제
+    let s_clone = s.clone();
+    let handle = thread::spawn(move || {
+        println!("스레드에서: {}", s_clone);
+    });
+
+    println!("메인에서: {}", s); // OK! s는 여전히 유효
+    handle.join().unwrap();
+
+    // 여러 스레드에 복제
+    let data = vec![1, 2, 3, 4, 5];
+    let mut handles = vec![];
+
+    for i in 0..3 {
+        let data_clone = data.clone();
+        let handle = thread::spawn(move || {
+            println!("스레드 {}: {:?}", i, data_clone);
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+}</pre>
+
+        <h2>7.3 메시지 전달 - 채널</h2>
+
+        <p>"메모리를 공유하지 말고, 메시지를 전달하라" - Go 언어의 철학을 Rust도 지원합니다.</p>
+
+        <h3>기본 채널 사용</h3>
+        <pre>use std::sync::mpsc; // multiple producer, single consumer
+use std::thread;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        let msg = String::from("안녕하세요");
+        tx.send(msg).unwrap();
+        // println!("{}", msg); // 에러! msg가 send로 이동됨
+    });
+
+    // 메시지 수신 (블로킹)
+    let received = rx.recv().unwrap();
+    println!("받은 메시지: {}", received);
+}</pre>
+
+        <h3>여러 메시지 전송</h3>
+        <pre>use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        let vals = vec![
+            String::from("안녕"),
+            String::from("스레드"),
+            String::from("에서"),
+            String::from("보냄"),
+        ];
+
+        for val in vals {
+            tx.send(val).unwrap();
+            thread::sleep(Duration::from_millis(500));
+        }
+    });
+
+    // for 루프로 모든 메시지 수신
+    for received in rx {
+        println!("받음: {}", received);
+    }
+}</pre>
+
+        <h3>여러 생산자 (Multiple Producers)</h3>
+        <pre>use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+
+    // 전송자 복제
+    let tx1 = tx.clone();
+    let tx2 = tx.clone();
+
+    thread::spawn(move || {
+        tx1.send("스레드 1에서").unwrap();
+    });
+
+    thread::spawn(move || {
+        tx2.send("스레드 2에서").unwrap();
+    });
+
+    thread::spawn(move || {
+        tx.send("스레드 3에서").unwrap();
+    });
+
+    // 3개의 메시지 수신
+    for _ in 0..3 {
+        println!("{}", rx.recv().unwrap());
+    }
+}</pre>
+
+        <h3>비동기 수신</h3>
+        <pre>use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        thread::sleep(Duration::from_secs(1));
+        tx.send("메시지").unwrap();
+    });
+
+    // recv() - 블로킹
+    // try_recv() - 논블로킹
+
+    loop {
+        match rx.try_recv() {
+            Ok(msg) => {
+                println!("받음: {}", msg);
+                break;
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                println!("아직 메시지 없음, 작업 계속...");
+                thread::sleep(Duration::from_millis(200));
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                println!("송신자 연결 끊김");
+                break;
+            }
+        }
+    }
+}</pre>
+
+        <h2>7.4 공유 상태 - Mutex</h2>
+
+        <p>여러 스레드가 동일한 메모리에 접근해야 할 때 Mutex를 사용합니다.</p>
+
+        <h3>Mutex 기본</h3>
+        <pre>use std::sync::Mutex;
+
+fn main() {
+    let m = Mutex::new(5);
+
+    {
+        // lock()으로 잠금 획득
+        let mut num = m.lock().unwrap();
+        *num = 6;
+        println!("변경된 값: {}", num);
+    } // 스코프를 벗어나면 자동으로 잠금 해제
+
+    println!("m = {:?}", m); // Mutex { data: 6, poisoned: false, .. }
+}</pre>
+
+        <h3>여러 스레드에서 Mutex 공유</h3>
+        <pre>use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let counter = Arc::clone(&counter);
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("결과: {}", *counter.lock().unwrap());
+}</pre>
+
+        <div class="warning">
+            <strong>Mutex 사용 시 주의사항</strong>
+            <ul style="margin-top: 10px;">
+                <li><strong>데드락</strong>: 두 스레드가 서로의 잠금을 기다리는 상황</li>
+                <li><strong>Poisoning</strong>: 잠금을 보유한 스레드가 패닉하면 Mutex가 오염됨</li>
+                <li><strong>성능</strong>: 잠금 경합이 심하면 성능 저하</li>
+            </ul>
+        </div>
+
+        <h3>데드락 피하기</h3>
+        <pre>use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    let lock1 = Arc::new(Mutex::new(0));
+    let lock2 = Arc::new(Mutex::new(0));
+
+    // 나쁜 예: 데드락 가능성
+    let lock1_clone = Arc::clone(&lock1);
+    let lock2_clone = Arc::clone(&lock2);
+
+    let handle1 = thread::spawn(move || {
+        let _g1 = lock1_clone.lock().unwrap();
+        thread::sleep(std::time::Duration::from_millis(10));
+        let _g2 = lock2_clone.lock().unwrap(); // 스레드2가 lock2를 잡고 있으면 데드락
+    });
+
+    let lock1_clone = Arc::clone(&lock1);
+    let lock2_clone = Arc::clone(&lock2);
+
+    let handle2 = thread::spawn(move || {
+        let _g2 = lock2_clone.lock().unwrap();
+        thread::sleep(std::time::Duration::from_millis(10));
+        let _g1 = lock1_clone.lock().unwrap(); // 스레드1이 lock1을 잡고 있으면 데드락
+    });
+
+    handle1.join().unwrap();
+    handle2.join().unwrap();
+}
+
+// 좋은 예: 항상 같은 순서로 잠금
+fn proper_locking() {
+    let lock1 = Arc::new(Mutex::new(0));
+    let lock2 = Arc::new(Mutex::new(0));
+
+    // 모든 스레드가 lock1 → lock2 순서로 획득
+    let lock1_clone = Arc::clone(&lock1);
+    let lock2_clone = Arc::clone(&lock2);
+
+    let handle1 = thread::spawn(move || {
+        let _g1 = lock1_clone.lock().unwrap();
+        let _g2 = lock2_clone.lock().unwrap();
+    });
+
+    let lock1_clone = Arc::clone(&lock1);
+    let lock2_clone = Arc::clone(&lock2);
+
+    let handle2 = thread::spawn(move || {
+        let _g1 = lock1_clone.lock().unwrap(); // 같은 순서!
+        let _g2 = lock2_clone.lock().unwrap();
+    });
+
+    handle1.join().unwrap();
+    handle2.join().unwrap();
+}</pre>
+
+        <h2>7.5 Arc - 원자적 참조 카운팅</h2>
+
+        <p>Arc는 스레드 안전한 참조 카운팅 포인터입니다.</p>
+
+        <h3>Rc vs Arc</h3>
+        <pre>use std::rc::Rc;
+use std::sync::Arc;
+use std::thread;
+
+fn main() {
+    // Rc는 단일 스레드용
+    let rc_data = Rc::new(5);
+    // let rc_clone = Rc::clone(&rc_data);
+    // thread::spawn(move || {
+    //     println!("{}", rc_clone); // 에러! Rc는 Send가 아님
+    // });
+
+    // Arc는 멀티스레드용
+    let arc_data = Arc::new(5);
+    let arc_clone = Arc::clone(&arc_data);
+
+    thread::spawn(move || {
+        println!("스레드에서: {}", arc_clone); // OK!
+    }).join().unwrap();
+
+    println!("메인에서: {}", arc_data);
+}</pre>
+
+        <h3>Arc&lt;Mutex&lt;T&gt;&gt; 패턴</h3>
+        <pre>use std::sync::{Arc, Mutex};
+use std::thread;
+
+#[derive(Debug)]
+struct SharedState {
+    value: i32,
+    description: String,
+}
+
+fn main() {
+    let state = Arc::new(Mutex::new(SharedState {
+        value: 0,
+        description: String::from("공유 상태"),
+    }));
+
+    let mut handles = vec![];
+
+    for i in 0..5 {
+        let state = Arc::clone(&state);
+        let handle = thread::spawn(move || {
+            let mut s = state.lock().unwrap();
+            s.value += i;
+            s.description.push_str(&format!(" +{}", i));
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    let final_state = state.lock().unwrap();
+    println!("최종 상태: {:?}", *final_state);
+}</pre>
+
+        <h2>7.6 Send와 Sync 트레이트</h2>
+
+        <p>Rust의 동시성 안전성은 이 두 마커 트레이트에 기반합니다.</p>
+
+        <div class="highlight">
+            <strong>Send와 Sync</strong>
+            <ul style="margin-top: 10px;">
+                <li><strong>Send</strong>: 타입의 소유권을 스레드 간 이동 가능</li>
+                <li><strong>Sync</strong>: 타입의 참조를 여러 스레드에서 안전하게 공유 가능</li>
+                <li>대부분의 타입은 자동으로 Send + Sync</li>
+                <li>예외: <code>Rc</code>, <code>RefCell</code>, 원시 포인터</li>
+            </ul>
+        </div>
+
+        <pre>use std::rc::Rc;
+use std::sync::Arc;
+use std::thread;
+
+fn main() {
+    // Rc는 Send가 아님
+    let rc = Rc::new(5);
+    // thread::spawn(move || {
+    //     println!("{}", rc); // 컴파일 에러!
+    // });
+
+    // Arc는 Send + Sync
+    let arc = Arc::new(5);
+    thread::spawn(move || {
+        println!("{}", arc); // OK!
+    }).join().unwrap();
+}
+
+// 커스텀 타입의 Send/Sync
+struct MyType {
+    value: i32,
+}
+
+// MyType은 자동으로 Send + Sync
+// (모든 필드가 Send + Sync이므로)
+
+// Send/Sync를 수동으로 구현하려면 unsafe 필요
+// unsafe impl Send for MyType {}
+// unsafe impl Sync for MyType {}</pre>
+
+        <h2>7.7 고급 동시성 패턴</h2>
+
+        <h3>작업자 풀 (Worker Pool)</h3>
+        <pre>use std::sync::{Arc, Mutex, mpsc};
+use std::thread;
+
+type Job = Box&lt;dyn FnOnce() + Send + 'static&gt;;
+
+struct Worker {
+    id: usize,
+    thread: Option&lt;thread::JoinHandle&lt;()&gt;&gt;,
+}
+
+impl Worker {
+    fn new(id: usize, receiver: Arc&lt;Mutex&lt;mpsc::Receiver&lt;Job&gt;&gt;&gt;) -> Worker {
+        let thread = thread::spawn(move || loop {
+            let job = receiver.lock().unwrap().recv();
+
+            match job {
+                Ok(job) => {
+                    println!("작업자 {}가 작업 실행", id);
+                    job();
+                }
+                Err(_) => {
+                    println!("작업자 {} 종료", id);
+                    break;
+                }
+            }
+        });
+
+        Worker {
+            id,
+            thread: Some(thread),
+        }
+    }
+}
+
+struct ThreadPool {
+    workers: Vec&lt;Worker&gt;,
+    sender: mpsc::Sender&lt;Job&gt;,
+}
+
+impl ThreadPool {
+    fn new(size: usize) -> ThreadPool {
+        let (sender, receiver) = mpsc::channel();
+        let receiver = Arc::new(Mutex::new(receiver));
+
+        let mut workers = Vec::with_capacity(size);
+
+        for id in 0..size {
+            workers.push(Worker::new(id, Arc::clone(&receiver)));
+        }
+
+        ThreadPool { workers, sender }
+    }
+
+    fn execute&lt;F&gt;(&self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        let job = Box::new(f);
+        self.sender.send(job).unwrap();
+    }
+}
+
+fn main() {
+    let pool = ThreadPool::new(4);
+
+    for i in 0..8 {
+        pool.execute(move || {
+            println!("작업 {} 실행 중", i);
+            thread::sleep(std::time::Duration::from_millis(500));
+        });
+    }
+
+    thread::sleep(std::time::Duration::from_secs(5));
+}</pre>
+
+        <h3>배리어 (Barrier)</h3>
+        <pre>use std::sync::{Arc, Barrier};
+use std::thread;
+
+fn main() {
+    let mut handles = Vec::with_capacity(10);
+    let barrier = Arc::new(Barrier::new(10));
+
+    for i in 0..10 {
+        let c = Arc::clone(&barrier);
+        handles.push(thread::spawn(move || {
+            println!("스레드 {} 준비 중...", i);
+            thread::sleep(std::time::Duration::from_millis(i * 100));
+
+            c.wait(); // 모든 스레드가 도착할 때까지 대기
+
+            println!("스레드 {} 시작!", i);
+        }));
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+}</pre>
+
+        <h2>7.8 WIA-AI-CITY 동시성 예제</h2>
+
+        <pre>use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
+
+// GPU 워크로드 관리자
+struct GPUManager {
+    active_jobs: Arc&lt;Mutex&lt;Vec&lt;String&gt;&gt;&gt;,
+    max_jobs: usize,
+}
+
+impl GPUManager {
+    fn new(max_jobs: usize) -> Self {
+        GPUManager {
+            active_jobs: Arc::new(Mutex::new(Vec::new())),
+            max_jobs,
+        }
+    }
+
+    fn submit_job(&self, job_name: String) -> Result&lt;(), String&gt; {
+        let mut jobs = self.active_jobs.lock().unwrap();
+
+        if jobs.len() >= self.max_jobs {
+            return Err("GPU 용량 초과".to_string());
+        }
+
+        jobs.push(job_name.clone());
+        println!("작업 제출됨: {} (총 {}개)", job_name, jobs.len());
+        Ok(())
+    }
+
+    fn complete_job(&self, job_name: &str) {
+        let mut jobs = self.active_jobs.lock().unwrap();
+        if let Some(pos) = jobs.iter().position(|j| j == job_name) {
+            jobs.remove(pos);
+            println!("작업 완료: {} (남은 {}개)", job_name, jobs.len());
+        }
+    }
+
+    fn get_stats(&self) -> (usize, usize) {
+        let jobs = self.active_jobs.lock().unwrap();
+        (jobs.len(), self.max_jobs)
+    }
+}
+
+fn main() {
+    let manager = Arc::new(GPUManager::new(4));
+    let mut handles = vec![];
+
+    // 8개의 AI 작업 제출
+    for i in 0..8 {
+        let manager = Arc::clone(&manager);
+        let handle = thread::spawn(move || {
+            let job_name = format!("AI-Job-{}", i);
+
+            loop {
+                match manager.submit_job(job_name.clone()) {
+                    Ok(_) => break,
+                    Err(_) => {
+                        thread::sleep(Duration::from_millis(100));
+                    }
+                }
+            }
+
+            // 작업 시뮬레이션
+            thread::sleep(Duration::from_secs(1));
+
+            manager.complete_job(&job_name);
+        });
+        handles.push(handle);
+    }
+
+    // 상태 모니터링
+    let manager_monitor = Arc::clone(&manager);
+    let monitor = thread::spawn(move || {
+        for _ in 0..10 {
+            let (active, max) = manager_monitor.get_stats();
+            println!("[모니터] GPU 사용률: {}/{}", active, max);
+            thread::sleep(Duration::from_millis(300));
+        }
+    });
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    monitor.join().unwrap();
+
+    println!("모든 작업 완료!");
+}</pre>
+
+        <h2>7.9 성능 최적화 팁</h2>
+
+        <div class="tip">
+            <strong>동시성 성능 최적화</strong>
+            <ul>
+                <li>잠금 경합 최소화: 임계 구역을 최대한 짧게</li>
+                <li>읽기 전용은 <code>RwLock</code> 사용 고려</li>
+                <li>메시지 전달 vs 공유 상태: 상황에 맞게 선택</li>
+                <li>원자적 연산: 단순한 카운터는 <code>AtomicUsize</code> 사용</li>
+                <li>스레드 풀 크기: CPU 코어 수와 작업 특성 고려</li>
+            </ul>
+        </div>
+
+        <pre>use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::thread;
+
+fn main() {
+    // Mutex보다 빠른 원자적 카운터
+    let counter = Arc::new(AtomicUsize::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let counter = Arc::clone(&counter);
+        let handle = thread::spawn(move || {
+            for _ in 0..1000 {
+                counter.fetch_add(1, Ordering::SeqCst);
+            }
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("결과: {}", counter.load(Ordering::SeqCst));
+}</pre>
+
+        </div>
+</body>
+</html>

@@ -5,270 +5,373 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-anti-money-laundering (Anti Money Laundering).
+This document defines the protocols that govern an
+obliged entity under the FATF 40 Recommendations as
+transposed into the operating jurisdiction's law: the
+risk-based-approach discipline (FATF Recommendation 1),
+the customer due diligence discipline (Recommendation
+10), the higher-risk-customer / PEP discipline
+(Recommendation 12), the correspondent-banking
+discipline (Recommendation 13), the new-technologies
+discipline (Recommendation 15) including virtual-asset
+service providers, the wire-transfer discipline
+(Recommendation 16, "Travel Rule"), the suspicious-
+transaction-reporting discipline (Recommendation 20),
+the tipping-off prohibition (Recommendation 21), the
+DNFBP discipline (Recommendations 22 and 23), the
+beneficial-ownership-transparency discipline
+(Recommendations 24 and 25), the sanctions-screening
+discipline (Recommendations 6 and 7), and the
+supervisor and FIU correspondence discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 8601 (date and time)
+- ISO 20022 (financial-services messaging)
+- ISO 17442 (LEI)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 9457 (Problem Details)
+- FATF 40 Recommendations
+- FATF Methodology
+- FATF Recommendation 6 (UN Security Council resolutions
+  against terrorism financing) and Recommendation 7
+  (UN Security Council resolutions against
+  proliferation financing)
+- FATF Recommendation 10 (CDD), 11 (record retention),
+  12 (PEPs), 13 (correspondent banking), 15 (new
+  technologies / VASPs), 16 (wire transfers / Travel
+  Rule), 18 (internal controls), 20 (STR), 21 (tipping
+  off prohibition), 22 (DNFBP CDD), 23 (DNFBP STR),
+  24 (legal-person beneficial ownership), 25 (legal-
+  arrangement beneficial ownership)
+- US Bank Secrecy Act (BSA) and 31 CFR Chapter X
+- US OFAC SDN and consolidated sanctions lists
+- EU AML Regulation (EU) 2024/1624 and EU Authority
+  Regulation (EU) 2024/1620 (AMLA)
+- Directive (EU) 2018/1673 on combating money
+  laundering by criminal law
+- KR Specific Financial Information Act
+- KR Act on Prohibition of Financing of Terrorism
+- UK MLR 2017 (Money Laundering, Terrorist Financing
+  and Transfer of Funds (Information on the Payer)
+  Regulations 2017)
+- Wolfsberg Group Anti-Money Laundering Principles
+  (cited as a community-recognised cross-border
+  banking baseline; non-binding)
 
 ---
 
-## §1 Scope
+## §1 Risk-Based-Approach Discipline (FATF Recommendation 1)
 
-This PHASE document is one of four that together define the WIA-anti-money-laundering
-standard. It addresses the protocol layer of the standard.
+The obliged entity's AML/CFT programme is calibrated to
+the risks the obliged entity faces. The discipline:
 
-## §2 Manifest
+- enterprise-wide risk assessment (EWRA) covering
+  customer types, geographic exposure, products and
+  services, delivery channels;
+- per-customer risk rating (PHASE-1 §3 `riskRating`)
+  applied as the basis for CDD intensity;
+- per-product risk assessment (private banking,
+  correspondent banking, virtual-asset products,
+  cross-border wires carry inherently elevated risk);
+- per-jurisdiction geographic risk assessment using
+  FATF's high-risk and other monitored jurisdictions
+  list as one input alongside the obliged entity's
+  internal geographic risk model;
+- annual EWRA refresh and event-triggered refresh
+  (regulatory change, new product launch, FATF list
+  update, a major sanctions designation that affects
+  a corridor).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "anti-money-laundering"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Customer Due Diligence Discipline (Recommendation 10)
 
-## §3 Conformance Tiers
+CDD is performed at:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- onboarding;
+- periodically per the customer's risk rating;
+- on event triggers (suspicious activity, beneficial-
+  ownership change, sanctions hit, regulatory inquiry,
+  customer change of jurisdiction);
+- when there is doubt about the veracity or adequacy
+  of previously obtained data.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+CDD scope: identification of the customer; verification
+of identity using reliable, independent source
+documents, data or information; identification of the
+beneficial owner; understanding the purpose and
+intended nature of the business relationship; ongoing
+monitoring.
 
-## §4 Discovery
+For natural persons the obliged entity captures legal
+name, date of birth, residential address, nationality,
+and a government-issued identification document. For
+legal persons the obliged entity captures legal name,
+registered address, principal place of business, the
+legal form, the proof of existence (extract from a
+public register), the powers that regulate and bind
+the legal person, and the natural-person beneficial
+owner identity. The Recommendation 24/25 beneficial-
+owner threshold is the operating jurisdiction's
+adopted threshold (the EU AML Regulation 2024/1624
+sets a 25% threshold; the operating jurisdiction's
+implementation governs).
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/anti-money-laundering`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Higher-Risk and PEP Discipline (Recommendation 12)
 
-## §5 Time and Identity
+PEPs (per FATF Recommendation 12) are subject to
+enhanced due diligence:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- senior-management approval for establishing or
+  continuing the relationship;
+- enhanced source-of-wealth and source-of-funds
+  verification;
+- enhanced ongoing monitoring of the relationship.
 
-## §6 Versioning and Deprecation
+The PEP discipline applies to family members and
+known close associates of PEPs. Domestic PEP / foreign
+PEP / international-organisation PEP distinctions
+follow the operating jurisdiction's transposition
+(some jurisdictions apply only foreign-PEP enhancement
+while some apply EDD to all PEP categories).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Correspondent-Banking Discipline (Recommendation 13)
 
-## §7 Privacy and Security
+Cross-border correspondent banking carries heightened
+risk because the obliged entity does not have direct
+visibility into the respondent bank's customers. The
+discipline:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- prohibition on shell-bank correspondent relationships
+  per Recommendation 13;
+- documented respondent-bank AML attestation review;
+- senior-management approval before establishing the
+  relationship;
+- enhanced ongoing monitoring of the relationship's
+  payment volume and corridor risk;
+- per-relationship review on a documented cadence
+  (typically annual) and on event-triggered re-review.
 
-## §8 Open Governance
+The Wolfsberg Group's Correspondent Banking Due
+Diligence Questionnaire (CBDDQ) is widely used as the
+respondent-attestation template; the discipline is the
+attestation review, not a specific template.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `anti-money-laundering` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 New-Technologies Discipline (Recommendation 15)
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+VASPs and the obliged entity's interaction with VASPs
+follow Recommendation 15:
 
+- VASPs are subject to AML/CFT supervision in the
+  operating jurisdiction (per the operating
+  jurisdiction's VASP licensing regime — KR's
+  Specific Financial Information Act VASP regime;
+  the EU's MiCA/AMLR VASP framework; FinCEN's MSB
+  VASP framework in the US);
+- the obliged entity's interaction with VASPs is
+  treated as enhanced-risk and triggers EDD;
+- on-chain transactions carry the Travel Rule fields
+  per Recommendation 16 cross-walk, with the wallet
+  address representing the account number.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §6 Wire-Transfer Discipline (Recommendation 16, "Travel Rule")
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Cross-border wire transfers above the operating
+jurisdiction's de minimis threshold (the FATF
+recommendation cites USD/EUR 1,000 as the suggested
+de minimis; the operating jurisdiction's threshold
+governs) carry:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+- originator information (name, account number /
+  wallet address, address);
+- beneficiary information (name, account number /
+  wallet address);
+- the originator and beneficiary information
+  accompanies the transaction across the chain (at
+  the originator's bank, intermediary banks, and the
+  beneficiary's bank).
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+For the SWIFT network, the originator and beneficiary
+fields appear in MT 103 fields 50 and 59 (for the
+direct customer credit transfer) and in MT 202 COV
+fields 50 and 59 of the underlying customer credit
+transfer (for cover payments). The MT-to-ISO 20022
+migration moves the fields to pacs.008 / pacs.009
+structured fields.
 
-## Annex F — Adoption Roadmap
+## §7 Suspicious-Transaction Discipline (Recommendation 20)
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+When the obliged entity suspects, or has reasonable
+grounds to suspect, that funds are the proceeds of a
+criminal activity, or are related to terrorism
+financing, the obliged entity files a suspicious-
+transaction report ("STR" in EU/KR; "SAR" in US/UK).
+The discipline:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+- a clear internal escalation path from frontline
+  staff and transaction monitoring to the compliance
+  officer / MLRO who decides on the filing;
+- the filing is made promptly per the operating
+  jurisdiction's deadline (e.g. FinCEN BSA SAR within
+  30 days of detection; KoFIU STR without delay);
+- the content includes the customer relationship, the
+  specific transactions, the suspicion basis, and the
+  hypothesised predicate offense;
+- the filing is preserved per the FIU's required
+  retention.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §8 Tipping-Off Prohibition (Recommendation 21)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The obliged entity does not disclose to the customer
+or to any third party (other than the FIU and law
+enforcement under the operating jurisdiction's
+information-sharing rules) the fact that an STR / SAR
+has been filed or that an investigation case has
+opened. The tipping-off prohibition is encoded as an
+access-control invariant in the API (PHASE-2 §7 and
+§10). Information-sharing within the same financial
+group is permitted under Recommendation 18 and the
+operating jurisdiction's transposition (e.g. the EU
+AMLR 2024/1624 group-information-sharing provisions).
 
-## Annex G — Test Vectors and Conformance Evidence
+## §9 Sanctions Screening Discipline (Recommendations 6 and 7)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Recommendation 6 obligates implementation of UN
+Security Council targeted financial sanctions
+relating to terrorism and terrorism financing;
+Recommendation 7 obligates implementation of UN
+Security Council targeted financial sanctions
+relating to proliferation financing. The obliged
+entity's sanctions discipline:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- per-customer screening at onboarding and on each
+  CDD refresh;
+- per-transaction screening for cross-border
+  transactions;
+- per-list screening across UN, the operating
+  jurisdiction's national list, and the operating
+  jurisdiction's coalition lists (US OFAC, EU
+  consolidated, UK OFSI, KR MOFA);
+- "without delay" freezing on confirmed match per
+  Recommendation 6 / 7 — the obliged entity does not
+  await court order before applying the freeze;
+- false-positive review with documented rationale
+  (sanctions screening is a noisy signal — name-
+  collision frequency drives a high false-positive
+  rate that the obliged entity manages with secondary
+  data points like date of birth and address).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §10 Records Retention (Recommendation 11)
 
-## Annex H — Versioning and Deprecation Policy
+CDD records, transaction records, sanctions screenings,
+STR / SAR filings, and supervisor correspondence
+retain for at least five years after the end of the
+business relationship or the date of the transaction —
+the FATF Recommendation 11 baseline — extended where
+the operating jurisdiction's law requires longer
+retention or where law enforcement requests preservation
+beyond the baseline.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 Time Synchronisation
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Operator clocks synchronise per RFC 5905 (NTPv4) so
+that transaction-monitoring rule windows, the
+operating jurisdiction's STR / SAR filing deadlines
+(e.g. FinCEN's 30-day SAR filing deadline), and
+"without delay" freezing under Recommendations 6 and 7
+are consistent across the obliged entity's runtime
+fleet.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §12 DNFBP Discipline (Recommendations 22 and 23)
 
-## Annex I — Interoperability Profiles
+DNFBPs (casinos, real-estate agents, dealers in
+precious metals and stones, lawyers and notaries
+within the scope of the FATF guidance, accountants,
+trust-and-company-service providers) follow the same
+risk-based AML/CFT discipline as financial-institution
+obliged entities, with adaptation for the sector's
+business model (e.g. real-estate-transaction triggers,
+lawyer/notary professional-privilege carve-out per the
+operating jurisdiction's transposition).
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §13 Beneficial-Ownership-Transparency Discipline (Recommendations 24 and 25)
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Legal-person and legal-arrangement beneficial-
+ownership identification follows Recommendations 24
+and 25:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- the obliged entity captures the natural-person
+  beneficial-owner identity at onboarding and on each
+  ownership change;
+- the obliged entity uses the operating jurisdiction's
+  beneficial-ownership register where one exists (EU
+  AML Regulation 2024/1624 requires Member State
+  central registers; the UK Companies House Register
+  of People with Significant Control; FinCEN's
+  Beneficial Ownership Information Reporting under
+  the Corporate Transparency Act in the US);
+- the obliged entity does not rely solely on the
+  register's content but uses it as one of several
+  inputs.
 
-## Annex J — Reference Implementation Topology
+## §14 Internal-Controls Discipline (Recommendation 18)
 
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
+Per Recommendation 18 the obliged entity maintains:
 
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-3-PROTOCOL validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
+- written internal AML/CFT policies and procedures;
+- senior-management designation of an AML compliance
+  officer / MLRO with the seniority and access to
+  effectively discharge the role;
+- ongoing employee training on the AML/CFT programme;
+- independent audit function — internal audit or an
+  external auditor — testing the AML/CFT programme;
+- pre-employment screening of staff in sensitive
+  functions.
 
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+## §15 Supervisor and FIU Correspondence Discipline
+
+The obliged entity's correspondence discipline:
+
+- per-supervisor inquiry response per the supervisor's
+  response SLA;
+- per-supervisor on-site examination cooperation;
+- per-supervisor enforcement-action response with
+  documented remediation plan;
+- per-FIU information-request response under the
+  operating jurisdiction's information-sharing rules;
+- per-FIU feedback consumption (FIUs publish typology
+  reports and feedback on STR / SAR quality that the
+  obliged entity uses to refine transaction
+  monitoring).
+
+## §16 Quality Dossier and Conformance
+
+The obliged entity's AML/CFT quality dossier records
+the governing frameworks, the EWRA, the AML
+programme document, the MLRO appointment, the FIU
+filing inventory, the supervisor correspondence, the
+sanctions-list-update calendar, the transaction-
+monitoring rule library, the DNFBP-class adaptations
+(if applicable), and the audit-cycle outcomes. The
+dossier is reviewed at least annually by the
+compliance officer / MLRO and is provided to the
+supervisor on request.
+
+A programme conformant with WIA-anti-money-laundering
+publishes its MLRO contact, its public AML/CFT
+disclosure where the operating jurisdiction requires
+it (e.g. the UK MLR 2017 sectoral disclosures), and
+answers an annual self-assessment that maps each
+clause of this PHASE to the obliged entity's
+implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-anti-money-laundering
+- **Last Updated:** 2026-04-28

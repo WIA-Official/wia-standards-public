@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 8: Building Real Projects - WIA-RUST-LEARN</title>
+    <style>
+        :root { --rust-orange: #f97316; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; --yellow: #eab308; --red: #ef4444; --purple: #8b5cf6; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-orange); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-orange); }
+        h2 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); border-bottom: 2px solid var(--rust-orange); padding-bottom: 10px; }
+        h3 { font-size: 1.2rem; margin: 25px 0 15px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-orange); }
+        code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; font-family: monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-orange); }
+        .success-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .warning-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--yellow); }
+        .project { background: var(--bg-card); padding: 25px; border-radius: 12px; margin: 20px 0; border: 1px solid var(--border); }
+        .project h3 { margin-top: 0; color: var(--rust-orange); }
+        table { width: 100%; margin: 20px 0; border-collapse: collapse; background: var(--bg-card); border-radius: 8px; overflow: hidden; }
+        th { background: var(--rust-orange); color: white; padding: 15px; text-align: left; }
+        td { padding: 12px 15px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+        tr:last-child td { border-bottom: none; }
+        .questions-box { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; }
+        .questions-box h3 { color: var(--blue); margin-top: 0; }
+        .questions-box ol { padding-left: 25px; }
+        .questions-box li { color: var(--text-muted); margin-bottom: 15px; }
+        .summary-box { background: linear-gradient(135deg, #1a2f1a 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--green); }
+        .summary-box h3 { color: var(--green); margin-top: 0; }
+        .summary-box ul { padding-left: 25px; }
+        .summary-box li { color: var(--text-muted); margin-bottom: 10px; }
+        .final-box { background: linear-gradient(135deg, #2d1f3d 0%, #1e293b 100%); padding: 30px; border-radius: 12px; margin: 30px 0; border: 2px solid var(--purple); text-align: center; }
+        .final-box h3 { color: #fbbf24; margin-top: 0; font-size: 1.5rem; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 8: Building Real Projects</h1>
+
+        <p>It's time to apply everything you've learned! This final chapter walks through building real-world projects: a CLI tool for command-line interfaces, a web service with async HTTP, and examples of how Rust integrates with the WIA ecosystem. You'll also learn testing strategies and discover resources for continuing your Rust journey.</p>
+
+        <div class="highlight">
+            <strong>From Theory to Practice</strong>
+            <p style="margin-top: 10px;">The best way to solidify your Rust knowledge is to build real projects. The patterns you've learned - ownership, borrowing, error handling, traits, and concurrency - come together in practical applications. Each project demonstrates how these concepts work in production code.</p>
+        </div>
+
+        <h2>8.1 Project 1: CLI Tool with Clap</h2>
+
+        <div class="project">
+            <h3>File Validator CLI</h3>
+            <p>Build a command-line tool to validate files. This demonstrates argument parsing, file I/O, and error handling patterns common in CLI applications.</p>
+
+            <pre>// Cargo.toml
+[package]
+name = "wia-validate"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"</pre>
+
+            <pre>// src/main.rs
+use clap::Parser;
+use std::fs;
+use std::path::PathBuf;
+use anyhow::{Context, Result};
+
+/// A CLI tool to validate files against standards
+#[derive(Parser)]
+#[command(name = "wia-validate")]
+#[command(about = "Validate files against WIA standards")]
+#[command(version = "1.0")]
+struct Cli {
+    /// The standard to validate against
+    #[arg(short, long)]
+    standard: String,
+
+    /// Path to the file to validate
+    #[arg(short, long)]
+    file: PathBuf,
+
+    /// Enable verbose output
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
+
+    /// Output format (text, json)
+    #[arg(short, long, default_value = "text")]
+    output: String,
+}
+
+fn main() -> Result&lt;()&gt; {
+    let cli = Cli::parse();
+
+    if cli.verbose {
+        println!("Validating {} against WIA-{}",
+            cli.file.display(), cli.standard);
+    }
+
+    let content = fs::read_to_string(&cli.file)
+        .with_context(|| format!("Failed to read file: {}", cli.file.display()))?;
+
+    let result = validate(&content, &cli.standard);
+
+    match cli.output.as_str() {
+        "json" => print_json_result(&result),
+        _ => print_text_result(&result),
+    }
+
+    if result.is_valid {
+        Ok(())
+    } else {
+        std::process::exit(1);
+    }
+}
+
+struct ValidationResult {
+    is_valid: bool,
+    errors: Vec&lt;String&gt;,
+    warnings: Vec&lt;String&gt;,
+}
+
+fn validate(content: &str, standard: &str) -> ValidationResult {
+    let mut errors = Vec::new();
+    let mut warnings = Vec::new();
+
+    // Example validation rules
+    if content.is_empty() {
+        errors.push("File is empty".to_string());
+    }
+
+    if content.len() > 1_000_000 {
+        warnings.push("File is very large".to_string());
+    }
+
+    ValidationResult {
+        is_valid: errors.is_empty(),
+        errors,
+        warnings,
+    }
+}
+
+fn print_text_result(result: &ValidationResult) {
+    if result.is_valid {
+        println!("Valid!");
+    } else {
+        println!("Invalid:");
+        for err in &result.errors {
+            println!("  - {}", err);
+        }
+    }
+    for warn in &result.warnings {
+        println!("Warning: {}", warn);
+    }
+}
+
+fn print_json_result(result: &ValidationResult) {
+    println!("{{\"valid\":{},\"errors\":{:?},\"warnings\":{:?}}}",
+        result.is_valid, result.errors, result.warnings);
+}</pre>
+
+            <pre># Usage examples
+cargo run -- --standard AI-CITY --file config.json --verbose
+cargo run -- -s HOME -f device.yaml -o json</pre>
+        </div>
+
+        <h2>8.2 Project 2: Web Server with Axum</h2>
+
+        <div class="project">
+            <h3>REST API Server</h3>
+            <p>Build an async HTTP API using Axum. This demonstrates async/await, JSON handling, and web service patterns.</p>
+
+            <pre>// Cargo.toml
+[package]
+name = "wia-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"</pre>
+
+            <pre>// src/main.rs
+use axum::{
+    routing::{get, post},
+    Router, Json,
+    http::StatusCode,
+    extract::State,
+};
+use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+
+// Shared application state
+struct AppState {
+    validations: Mutex&lt;HashMap&lt;String, ValidationRecord&gt;&gt;,
+}
+
+#[derive(Clone, Serialize)]
+struct ValidationRecord {
+    id: String,
+    standard: String,
+    valid: bool,
+    timestamp: String,
+}
+
+#[derive(Serialize)]
+struct HealthResponse {
+    status: String,
+    version: String,
+}
+
+#[derive(Deserialize)]
+struct ValidateRequest {
+    standard: String,
+    content: String,
+}
+
+#[derive(Serialize)]
+struct ValidateResponse {
+    id: String,
+    valid: bool,
+    errors: Vec&lt;String&gt;,
+}
+
+async fn health() -> Json&lt;HealthResponse&gt; {
+    Json(HealthResponse {
+        status: "healthy".to_string(),
+        version: "1.0.0".to_string(),
+    })
+}
+
+async fn validate(
+    State(state): State&lt;Arc&lt;AppState&gt;&gt;,
+    Json(payload): Json&lt;ValidateRequest&gt;,
+) -> (StatusCode, Json&lt;ValidateResponse&gt;) {
+    let valid = !payload.content.is_empty();
+    let id = uuid::Uuid::new_v4().to_string();
+
+    // Store validation record
+    let record = ValidationRecord {
+        id: id.clone(),
+        standard: payload.standard,
+        valid,
+        timestamp: chrono::Utc::now().to_rfc3339(),
+    };
+
+    state.validations.lock().unwrap().insert(id.clone(), record);
+
+    let response = ValidateResponse {
+        id,
+        valid,
+        errors: if valid { vec![] } else { vec!["Content is empty".to_string()] },
+    };
+
+    let status = if valid { StatusCode::OK } else { StatusCode::BAD_REQUEST };
+    (status, Json(response))
+}
+
+async fn list_validations(
+    State(state): State&lt;Arc&lt;AppState&gt;&gt;,
+) -> Json&lt;Vec&lt;ValidationRecord&gt;&gt; {
+    let validations = state.validations.lock().unwrap();
+    Json(validations.values().cloned().collect())
+}
+
+#[tokio::main]
+async fn main() {
+    // Initialize tracing
+    tracing_subscriber::init();
+
+    // Create shared state
+    let state = Arc::new(AppState {
+        validations: Mutex::new(HashMap::new()),
+    });
+
+    // Build router
+    let app = Router::new()
+        .route("/health", get(health))
+        .route("/validate", post(validate))
+        .route("/validations", get(list_validations))
+        .with_state(state);
+
+    // Start server
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+        .await
+        .unwrap();
+
+    println!("Server running on http://localhost:3000");
+    axum::serve(listener, app).await.unwrap();
+}</pre>
+        </div>
+
+        <h2>8.3 Project 3: Concurrent System Controller</h2>
+
+        <div class="project">
+            <h3>Rust-Core Controller</h3>
+            <p>A simplified concurrent control system demonstrating Arc, Mutex, and channels.</p>
+
+            <pre>use std::sync::{Arc, Mutex, mpsc};
+use std::thread;
+use std::time::Duration;
+
+pub struct RustCore {
+    hbm_usage: Arc&lt;Mutex&lt;f64&gt;&gt;,
+    power_distribution: Arc&lt;PowerDistribution&gt;,
+    command_tx: mpsc::Sender&lt;Command&gt;,
+}
+
+struct PowerDistribution {
+    ai_compute: Mutex&lt;f64&gt;,
+    infrastructure: Mutex&lt;f64&gt;,
+    reserve: Mutex&lt;f64&gt;,
+}
+
+enum Command {
+    AllocateHBM(f64),
+    SetPower { category: String, value: f64 },
+    GetStatus,
+    Shutdown,
+}
+
+#[derive(Debug, Clone)]
+pub struct CoreStatus {
+    pub hbm_usage: f64,
+    pub power_ai: f64,
+    pub power_infra: f64,
+    pub power_reserve: f64,
+}
+
+impl RustCore {
+    pub fn new() -> Self {
+        let (tx, rx) = mpsc::channel();
+
+        let core = RustCore {
+            hbm_usage: Arc::new(Mutex::new(0.0)),
+            power_distribution: Arc::new(PowerDistribution {
+                ai_compute: Mutex::new(70.0),
+                infrastructure: Mutex::new(20.0),
+                reserve: Mutex::new(10.0),
+            }),
+            command_tx: tx,
+        };
+
+        // Spawn background command processor
+        let hbm = Arc::clone(&core.hbm_usage);
+        let power = Arc::clone(&core.power_distribution);
+
+        thread::spawn(move || {
+            for cmd in rx {
+                match cmd {
+                    Command::AllocateHBM(amount) => {
+                        let mut usage = hbm.lock().unwrap();
+                        if *usage + amount <= 100.0 {
+                            *usage += amount;
+                            println!("HBM allocated: {:.1}%", amount);
+                        }
+                    }
+                    Command::SetPower { category, value } => {
+                        match category.as_str() {
+                            "ai" => *power.ai_compute.lock().unwrap() = value,
+                            "infra" => *power.infrastructure.lock().unwrap() = value,
+                            "reserve" => *power.reserve.lock().unwrap() = value,
+                            _ => {}
+                        }
+                    }
+                    Command::Shutdown => break,
+                    _ => {}
+                }
+            }
+        });
+
+        core
+    }
+
+    pub fn allocate_hbm(&self, amount: f64) -> Result&lt;(), String&gt; {
+        let usage = *self.hbm_usage.lock().unwrap();
+        if usage + amount > 100.0 {
+            return Err("HBM capacity exceeded".to_string());
+        }
+        self.command_tx.send(Command::AllocateHBM(amount)).unwrap();
+        Ok(())
+    }
+
+    pub fn get_status(&self) -> CoreStatus {
+        CoreStatus {
+            hbm_usage: *self.hbm_usage.lock().unwrap(),
+            power_ai: *self.power_distribution.ai_compute.lock().unwrap(),
+            power_infra: *self.power_distribution.infrastructure.lock().unwrap(),
+            power_reserve: *self.power_distribution.reserve.lock().unwrap(),
+        }
+    }
+}</pre>
+        </div>
+
+        <h2>8.4 Testing Your Code</h2>
+
+        <p>Rust has excellent built-in testing support. Tests live alongside your code and run with <code>cargo test</code>:</p>
+
+        <pre>#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hbm_allocation() {
+        let core = RustCore::new();
+
+        assert!(core.allocate_hbm(50.0).is_ok());
+        assert!(core.allocate_hbm(40.0).is_ok());
+        assert!(core.allocate_hbm(20.0).is_err()); // Would exceed 100%
+    }
+
+    #[test]
+    fn test_status_initial() {
+        let core = RustCore::new();
+        let status = core.get_status();
+
+        assert_eq!(status.hbm_usage, 0.0);
+        assert_eq!(status.power_ai, 70.0);
+    }
+
+    #[test]
+    fn test_validation_empty_content() {
+        let result = validate("", "AI-CITY");
+        assert!(!result.is_valid);
+        assert!(!result.errors.is_empty());
+    }
+
+    #[test]
+    fn test_validation_valid_content() {
+        let result = validate("Some content", "AI-CITY");
+        assert!(result.is_valid);
+        assert!(result.errors.is_empty());
+    }
+}
+
+// Integration tests go in tests/ directory
+// tests/integration_test.rs
+#[test]
+fn test_full_workflow() {
+    // Test complete user workflow
+}</pre>
+
+        <pre># Run all tests
+cargo test
+
+# Run with output visible
+cargo test -- --nocapture
+
+# Run specific test
+cargo test test_hbm_allocation
+
+# Run tests matching pattern
+cargo test allocation</pre>
+
+        <div class="success-box">
+            <strong>Test-Driven Development</strong>
+            <p style="margin-top: 10px;">Rust's type system catches many bugs at compile time, but tests are still essential for logic errors and integration testing. Write tests first to clarify requirements, then implement the code to make them pass.</p>
+        </div>
+
+        <h2>8.5 Next Steps</h2>
+
+        <table>
+            <tr>
+                <th>Resource</th>
+                <th>Description</th>
+            </tr>
+            <tr>
+                <td>The Rust Book</td>
+                <td>doc.rust-lang.org/book - Complete official guide, free online</td>
+            </tr>
+            <tr>
+                <td>Rustlings</td>
+                <td>github.com/rust-lang/rustlings - Small exercises to practice concepts</td>
+            </tr>
+            <tr>
+                <td>Exercism</td>
+                <td>exercism.org/tracks/rust - Practice problems with mentorship</td>
+            </tr>
+            <tr>
+                <td>Crates.io</td>
+                <td>crates.io - Explore the package ecosystem (200k+ crates)</td>
+            </tr>
+            <tr>
+                <td>This Week in Rust</td>
+                <td>this-week-in-rust.org - Weekly newsletter of Rust news</td>
+            </tr>
+            <tr>
+                <td>Rust by Example</td>
+                <td>doc.rust-lang.org/rust-by-example - Learn by working examples</td>
+            </tr>
+            <tr>
+                <td>The Rustonomicon</td>
+                <td>doc.rust-lang.org/nomicon - Advanced/unsafe Rust guide</td>
+            </tr>
+        </table>
+
+        <h2>8.6 WIA Ecosystem Integration</h2>
+
+        <p>Your Rust skills connect to the entire WIA ecosystem. Rust's performance and safety make it ideal for infrastructure components:</p>
+
+        <div class="highlight">
+            <ul style="padding-left: 20px; color: var(--text-muted);">
+                <li><strong>WIA-HOME:</strong> Build smart device drivers and IoT protocols in Rust</li>
+                <li><strong>WIA-AI-CITY:</strong> Contribute to Rust-Core infrastructure for AI compute management</li>
+                <li><strong>WIA-SOCIAL:</strong> Build high-performance APIs and real-time messaging systems</li>
+                <li><strong>AIDC-Link:</strong> Implement protocol handlers and data encoders</li>
+                <li><strong>WIA-BLOCKCHAIN:</strong> Smart contract development and node implementation</li>
+                <li><strong>WIA-EMOTION-AI:</strong> Real-time emotion processing pipelines</li>
+            </ul>
+        </div>
+
+        <h2>8.7 Chapter Summary</h2>
+
+        <div class="summary-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>CLI Tools:</strong> Use clap for declarative argument parsing; anyhow for ergonomic error handling</li>
+                <li><strong>Web Services:</strong> Axum provides async, type-safe web development with excellent ergonomics</li>
+                <li><strong>Concurrency:</strong> Combine Arc, Mutex, and channels for safe concurrent systems</li>
+                <li><strong>Testing:</strong> Rust has built-in testing with <code>#[test]</code>; run with <code>cargo test</code></li>
+                <li><strong>Real Projects:</strong> Combine ownership, traits, error handling, and concurrency effectively</li>
+                <li><strong>Ecosystem:</strong> Rust skills apply across the entire WIA family of standards</li>
+            </ul>
+        </div>
+
+        <h2>8.8 Review Questions</h2>
+
+        <div class="questions-box">
+            <h3>Test Your Understanding</h3>
+            <ol>
+                <li>What crate is commonly used for parsing command-line arguments in Rust? What are its key features?</li>
+                <li>How does Axum handle JSON request/response serialization? What traits are involved?</li>
+                <li>What attribute marks a function as a test in Rust? How do you run only specific tests?</li>
+                <li>How would you run only tests whose names contain "allocation"?</li>
+                <li>What's the purpose of <code>#[tokio::main]</code>? Why is it needed for async main functions?</li>
+                <li>How could you extend the RustCore example to support multiple independent zones?</li>
+            </ol>
+        </div>
+
+        <h2>8.9 Conclusion</h2>
+
+        <div class="final-box">
+            <h3>Congratulations!</h3>
+            <p style="color: var(--text-muted); margin-top: 15px;">You've completed Zero-to-Rust! You now understand ownership, borrowing, lifetimes, structs, enums, traits, generics, closures, iterators, and concurrency. More importantly, you understand <em>why</em> Rust makes the design choices it does.</p>
+            <p style="color: var(--text-muted); margin-top: 15px;">Rust's learning curve is real, but you've climbed it. The concepts that felt strange at first - ownership, the borrow checker, lifetimes - are now your tools for writing safe, fast code.</p>
+            <p style="color: var(--text-muted); margin-top: 15px;">The Rust community is welcoming and helpful. Don't hesitate to ask questions on forums, Discord, or Stack Overflow. Everyone was a beginner once.</p>
+            <p style="color: var(--rust-orange); margin-top: 20px; font-weight: bold;">Welcome to the Rust community. Happy coding!</p>
+            <p style="color: #fbbf24; margin-top: 20px; font-size: 1.2rem;">弘益人間 - Benefit All Humanity</p>
+        </div>
+
+        </div>
+</body>
+</html>

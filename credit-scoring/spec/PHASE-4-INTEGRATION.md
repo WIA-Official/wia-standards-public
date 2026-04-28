@@ -5,237 +5,266 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-credit-scoring (Credit Scoring).
+This document defines how a credit-scoring operator
+integrates with the systems that surround the credit-
+decision lifecycle: the credit-bureau-supplied data
+feed; the lender's loan-origination, loan-servicing,
+and collections systems; the consumer-facing portal
+and the consumer's right-to-explanation surface; the
+supervisory authority for the operating jurisdiction;
+the external auditor and the model-risk-validation
+function; the EU AI Act conformity-assessment body
+(for high-risk credit-scoring AI systems placed on
+the EU market); and the long-term archive that
+preserves model artefacts past the retention horizon.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 42001:2023 (AI management system)
+- ISO/IEC 17021-1:2015 (audit and certification)
+- ISO/IEC 17065:2012 (conformity-assessment bodies)
+- ISO 8601 (date and time)
+- W3C Verifiable Credentials Data Model 2.0 (optional
+  for re-issuance of attestations)
+- US ECOA + Reg B, FCRA + Reg V, FHA, TILA + Reg Z
+- US CFPB Examination Manual
+- EU CCD recast (Directive (EU) 2023/2225)
+- EU Mortgage Credit Directive (Directive 2014/17/EU)
+- EU AI Act 2024 (Regulation (EU) 2024/1689)
+- EU GDPR Articles 9, 15, 20, 22, 33, 34, 46
+- KR Credit Information Use and Protection Act
+- KR 금융소비자보호법
+- Basel Committee on Banking Supervision sound-
+  practices guidance on model risk governance
+- NIST AI RMF 1.0
 
 ---
 
-## §1 Scope
+## §1 Credit-Bureau Integration
 
-This PHASE document is one of four that together define the WIA-credit-scoring
-standard. It addresses the integration layer of the standard.
+The operator integrates with the credit-bureaux that
+supply tradeline information. The integration carries:
 
-## §2 Manifest
+- The bureau's identity and the bureau's contact
+  information (carried into the adverse-action notice
+  per FCRA 15 USC 1681m(a)(3)).
+- The permissible-purpose certification per FCRA 15
+  USC 1681e(a) — the operator certifies the
+  permissible purpose for each inquiry.
+- The bureau's API endpoint, authentication
+  credential, and the wire-format declaration (the
+  bureaux publish proprietary specifications; this
+  standard prescribes the operator-side discipline,
+  not the bureau-side wire format).
+- The dispute relay channel — when the consumer
+  disputes a tradeline through the operator's
+  channel the operator forwards the dispute to the
+  bureau under FCRA 15 USC 1681i(a).
+- The reciprocity / furnisher feed — when the
+  operator furnishes tradeline data back to the
+  bureau the operator's furnisher discipline (FCRA
+  15 USC 1681s-2 and Regulation V 12 CFR 1022.40 to
+  1022.43) applies.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "credit-scoring"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Loan-Origination System Integration
 
-## §3 Conformance Tiers
+The operator's scoring pipeline integrates with the
+lender's loan-origination system (LOS):
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- The LOS produces the credit application; the
+  operator records the application identifier and
+  the consumer's identity binding.
+- The operator returns the score and the
+  creditworthiness-assessment outcome; the LOS
+  applies the operator's policy decision to the
+  application's lifecycle (approved, declined,
+  counter-offer, manual review).
+- The adverse-action notice is produced by the LOS
+  using the operator's principal-reasons and bureau-
+  reference fields.
+- The decision and the supporting artefacts (the
+  signed score record, the feature vector, the model
+  reference) are preserved for the operating
+  retention horizon.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Loan-Servicing and Collections Integration
 
-## §4 Discovery
+For active-account review (FCRA 15 USC 1681b(a)(3)(B))
+and collections:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/credit-scoring`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- The servicing system periodically requests refreshed
+  scores; the permissible purpose is the active-
+  account review.
+- For accounts that enter delinquency the collections
+  system uses the score to triage outreach intensity
+  (consistent with the operator's compliance
+  obligations under the operating jurisdiction's
+  consumer-credit collection statutes).
+- For accounts that enter charge-off or settlement
+  the operator updates the bureau-furnished tradeline
+  per the operator's furnisher-duty discipline
+  (Regulation V 12 CFR 1022.41 accuracy and integrity
+  guidelines).
 
-## §5 Time and Identity
+## §4 Consumer-Portal Integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The consumer-portal exposes:
 
-## §6 Versioning and Deprecation
+- The consumer's free credit-report copy under FCRA
+  15 USC 1681j(a) where the operator is a covered
+  entity.
+- The consumer's adverse-action notices.
+- The consumer's score history (where the operator
+  is a credit-bureau or scoring provider that
+  delivers a consumer-facing score subscription).
+- The dispute channel for tradeline inaccuracies.
+- The Article 22(3) right-to-explanation surface for
+  GDPR-regulated operators.
+- The KR Credit Information Use and Protection Act
+  rejection-reasoning explanation surface for KR-
+  regulated operators.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Supervisory-Authority Integration
 
-## §7 Privacy and Security
+For US-regulated operators the supervisory-authority
+counterparty is the CFPB (consumer-credit
+examinations), the operator's prudential regulator
+(FRB, OCC, FDIC, NCUA — depending on charter), the
+state attorney-general (state-law UDAAP and consumer-
+protection enforcement), and the Federal Trade
+Commission (non-bank entities). For EU-regulated
+operators the counterparty is the Member-State
+financial-supervisory authority and the lead data-
+protection authority. For KR-regulated operators the
+counterparty is the Financial Services Commission
+(FSC), the Financial Supervisory Service (FSS), and
+the Personal Information Protection Commission
+(PIPC).
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 EU AI Act Conformity-Assessment Integration
 
-## §8 Open Governance
+For high-risk credit-scoring AI systems placed on the
+EU market the operator integrates with:
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `credit-scoring` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+- The Member-State notifying authority and the
+  notified body that performs the conformity
+  assessment under EU AI Act Article 43 where third-
+  party assessment is required (Annex III §5(b) is
+  high-risk; the standard internal-control conformity-
+  assessment procedure of Annex VI applies for most
+  credit-scoring systems).
+- The EU database for high-risk AI systems under
+  Article 71.
+- The post-market-monitoring channel under Article 72
+  for collecting field performance data.
+- The serious-incident reporting channel under
+  Article 73.
+- The market-surveillance authority under Article 74.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 External Audit and Model-Validation Integration
 
+The operator's model-validation function operates
+organisationally separate from model development per
+Basel sound-practices for model risk governance. The
+ISMS is certified against ISO/IEC 27001:2022 and the
+AI management system against ISO/IEC 42001:2023.
+The certification body operates under ISO/IEC 17021-1;
+the conformity-assessment body operates under
+ISO/IEC 17065. External-audit findings feed the
+operator's remediation cycle on the operator's
+declared cadence.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §8 Cross-Border Data-Transfer Integration
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+For cross-border transfers of credit information the
+operator's discipline applies the destination
+jurisdiction's regulatory regime — GDPR Chapter V
+(Article 45 adequacy, Article 46 SCC / BCR, Article
+49 derogation) for EU-source transfers; KR Credit
+Information Use and Protection Act Article 32-2
+(third-party provision of personal credit
+information) and KR PIPA Article 28-8 (cross-border
+transfer) for KR-source transfers; the operator's
+business-associate-agreement equivalent for US-
+source transfers where consumer-credit data is
+transferred to a service provider.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §9 Long-Term Archival Integration
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Records governed by the operator's retention horizons
+(US ECOA Reg B 12 CFR 1002.12 retention discipline
+twenty-five months; FCRA recordkeeping; EU GDPR
+Article 5(1)(e) no-longer-than-necessary; KR Credit
+Information Use and Protection Act Article 20-2
+retention discipline) are migrated to the long-term
+archive at the close of the active retention window.
+The archive preserves the model registry (training
+data manifest, validation report, model version),
+the score records, the adverse-action notices, the
+audit-event trail, and the dispute correspondence.
 
-## Annex F — Adoption Roadmap
+## §10 Open-Banking and Alternative-Data Integration
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Where the operator uses open-banking-supplied or
+alternative-data-supplied features (rent payments,
+utility payments, telecom payments, payroll-direct-
+deposit signals) the integration carries:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+- The data-provider's identity and the consumer's
+  explicit consent to the operator's collection and
+  use of the data (PSD2 access-to-account in the EU,
+  US CFPB §1033 personal financial data rights, KR
+  마이데이터 서비스).
+- The data-provider's API endpoint, authentication
+  credential, and the wire-format declaration.
+- The provenance record — the alternative-data signal
+  is preserved alongside the consumer's feature
+  vector so that disputes referencing alternative
+  data can be traced to the source.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Alternative-data features pass through the operator's
+fair-lending review (PHASE-3 §4) and the model-risk
+discipline (PHASE-3 §3) before they enter production.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §11 Identity-Verification and Anti-Fraud Integration
 
-## Annex G — Test Vectors and Conformance Evidence
+The operator integrates with the lender's identity-
+verification (IDV) and anti-fraud systems:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+- IDV checks confirm the applicant's identity against
+  jurisdictional identity-document verification
+  (US KYC, EU eIDAS-aligned IDV, KR 신원확인);
+  failed IDV stops the credit-application before
+  scoring.
+- Anti-fraud signals (synthetic-identity flags,
+  velocity flags, device-fingerprint flags) are
+  surfaced to the operator's manual-review queue;
+  fraud denials are reported to the bureau-furnished
+  tradeline only where FCRA permissible-purpose
+  conditions are met.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §12 Conformance
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+Implementations claiming PHASE-4 conformance maintain
+the credit-bureau integration with the FCRA
+permissible-purpose discipline, integrate the LOS
+and servicing systems with the operator's policy-
+decision point, expose the consumer-portal surface
+required by the operating jurisdiction's right-to-
+explanation discipline, hold the EU AI Act
+conformity-assessment record (where the operator
+places a high-risk system on the EU market), and
+operate the external-audit and supervisory-authority
+integrations described above.
 
-## Annex H — Versioning and Deprecation Policy
+---
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+**Document Information:**
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-credit-scoring
+- **Last Updated:** 2026-04-28

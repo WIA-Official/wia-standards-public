@@ -5,237 +5,330 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-distributed-energy (Distributed Energy).
+This document defines the API contract that a
+distributed-energy operator exposes for the records
+defined in PHASE-1. Three complementary surfaces are
+described: the IEEE 2030.5 Smart Energy Profile
+surface — the canonical IP-based application-layer
+protocol for utility-DER communication; the SunSpec
+Modbus surface for inverter-level monitoring; the
+OpenADR 2.0 + OCPP 2.0.1 surfaces for demand-response
+and EV-charging coordination; and the HTTPS / JSON
+RESTful surface for operational visibility, the
+operator's compliance functions, and the supervisory
+or balancing-authority examination scope.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IEEE 2030.5-2018 (Smart Energy Profile)
+- SunSpec Alliance Modbus specification
+- OpenADR Alliance OpenADR 2.0a / 2.0b
+- Open Charge Alliance OCPP 2.0.1
+- IEC 61850-7-420:2021 (DER object model)
+- IETF RFC 9110 (HTTP Semantics), RFC 9111 (HTTP
+  Caching), RFC 9457 (Problem Details), RFC 6901 /
+  6902 (JSON Pointer / Patch), RFC 8288 (Web Linking),
+  RFC 8259 (JSON), RFC 9421 (HTTP Message Signatures)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022, ISO/IEC 27019:2024 (information
+  security in the energy industry)
+- W3C Trace Context
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-distributed-energy
-standard. It addresses the api-interface layer of the standard.
+The operator exposes:
 
-## §2 Manifest
+- The IEEE 2030.5-2018 endpoints over HTTPS / TLS
+  per the IEEE 2030.5 specification (REST resource
+  hierarchy).
+- The SunSpec Modbus endpoints (Modbus TCP / RTU)
+  for inverter-level monitoring.
+- The OpenADR 2.0b VTN ↔ VEN endpoints over HTTPS.
+- The OCPP 2.0.1 endpoints over WebSocket Secure
+  for EV-supply equipment.
+- The HTTPS / JSON RESTful surface served from a
+  domain published by the operator under `/v1/`.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "distributed-energy"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The OpenAPI 3.1 document at `/v1/openapi.json` is
+canonical for the JSON surface; the IEEE 2030.5
+device-capability list, the SunSpec model registry,
+the OpenADR conformance certificate, and the OCPP
+conformance certificate are canonical for their
+respective surfaces.
 
-## §3 Conformance Tiers
+## §2 Root Discovery
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+GET /v1/
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```json
+{
+  "standard": "WIA-distributed-energy",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":              "/v1/programmes",
+    "derAssets":               "/v1/der-assets",
+    "interconnections":        "/v1/interconnections",
+    "derControllers":          "/v1/der-controllers",
+    "ieee20305":               "/sep2/",
+    "sunspec":                 "/sunspec/",
+    "openadr":                 "/openadr/",
+    "ocpp":                    "/ocpp/",
+    "events":                  "/v1/events",
+    "examination":             "/v1/examination",
+    "openapi":                 "/v1/openapi.json"
+  }
+}
+```
 
-## §4 Discovery
+## §3 IEEE 2030.5 Smart Energy Profile Surface
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/distributed-energy`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The IEEE 2030.5-2018 resource hierarchy:
 
-## §5 Time and Identity
+```
+GET  /sep2/
+GET  /sep2/dcap                 (DeviceCapability)
+GET  /sep2/edev/{eId}/der       (DER function set)
+PUT  /sep2/edev/{eId}/der/dera  (DERAvailability)
+PUT  /sep2/edev/{eId}/der/derc  (DERCapability)
+PUT  /sep2/edev/{eId}/der/derg  (DERSettings —
+                                 voltage-volt-var,
+                                 watt-volt-var,
+                                 watt-power-factor,
+                                 voltage-frequency
+                                 ride-through curves)
+GET  /sep2/edev/{eId}/derp      (DER program)
+GET  /sep2/mr                   (MeterReading)
+GET  /sep2/drlc                 (Demand-Response
+                                 Load-Control)
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The CSIP (Common Smart Inverter Profile) constrains
+the IEEE 2030.5 surface to the subset that California
+Rule 21 + the IEEE 1547-2018 reactive-power /
+ride-through requirements demand; the Australia CSIP-
+AUS variant applies for AS/NZS-jurisdiction
+deployments.
 
-## §6 Versioning and Deprecation
+## §4 SunSpec Modbus Surface
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The SunSpec Modbus surface follows the inverter's
+published model map:
 
-## §7 Privacy and Security
+```
+Common Model 1            (manufacturer + model +
+                           serial number)
+Inverter Model 101-103    (single-/split-/three-
+                           phase inverter telemetry)
+Storage Model 124         (storage-specific control)
+DER Models 701-705        (IEEE 2030.5-aligned DER
+                           function set)
+Network Model 11/12       (NTP, time)
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Each model exposes its register map per the SunSpec
+specification; the operator's monitoring agent reads
+on the operator's polling cadence.
 
-## §8 Open Governance
+## §5 OpenADR 2.0 Surface
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `distributed-energy` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The OpenADR 2.0b VTN-to-VEN message exchange:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+POST /openadr/oadrPoll        (VEN polls VTN for
+                               events)
+POST /openadr/oadrCreatedEvent (VEN acknowledges
+                               event)
+POST /openadr/oadrDistributeEvent (VTN distributes
+                                   event payload)
+POST /openadr/oadrResponse     (acknowledgement /
+                                error)
+POST /openadr/oadrUpdateReport (VEN reports back)
+```
 
+OpenADR profiles A and B are both supported; profile
+B carries the price-relative and absolute-price
+signal types in addition to simple level signals.
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+## §6 OCPP 2.0.1 Surface
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+The OCPP 2.0.1 messages over WebSocket Secure:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+BootNotification, Heartbeat, StatusNotification
+TransactionEvent (Started, Updated, Ended)
+Authorize, MeterValues
+SetChargingProfile, GetChargingProfiles,
+ClearChargingProfile, ReportChargingProfiles
+GetCompositeSchedule
+NotifyChargingLimit
+DataTransfer (vendor-extension)
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+ISO 15118-2:2014 + ISO 15118-20:2022 plug-and-charge
+authentication and bidirectional V2G is layered above
+OCPP 2.0.1.
 
-## Annex F — Adoption Roadmap
+## §7 DER Asset and Interconnection Endpoints
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+GET    /v1/der-assets
+GET    /v1/der-assets/{assetId}
+POST   /v1/der-assets
+PATCH  /v1/der-assets/{assetId}
+GET    /v1/interconnections?asset={assetId}
+POST   /v1/interconnections
+GET    /v1/interconnections/{interconnectionId}
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §8 DER Controller and DERMS Endpoints
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+GET    /v1/der-controllers
+GET    /v1/der-controllers/{controllerId}
+POST   /v1/der-controllers
+GET    /v1/derms
+GET    /v1/derms/{dermsId}
+POST   /v1/derms/{dermsId}/dispatch     (issue a
+                                         dispatch
+                                         instruction
+                                         to a
+                                         controller)
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §9 Event and Ride-Through Endpoints
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+GET    /v1/events?asset={assetId}&from={iso}&to={iso}
+GET    /v1/events/{eventId}
+GET    /v1/events/{eventId}/comtrade   (download the
+                                        IEEE C37.111
+                                        COMTRADE
+                                        waveform
+                                        record where
+                                        captured)
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §10 Examination Endpoints
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+```
+GET    /v1/examination/programmes
+GET    /v1/examination/der-assets
+GET    /v1/examination/interconnections
+GET    /v1/examination/cybersecurity-posture
+GET    /v1/examination/events
+GET    /v1/examination/storage-records
+GET    /v1/examination/audit-events
+```
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+The examination scope is read-only and bound to the
+authority's identity (NERC for US bulk-electric-
+system operators; FERC for FERC-jurisdictional
+markets; KR FSC + 한국에너지공단 + KEPCO for KR-
+jurisdiction; the local Public Utility Commission
+for the operator's service territory).
 
-## Annex H — Versioning and Deprecation Policy
+## §11 Authentication and Authorisation
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+IEEE 2030.5 endpoints use TLS with mutual
+authentication per the specification's certificate
+discipline. SunSpec Modbus over TCP is layered behind
+the operator's network-segmentation firewall; Modbus
+TCP/Secure (the IEC 62351-derived secure variant) is
+the recommended mode where supported. OpenADR endpoints
+use TLS with the OpenADR-published certificate-
+authority chain. OCPP endpoints use WSS with TLS
+client authentication. The HTTPS / JSON surface uses
+OAuth 2.1 bearer tokens per surface.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §12 HTTP Status Codes
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Standard codes apply (200 / 201 / 202 / 400 / 401 /
+403 / 404 / 409 / 422 / 429 / 503) with Problem
+Details bodies; IEEE 2030.5 / OpenADR / OCPP each
+follow their published response-code semantics.
 
-## Annex I — Interoperability Profiles
+## §13 Caching and Trace-Context
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+`ETag` carries the resource's version-id. Trace-
+context (`traceparent`) is propagated across the
+operator's pipeline. Real-time telemetry endpoints
+use `Cache-Control: no-store`.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §14 Webhook and Event Surface
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The operator publishes lifecycle events through a
+webhook channel:
+
+- `der-asset.commissioned`, `der-asset.retired`.
+- `interconnection.approved`,
+  `interconnection.amended`.
+- `event.ride-through-detected`,
+  `event.thermal-runaway-detected`.
+- `derms.dispatch-issued`,
+  `derms.dispatch-acknowledged`.
+- `openadr.event-distributed`,
+  `openadr.opt-changed`.
+- `ocpp.transaction-started`,
+  `ocpp.transaction-ended`.
+
+Webhook signatures use HTTP Message Signatures (RFC
+9421).
+
+## §15 Telemetry Bulk-Export and Examination Surface
+
+```
+POST   /v1/bulk-export
+GET    /v1/bulk-export/{exportId}/status
+GET    /v1/bulk-export/{exportId}/manifest
+GET    /v1/examination/forecast-vs-actual?asset={assetId}&period={iso}
+```
+
+Bulk exports support the supervisory authority's
+periodic data calls and the wholesale-market
+settlement reconciliation (FERC Order 2222 settlement-
+data retrieval, ISO 14064-3 audit data calls). The
+examination forecast-vs-actual endpoint surfaces the
+asset's IEEE 2030.5 DERAvailability forecasts against
+its actual output for the requested period — the
+RTO / ISO settlement engine uses this data for
+performance reconciliation under the operator's
+demand-response or capacity programme.
+
+## §16 Per-Asset State Snapshot Surface
+
+```
+GET    /v1/der-assets/{assetId}/state
+GET    /v1/der-assets/{assetId}/state/history?from={iso}&to={iso}
+```
+
+The state snapshot returns the asset's instantaneous
+state-of-charge (storage), output power, voltage /
+frequency observations, ride-through curve in effect,
+DERControl in effect, and any active fault codes.
+History returns the windowed time-series at the
+operator's published granularity (typically 1-minute
+or 5-minute averages).
+
+## §17 Conformance
+
+Implementations claiming PHASE-2 conformance publish
+the OpenAPI document, expose the IEEE 2030.5 + SunSpec
++ OpenADR + OCPP surfaces relevant to the operator's
+asset mix, expose the supervisory examination surface,
+and propagate trace-context across the dispatch-and-
+ride-through chain.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-distributed-energy
+- **Last Updated:** 2026-04-28

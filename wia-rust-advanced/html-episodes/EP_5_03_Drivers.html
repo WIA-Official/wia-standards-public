@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 5-03: Device Drivers | WIA-RUST-ADVANCED</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { width: 1920px; height: 1080px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%); font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; color: #fff; overflow: hidden; }
+        .slide { display: none; width: 100%; height: 100%; padding: 60px; position: relative; }
+        .slide.active { display: flex; flex-direction: column; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        .episode-badge { background: linear-gradient(135deg, #F39C12, #F1C40F); padding: 12px 30px; border-radius: 30px; font-size: 24px; font-weight: bold; }
+        .lang-toggle { display: flex; gap: 10px; }
+        .lang-btn { padding: 10px 25px; border: 2px solid #F39C12; background: transparent; color: #fff; border-radius: 20px; cursor: pointer; font-size: 18px; transition: all 0.3s; }
+        .lang-btn.active { background: #F39C12; }
+        .title { font-size: 60px; font-weight: bold; text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #F39C12, #FFD700); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .content { flex: 1; display: flex; justify-content: center; align-items: center; gap: 60px; }
+        .center-content { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; }
+        .code-block { background: #0d1117; border-radius: 15px; padding: 25px; font-family: 'Consolas', 'D2Coding', monospace; font-size: 24px; line-height: 1.6; border: 2px solid #30363d; }
+        .code-line { opacity: 0; transform: translateY(10px); transition: all 0.4s; }
+        .code-line.show { opacity: 1; transform: translateY(0); }
+        .keyword { color: #ff7b72; }
+        .type { color: #79c0ff; }
+        .variable { color: #ffa657; }
+        .string { color: #a5d6ff; }
+        .number { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .function { color: #d2a8ff; }
+        .macro { color: #d2a8ff; }
+        .navigation { position: absolute; bottom: 40px; left: 0; right: 0; display: flex; justify-content: center; gap: 20px; }
+        .nav-btn { padding: 15px 40px; background: rgba(243, 156, 18, 0.8); border: none; border-radius: 30px; color: white; font-size: 20px; cursor: pointer; transition: all 0.3s; }
+        .nav-btn:hover { background: #F39C12; transform: scale(1.05); }
+        .progress-bar { position: absolute; bottom: 0; left: 0; height: 8px; background: #F39C12; transition: width 0.5s; }
+        .slide-number { position: absolute; bottom: 100px; right: 60px; font-size: 24px; color: #888; }
+        .big-emoji { font-size: 120px; margin-bottom: 30px; }
+        .subtitle { font-size: 32px; color: #aaa; text-align: center; margin-bottom: 40px; }
+        .two-col { display: flex; gap: 40px; align-items: flex-start; }
+        .tip-box { background: rgba(243, 156, 18, 0.1); border-left: 5px solid #F39C12; padding: 20px; border-radius: 0 15px 15px 0; font-size: 24px; margin: 20px 0; }
+        .channel-info { background: rgba(255, 0, 0, 0.1); border: 2px solid #FF0000; border-radius: 20px; padding: 20px 40px; margin-top: 30px; font-size: 28px; }
+        .channel-info a { color: #FF6B6B; text-decoration: none; }
+        .step-box { background: rgba(255,255,255,0.1); border-radius: 20px; padding: 30px; margin: 15px; text-align: center; width: 450px; opacity: 0; transform: translateY(30px); transition: all 0.5s; }
+        .step-box.show { opacity: 1; transform: translateY(0); }
+        .step-box .number { font-size: 50px; color: #F39C12; font-weight: bold; }
+        .step-box h3 { font-size: 28px; margin: 15px 0; }
+        .step-box p { font-size: 22px; color: #aaa; }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">🔌</div>
+            <h1 class="title">Device Drivers</h1>
+            <p class="subtitle">
+                <span class="ko">디바이스 드라이버 - 하드웨어와 대화하기</span>
+                <span class="en" style="display:none;">Device Drivers - Talking to Hardware</span>
+            </p>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: Driver Types -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">드라이버 종류</span>
+            <span class="en" style="display:none;">Driver Types</span>
+        </h1>
+        <div class="content">
+            <div style="display: flex; gap: 30px;">
+                <div class="step-box" id="step1">
+                    <div class="number">⌨️</div>
+                    <h3 class="ko">키보드</h3>
+                    <h3 class="en" style="display:none;">Keyboard</h3>
+                    <p class="ko">PS/2 포트<br>스캔코드 처리</p>
+                    <p class="en" style="display:none;">PS/2 port<br>Scancode handling</p>
+                </div>
+                <div class="step-box" id="step2">
+                    <div class="number">⏰</div>
+                    <h3 class="ko">타이머</h3>
+                    <h3 class="en" style="display:none;">Timer</h3>
+                    <p class="ko">PIT/APIC<br>주기적 인터럽트</p>
+                    <p class="en" style="display:none;">PIT/APIC<br>Periodic interrupts</p>
+                </div>
+                <div class="step-box" id="step3">
+                    <div class="number">💿</div>
+                    <h3 class="ko">디스크</h3>
+                    <h3 class="en" style="display:none;">Disk</h3>
+                    <p class="ko">ATA/AHCI<br>블록 I/O</p>
+                    <p class="en" style="display:none;">ATA/AHCI<br>Block I/O</p>
+                </div>
+            </div>
+        </div>
+        <div class="tip-box" style="max-width: 900px; margin: 30px auto;">
+            <span class="ko">💡 드라이버는 하드웨어와 OS를 연결하는 다리입니다</span>
+            <span class="en" style="display:none;">💡 Drivers are bridges between hardware and OS</span>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: Keyboard Driver -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">키보드 드라이버</span>
+            <span class="en" style="display:none;">Keyboard Driver</span>
+        </h1>
+        <div class="center-content">
+            <div class="code-block" style="width: 1100px;">
+                <div class="code-line"><span class="keyword">use</span> x86_64::instructions::port::Port;</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">pub struct</span> <span class="type">Keyboard</span> {</div>
+                <div class="code-line">    data_port: Port<<span class="type">u8</span>>,</div>
+                <div class="code-line">}</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">impl</span> Keyboard {</div>
+                <div class="code-line">    <span class="keyword">pub fn</span> <span class="function">new</span>() -> <span class="keyword">Self</span> {</div>
+                <div class="code-line">        Keyboard {</div>
+                <div class="code-line">            data_port: Port::new(<span class="number">0x60</span>),</div>
+                <div class="code-line">        }</div>
+                <div class="code-line">    }</div>
+                <div class="code-line"></div>
+                <div class="code-line">    <span class="keyword">pub fn</span> <span class="function">read_scancode</span>(&<span class="keyword">mut</span> <span class="keyword">self</span>) -> <span class="type">u8</span> {</div>
+                <div class="code-line">        <span class="keyword">unsafe</span> { <span class="keyword">self</span>.data_port.read() }</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: Keyboard Interrupt -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">키보드 인터럽트</span>
+            <span class="en" style="display:none;">Keyboard Interrupt</span>
+        </h1>
+        <div class="center-content">
+            <div class="code-block" style="width: 1100px;">
+                <div class="code-line"><span class="keyword">extern</span> <span class="string">"x86-interrupt"</span> <span class="keyword">fn</span> <span class="function">keyboard_interrupt_handler</span>(</div>
+                <div class="code-line">    <span class="variable">_stack_frame</span>: InterruptStackFrame</div>
+                <div class="code-line">) {</div>
+                <div class="code-line">    <span class="keyword">use</span> pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="keyword">let mut</span> <span class="variable">keyboard</span> = KEYBOARD.lock();</div>
+                <div class="code-line">    <span class="keyword">let mut</span> <span class="variable">port</span> = Port::new(<span class="number">0x60</span>);</div>
+                <div class="code-line">    <span class="keyword">let</span> <span class="variable">scancode</span>: <span class="type">u8</span> = <span class="keyword">unsafe</span> { <span class="variable">port</span>.read() };</div>
+                <div class="code-line"></div>
+                <div class="code-line">    <span class="keyword">if let</span> Ok(Some(<span class="variable">key_event</span>)) = <span class="variable">keyboard</span>.add_byte(<span class="variable">scancode</span>) {</div>
+                <div class="code-line">        <span class="keyword">if let</span> Some(<span class="variable">key</span>) = <span class="variable">keyboard</span>.process_keyevent(<span class="variable">key_event</span>) {</div>
+                <div class="code-line">            <span class="macro">print!</span>(<span class="string">"{}"</span>, <span class="variable">key</span>);</div>
+                <div class="code-line">        }</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: Timer Driver -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">타이머 드라이버 (PIT)</span>
+            <span class="en" style="display:none;">Timer Driver (PIT)</span>
+        </h1>
+        <div class="center-content">
+            <div class="code-block" style="width: 1100px;">
+                <div class="code-line"><span class="keyword">pub fn</span> <span class="function">init_pit</span>(<span class="variable">frequency</span>: <span class="type">u32</span>) {</div>
+                <div class="code-line">    <span class="keyword">const</span> BASE_FREQUENCY: <span class="type">u32</span> = <span class="number">1193182</span>;</div>
+                <div class="code-line">    <span class="keyword">let</span> <span class="variable">divisor</span> = BASE_FREQUENCY / <span class="variable">frequency</span>;</div>
+                <div class="code-line"></div>
+                <div class="code-line">    <span class="keyword">unsafe</span> {</div>
+                <div class="code-line">        <span class="comment">// 명령 포트: 채널 0, 모드 3</span></div>
+                <div class="code-line">        Port::new(<span class="number">0x43</span>).write(<span class="number">0x36u8</span>);</div>
+                <div class="code-line">        </div>
+                <div class="code-line">        <span class="comment">// 데이터 포트: divisor 전송</span></div>
+                <div class="code-line">        Port::new(<span class="number">0x40</span>).write((<span class="variable">divisor</span> & <span class="number">0xFF</span>) <span class="keyword">as</span> <span class="type">u8</span>);</div>
+                <div class="code-line">        Port::new(<span class="number">0x40</span>).write(((<span class="variable">divisor</span> >> <span class="number">8</span>) & <span class="number">0xFF</span>) <span class="keyword">as</span> <span class="type">u8</span>);</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="tip-box" style="max-width: 900px; margin: 30px auto;">
+            <span class="ko">💡 PIT는 1193182 Hz의 기본 주파수를 가집니다</span>
+            <span class="en" style="display:none;">💡 PIT has a base frequency of 1193182 Hz</span>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: Timer Interrupt -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">타이머 인터럽트</span>
+            <span class="en" style="display:none;">Timer Interrupt</span>
+        </h1>
+        <div class="center-content">
+            <div class="code-block" style="width: 1000px;">
+                <div class="code-line"><span class="keyword">static</span> TICKS: AtomicU64 = AtomicU64::new(<span class="number">0</span>);</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">extern</span> <span class="string">"x86-interrupt"</span> <span class="keyword">fn</span> <span class="function">timer_interrupt_handler</span>(</div>
+                <div class="code-line">    <span class="variable">_stack_frame</span>: InterruptStackFrame</div>
+                <div class="code-line">) {</div>
+                <div class="code-line">    TICKS.fetch_add(<span class="number">1</span>, Ordering::Relaxed);</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="comment">// EOI 신호 전송</span></div>
+                <div class="code-line">    <span class="keyword">unsafe</span> {</div>
+                <div class="code-line">        PICS.lock().notify_end_of_interrupt(<span class="number">32</span>);</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Serial Port Driver -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">시리얼 포트 드라이버</span>
+            <span class="en" style="display:none;">Serial Port Driver</span>
+        </h1>
+        <div class="center-content">
+            <div class="code-block" style="width: 1100px;">
+                <div class="code-line"><span class="keyword">pub struct</span> <span class="type">SerialPort</span> {</div>
+                <div class="code-line">    data: Port<<span class="type">u8</span>>,</div>
+                <div class="code-line">    line_status: Port<<span class="type">u8</span>>,</div>
+                <div class="code-line">}</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">impl</span> SerialPort {</div>
+                <div class="code-line">    <span class="keyword">pub fn</span> <span class="function">send</span>(&<span class="keyword">mut</span> <span class="keyword">self</span>, <span class="variable">data</span>: <span class="type">u8</span>) {</div>
+                <div class="code-line">        <span class="keyword">unsafe</span> {</div>
+                <div class="code-line">            <span class="keyword">while</span> (<span class="keyword">self</span>.line_status.read() & <span class="number">0x20</span>) == <span class="number">0</span> {}</div>
+                <div class="code-line">            <span class="keyword">self</span>.data.write(<span class="variable">data</span>);</div>
+                <div class="code-line">        }</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="tip-box" style="max-width: 900px; margin: 30px auto;">
+            <span class="ko">💡 시리얼 포트는 디버깅에 매우 유용합니다</span>
+            <span class="en" style="display:none;">💡 Serial port is very useful for debugging</span>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">✅</div>
+            <h1 class="title">
+                <span class="ko">OS 개발 완료!</span>
+                <span class="en" style="display:none;">OS Development Complete!</span>
+            </h1>
+            <div style="font-size: 28px; text-align: center; margin: 30px 0; max-width: 1000px;">
+                <p class="ko">이제 디바이스 드라이버를 만들 수 있습니다!<br>다음: 커스텀 메모리 할당자</p>
+                <p class="en" style="display:none;">Now you can create device drivers!<br>Next: Custom Memory Allocators</p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_6_01_GlobalAlloc.html'">
+                <span class="ko">다음 에피소드 →</span>
+                <span class="en" style="display:none;">Next Episode →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() { if (currentSlide < totalSlides) showSlide(currentSlide + 1); }
+        function prevSlide() { if (currentSlide > 1) showSlide(currentSlide - 1); }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') || (lang === 'en' && btn.textContent === 'English')) btn.classList.add('active');
+            });
+            document.querySelectorAll('.ko').forEach(el => el.style.display = lang === 'ko' ? '' : 'none');
+            document.querySelectorAll('.en').forEach(el => el.style.display = lang === 'en' ? '' : 'none');
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                if (n === 2) {
+                    ['step1', 'step2', 'step3'].forEach((id, i) => {
+                        setTimeout(() => document.getElementById(id).classList.add('show'), i * 300);
+                    });
+                }
+                if (n === 3 || n === 4 || n === 5 || n === 6 || n === 7) {
+                    document.querySelectorAll('#slide' + n + ' .code-line').forEach((line, i) => {
+                        setTimeout(() => line.classList.add('show'), i * 100);
+                    });
+                }
+            }, 100);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        animateSlide(1);
+    </script>
+</body>
+</html>

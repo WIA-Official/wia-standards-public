@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 5-02: Async/Await - Rust NRT Academy</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #0d1b2a 0%, #1b263b 50%, #415a77 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e0e1dd;
+            overflow: hidden;
+        }
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            display: none;
+            flex-direction: column;
+        }
+        .slide.active { display: flex; }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+        .logo { font-size: 28px; font-weight: bold; color: #778da9; }
+        .episode-tag {
+            background: linear-gradient(90deg, #778da9, #415a77);
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-size: 18px;
+            color: white;
+        }
+        .lang-toggle { display: flex; gap: 10px; }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 2px solid #778da9;
+            background: transparent;
+            color: #778da9;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .lang-btn.active { background: #778da9; color: #0d1b2a; }
+
+        h1 {
+            font-size: 72px;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #a29bfe, #74b9ff, #81ecec);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+        h2 { font-size: 48px; color: #a29bfe; margin-bottom: 30px; }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .code-block {
+            background: #0d1b2a;
+            border-radius: 20px;
+            padding: 35px;
+            margin: 15px 0;
+            border: 2px solid #a29bfe;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 24px;
+            line-height: 1.5;
+            position: relative;
+        }
+        .code-block::before {
+            content: 'RUST';
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            color: #a29bfe;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateX(-30px);
+            animation: slideIn 0.5s forwards;
+        }
+        @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+
+        .keyword { color: #ff6b6b; }
+        .type { color: #ffc371; }
+        .string { color: #a8e6cf; }
+        .comment { color: #6b7280; font-style: italic; }
+        .function { color: #74b9ff; }
+        .number { color: #fab1a0; }
+        .macro { color: #a29bfe; }
+        .async { color: #81ecec; }
+
+        .concept-box {
+            background: linear-gradient(135deg, rgba(162, 155, 254, 0.2), rgba(116, 185, 255, 0.1));
+            border: 2px solid #a29bfe;
+            border-radius: 20px;
+            padding: 30px;
+            margin: 15px 0;
+        }
+
+        .flex-container { display: flex; gap: 30px; align-items: flex-start; }
+        .flex-item { flex: 1; }
+
+        .highlight { color: #ffc371; font-weight: bold; }
+
+        .async-diagram {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin: 40px 0;
+            flex-wrap: wrap;
+        }
+        .async-box {
+            padding: 25px 40px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+        }
+        .future-box {
+            background: linear-gradient(135deg, #a29bfe, #6c5ce7);
+            color: white;
+        }
+        .runtime-box {
+            background: linear-gradient(135deg, #81ecec, #00cec9);
+            color: #0d1b2a;
+        }
+        .arrow { font-size: 36px; color: #ffc371; }
+
+        .bullet-list {
+            list-style: none;
+            font-size: 24px;
+            line-height: 1.8;
+        }
+        .bullet-list li::before { content: '🦀 '; }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #a29bfe, #81ecec);
+            transition: width 0.3s;
+        }
+        .slide-number {
+            position: fixed;
+            bottom: 20px;
+            right: 40px;
+            font-size: 24px;
+            color: #a29bfe;
+        }
+        .nav-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 40px;
+            font-size: 18px;
+            color: #6b7280;
+        }
+
+        .ko { display: block; }
+        .en { display: none; }
+        body.lang-en .ko { display: none; }
+        body.lang-en .en { display: block; }
+
+        .center { text-align: center; }
+        .subtitle { font-size: 28px; color: #81ecec; text-align: center; margin-bottom: 30px; }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 20px;
+        }
+        .comparison-table th, .comparison-table td {
+            padding: 15px;
+            text-align: left;
+            border: 2px solid #a29bfe;
+        }
+        .comparison-table th { background: rgba(162, 155, 254, 0.3); color: #ffc371; }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">EP 5-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="content center">
+            <h1>async / await</h1>
+            <p class="subtitle ko">비동기 프로그래밍: 논블로킹 I/O</p>
+            <p class="subtitle en">Asynchronous Programming: Non-blocking I/O</p>
+            <div class="async-diagram">
+                <div class="async-box future-box">Future&lt;T&gt;<br>⏳ 미래의 값</div>
+                <div class="arrow">→</div>
+                <div class="async-box runtime-box">Runtime<br>🔄 tokio/async-std</div>
+                <div class="arrow">→</div>
+                <div class="async-box future-box">Result&lt;T&gt;<br>✅ 완료!</div>
+            </div>
+            <p style="font-size: 26px; color: #6b7280;">
+                <span class="ko">스레드보다 가볍고, 효율적인 동시성</span>
+                <span class="en">Lighter and more efficient than threads</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Slide 2: async fn Basics -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">async fn</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">async 함수 기초</h2>
+        <h2 class="en">async Function Basics</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// async 함수 정의</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="async">async</span> <span class="keyword">fn</span> <span class="function">fetch_data</span>() -> <span class="type">String</span> {</div>
+                <div class="code-line" style="animation-delay: 0.3s">    <span class="comment">// 비동기 작업 시뮬레이션</span></div>
+                <div class="code-line" style="animation-delay: 0.4s">    <span class="type">String</span>::<span class="function">from</span>(<span class="string">"데이터 로드 완료!"</span>)</div>
+                <div class="code-line" style="animation-delay: 0.5s">}</div>
+                <div class="code-line" style="animation-delay: 0.7s"></div>
+                <div class="code-line" style="animation-delay: 0.8s"><span class="comment">// async 함수는 Future를 반환!</span></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="comment">// 호출만으로는 실행되지 않음</span></div>
+                <div class="code-line" style="animation-delay: 1.0s"><span class="keyword">let</span> future = <span class="function">fetch_data</span>();  <span class="comment">// 아직 실행 안됨!</span></div>
+                <div class="code-line" style="animation-delay: 1.2s"></div>
+                <div class="code-line" style="animation-delay: 1.3s"><span class="comment">// await로 실행 및 결과 대기</span></div>
+                <div class="code-line" style="animation-delay: 1.4s"><span class="keyword">let</span> result = <span class="function">fetch_data</span>().<span class="async">await</span>;</div>
+                <div class="code-line" style="animation-delay: 1.5s"><span class="macro">println!</span>(<span class="string">"{}"</span>, result);</div>
+            </div>
+            <div class="concept-box">
+                <p style="font-size: 22px;">
+                    <span class="ko">💡 <span class="highlight">async fn</span>은 즉시 실행되지 않습니다. <span class="highlight">.await</span>가 있어야 실행!</span>
+                    <span class="en">💡 <span class="highlight">async fn</span> doesn't run immediately. It needs <span class="highlight">.await</span> to execute!</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 3: Tokio Runtime -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Tokio</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">Tokio - 비동기 런타임</h2>
+        <h2 class="en">Tokio - Async Runtime</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// Cargo.toml</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="comment">// [dependencies]</span></div>
+                <div class="code-line" style="animation-delay: 0.3s"><span class="comment">// tokio = { version = "1", features = ["full"] }</span></div>
+                <div class="code-line" style="animation-delay: 0.5s"></div>
+                <div class="code-line" style="animation-delay: 0.6s"><span class="keyword">use</span> tokio;</div>
+                <div class="code-line" style="animation-delay: 0.8s"></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="macro">#[tokio::main]</span></div>
+                <div class="code-line" style="animation-delay: 1.0s"><span class="async">async</span> <span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                <div class="code-line" style="animation-delay: 1.1s">    <span class="macro">println!</span>(<span class="string">"Hello, async world!"</span>);</div>
+                <div class="code-line" style="animation-delay: 1.3s"></div>
+                <div class="code-line" style="animation-delay: 1.4s">    <span class="comment">// 비동기 sleep</span></div>
+                <div class="code-line" style="animation-delay: 1.5s">    tokio::time::<span class="function">sleep</span>(</div>
+                <div class="code-line" style="animation-delay: 1.6s">        std::time::<span class="type">Duration</span>::<span class="function">from_secs</span>(<span class="number">1</span>)</div>
+                <div class="code-line" style="animation-delay: 1.7s">    ).<span class="async">await</span>;</div>
+                <div class="code-line" style="animation-delay: 1.9s"></div>
+                <div class="code-line" style="animation-delay: 2.0s">    <span class="macro">println!</span>(<span class="string">"1초 후!"</span>);</div>
+                <div class="code-line" style="animation-delay: 2.1s">}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: Concurrent Tasks -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">동시 실행</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">여러 작업 동시 실행</h2>
+        <h2 class="en">Running Multiple Tasks Concurrently</h2>
+        <div class="content">
+            <div class="code-block" style="font-size: 22px;">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">use</span> tokio::time::{<span class="function">sleep</span>, <span class="type">Duration</span>};</div>
+                <div class="code-line" style="animation-delay: 0.3s"></div>
+                <div class="code-line" style="animation-delay: 0.4s"><span class="async">async</span> <span class="keyword">fn</span> <span class="function">task_a</span>() -> <span class="type">i32</span> {</div>
+                <div class="code-line" style="animation-delay: 0.5s">    <span class="function">sleep</span>(<span class="type">Duration</span>::<span class="function">from_secs</span>(<span class="number">2</span>)).<span class="async">await</span>;</div>
+                <div class="code-line" style="animation-delay: 0.6s">    <span class="number">1</span></div>
+                <div class="code-line" style="animation-delay: 0.7s">}</div>
+                <div class="code-line" style="animation-delay: 0.8s"><span class="async">async</span> <span class="keyword">fn</span> <span class="function">task_b</span>() -> <span class="type">i32</span> {</div>
+                <div class="code-line" style="animation-delay: 0.9s">    <span class="function">sleep</span>(<span class="type">Duration</span>::<span class="function">from_secs</span>(<span class="number">1</span>)).<span class="async">await</span>;</div>
+                <div class="code-line" style="animation-delay: 1.0s">    <span class="number">2</span></div>
+                <div class="code-line" style="animation-delay: 1.1s">}</div>
+                <div class="code-line" style="animation-delay: 1.3s"></div>
+                <div class="code-line" style="animation-delay: 1.4s"><span class="macro">#[tokio::main]</span></div>
+                <div class="code-line" style="animation-delay: 1.5s"><span class="async">async</span> <span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                <div class="code-line" style="animation-delay: 1.6s">    <span class="comment">// join!으로 동시 실행 - 총 2초만 걸림!</span></div>
+                <div class="code-line" style="animation-delay: 1.7s">    <span class="keyword">let</span> (a, b) = tokio::<span class="macro">join!</span>(<span class="function">task_a</span>(), <span class="function">task_b</span>());</div>
+                <div class="code-line" style="animation-delay: 1.8s">    <span class="macro">println!</span>(<span class="string">"결과: {} + {} = {}"</span>, a, b, a + b);</div>
+                <div class="code-line" style="animation-delay: 1.9s">}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 5: Spawning Tasks -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">spawn</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">tokio::spawn - 백그라운드 태스크</h2>
+        <h2 class="en">tokio::spawn - Background Tasks</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="macro">#[tokio::main]</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="async">async</span> <span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                <div class="code-line" style="animation-delay: 0.3s">    <span class="comment">// 백그라운드 태스크 시작</span></div>
+                <div class="code-line" style="animation-delay: 0.4s">    <span class="keyword">let</span> handle = tokio::<span class="function">spawn</span>(<span class="async">async</span> {</div>
+                <div class="code-line" style="animation-delay: 0.5s">        <span class="comment">// 이 작업은 별도로 실행됨</span></div>
+                <div class="code-line" style="animation-delay: 0.6s">        <span class="number">42</span></div>
+                <div class="code-line" style="animation-delay: 0.7s">    });</div>
+                <div class="code-line" style="animation-delay: 0.9s"></div>
+                <div class="code-line" style="animation-delay: 1.0s">    <span class="comment">// 다른 작업 수행...</span></div>
+                <div class="code-line" style="animation-delay: 1.1s">    <span class="macro">println!</span>(<span class="string">"메인 작업 중..."</span>);</div>
+                <div class="code-line" style="animation-delay: 1.3s"></div>
+                <div class="code-line" style="animation-delay: 1.4s">    <span class="comment">// 결과 대기</span></div>
+                <div class="code-line" style="animation-delay: 1.5s">    <span class="keyword">let</span> result = handle.<span class="async">await</span>.<span class="function">unwrap</span>();</div>
+                <div class="code-line" style="animation-delay: 1.6s">    <span class="macro">println!</span>(<span class="string">"결과: {}"</span>, result);</div>
+                <div class="code-line" style="animation-delay: 1.7s">}</div>
+            </div>
+            <div class="concept-box">
+                <p style="font-size: 22px;">
+                    <span class="ko">💡 <span class="highlight">spawn</span>은 'static 수명이 필요합니다. 참조 대신 소유권을 넘기세요!</span>
+                    <span class="en">💡 <span class="highlight">spawn</span> requires 'static lifetime. Transfer ownership instead of references!</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 6: HTTP Example -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">실전 예제</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">실전: HTTP 요청 (reqwest)</h2>
+        <h2 class="en">Real Example: HTTP Requests (reqwest)</h2>
+        <div class="content">
+            <div class="code-block" style="font-size: 21px;">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// Cargo.toml: reqwest = { version = "0.11", features = ["json"] }</span></div>
+                <div class="code-line" style="animation-delay: 0.3s"></div>
+                <div class="code-line" style="animation-delay: 0.4s"><span class="keyword">use</span> reqwest;</div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="keyword">use</span> serde::{<span class="type">Deserialize</span>};</div>
+                <div class="code-line" style="animation-delay: 0.7s"></div>
+                <div class="code-line" style="animation-delay: 0.8s"><span class="macro">#[derive(Deserialize, Debug)]</span></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="keyword">struct</span> <span class="type">User</span> { login: <span class="type">String</span>, id: <span class="type">u64</span> }</div>
+                <div class="code-line" style="animation-delay: 1.1s"></div>
+                <div class="code-line" style="animation-delay: 1.2s"><span class="macro">#[tokio::main]</span></div>
+                <div class="code-line" style="animation-delay: 1.3s"><span class="async">async</span> <span class="keyword">fn</span> <span class="function">main</span>() -> <span class="type">Result</span>&lt;(), <span class="type">Box</span>&lt;<span class="keyword">dyn</span> std::error::<span class="type">Error</span>&gt;&gt; {</div>
+                <div class="code-line" style="animation-delay: 1.4s">    <span class="keyword">let</span> user: <span class="type">User</span> = reqwest::<span class="function">get</span>(</div>
+                <div class="code-line" style="animation-delay: 1.5s">        <span class="string">"https://api.github.com/users/rust-lang"</span></div>
+                <div class="code-line" style="animation-delay: 1.6s">    ).<span class="async">await</span>?.<span class="function">json</span>().<span class="async">await</span>?;</div>
+                <div class="code-line" style="animation-delay: 1.8s"></div>
+                <div class="code-line" style="animation-delay: 1.9s">    <span class="macro">println!</span>(<span class="string">"{:?}"</span>, user);</div>
+                <div class="code-line" style="animation-delay: 2.0s">    <span class="type">Ok</span>(())</div>
+                <div class="code-line" style="animation-delay: 2.1s">}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 7: Sync vs Async -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">비교</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">스레드 vs async/await</h2>
+        <h2 class="en">Threads vs async/await</h2>
+        <div class="content">
+            <table class="comparison-table">
+                <tr>
+                    <th></th>
+                    <th class="ko">스레드</th>
+                    <th class="en">Threads</th>
+                    <th class="ko">async/await</th>
+                    <th class="en">async/await</th>
+                </tr>
+                <tr>
+                    <td class="ko">메모리</td>
+                    <td class="en">Memory</td>
+                    <td class="ko">수 MB/스레드</td>
+                    <td class="en">Several MB/thread</td>
+                    <td class="ko">수 KB/태스크</td>
+                    <td class="en">Several KB/task</td>
+                </tr>
+                <tr>
+                    <td class="ko">생성 비용</td>
+                    <td class="en">Creation Cost</td>
+                    <td class="ko">높음</td>
+                    <td class="en">High</td>
+                    <td class="ko">매우 낮음</td>
+                    <td class="en">Very low</td>
+                </tr>
+                <tr>
+                    <td class="ko">동시 실행 수</td>
+                    <td class="en">Concurrent Tasks</td>
+                    <td class="ko">수천 개</td>
+                    <td class="en">Thousands</td>
+                    <td class="ko">수백만 개</td>
+                    <td class="en">Millions</td>
+                </tr>
+                <tr>
+                    <td class="ko">적합한 용도</td>
+                    <td class="en">Best For</td>
+                    <td class="ko">CPU 집약 작업</td>
+                    <td class="en">CPU-intensive work</td>
+                    <td class="ko">I/O 대기 작업</td>
+                    <td class="en">I/O-bound work</td>
+                </tr>
+            </table>
+            <div class="concept-box">
+                <p style="font-size: 24px; text-align: center;">
+                    <span class="ko">💡 웹 서버, API 호출 등 <span class="highlight">I/O 작업</span>에는 async가 최적!</span>
+                    <span class="en">💡 async is optimal for <span class="highlight">I/O operations</span> like web servers and API calls!</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">정리</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">EP 5-02 요약</h2>
+        <h2 class="en">EP 5-02 Summary</h2>
+        <div class="content">
+            <div class="flex-container">
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #a29bfe; margin-bottom: 20px;">async/await 핵심</h3>
+                        <ul class="bullet-list" style="font-size: 20px;">
+                            <li class="ko">async fn → Future 반환</li>
+                            <li class="en">async fn → Returns Future</li>
+                            <li class="ko">.await → 실제 실행</li>
+                            <li class="en">.await → Actually executes</li>
+                            <li class="ko">런타임 필요 (tokio)</li>
+                            <li class="en">Needs runtime (tokio)</li>
+                            <li class="ko">논블로킹 I/O</li>
+                            <li class="en">Non-blocking I/O</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #81ecec; margin-bottom: 20px;">주요 도구</h3>
+                        <ul class="bullet-list" style="font-size: 20px;">
+                            <li class="ko">join! - 동시 실행</li>
+                            <li class="en">join! - Concurrent execution</li>
+                            <li class="ko">spawn - 백그라운드 태스크</li>
+                            <li class="en">spawn - Background tasks</li>
+                            <li class="ko">select! - 먼저 완료된 것</li>
+                            <li class="en">select! - First to complete</li>
+                            <li class="ko">reqwest - HTTP 클라이언트</li>
+                            <li class="en">reqwest - HTTP client</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 40px;">
+                <p style="font-size: 28px; color: #ffc371;">
+                    <span class="ko">다음 레벨: 테스팅과 고급 Cargo! 🚀</span>
+                    <span class="en">Next Level: Testing and Advanced Cargo! 🚀</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="progress-bar" id="progress"></div>
+    <div class="slide-number" id="slideNum">1 / 8</div>
+    <div class="nav-hint">← → 키 또는 클릭으로 이동</div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+
+        function showSlide(n) {
+            if (n < 1) n = 1;
+            if (n > totalSlides) n = totalSlides;
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            document.getElementById('progress').style.width = (n / totalSlides * 100) + '%';
+            document.getElementById('slideNum').textContent = n + ' / ' + totalSlides;
+            animateSlide();
+        }
+
+        function nextSlide() { showSlide(currentSlide + 1); }
+        function prevSlide() { showSlide(currentSlide - 1); }
+
+        function animateSlide() {
+            const slide = document.getElementById('slide' + currentSlide);
+            const lines = slide.querySelectorAll('.code-line');
+            lines.forEach((line, i) => {
+                line.style.animation = 'none';
+                line.offsetHeight;
+                line.style.animation = `slideIn 0.5s ${i * 0.1}s forwards`;
+            });
+        }
+
+        function setLang(lang) {
+            document.body.classList.remove('lang-en');
+            if (lang === 'en') document.body.classList.add('lang-en');
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.includes(lang === 'ko' ? '한국어' : 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                if (e.clientX > window.innerWidth / 2) nextSlide();
+                else prevSlide();
+            }
+        });
+
+        showSlide(1);
+    </script>
+</body>
+</html>

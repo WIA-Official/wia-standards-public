@@ -5,237 +5,305 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-credit-scoring (Credit Scoring).
+This document defines the protocols that govern a
+credit-scoring operator: the FCRA permissible-purpose
+discipline that gates the operator's consumer-credit-
+report inquiries; the model-risk discipline that
+governs the development, validation, deployment, and
+monitoring of the scoring model; the fair-lending
+discipline that surfaces disparate-impact concerns
+before a feature or model enters production; the
+consumer-disclosure discipline that produces the
+adverse-action notices required by ECOA and FCRA, the
+consumer-credit pre-contractual information required
+by EU CCD, and the equivalent KR-statutory
+disclosures; the GDPR Article 22(3) right-to-
+explanation discipline; and the model-monitoring
+discipline that detects covariate shift, score-
+stability drift, and outcome disparities over time.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 42001:2023 (AI management system)
+- ISO/IEC 22989:2022, 23053:2022, 24029-2:2023
+- IETF RFC 5905 (NTPv4), RFC 9421 (HTTP Message
+  Signatures), RFC 9457 (Problem Details)
+- US ECOA (15 USC 1691), Regulation B (12 CFR Part
+  1002, including 1002.4 general rules, 1002.5
+  request for information, 1002.6 evaluation, 1002.7
+  rules concerning extensions of credit, 1002.9
+  notifications, 1002.13 information for monitoring
+  purposes)
+- US FCRA (15 USC 1681), Regulation V (12 CFR Part
+  1022, including 1022.40 to 1022.43 furnisher
+  duties)
+- US FHA (42 USC 3601)
+- US TILA (15 USC 1601), Regulation Z (12 CFR Part
+  1026, including 1026.43 ability-to-repay)
+- US CFPB Examination Manual (ECOA, FCRA,
+  unfair-deceptive-abusive-acts-or-practices)
+- EU CCD recast (Directive (EU) 2023/2225) Articles
+  6, 9, 18, 26
+- EU Mortgage Credit Directive (Directive 2014/17/EU)
+  Articles 18 to 20
+- EU AI Act 2024 (Regulation (EU) 2024/1689) Annex
+  III §5(b), Articles 8 to 17 (high-risk AI system
+  obligations), Article 13 (transparency and
+  provision of information to deployers), Article
+  14 (human oversight), Article 15 (accuracy,
+  robustness, cybersecurity)
+- EU GDPR Articles 5, 6, 12 to 22, 22(3), 24, 25,
+  32, 35
+- KR Credit Information Use and Protection Act
+- KR 금융소비자보호법
+- Basel Committee on Banking Supervision Principles
+  for the Sound Management of Operational Risk and
+  the BCBS sound-practices guidance on model risk
+  governance
+- NIST AI RMF 1.0
 
 ---
 
-## §1 Scope
+## §1 FCRA Permissible-Purpose Discipline
 
-This PHASE document is one of four that together define the WIA-credit-scoring
-standard. It addresses the protocol layer of the standard.
+The operator's consumer-credit-report inquiries against
+a credit-bureau are gated by the FCRA permissible
+purposes (15 USC 1681b):
 
-## §2 Manifest
+- §1681b(a)(3)(A) — extension of credit to the
+  consumer.
+- §1681b(a)(3)(B) — review or collection of an
+  existing account.
+- §1681b(a)(3)(F) — legitimate business need in
+  connection with a transaction initiated by the
+  consumer.
+- §1681b(a)(3)(E) — employment purposes (with the
+  consumer's written authorisation per §1681b(b)).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "credit-scoring"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Inquiries outside the permissible purposes are
+rejected at the operator's policy-decision point; the
+audit-event records the rejected inquiry. The
+operator's furnisher-duty discipline (Regulation V 12
+CFR 1022.40 to 1022.43) governs the operator's role
+when furnishing tradeline information to a bureau.
 
-## §3 Conformance Tiers
+## §2 ECOA Adverse-Action and Effects-Test Discipline
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+The ECOA discipline:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- §1002.5 — the operator MUST NOT request information
+  that ECOA prohibits in the application form (race,
+  colour, religion, national origin, sex, marital
+  status, age outside specific safe-harbour uses;
+  receipt of public-assistance income; rights
+  exercised under the Consumer Credit Protection
+  Act) except for HMDA / Regulation B 12 CFR 1002.13
+  monitoring purposes.
+- §1002.7(d) — special purpose credit programmes
+  follow the §1002.8 requirements.
+- §1002.9 — adverse-action notice within 30 days of
+  the application, carrying the principal reasons.
+- The effects-test discipline — the operator's
+  monitoring identifies disparities in approval
+  rates, pricing, or terms across protected classes
+  and triggers the operator's fair-lending review
+  when disparities exceed the operating threshold.
 
-## §4 Discovery
+## §3 Model-Risk Discipline (Basel + NIST AI RMF +
+       ISO/IEC 42001)
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/credit-scoring`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The model-risk lifecycle:
 
-## §5 Time and Identity
+1. Definition — the model's purpose, target variable,
+   in-scope population, and out-of-scope edge cases
+   are documented before training begins.
+2. Training-data discipline — the training data set
+   is documented (population, sampling method, time
+   window, feature engineering, label provenance);
+   the dataset's representation across protected
+   classes is reviewed for sufficiency.
+3. Validation — out-of-time and out-of-sample
+   validation, sensitivity analysis, fairness
+   metrics (demographic-parity ratio, equal-
+   opportunity differential, false-negative-rate
+   differential), and an independent challenge
+   review by a function organisationally separate
+   from model development (Basel sound-practices).
+4. Approval — the model-risk committee documents the
+   acceptance criteria, the residual risks, and the
+   monitoring discipline; the EU AI Act Article 9
+   risk-management system, Article 10 data-and-data-
+   governance, Article 11 technical-documentation,
+   Article 14 human-oversight, and Article 15
+   accuracy-robustness-cybersecurity disciplines all
+   apply for high-risk credit-scoring AI systems.
+5. Deployment — the model server emits the model
+   version, the input feature snapshot, and the
+   score-with-reason-codes; the operator's audit log
+   captures every score computed.
+6. Monitoring — covariate shift (PSI), performance
+   stability (KS / AUC), and fairness metrics are
+   monitored on the operating cadence; thresholds
+   trigger the operator's revalidation or retirement
+   workflow.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Fair-Lending Discipline
 
-## §6 Versioning and Deprecation
+Disparate-treatment review — the operator's pricing
+and underwriting policies are reviewed to ensure that
+no policy discriminates on a protected basis.
+Disparate-impact review — the operator's empirical
+outcome data is reviewed for unjustified disparities;
+features and rules with disparate-impact concerns are
+either removed or supported by a less-discriminatory-
+alternative analysis. The CFPB's UDAAP and ECOA
+examinations exercise the discipline; the operator's
+records of review, remediation, and challenger-model
+analyses are preserved as compliance artefacts.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Consumer-Disclosure Discipline
 
-## §7 Privacy and Security
+Consumer disclosures cover the four moments at which
+the consumer interacts with the credit decision:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Pre-application — the operator's product
+  disclosures (TILA Reg Z, EU CCD Article 6 pre-
+  contractual information, KR 금융소비자보호법
+  설명의무) explain the product's terms.
+- Application — the operator collects only ECOA-
+  permitted information.
+- Decision — for declines or counter-offers the
+  adverse-action notice (ECOA Reg B 12 CFR 1002.9,
+  FCRA 15 USC 1681m, EU CCD Article 18 rejection
+  reasoning, KR Credit Information Use and Protection
+  Act rejection reasoning) carries the principal
+  reasons, the bureau reference, and the redress
+  channel.
+- Post-decision — for GDPR-regulated operators the
+  Article 22(3) right-to-explanation surface explains
+  the logic of the automated decision; for FCRA-
+  regulated operators the consumer's right to a free
+  credit-report copy is exercised through 15 USC
+  1681j(a).
 
-## §8 Open Governance
+## §6 GDPR Article 22 Discipline
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `credit-scoring` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+For fully automated credit decisions:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- Article 22(1) — the consumer has the right not to
+  be subject to a fully automated decision producing
+  legal or similarly significant effects.
+- Article 22(2)(a) — entered into a contract.
+- Article 22(2)(b) — authorised by Member-State law
+  with safeguards.
+- Article 22(2)(c) — based on the consumer's explicit
+  consent.
+- Article 22(3) — meaningful information about the
+  logic involved, the significance of the decision,
+  the right to obtain human intervention, and the
+  right to express a point of view.
 
+The operator's Article 22 procedure carries the
+reasoned-explanation template, the human-intervention
+SLA, and the right-to-contest workflow.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §7 KR Credit Information Use and Protection Discipline
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+KR Credit Information Use and Protection Act
+(신용정보의 이용 및 보호에 관한 법률) Articles 32 and
+33 govern the use of credit information; the
+operator's discipline carries the consent record, the
+purpose-limitation discipline, the third-party
+disclosure record (for credit-bureau-supplied
+information), and the consumer's right to receive a
+rejection-reasoning explanation. KR 금융소비자보호법
+설명의무 (the financial-consumer protection
+explanation duty) applies to the lender's product
+explanation at the application moment.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Identity, Time and Audit Discipline
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+NTPv4 stratum-2 or better is the operator's clock
+baseline. Audit-events are emitted for every score
+computation, every credit-bureau inquiry (recorded
+under the FCRA permissible purpose), every adverse-
+action notice delivery, every consumer dispute, and
+every Article 22(3) request. Audit logs are integrity-
+protected per the operator's chosen tamper-evident
+mechanism; HIPAA-equivalent integrity controls apply
+to the operator's PII / NPI substrate.
 
-## Annex F — Adoption Roadmap
+## §9 Model-Monitoring and Drift Discipline
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+The operator's monitoring surface produces three
+families of metric on the operating cadence:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+- Stability metrics — population-stability index
+  (PSI) on the input feature distribution; the
+  operator's threshold for triggering revalidation
+  is documented in the model-risk record.
+- Performance metrics — KS / AUC / Gini on out-of-
+  time samples; calibration plots; expected-loss
+  versus observed-loss reconciliation. Material
+  performance degradation triggers the operator's
+  retire-or-revalidate workflow.
+- Fairness metrics — demographic-parity ratio,
+  equal-opportunity differential, false-negative-
+  rate differential across protected classes;
+  thresholds aligned with the operator's fair-
+  lending policy. Material disparities trigger the
+  operator's challenger-model and remediation
+  workflow.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Monitoring outputs feed the model-risk committee's
+quarterly review. The EU AI Act Article 72 post-
+market monitoring discipline applies for high-risk
+credit-scoring AI systems and provides additional
+field-performance reporting to the EU AI database.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Incident-Response and Breach-Notification Discipline
 
-## Annex G — Test Vectors and Conformance Evidence
+The operator's incident-response plan covers:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+- PII / NPI breach (FCRA 15 USC 1681w disposal of
+  records, GDPR Article 33 / 34 breach notification,
+  KR Credit Information Use and Protection Act
+  Article 39-4 leakage notification, KR PIPA Article
+  34 leakage notification) — the operator notifies
+  the supervisory authority and the affected
+  consumers within the statutory window.
+- Model-failure incident (a deployed model returns
+  scores that materially diverge from validation
+  baseline, or a data-feed corruption produces
+  systematically biased input vectors) — the
+  operator pauses scoring, reverts to the previous
+  model version, and reports the incident under the
+  EU AI Act Article 73 serious-incident reporting
+  channel where the AI Act applies.
+- Adverse-action-notice failure — undelivered or
+  delayed adverse-action notices are reported and
+  remediated under the operator's ECOA Reg B 12
+  CFR 1002.9 compliance procedure.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §11 Conformance
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+Implementations claiming PHASE-3 conformance enforce
+the discipline at every relevant decision point,
+maintain the model-risk records on the Basel + NIST
+AI RMF + ISO/IEC 42001 baseline, deliver the adverse-
+action notices within the operating jurisdiction's
+mandated time-window, exercise the GDPR Article 22(3)
+right-to-explanation discipline, and surface fair-
+lending disparities at the operating cadence.
 
-## Annex H — Versioning and Deprecation Policy
+---
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+**Document Information:**
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-credit-scoring
+- **Last Updated:** 2026-04-28

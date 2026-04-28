@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 0-01: Rust Memory Model | WIA-RUST-ADVANCED</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            position: relative;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .episode-badge {
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 10px 25px;
+            border: 2px solid #F39C12;
+            background: transparent;
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: #F39C12;
+        }
+
+        .title {
+            font-size: 72px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .text-content {
+            flex: 1;
+            font-size: 32px;
+            line-height: 1.8;
+        }
+
+        .visual-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border-radius: 15px;
+            padding: 30px;
+            font-family: 'Consolas', 'D2Coding', monospace;
+            font-size: 26px;
+            line-height: 1.6;
+            border: 2px solid #30363d;
+            width: 900px;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+
+        .code-line.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .keyword { color: #ff7b72; }
+        .function { color: #d2a8ff; }
+        .string { color: #a5d6ff; }
+        .macro { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .type { color: #ffa657; }
+        .number { color: #79c0ff; }
+
+        .memory-diagram {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 40px;
+            font-family: 'Consolas', monospace;
+        }
+
+        .memory-row {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0;
+            font-size: 24px;
+            opacity: 0;
+            transform: translateX(-20px);
+            transition: all 0.5s;
+        }
+
+        .memory-row.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .memory-label {
+            width: 200px;
+            color: #F39C12;
+            font-weight: bold;
+        }
+
+        .memory-value {
+            flex: 1;
+            font-family: monospace;
+        }
+
+        .concept-box {
+            background: rgba(243, 156, 18, 0.1);
+            border-left: 5px solid #F39C12;
+            padding: 40px;
+            border-radius: 0 20px 20px 0;
+            margin: 20px 0;
+        }
+
+        .concept-box h3 {
+            color: #F39C12;
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .concept-box p {
+            font-size: 28px;
+            line-height: 1.8;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            width: 100%;
+        }
+
+        .comparison-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 40px;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 0.5s;
+        }
+
+        .comparison-item.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .comparison-item h3 {
+            color: #F39C12;
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .comparison-item ul {
+            list-style: none;
+            font-size: 24px;
+        }
+
+        .comparison-item li {
+            margin: 12px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .comparison-item li:before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+            color: #F39C12;
+        }
+
+        .navigation {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(243, 156, 18, 0.8);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: #F39C12;
+            transform: scale(1.05);
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 8px;
+            background: #F39C12;
+            transition: width 0.5s;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 100px;
+            right: 60px;
+            font-size: 24px;
+            color: #888;
+        }
+
+        .subtitle {
+            font-size: 36px;
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .big-emoji {
+            font-size: 150px;
+            margin-bottom: 30px;
+        }
+
+        .channel-info {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid #FF0000;
+            border-radius: 20px;
+            padding: 30px 60px;
+            margin-top: 40px;
+            font-size: 32px;
+        }
+
+        .channel-info a {
+            color: #FF6B6B;
+            text-decoration: none;
+        }
+
+        .layout-diagram {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 40px;
+            font-family: 'Consolas', monospace;
+            font-size: 24px;
+        }
+
+        .layout-row {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            opacity: 0;
+            transform: translateX(-20px);
+            transition: all 0.5s;
+        }
+
+        .layout-row.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .layout-box {
+            background: rgba(243, 156, 18, 0.2);
+            border: 2px solid #F39C12;
+            padding: 20px 40px;
+            border-radius: 10px;
+            margin-right: 20px;
+        }
+
+        .highlight-box {
+            background: rgba(243, 156, 18, 0.15);
+            border: 2px solid #F39C12;
+            border-radius: 20px;
+            padding: 50px;
+            margin: 30px 0;
+        }
+
+        .highlight-box h3 {
+            color: #F39C12;
+            font-size: 40px;
+            margin-bottom: 25px;
+        }
+
+        .highlight-box p {
+            font-size: 30px;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">🧠</div>
+            <h1 class="title">Rust Memory Model</h1>
+            <p class="subtitle">
+                <span class="ko">Rust 메모리 모델 완전 이해</span>
+                <span class="en" style="display:none;">Complete Understanding of Rust Memory Model</span>
+            </p>
+            <div class="channel-info">
+                📺 YouTube: <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">
+                <span class="ko">시작하기 →</span>
+                <span class="en" style="display:none;">Start →</span>
+            </button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: Memory Layout Fundamentals -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">메모리 레이아웃 기초</span>
+            <span class="en" style="display:none;">Memory Layout Fundamentals</span>
+        </h1>
+        <div class="content">
+            <div class="layout-diagram" style="width: 100%;">
+                <div class="layout-row">
+                    <div class="layout-box" style="width: 800px;">
+                        <span class="ko">📚 Stack (고정 크기, 빠름)</span>
+                        <span class="en" style="display:none;">📚 Stack (Fixed size, Fast)</span>
+                    </div>
+                    <span class="ko">함수 로컬 변수, 기본 타입</span>
+                    <span class="en" style="display:none;">Function locals, primitives</span>
+                </div>
+                <div class="layout-row">
+                    <div class="layout-box" style="width: 800px;">
+                        <span class="ko">📦 Heap (동적 크기, 느림)</span>
+                        <span class="en" style="display:none;">📦 Heap (Dynamic size, Slow)</span>
+                    </div>
+                    <span class="ko">Box, Vec, String 등</span>
+                    <span class="en" style="display:none;">Box, Vec, String, etc.</span>
+                </div>
+                <div class="layout-row">
+                    <div class="layout-box" style="width: 800px;">
+                        <span class="ko">💾 Static (프로그램 수명)</span>
+                        <span class="en" style="display:none;">💾 Static (Program lifetime)</span>
+                    </div>
+                    <span class="ko">전역 변수, 상수, 문자열 리터럴</span>
+                    <span class="en" style="display:none;">Globals, constants, string literals</span>
+                </div>
+                <div class="layout-row">
+                    <div class="layout-box" style="width: 800px;">
+                        <span class="ko">📝 Code (읽기 전용)</span>
+                        <span class="en" style="display:none;">📝 Code (Read-only)</span>
+                    </div>
+                    <span class="ko">실행 가능한 기계어 코드</span>
+                    <span class="en" style="display:none;">Executable machine code</span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: Size and Alignment -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">크기와 정렬</span>
+            <span class="en" style="display:none;">Size and Alignment</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">use</span> std::mem;</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">struct</span> <span class="type">Data</span> {</div>
+                    <div class="code-line">    a: <span class="type">u8</span>,   <span class="comment">// 1 byte</span></div>
+                    <div class="code-line">    b: <span class="type">u32</span>,  <span class="comment">// 4 bytes</span></div>
+                    <div class="code-line">    c: <span class="type">u16</span>,  <span class="comment">// 2 bytes</span></div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// Size: 12 bytes (padding added!)</span></div>
+                    <div class="code-line"><span class="comment">// Alignment: 4 bytes (largest field)</span></div>
+                </div>
+                <div class="highlight-box">
+                    <h3>
+                        <span class="ko">⚡ 핵심 개념</span>
+                        <span class="en" style="display:none;">⚡ Key Concept</span>
+                    </h3>
+                    <p class="ko">
+                        컴파일러는 성능을 위해 필드 사이에 패딩을 추가합니다.<br>
+                        #[repr(C)]로 C 호환 레이아웃 강제 가능
+                    </p>
+                    <p class="en" style="display:none;">
+                        Compiler adds padding between fields for performance.<br>
+                        Use #[repr(C)] to force C-compatible layout
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: Ownership Memory Model -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">소유권 메모리 모델</span>
+            <span class="en" style="display:none;">Ownership Memory Model</span>
+        </h1>
+        <div class="content">
+            <div class="comparison-grid">
+                <div class="comparison-item">
+                    <h3>
+                        <span class="ko">📦 Owned (T)</span>
+                        <span class="en" style="display:none;">📦 Owned (T)</span>
+                    </h3>
+                    <ul>
+                        <li class="ko">유일한 소유자</li>
+                        <li class="en" style="display:none;">Single owner</li>
+                        <li class="ko">스코프 끝에서 drop</li>
+                        <li class="en" style="display:none;">Dropped at scope end</li>
+                        <li class="ko">Move semantics</li>
+                        <li class="en" style="display:none;">Move semantics</li>
+                    </ul>
+                </div>
+                <div class="comparison-item">
+                    <h3>
+                        <span class="ko">👀 Borrowed (&T)</span>
+                        <span class="en" style="display:none;">👀 Borrowed (&T)</span>
+                    </h3>
+                    <ul>
+                        <li class="ko">읽기 전용 참조</li>
+                        <li class="en" style="display:none;">Read-only reference</li>
+                        <li class="ko">여러 개 동시 가능</li>
+                        <li class="en" style="display:none;">Multiple allowed</li>
+                        <li class="ko">라이프타임 검증</li>
+                        <li class="en" style="display:none;">Lifetime verified</li>
+                    </ul>
+                </div>
+                <div class="comparison-item">
+                    <h3>
+                        <span class="ko">✏️ Mutable (&mut T)</span>
+                        <span class="en" style="display:none;">✏️ Mutable (&mut T)</span>
+                    </h3>
+                    <ul>
+                        <li class="ko">독점 쓰기 권한</li>
+                        <li class="en" style="display:none;">Exclusive write access</li>
+                        <li class="ko">하나만 존재 가능</li>
+                        <li class="en" style="display:none;">Only one allowed</li>
+                        <li class="ko">데이터 레이스 방지</li>
+                        <li class="en" style="display:none;">Prevents data races</li>
+                    </ul>
+                </div>
+                <div class="comparison-item">
+                    <h3>
+                        <span class="ko">🔄 Shared (Arc&lt;T&gt;)</span>
+                        <span class="en" style="display:none;">🔄 Shared (Arc&lt;T&gt;)</span>
+                    </h3>
+                    <ul>
+                        <li class="ko">여러 소유자</li>
+                        <li class="en" style="display:none;">Multiple owners</li>
+                        <li class="ko">참조 카운팅</li>
+                        <li class="en" style="display:none;">Reference counting</li>
+                        <li class="ko">스레드 안전</li>
+                        <li class="en" style="display:none;">Thread-safe</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: Drop and RAII -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Drop과 RAII</span>
+            <span class="en" style="display:none;">Drop and RAII</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">struct</span> <span class="type">Resource</span> {</div>
+                    <div class="code-line">    name: <span class="type">String</span>,</div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">impl</span> <span class="type">Drop</span> <span class="keyword">for</span> <span class="type">Resource</span> {</div>
+                    <div class="code-line">    <span class="keyword">fn</span> <span class="function">drop</span>(&<span class="keyword">mut</span> <span class="keyword">self</span>) {</div>
+                    <div class="code-line">        <span class="macro">println!</span>(<span class="string">"Dropping {}"</span>, <span class="keyword">self</span>.name);</div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// 스코프 끝에서 자동 호출</span></div>
+                    <div class="code-line"><span class="comment">// Automatically called at scope end</span></div>
+                </div>
+                <div class="concept-box">
+                    <h3>RAII (Resource Acquisition Is Initialization)</h3>
+                    <p class="ko">
+                        리소스 획득과 해제를 생성자/소멸자와 결합<br>
+                        메모리 누수 방지 및 리소스 안전성 보장
+                    </p>
+                    <p class="en" style="display:none;">
+                        Ties resource acquisition/release to constructor/destructor<br>
+                        Prevents memory leaks and ensures resource safety
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: Interior Mutability -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">내부 가변성 패턴</span>
+            <span class="en" style="display:none;">Interior Mutability Pattern</span>
+        </h1>
+        <div class="content">
+            <div class="comparison-grid">
+                <div class="comparison-item">
+                    <h3>Cell&lt;T&gt;</h3>
+                    <ul>
+                        <li class="ko">Copy 타입 전용</li>
+                        <li class="en" style="display:none;">Copy types only</li>
+                        <li class="ko">런타임 체크 없음</li>
+                        <li class="en" style="display:none;">No runtime checks</li>
+                        <li class="ko">단일 스레드</li>
+                        <li class="en" style="display:none;">Single-threaded</li>
+                    </ul>
+                </div>
+                <div class="comparison-item">
+                    <h3>RefCell&lt;T&gt;</h3>
+                    <ul>
+                        <li class="ko">모든 타입 지원</li>
+                        <li class="en" style="display:none;">All types supported</li>
+                        <li class="ko">런타임 빌림 검사</li>
+                        <li class="en" style="display:none;">Runtime borrow checking</li>
+                        <li class="ko">단일 스레드</li>
+                        <li class="en" style="display:none;">Single-threaded</li>
+                    </ul>
+                </div>
+                <div class="comparison-item">
+                    <h3>Mutex&lt;T&gt;</h3>
+                    <ul>
+                        <li class="ko">멀티 스레드</li>
+                        <li class="en" style="display:none;">Multi-threaded</li>
+                        <li class="ko">락으로 동기화</li>
+                        <li class="en" style="display:none;">Lock-based sync</li>
+                        <li class="ko">성능 오버헤드</li>
+                        <li class="en" style="display:none;">Performance overhead</li>
+                    </ul>
+                </div>
+                <div class="comparison-item">
+                    <h3>RwLock&lt;T&gt;</h3>
+                    <ul>
+                        <li class="ko">읽기/쓰기 분리</li>
+                        <li class="en" style="display:none;">Read/write separation</li>
+                        <li class="ko">동시 읽기 가능</li>
+                        <li class="en" style="display:none;">Concurrent reads</li>
+                        <li class="ko">멀티 스레드</li>
+                        <li class="en" style="display:none;">Multi-threaded</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Memory Ordering -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">메모리 순서 보장</span>
+            <span class="en" style="display:none;">Memory Ordering Guarantees</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="memory-diagram">
+                    <div class="memory-row">
+                        <div class="memory-label">Relaxed</div>
+                        <div class="memory-value">
+                            <span class="ko">순서 보장 없음 (가장 빠름)</span>
+                            <span class="en" style="display:none;">No ordering (Fastest)</span>
+                        </div>
+                    </div>
+                    <div class="memory-row">
+                        <div class="memory-label">Acquire</div>
+                        <div class="memory-value">
+                            <span class="ko">이후 연산이 앞으로 이동 금지</span>
+                            <span class="en" style="display:none;">Prevents later ops from moving before</span>
+                        </div>
+                    </div>
+                    <div class="memory-row">
+                        <div class="memory-label">Release</div>
+                        <div class="memory-value">
+                            <span class="ko">이전 연산이 뒤로 이동 금지</span>
+                            <span class="en" style="display:none;">Prevents earlier ops from moving after</span>
+                        </div>
+                    </div>
+                    <div class="memory-row">
+                        <div class="memory-label">AcqRel</div>
+                        <div class="memory-value">
+                            <span class="ko">Acquire + Release</span>
+                            <span class="en" style="display:none;">Acquire + Release</span>
+                        </div>
+                    </div>
+                    <div class="memory-row">
+                        <div class="memory-label">SeqCst</div>
+                        <div class="memory-value">
+                            <span class="ko">순차 일관성 (가장 안전, 느림)</span>
+                            <span class="en" style="display:none;">Sequential consistency (Safest, Slowest)</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="highlight-box">
+                    <h3>
+                        <span class="ko">⚠️ 중요</span>
+                        <span class="en" style="display:none;">⚠️ Important</span>
+                    </h3>
+                    <p class="ko">
+                        잘못된 메모리 순서 사용은 데이터 레이스 발생 가능<br>
+                        확실하지 않으면 SeqCst 사용 권장
+                    </p>
+                    <p class="en" style="display:none;">
+                        Wrong memory ordering can cause data races<br>
+                        Use SeqCst if unsure
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">🧠✨</div>
+            <div class="highlight-box" style="max-width: 1400px;">
+                <h3>
+                    <span class="ko">핵심 요약</span>
+                    <span class="en" style="display:none;">Key Takeaways</span>
+                </h3>
+                <p class="ko">
+                    ✅ Stack, Heap, Static 메모리 영역 이해<br>
+                    ✅ 크기, 정렬, 레이아웃 최적화<br>
+                    ✅ 소유권 기반 메모리 관리<br>
+                    ✅ Drop과 RAII 패턴<br>
+                    ✅ 내부 가변성과 동기화 프리미티브<br>
+                    ✅ 메모리 순서 보장 메커니즘
+                </p>
+                <p class="en" style="display:none;">
+                    ✅ Understanding Stack, Heap, Static memory regions<br>
+                    ✅ Size, alignment, layout optimization<br>
+                    ✅ Ownership-based memory management<br>
+                    ✅ Drop and RAII pattern<br>
+                    ✅ Interior mutability and sync primitives<br>
+                    ✅ Memory ordering guarantees
+                </p>
+            </div>
+            <div style="margin-top: 40px; text-align: center;">
+                <p style="font-size: 36px; margin-bottom: 20px;">
+                    <span class="ko">다음 에피소드: Undefined Behavior 완벽 가이드</span>
+                    <span class="en" style="display:none;">Next Episode: Complete Guide to Undefined Behavior</span>
+                </p>
+                <p style="font-size: 28px; color: #888;">EP 0-02 →</p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a> |
+                <span class="ko">弘益人間 - 널리 인간을 이롭게 하라</span>
+                <span class="en" style="display:none;">Benefit All Humanity</span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_0_02_UB.html'">
+                <span class="ko">다음 에피소드 →</span>
+                <span class="en" style="display:none;">Next Episode →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') ||
+                    (lang === 'en' && btn.textContent === 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.ko').forEach(el => {
+                el.style.display = lang === 'ko' ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = lang === 'en' ? '' : 'none';
+            });
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                if (n === 2) {
+                    const rows = document.querySelectorAll('#slide2 .layout-row');
+                    rows.forEach((row, i) => {
+                        setTimeout(() => row.classList.add('show'), i * 200);
+                    });
+                }
+                if (n === 3) {
+                    const lines = document.querySelectorAll('#slide3 .code-line');
+                    lines.forEach((line, i) => {
+                        setTimeout(() => line.classList.add('show'), i * 150);
+                    });
+                }
+                if (n === 4) {
+                    const items = document.querySelectorAll('#slide4 .comparison-item');
+                    items.forEach((item, i) => {
+                        setTimeout(() => item.classList.add('show'), i * 200);
+                    });
+                }
+                if (n === 5) {
+                    const lines = document.querySelectorAll('#slide5 .code-line');
+                    lines.forEach((line, i) => {
+                        setTimeout(() => line.classList.add('show'), i * 150);
+                    });
+                }
+                if (n === 6) {
+                    const items = document.querySelectorAll('#slide6 .comparison-item');
+                    items.forEach((item, i) => {
+                        setTimeout(() => item.classList.add('show'), i * 200);
+                    });
+                }
+                if (n === 7) {
+                    const rows = document.querySelectorAll('#slide7 .memory-row');
+                    rows.forEach((row, i) => {
+                        setTimeout(() => row.classList.add('show'), i * 200);
+                    });
+                }
+            }, 100);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Initialize
+        animateSlide(1);
+    </script>
+</body>
+</html>

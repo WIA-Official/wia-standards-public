@@ -5,270 +5,453 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-anti-money-laundering (Anti Money Laundering).
+This document defines the canonical data-format layer for
+WIA-anti-money-laundering. The standard covers persistent
+record shapes for financial institutions and other
+obliged entities subject to anti-money-laundering and
+counter-terrorist-financing (AML/CFT) obligations under
+the Financial Action Task Force (FATF) 40
+Recommendations as transposed into the operating
+jurisdiction's legal regime — customer due diligence
+(CDD), enhanced due diligence (EDD) for higher-risk
+relationships, beneficial-ownership identification,
+politically-exposed-person (PEP) screening, sanctions
+screening (UN, EU, OFAC, HM Treasury, MOFA-KR),
+transaction monitoring, suspicious-transaction reports
+(STR / SAR), currency-transaction reports (CTR), and
+correspondent-banking relationships. The format is
+consumed by the obliged entity's compliance officer,
+the operating jurisdiction's financial-intelligence
+unit (FIU), the operating jurisdiction's AML/CFT
+supervisor, and the obliged entity's external auditors.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 20022 (financial-services messaging; the
+  successor to MT in cross-border payments and
+  securities messaging)
+- ISO 17442 (Legal Entity Identifier — LEI)
+- ISO 4217 (currency codes)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- FATF 40 Recommendations (cited normatively for the
+  international AML/CFT framework)
+- FATF Methodology for Assessing Technical Compliance
+  with the FATF Recommendations and the Effectiveness
+  of AML/CFT Systems
+- US Bank Secrecy Act (BSA) and 31 CFR Chapter X
+  (FinCEN regulations); cited where the operating
+  jurisdiction is the United States
+- US OFAC Specially Designated Nationals (SDN) and
+  consolidated sanctions lists (cited as the canonical
+  US sanctions screening source)
+- EU AML Regulation (EU) 2024/1624; EU AMLD6 framework
+  regulation (Regulation (EU) 2024/1620 establishing
+  the Authority for Anti-Money Laundering and
+  Countering the Financing of Terrorism, AMLA);
+  Directive (EU) 2018/1673 on combating money
+  laundering by criminal law
+- EU consolidated sanctions list (cited as the
+  canonical EU restrictive-measures source)
+- KR Specific Financial Information Act
+  ("특정금융정보법"; cited where the operating
+  jurisdiction is Korea, as the legal basis for the
+  Korea Financial Intelligence Unit (KoFIU) reporting
+  regime)
+- KR Act on Prohibition of Financing of Terrorism
+  (cited for Korea CFT obligations)
+- UK Money Laundering, Terrorist Financing and Transfer
+  of Funds (Information on the Payer) Regulations 2017
+  (the "MLR 2017"; cited where the operating
+  jurisdiction is the UK)
+- SWIFT MT 103 (single customer credit transfer)
+- SWIFT MT 202 / MT 202 COV (general financial
+  institution transfer / cover payment); cited where
+  the operating environment uses MT in parallel with
+  ISO 20022
+- ISO 20022 pacs.008 / pacs.009 / camt.* (cited as the
+  successor to MT messaging on the SWIFT network's
+  MT-to-ISO 20022 migration timetable)
+- W3C Verifiable Credentials Data Model 2.0 (used in
+  PHASE-4 for optional attestation re-issuance)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-anti-money-laundering
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts
+an obliged entity manages under the FATF 40
+Recommendations as transposed into the operating
+jurisdiction's law. Implementations covered include:
 
-## §2 Manifest
+- Banks and other deposit-taking institutions.
+- Money-transmitter and payment-service-provider
+  obliged entities.
+- Securities brokers and asset managers.
+- Insurance underwriters offering life-insurance and
+  investment-linked products.
+- Designated non-financial businesses and professions
+  (DNFBPs): casinos, real-estate agents, dealers in
+  precious metals and stones, lawyers, accountants,
+  trust-and-company-service providers (per FATF
+  Recommendation 22).
+- Virtual-asset service providers (VASPs) per FATF
+  Recommendation 15.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "anti-money-laundering"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Cross-border wire-transfer information requirements per
+FATF Recommendation 16 ("Travel Rule") and the
+analogous EU Wire Transfer Regulation are encoded in
+PHASE-3 §6; this PHASE addresses the record shapes.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+obligedEntityName    : string (legal name of the
+                       obliged entity)
+legalEntityIdentifier : string (ISO 17442 LEI; obliged
+                       entities operating in
+                       jurisdictions that mandate LEI
+                       under the FSB recommendation)
+operatingJurisdiction : array of string (ISO 3166-1
+                       country codes of the obliged
+                       entity's operations)
+governingFrameworks  : array of enum ("FATF-40-Recs" |
+                       "US-BSA-31-CFR-X" |
+                       "EU-AMLD6-Reg-2024-1624" |
+                       "KR-Specific-Financial-
+                       Information-Act" |
+                       "UK-MLR-2017" |
+                       "user-defined")
+mlroReference        : string (the Money Laundering
+                       Reporting Officer's contact
+                       reference, per FATF
+                       Recommendation 18 / national
+                       equivalent — KR's compliance
+                       officer designated under the
+                       Specific Financial Information
+                       Act)
+fiuReference         : string (operating jurisdiction's
+                       FIU identity — FinCEN for US,
+                       KoFIU for KR, the operating
+                       Member State's FIU for EU,
+                       NCA-UKFIU for UK)
+amlSupervisor        : string (operating jurisdiction's
+                       AML/CFT supervisor — FinCEN +
+                       Federal Reserve / OCC / FDIC /
+                       SEC / CFTC for US per the
+                       obliged entity's primary
+                       prudential regulator; AMLA for
+                       EU once operational; FSC + FSS
+                       for KR; FCA / HMRC / Gambling
+                       Commission for UK per the
+                       obliged entity's class)
+programmeStatus      : enum ("design" | "operating" |
+                       "limited-rollout" |
+                       "wind-down" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Customer Due Diligence (CDD) Record
 
-## §4 Discovery
+Per FATF Recommendation 10. Record shape:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/anti-money-laundering`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+cddRecord:
+  customerId         : string (uuidv7)
+  programmeId        : string (uuidv7)
+  customerKind       : enum ("natural-person" |
+                       "legal-person" | "trust" |
+                       "partnership" | "non-profit" |
+                       "government-or-soe")
+  identificationDocs : array of object (each carrying
+                       document kind, issuing
+                       authority, document number, and
+                       a content-addressed reference to
+                       the verified copy)
+  identityVerifiedAt : string (ISO 8601)
+  riskRating         : enum ("simplified-low" |
+                       "standard" | "enhanced-high")
+                       (per FATF Recommendation 10
+                       risk-based approach)
+  beneficialOwners   : array of object (per FATF
+                       Recommendation 24/25 for legal
+                       persons / arrangements; each
+                       entry carries the natural-
+                       person identity, the ownership
+                       or control percentage, and the
+                       basis for the determination)
+  pepStatus          : enum ("not-pep" |
+                       "domestic-pep" |
+                       "foreign-pep" |
+                       "international-organisation-pep"
+                       | "pep-family-member" |
+                       "pep-close-associate")
+  sanctionsScreeningRef : string (URI of the most-
+                       recent sanctions screening
+                       result)
+  sourceOfFunds      : string (URI of the documented
+                       source-of-funds narrative; for
+                       enhanced-high risk relationships
+                       per FATF Recommendation 10
+                       enhanced CDD)
+  ongoingMonitoringFrequency : enum ("monthly" |
+                       "quarterly" | "semi-annual" |
+                       "annual" | "event-triggered")
+  refreshDueAt       : string (ISO 8601)
+```
 
-## §5 Time and Identity
+## §4 Enhanced Due Diligence (EDD) Annotation
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+For enhanced-high risk relationships (PEPs, high-risk
+third countries per FATF, complex unusually large
+transactions without an apparent economic purpose,
+correspondent banking with respondent banks in higher-
+risk jurisdictions):
 
-## §6 Versioning and Deprecation
+```
+eddAnnotation:
+  customerRef        : string (CDD record reference)
+  triggeringFactor   : enum ("pep-status" |
+                       "high-risk-third-country" |
+                       "complex-unusual-transaction" |
+                       "correspondent-banking-respondent"
+                       | "private-banking" |
+                       "vasp-counterparty" |
+                       "non-face-to-face-onboarding" |
+                       "user-defined")
+  seniorManagementApprovalRef : string (URI of the
+                       senior-management approval per
+                       FATF Recommendation 12 for PEPs)
+  enhancedSourceOfWealthRef : string (URI of the
+                       documented source-of-wealth
+                       narrative)
+  enhancedMonitoringPlanRef : string (URI of the
+                       enhanced ongoing-monitoring
+                       plan)
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Sanctions Screening Record
 
-## §7 Privacy and Security
+```
+sanctionsScreening:
+  screeningId        : string (uuidv7)
+  subjectRef         : string (CDD record or
+                       transaction record reference)
+  screeningTimestamp : string (ISO 8601)
+  listsScreened      : array of enum ("UN-Security-
+                       Council-Consolidated-Sanctions"
+                       | "EU-Consolidated-Sanctions" |
+                       "US-OFAC-SDN" |
+                       "US-OFAC-non-SDN-Sectoral" |
+                       "UK-HM-Treasury-OFSI-
+                       Consolidated" |
+                       "KR-MOFA-Sanctions-List" |
+                       "operator-internal-watchlist" |
+                       "user-defined")
+  matchKind          : enum ("no-match" | "potential-
+                       match-pending-review" |
+                       "confirmed-match-blocked" |
+                       "confirmed-false-positive")
+  reviewerRef        : string (compliance reviewer
+                       reference; absent for no-match)
+  decisionRationaleRef : string (URI of the documented
+                       review rationale; absent for
+                       no-match)
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Transaction Record
 
-## §8 Open Governance
+```
+transaction:
+  transactionId      : string (uuidv7)
+  programmeId        : string (uuidv7)
+  customerRef        : string (CDD record reference)
+  counterpartyRef    : string (counterparty CDD record
+                       reference if known; otherwise
+                       opaque counterparty identity)
+  bookedAt           : string (ISO 8601)
+  amount             : object (currency per ISO 4217 +
+                       amount + fx rate at booking)
+  rail               : enum ("swift-mt-103" |
+                       "swift-mt-202" |
+                       "swift-mt-202-cov" |
+                       "iso-20022-pacs-008" |
+                       "iso-20022-pacs-009" |
+                       "domestic-rtgs" |
+                       "domestic-ach" |
+                       "card-network" |
+                       "virtual-asset-on-chain" |
+                       "cash" |
+                       "user-defined")
+  travelRuleFields   : object (FATF Recommendation 16
+                       wire-transfer information —
+                       originator and beneficiary name,
+                       account number / wallet address,
+                       physical address; cross-border
+                       transactions above the operating
+                       jurisdiction's de minimis
+                       threshold include all fields)
+  monitoringRulesHit : array of string (transaction-
+                       monitoring rule identifiers
+                       that flagged the transaction)
+  caseRef            : string (URI of the alert-and-
+                       case record if the transaction
+                       triggered a case; absent
+                       otherwise)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `anti-money-laundering` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §7 Suspicious-Transaction Report (STR / SAR) Record
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+suspiciousTransactionReport:
+  reportId           : string (uuidv7)
+  programmeId        : string (uuidv7)
+  filedAt            : string (ISO 8601)
+  fiuRef             : enum ("us-fincen-sar" |
+                       "kr-kofiu-str" |
+                       "eu-member-state-fiu" |
+                       "uk-nca-ukfiu" |
+                       "user-defined")
+  fiuFiledAcknowledgement : string (FIU-issued
+                       acknowledgement reference;
+                       absent until FIU acknowledges)
+  triggerKind        : enum ("transaction-monitoring-
+                       rule" | "compliance-officer-
+                       review" | "frontline-staff-
+                       referral" | "law-enforcement-
+                       request" | "external-tip" |
+                       "user-defined")
+  underlyingPredicateOffenseHypothesis : string
+                       (compliance officer's
+                       hypothesised predicate offense
+                       under the operating
+                       jurisdiction's predicate-
+                       offense list — drug-trafficking,
+                       fraud, tax-evasion, corruption,
+                       terrorism-financing, etc.;
+                       hypothesis only — adjudication
+                       is the FIU's and law
+                       enforcement's responsibility)
+  reportNarrativeRef : string (URI of the redacted
+                       narrative; the narrative cites
+                       the specific transactions, the
+                       customer relationship, and the
+                       compliance officer's
+                       suspicion basis)
+  tippingOffPrecaution : boolean (true once the
+                       compliance officer has
+                       confirmed no tipping-off has
+                       occurred per FATF
+                       Recommendation 21)
+```
 
+## §8 Currency-Transaction Report (CTR) Record
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+For jurisdictions that mandate CTR filing above a de
+minimis threshold (US BSA $10,000, KR over the
+operating jurisdiction's threshold per the Specific
+Financial Information Act):
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```
+ctrRecord:
+  ctrId              : string (uuidv7)
+  programmeId        : string (uuidv7)
+  filedAt            : string (ISO 8601)
+  transactionRef     : string (transaction record
+                       reference)
+  thresholdJurisdiction : string (ISO 3166-1; the
+                       jurisdiction whose threshold
+                       applies)
+  fiuFiledAcknowledgement : string (FIU acknowledgement
+                       reference; absent until FIU
+                       acknowledges)
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §9 Correspondent-Banking Relationship Record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Per FATF Recommendation 13:
 
-## Annex F — Adoption Roadmap
+```
+correspondentBanking:
+  relationshipId     : string (uuidv7)
+  programmeId        : string (uuidv7)
+  respondentBankIdentity : string (respondent legal
+                       entity identifier)
+  respondentJurisdiction : string (ISO 3166-1)
+  relationshipKind   : enum ("nested-cover-payment-
+                       eligible" | "vostro-only" |
+                       "nostro-only" | "two-way")
+  respondentAmlAttestationRef : string (URI of the
+                       respondent's AML programme
+                       attestation; the obliged entity
+                       reviews the attestation per its
+                       correspondent-banking
+                       discipline)
+  shellBankPolicy    : enum ("respondent-not-shell" |
+                       "respondent-may-permit-shell-
+                       use") (per FATF Recommendation
+                       13 the obliged entity declines
+                       shell-bank correspondent
+                       relationships)
+  seniorManagementApprovalRef : string (URI of the
+                       senior-management approval
+                       record)
+  reviewCadence      : enum ("annual" | "biennial" |
+                       "ad-hoc-on-event")
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §10 Investigation Case Record
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+investigationCase:
+  caseId             : string (uuidv7)
+  programmeId        : string (uuidv7)
+  openedAt           : string (ISO 8601)
+  caseKind           : enum ("transaction-monitoring-
+                       alert" | "sanctions-hit" |
+                       "compliance-officer-referral"
+                       | "law-enforcement-inquiry" |
+                       "user-defined")
+  customerRef        : string (CDD record reference)
+  alertedTransactions : array of string (transaction
+                       record references)
+  caseStatus         : enum ("open" |
+                       "pending-additional-evidence" |
+                       "closed-no-suspicion" |
+                       "closed-str-filed" |
+                       "closed-customer-exited")
+  exitDecisionRef    : string (URI of the customer-
+                       exit decision narrative; absent
+                       unless the obliged entity
+                       declined to continue the
+                       relationship)
+  freezeOrSeizureRef : string (URI of the freeze or
+                       seizure-order acknowledgement;
+                       absent unless an order is in
+                       force)
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §11 Conformance
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Implementations claiming PHASE-1 conformance emit each
+of the records defined above for every operating
+programme, maintain CDD records for the duration of
+the customer relationship plus the operating
+jurisdiction's records-retention horizon (typically
+five years per FATF Recommendation 11 / equivalent
+national rule), and preserve STR / SAR filings per
+the FIU's required retention.
 
-## Annex G — Test Vectors and Conformance Evidence
+---
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+**Document Information:**
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
-
-## Annex J — Reference Implementation Topology
-
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
-
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-1-DATA-FORMAT validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
-
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-anti-money-laundering
+- **Last Updated:** 2026-04-28

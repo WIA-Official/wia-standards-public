@@ -5,270 +5,375 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-anti-money-laundering (Anti Money Laundering).
+This document defines the HTTPS API contract that an
+obliged entity exposes for the records defined in
+PHASE-1. Consumers include the obliged entity's
+compliance officer / MLRO, the operating jurisdiction's
+financial-intelligence unit (FIU), the operating
+jurisdiction's AML/CFT supervisor, the obliged entity's
+external auditors, and law enforcement under the
+operating jurisdiction's information-sharing rules.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics)
+- IETF RFC 9111 (HTTP Caching)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 6901 / 6902 (JSON Pointer / Patch)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9421 (HTTP Message Signatures)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 20022 (financial-services messaging)
+- ISO 17442 (LEI)
+- W3C Trace Context
+- FATF 40 Recommendations
+- FATF Recommendation 16 ("Travel Rule") for cross-
+  border wire transfers
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-anti-money-laundering
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by the
+obliged entity. Versioning uses `/v1/` path segments.
+The OpenAPI 3.1 document at `/v1/openapi.json` is
+canonical.
 
-## §2 Manifest
+This API is the obliged-entity-facing facade for AML
+records. It does NOT expose end-user banking APIs;
+those are operated by the obliged entity's product
+surface. STR/SAR filings flow from this API through
+the FIU's prescribed channel (e.g. FinCEN BSA E-Filing
+for US, KoFIU's electronic reporting channel for KR,
+the operating Member State's FIU portal for EU,
+NCA-UKFIU for UK).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "anti-money-laundering"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Root Discovery
 
-## §3 Conformance Tiers
+```
+GET /v1/
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```json
+{
+  "standard": "WIA-anti-money-laundering",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":               "/v1/programmes",
+    "cddRecords":               "/v1/cdd-records",
+    "sanctionsScreenings":      "/v1/sanctions-screenings",
+    "transactions":             "/v1/transactions",
+    "suspiciousReports":        "/v1/suspicious-reports",
+    "ctrRecords":               "/v1/ctr-records",
+    "correspondentBanking":     "/v1/correspondent-banking",
+    "investigationCases":       "/v1/investigation-cases",
+    "evidence":                 "/v1/evidence",
+    "openapi":                  "/v1/openapi.json"
+  }
+}
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Programme Lifecycle
 
-## §4 Discovery
+```
+POST   /v1/programmes              — register a
+                                     programme
+GET    /v1/programmes/{pid}        — retrieve programme
+PATCH  /v1/programmes/{pid}/status — advance status
+PATCH  /v1/programmes/{pid}/mlro   — record MLRO
+                                     designation per
+                                     FATF Recommendation
+                                     18 / equivalent
+                                     national rule
+PATCH  /v1/programmes/{pid}/fiu-binding
+                                   — record FIU binding
+                                     for STR/SAR filings
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/anti-money-laundering`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Programmes operating in a jurisdiction without an MLRO
+designation field return `409` with type
+`urn:wia:anti-money-laundering:mlro-required`.
 
-## §5 Time and Identity
+## §4 CDD Records
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST   /v1/programmes/{pid}/cdd-records
+                                   — register a customer
+                                     CDD record per
+                                     FATF Recommendation
+                                     10
+PATCH  /v1/cdd-records/{cid}/risk-rating
+                                   — update risk rating
+                                     (typically on
+                                     periodic refresh
+                                     or event trigger)
+PATCH  /v1/cdd-records/{cid}/beneficial-owners
+                                   — update beneficial-
+                                     ownership chain
+GET    /v1/cdd-records/{cid}       — retrieve CDD record
+GET    /v1/cdd-records/{cid}/edd-annotation
+                                   — retrieve EDD
+                                     annotation if
+                                     applicable
+```
 
-## §6 Versioning and Deprecation
+CDD submissions whose `customerKind` is `legal-person`
+or `trust` without a `beneficialOwners` array return
+`422` with type
+`urn:wia:anti-money-laundering:beneficial-ownership-
+required`. CDD submissions whose `pepStatus` is non-
+`not-pep` without an `eddAnnotation.seniorManagement
+ApprovalRef` return `409` with type
+`urn:wia:anti-money-laundering:pep-senior-management-
+approval-required`.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Sanctions Screening
 
-## §7 Privacy and Security
+```
+POST   /v1/cdd-records/{cid}/sanctions-screenings
+                                   — register a customer
+                                     sanctions screening
+POST   /v1/transactions/{tid}/sanctions-screenings
+                                   — register a
+                                     transaction-level
+                                     sanctions screening
+PATCH  /v1/sanctions-screenings/{sid}/decision
+                                   — record reviewer
+                                     decision
+GET    /v1/sanctions-screenings/{sid}
+                                   — retrieve screening
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Screenings with `matchKind=potential-match-pending-
+review` outstanding longer than the obliged entity's
+published review SLA emit a programme-level event so
+that the compliance officer can re-prioritise the
+queue.
 
-## §8 Open Governance
+## §6 Transactions
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `anti-money-laundering` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST   /v1/programmes/{pid}/transactions
+                                   — register a
+                                     transaction
+GET    /v1/transactions/{tid}      — retrieve
+                                     transaction
+GET    /v1/transactions/{tid}/travel-rule-fields
+                                   — retrieve
+                                     Recommendation 16
+                                     wire-transfer
+                                     information
+                                     (originator and
+                                     beneficiary fields)
+GET    /v1/transactions/{tid}/case
+                                   — retrieve linked
+                                     case if applicable
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Cross-border transactions above the operating
+jurisdiction's de minimis threshold whose
+`travelRuleFields` are incomplete return `422` with
+type
+`urn:wia:anti-money-laundering:travel-rule-fields-
+incomplete`.
 
+## §7 Suspicious-Transaction Reports (STR / SAR)
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST   /v1/programmes/{pid}/suspicious-reports
+                                   — file an STR / SAR
+PATCH  /v1/suspicious-reports/{rid}/fiu-acknowledgement
+                                   — record FIU
+                                     acknowledgement
+GET    /v1/suspicious-reports/{rid}
+                                   — retrieve report
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+STR / SAR submissions whose `tippingOffPrecaution` is
+not true return `409` with type
+`urn:wia:anti-money-laundering:tipping-off-precaution-
+required`. STR / SAR records are gated to the
+compliance officer / MLRO and external auditors; the
+records are NEVER exposed to the customer or to
+unrelated branches per FATF Recommendation 21 tipping-
+off prohibition.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Currency-Transaction Reports (CTR)
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+POST   /v1/transactions/{tid}/ctr-records
+                                   — file a CTR for a
+                                     transaction above
+                                     the operating
+                                     jurisdiction's
+                                     threshold
+GET    /v1/ctr-records/{cid}       — retrieve CTR
+```
 
-## Annex F — Adoption Roadmap
+CTRs for transactions structured to evade the
+threshold (multiple deposits below threshold by the
+same customer within a defined window, the
+"structuring" pattern under US BSA 31 USC 5324) are
+flagged by the obliged entity's transaction-monitoring
+rules and routed through the STR / SAR endpoint
+instead of the CTR endpoint.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Correspondent Banking
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+POST   /v1/programmes/{pid}/correspondent-banking
+                                   — register a
+                                     correspondent-
+                                     banking
+                                     relationship
+PATCH  /v1/correspondent-banking/{rid}/respondent-aml-
+attestation
+                                   — record respondent
+                                     AML attestation
+                                     review
+PATCH  /v1/correspondent-banking/{rid}/review
+                                   — record periodic
+                                     relationship
+                                     review
+GET    /v1/correspondent-banking/{rid}
+                                   — retrieve
+                                     relationship
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Correspondent-banking submissions whose `shellBankPolicy`
+is `respondent-may-permit-shell-use` return `409` with
+type
+`urn:wia:anti-money-laundering:shell-bank-correspondent-
+prohibited`, mirroring FATF Recommendation 13.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Investigation Cases
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+POST   /v1/programmes/{pid}/investigation-cases
+                                   — open an investigation
+                                     case
+PATCH  /v1/investigation-cases/{cid}/status
+                                   — advance case status
+PATCH  /v1/investigation-cases/{cid}/exit-decision
+                                   — record customer-
+                                     exit decision
+GET    /v1/investigation-cases/{cid}
+                                   — retrieve case
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Cases closed with `closed-customer-exited` automatically
+trigger downstream workflow (account closure,
+relationship termination per the obliged entity's
+contracted-out workflow, downstream notifications to
+joint-account holders per the operating jurisdiction's
+consumer-protection rules).
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §11 Errors, Authentication, Caching, Audit
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Errors: `application/problem+json` per RFC 9457 with
+the types named above plus
+`urn:wia:anti-money-laundering:evidence-mismatch`.
+Authentication: mutually-authenticated TLS for all
+consumers; the customer's own access (Article 15 GDPR
+right of access where applicable) is gated through the
+operating jurisdiction's tipping-off discipline (some
+records — open STR / SAR and ongoing investigations —
+are not subject to disclosure even on Article 15
+request, under Article 23 derogations). Caching:
+stable resources (closed cases, acknowledged STR / SAR
+filings, archived programmes) cacheable with
+`Cache-Control: max-age=31536000, immutable`. Audit
+logs carry `programmeId`, `customerId`, `transactionId`,
+`traceId`, the issuing client certificate's subject,
+and the obliged entity's clock skew vs the operating
+jurisdiction's NTP service.
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Streaming Subscription, Bulk, Pagination, Provenance
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+SSE at `/v1/programmes/{pid}/events` for programme-
+wide events (sanctions match confirmed, transaction-
+monitoring rule triggered, STR / SAR filed, FIU
+acknowledgement received). Subscribers reconnect via
+`Last-Event-ID`. Bulk endpoints: `/v1/bulk/cdd-records`,
+`/v1/bulk/transactions`, `/v1/bulk/sanctions-
+screenings`. Cursor-based pagination via `cursor` and
+`Link` headers. Provenance via
+`/v1/provenance/{recordId}` emits the in-toto
+attestation chain for any record.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §13 Worked Example: Travel-Rule Cross-Border Wire
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+1. Customer requests a cross-border wire above the
+   operating jurisdiction's Travel-Rule de minimis
+   threshold.
+2. Obliged entity registers the transaction via
+   `POST /transactions` with full `travelRuleFields`
+   (originator + beneficiary name, account number /
+   wallet address, physical address).
+3. Sanctions screening runs against UN, EU, OFAC, and
+   the operating jurisdiction's national list via
+   `POST /sanctions-screenings`; on `confirmed-match-
+   blocked` the transaction is held and the case is
+   opened via `POST /investigation-cases`.
+4. On `no-match`, the wire is dispatched on the
+   chosen rail (SWIFT MT 103 or ISO 20022 pacs.008
+   per the corridor's adoption status).
+5. Transaction-monitoring rules retrospectively
+   evaluate the transaction; if a rule fires, an
+   investigation case opens.
+6. If the case closes with `closed-str-filed`, an
+   STR / SAR is filed via `POST /suspicious-reports`.
 
-## Annex I — Interoperability Profiles
+## §14 Politically-Exposed-Person Refresh Endpoint
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+```
+POST   /v1/cdd-records/{cid}/pep-refresh
+                                   — refresh PEP status
+                                     against an
+                                     operator-bound PEP
+                                     data source (the
+                                     obliged entity's
+                                     contracted PEP
+                                     screening
+                                     provider)
+GET    /v1/cdd-records/{cid}/pep-history
+                                   — retrieve PEP-
+                                     status change
+                                     history (a
+                                     domestic PEP that
+                                     becomes a foreign
+                                     PEP on relocation
+                                     triggers reassessment)
+```
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §15 Aggregate and Provenance Endpoints
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+```
+GET    /v1/provenance/{recordId}
+GET    /v1/aggregate/transaction-volume?period=...&rail=...
+GET    /v1/aggregate/sanctions-match-volume?period=...&list=...
+GET    /v1/aggregate/str-volume?period=...&trigger=...
+```
 
-## Annex J — Reference Implementation Topology
+## §16 Conformance
 
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
+A conformant server passes the test vectors published
+under `tests/phase-vectors/phase-2-api-interface/`,
+emits an OpenAPI 3.1 document, signs evidence packages
+per RFC 9421, refuses shell-bank correspondent
+relationships, refuses incomplete Travel-Rule fields
+above threshold, and refuses STR / SAR submissions
+without the tipping-off precaution flag.
 
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-2-API-INTERFACE validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
+---
 
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-anti-money-laundering
+- **Last Updated:** 2026-04-28

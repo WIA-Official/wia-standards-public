@@ -1,0 +1,10 @@
+# DALL-E Prompts for WIA-COMM-009 Press Materials
+
+## Prompt 1: Hero Image - Long-Range Wireless Power System
+A futuristic power transmission scene with blue (#3B82F6) energy beams: microwave power beaming from transmitter array to rectenna receiver 500 meters away providing 100W, laser power transmission using 1064nm infrared beam safely delivering 10kW to photovoltaic receiver, resonant wireless power coupling powering multiple devices in 2-meter radius at 11kW, and space-based solar power satellite beaming energy to Earth ground station. Advanced electromagnetic visualization showing power flow. High-tech energy infrastructure photography.
+
+## Prompt 2: Problem Scenario - Power Distribution Limitations
+An industrial scene showing traditional power limitations: construction site requiring long, dangerous extension cords creating trip hazards, remote sensors dying from battery depletion requiring costly manual replacement, drones limited to 20-30 minute flight times before landing to recharge, disaster zones with destroyed power infrastructure leaving people without electricity, and satellites with degraded solar panels losing functionality. Documentary photography emphasizing power access challenges, safety hazards, and range limitations.
+
+## Prompt 3: Solution Visualization - Ubiquitous Wireless Power Access
+A revolutionary energy landscape powered by WIA-COMM-009: drone charging in-flight via microwave power beaming extending flight to unlimited duration, remote IoT sensors powered wirelessly for 10+ years without battery replacement, disaster relief powered by mobile laser power beaming systems restoring electricity instantly, electric vehicles charging dynamically while driving on electrified roads at 20kW, construction robots powered continuously via resonant coupling eliminating downtime. Dashboard shows 10-50% efficiency at distance, SAR safety compliance <2 W/kg. Clean, accessible, wireless power everywhere. Futuristic energy photography celebrating power freedom.

@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 0-02: Undefined Behavior | WIA-RUST-ADVANCED</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            position: relative;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .episode-badge {
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 10px 25px;
+            border: 2px solid #F39C12;
+            background: transparent;
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: #F39C12;
+        }
+
+        .title {
+            font-size: 72px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #F39C12, #FFD700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border-radius: 15px;
+            padding: 30px;
+            font-family: 'Consolas', 'D2Coding', monospace;
+            font-size: 26px;
+            line-height: 1.6;
+            border: 2px solid #30363d;
+            width: 900px;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+
+        .code-line.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .keyword { color: #ff7b72; }
+        .function { color: #d2a8ff; }
+        .string { color: #a5d6ff; }
+        .macro { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .type { color: #ffa657; }
+        .danger { color: #ff4444; }
+
+        .danger-box {
+            background: rgba(255, 68, 68, 0.15);
+            border: 3px solid #ff4444;
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+        }
+
+        .danger-box h3 {
+            color: #ff4444;
+            font-size: 40px;
+            margin-bottom: 25px;
+        }
+
+        .danger-box p {
+            font-size: 28px;
+            line-height: 1.8;
+        }
+
+        .ub-list {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 40px;
+        }
+
+        .ub-item {
+            display: flex;
+            align-items: flex-start;
+            margin: 25px 0;
+            font-size: 28px;
+            opacity: 0;
+            transform: translateX(-20px);
+            transition: all 0.5s;
+        }
+
+        .ub-item.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .ub-icon {
+            font-size: 40px;
+            margin-right: 20px;
+            flex-shrink: 0;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            width: 100%;
+        }
+
+        .comparison-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 40px;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 0.5s;
+        }
+
+        .comparison-item.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .comparison-item.good {
+            border: 2px solid #4CAF50;
+        }
+
+        .comparison-item.bad {
+            border: 2px solid #ff4444;
+        }
+
+        .comparison-item h3 {
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .good h3 { color: #4CAF50; }
+        .bad h3 { color: #ff4444; }
+
+        .navigation {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(243, 156, 18, 0.8);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: #F39C12;
+            transform: scale(1.05);
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 8px;
+            background: #F39C12;
+            transition: width 0.5s;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 100px;
+            right: 60px;
+            font-size: 24px;
+            color: #888;
+        }
+
+        .subtitle {
+            font-size: 36px;
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .big-emoji {
+            font-size: 150px;
+            margin-bottom: 30px;
+        }
+
+        .channel-info {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid #FF0000;
+            border-radius: 20px;
+            padding: 30px 60px;
+            margin-top: 40px;
+            font-size: 32px;
+        }
+
+        .channel-info a {
+            color: #FF6B6B;
+            text-decoration: none;
+        }
+
+        .highlight-box {
+            background: rgba(243, 156, 18, 0.15);
+            border: 2px solid #F39C12;
+            border-radius: 20px;
+            padding: 50px;
+            margin: 30px 0;
+        }
+
+        .highlight-box h3 {
+            color: #F39C12;
+            font-size: 40px;
+            margin-bottom: 25px;
+        }
+
+        .highlight-box p {
+            font-size: 30px;
+            line-height: 1.8;
+        }
+
+        .rule-box {
+            background: rgba(76, 175, 80, 0.1);
+            border-left: 5px solid #4CAF50;
+            padding: 30px;
+            margin: 20px 0;
+            border-radius: 0 15px 15px 0;
+        }
+
+        .rule-box h4 {
+            color: #4CAF50;
+            font-size: 30px;
+            margin-bottom: 15px;
+        }
+
+        .rule-box p {
+            font-size: 26px;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 0-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">⚠️</div>
+            <h1 class="title">Undefined Behavior</h1>
+            <p class="subtitle">
+                <span class="ko">Undefined Behavior 완벽 가이드</span>
+                <span class="en" style="display:none;">Complete Guide to Undefined Behavior</span>
+            </p>
+            <div class="channel-info">
+                📺 YouTube: <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">
+                <span class="ko">시작하기 →</span>
+                <span class="en" style="display:none;">Start →</span>
+            </button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: What is UB? -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 0-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">UB란 무엇인가?</span>
+            <span class="en" style="display:none;">What is UB?</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="danger-box">
+                    <h3>
+                        <span class="ko">⚠️ Undefined Behavior</span>
+                        <span class="en" style="display:none;">⚠️ Undefined Behavior</span>
+                    </h3>
+                    <p class="ko">
+                        컴파일러가 "이 코드는 절대 실행되지 않을 것"이라고 가정하는 상황.<br>
+                        실제로 실행되면 예측 불가능한 결과 발생.<br><br>
+                        💥 프로그램 크래시<br>
+                        💥 데이터 손상<br>
+                        💥 보안 취약점<br>
+                        💥 "정상 작동"처럼 보이다가 갑자기 실패
+                    </p>
+                    <p class="en" style="display:none;">
+                        Situations where compiler assumes "this code will never execute."<br>
+                        If actually executed, unpredictable results occur.<br><br>
+                        💥 Program crash<br>
+                        💥 Data corruption<br>
+                        💥 Security vulnerabilities<br>
+                        💥 "Works fine" then suddenly fails
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: Common UB Cases -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 0-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">주요 UB 사례</span>
+            <span class="en" style="display:none;">Common UB Cases</span>
+        </h1>
+        <div class="content">
+            <div class="ub-list" style="width: 100%;">
+                <div class="ub-item">
+                    <div class="ub-icon">🔴</div>
+                    <div>
+                        <strong class="ko">Null 포인터 역참조</strong>
+                        <strong class="en" style="display:none;">Dereferencing null pointers</strong>
+                        <span class="ko"> - *ptr where ptr is null</span>
+                        <span class="en" style="display:none;"> - *ptr where ptr is null</span>
+                    </div>
+                </div>
+                <div class="ub-item">
+                    <div class="ub-icon">🔴</div>
+                    <div>
+                        <strong class="ko">댕글링 포인터 접근</strong>
+                        <strong class="en" style="display:none;">Accessing dangling pointers</strong>
+                        <span class="ko"> - 해제된 메모리 사용</span>
+                        <span class="en" style="display:none;"> - Using freed memory</span>
+                    </div>
+                </div>
+                <div class="ub-item">
+                    <div class="ub-icon">🔴</div>
+                    <div>
+                        <strong class="ko">데이터 레이스</strong>
+                        <strong class="en" style="display:none;">Data races</strong>
+                        <span class="ko"> - 동시에 같은 메모리 읽기/쓰기</span>
+                        <span class="en" style="display:none;"> - Concurrent read/write to same memory</span>
+                    </div>
+                </div>
+                <div class="ub-item">
+                    <div class="ub-icon">🔴</div>
+                    <div>
+                        <strong class="ko">잘못된 정렬 접근</strong>
+                        <strong class="en" style="display:none;">Misaligned access</strong>
+                        <span class="ko"> - 4-byte 타입을 홀수 주소에서 읽기</span>
+                        <span class="en" style="display:none;"> - Reading 4-byte type at odd address</span>
+                    </div>
+                </div>
+                <div class="ub-item">
+                    <div class="ub-icon">🔴</div>
+                    <div>
+                        <strong class="ko">초기화되지 않은 메모리 읽기</strong>
+                        <strong class="en" style="display:none;">Reading uninitialized memory</strong>
+                        <span class="ko"> - 값이 설정되기 전 사용</span>
+                        <span class="en" style="display:none;"> - Using before value is set</span>
+                    </div>
+                </div>
+                <div class="ub-item">
+                    <div class="ub-icon">🔴</div>
+                    <div>
+                        <strong class="ko">잘못된 타입 캐스팅</strong>
+                        <strong class="en" style="display:none;">Invalid type casting</strong>
+                        <span class="ko"> - &u8를 &u64로 변환</span>
+                        <span class="en" style="display:none;"> - Casting &u8 to &u64</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: UB Example - Bad -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 0-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">❌ UB 예제: 잘못된 코드</span>
+            <span class="en" style="display:none;">❌ UB Example: Bad Code</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">unsafe</span> {</div>
+                    <div class="code-line">    <span class="comment">// ❌ Null pointer dereference</span></div>
+                    <div class="code-line">    <span class="keyword">let</span> ptr = std::ptr::<span class="function">null</span>::&lt;<span class="type">i32</span>&gt;();</div>
+                    <div class="code-line">    <span class="keyword">let</span> val = *ptr;  <span class="danger">// UB!</span></div>
+                    <div class="code-line"></div>
+                    <div class="code-line">    <span class="comment">// ❌ Use after free</span></div>
+                    <div class="code-line">    <span class="keyword">let</span> ptr = Box::<span class="function">into_raw</span>(Box::<span class="function">new</span>(<span class="number">42</span>));</div>
+                    <div class="code-line">    drop(Box::<span class="function">from_raw</span>(ptr));</div>
+                    <div class="code-line">    <span class="keyword">let</span> val = *ptr;  <span class="danger">// UB!</span></div>
+                    <div class="code-line"></div>
+                    <div class="code-line">    <span class="comment">// ❌ Uninitialized memory</span></div>
+                    <div class="code-line">    <span class="keyword">let</span> x: <span class="type">i32</span>;</div>
+                    <div class="code-line">    <span class="macro">println!</span>(<span class="string">"{}"</span>, x);  <span class="danger">// UB!</span></div>
+                    <div class="code-line">}</div>
+                </div>
+                <div class="danger-box">
+                    <h3>
+                        <span class="ko">⚠️ 이 코드들은 절대 작성하지 마세요!</span>
+                        <span class="en" style="display:none;">⚠️ Never write code like this!</span>
+                    </h3>
+                    <p class="ko">컴파일러가 이 코드를 완전히 최적화로 제거하거나, 예상치 못한 동작을 할 수 있습니다.</p>
+                    <p class="en" style="display:none;">Compiler may optimize this code away completely or cause unexpected behavior.</p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: UB Example - Good -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 0-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">✅ 안전한 코드</span>
+            <span class="en" style="display:none;">✅ Safe Code</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">unsafe</span> {</div>
+                    <div class="code-line">    <span class="comment">// ✅ Check before dereferencing</span></div>
+                    <div class="code-line">    <span class="keyword">let</span> ptr: *<span class="keyword">const</span> <span class="type">i32</span> = get_ptr();</div>
+                    <div class="code-line">    <span class="keyword">if</span> !ptr.<span class="function">is_null</span>() {</div>
+                    <div class="code-line">        <span class="keyword">let</span> val = *ptr;  <span class="comment">// Safe!</span></div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line"></div>
+                    <div class="code-line">    <span class="comment">// ✅ Use safe abstractions</span></div>
+                    <div class="code-line">    <span class="keyword">let</span> boxed = Box::<span class="function">new</span>(<span class="number">42</span>);</div>
+                    <div class="code-line">    <span class="keyword">let</span> val = *boxed;  <span class="comment">// Safe!</span></div>
+                    <div class="code-line"></div>
+                    <div class="code-line">    <span class="comment">// ✅ Always initialize</span></div>
+                    <div class="code-line">    <span class="keyword">let</span> x: <span class="type">i32</span> = <span class="number">0</span>;</div>
+                    <div class="code-line">    <span class="macro">println!</span>(<span class="string">"{}"</span>, x);  <span class="comment">// Safe!</span></div>
+                    <div class="code-line">}</div>
+                </div>
+                <div class="rule-box">
+                    <h4>
+                        <span class="ko">✅ 안전 규칙</span>
+                        <span class="en" style="display:none;">✅ Safety Rules</span>
+                    </h4>
+                    <p class="ko">
+                        1️⃣ 포인터는 사용 전 항상 null 체크<br>
+                        2️⃣ 가능하면 안전한 추상화 사용 (Box, Rc, Arc)<br>
+                        3️⃣ 변수는 사용 전 반드시 초기화
+                    </p>
+                    <p class="en" style="display:none;">
+                        1️⃣ Always check pointers for null before use<br>
+                        2️⃣ Use safe abstractions when possible (Box, Rc, Arc)<br>
+                        3️⃣ Always initialize variables before use
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: Compiler Optimizations and UB -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 0-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">컴파일러 최적화와 UB</span>
+            <span class="en" style="display:none;">Compiler Optimizations and UB</span>
+        </h1>
+        <div class="content">
+            <div class="comparison-grid">
+                <div class="comparison-item bad">
+                    <h3>
+                        <span class="ko">❌ UB가 있는 코드</span>
+                        <span class="en" style="display:none;">❌ Code with UB</span>
+                    </h3>
+                    <div class="code-block" style="width: 100%; font-size: 22px;">
+                        <div><span class="keyword">fn</span> <span class="function">sum</span>(ptr: *<span class="keyword">const</span> <span class="type">i32</span>) {</div>
+                        <div>    <span class="keyword">unsafe</span> {</div>
+                        <div>        <span class="comment">// Assumes non-null</span></div>
+                        <div>        *ptr + <span class="number">1</span></div>
+                        <div>    }</div>
+                        <div>}</div>
+                    </div>
+                    <p class="ko" style="margin-top: 20px; font-size: 22px;">
+                        컴파일러: "ptr은 null이 아니다"<br>
+                        → null 체크 제거<br>
+                        → 크래시 발생
+                    </p>
+                    <p class="en" style="display:none; margin-top: 20px; font-size: 22px;">
+                        Compiler: "ptr is not null"<br>
+                        → Removes null checks<br>
+                        → Crash occurs
+                    </p>
+                </div>
+                <div class="comparison-item good">
+                    <h3>
+                        <span class="ko">✅ 안전한 코드</span>
+                        <span class="en" style="display:none;">✅ Safe Code</span>
+                    </h3>
+                    <div class="code-block" style="width: 100%; font-size: 22px;">
+                        <div><span class="keyword">fn</span> <span class="function">sum</span>(val: &<span class="type">i32</span>) {</div>
+                        <div>    <span class="comment">// Reference guaranteed valid</span></div>
+                        <div>    *val + <span class="number">1</span></div>
+                        <div>}</div>
+                    </div>
+                    <p class="ko" style="margin-top: 20px; font-size: 22px;">
+                        컴파일러: "참조는 항상 유효"<br>
+                        → 적극적으로 최적화<br>
+                        → 안전하고 빠른 코드
+                    </p>
+                    <p class="en" style="display:none; margin-top: 20px; font-size: 22px;">
+                        Compiler: "Reference always valid"<br>
+                        → Aggressive optimization<br>
+                        → Safe and fast code
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Preventing UB -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 0-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">UB 방지 전략</span>
+            <span class="en" style="display:none;">Preventing UB</span>
+        </h1>
+        <div class="content">
+            <div style="width: 100%;">
+                <div class="rule-box">
+                    <h4>
+                        <span class="ko">1️⃣ 안전한 Rust 우선 사용</span>
+                        <span class="en" style="display:none;">1️⃣ Prefer Safe Rust</span>
+                    </h4>
+                    <p class="ko">unsafe는 정말 필요할 때만 사용. 안전한 추상화로 감싸기.</p>
+                    <p class="en" style="display:none;">Use unsafe only when absolutely necessary. Wrap in safe abstractions.</p>
+                </div>
+                <div class="rule-box">
+                    <h4>
+                        <span class="ko">2️⃣ 포인터보다 참조 사용</span>
+                        <span class="en" style="display:none;">2️⃣ Use References Over Pointers</span>
+                    </h4>
+                    <p class="ko">*const T, *mut T 대신 &T, &mut T 사용. 컴파일러가 유효성 보장.</p>
+                    <p class="en" style="display:none;">Use &T, &mut T instead of *const T, *mut T. Compiler guarantees validity.</p>
+                </div>
+                <div class="rule-box">
+                    <h4>
+                        <span class="ko">3️⃣ Miri로 테스트</span>
+                        <span class="en" style="display:none;">3️⃣ Test with Miri</span>
+                    </h4>
+                    <p class="ko">unsafe 코드는 반드시 Miri로 검증. UB를 런타임에 탐지.</p>
+                    <p class="en" style="display:none;">Always validate unsafe code with Miri. Detects UB at runtime.</p>
+                </div>
+                <div class="rule-box">
+                    <h4>
+                        <span class="ko">4️⃣ 문서화 및 불변조건 명시</span>
+                        <span class="en" style="display:none;">4️⃣ Document and State Invariants</span>
+                    </h4>
+                    <p class="ko">unsafe 함수의 안전 조건을 주석으로 명확히 기술.</p>
+                    <p class="en" style="display:none;">Clearly document safety conditions for unsafe functions.</p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 0-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">⚠️✨</div>
+            <div class="highlight-box" style="max-width: 1400px;">
+                <h3>
+                    <span class="ko">핵심 요약</span>
+                    <span class="en" style="display:none;">Key Takeaways</span>
+                </h3>
+                <p class="ko">
+                    ✅ UB는 예측 불가능하고 위험함<br>
+                    ✅ null 포인터, use-after-free, 데이터 레이스 등 주의<br>
+                    ✅ 안전한 Rust를 최대한 활용<br>
+                    ✅ unsafe 코드는 항상 검증 (Miri)<br>
+                    ✅ 컴파일러는 UB가 없다고 가정하고 최적화<br>
+                    ✅ 문서화와 테스트로 안전성 확보
+                </p>
+                <p class="en" style="display:none;">
+                    ✅ UB is unpredictable and dangerous<br>
+                    ✅ Watch out for null pointers, use-after-free, data races<br>
+                    ✅ Maximize use of safe Rust<br>
+                    ✅ Always validate unsafe code (Miri)<br>
+                    ✅ Compiler optimizes assuming no UB<br>
+                    ✅ Ensure safety through documentation and testing
+                </p>
+            </div>
+            <div style="margin-top: 40px; text-align: center;">
+                <p style="font-size: 36px; margin-bottom: 20px;">
+                    <span class="ko">다음 에피소드: Miri로 unsafe 코드 검증</span>
+                    <span class="en" style="display:none;">Next Episode: Verifying unsafe Code with Miri</span>
+                </p>
+                <p style="font-size: 28px; color: #888;">EP 0-03 →</p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a> |
+                <span class="ko">弘益人間 - 널리 인간을 이롭게 하라</span>
+                <span class="en" style="display:none;">Benefit All Humanity</span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_0_03_Miri.html'">
+                <span class="ko">다음 에피소드 →</span>
+                <span class="en" style="display:none;">Next Episode →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') ||
+                    (lang === 'en' && btn.textContent === 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.ko').forEach(el => {
+                el.style.display = lang === 'ko' ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = lang === 'en' ? '' : 'none';
+            });
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                if (n === 3) {
+                    const items = document.querySelectorAll('#slide3 .ub-item');
+                    items.forEach((item, i) => {
+                        setTimeout(() => item.classList.add('show'), i * 150);
+                    });
+                }
+                if (n === 4) {
+                    const lines = document.querySelectorAll('#slide4 .code-line');
+                    lines.forEach((line, i) => {
+                        setTimeout(() => line.classList.add('show'), i * 150);
+                    });
+                }
+                if (n === 5) {
+                    const lines = document.querySelectorAll('#slide5 .code-line');
+                    lines.forEach((line, i) => {
+                        setTimeout(() => line.classList.add('show'), i * 150);
+                    });
+                }
+                if (n === 6) {
+                    const items = document.querySelectorAll('#slide6 .comparison-item');
+                    items.forEach((item, i) => {
+                        setTimeout(() => item.classList.add('show'), i * 300);
+                    });
+                }
+            }, 100);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Initialize
+        animateSlide(1);
+    </script>
+</body>
+</html>

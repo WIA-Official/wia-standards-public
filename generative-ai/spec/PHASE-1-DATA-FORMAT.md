@@ -5,237 +5,444 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-generative-ai (Generative Ai).
+This document defines the canonical data-format layer
+for WIA-generative-ai. The standard covers persistent
+record shapes for the lifecycle of a generative-AI
+system — the foundation model and its training data
+provenance; the system that wraps the model into a
+deployed service; the fine-tuning, alignment, and
+evaluation artefacts that adapt the model to its
+deployment; the input-prompt, retrieval-augmentation,
+and output-generation log; the content-provenance and
+synthetic-content-marking record; the evaluation,
+red-team, and post-deployment monitoring record; and
+the incident, complaint, and corrective-action record.
+Records are consumed by the system's deployer
+(operator), the model provider (where distinct from
+the deployer), the deployer's compliance and risk
+function, the regulatory authority for the operating
+jurisdiction (the EU AI Office for general-purpose AI
+models with systemic risk, the Member-State market-
+surveillance authority for high-risk AI systems, the
+US sector regulators for sector-specific deployments,
+and KR PIPC / NIA / FSC for KR-jurisdiction
+deployments), the affected-rights holder under the EU
+Copyright Directive opt-out and the equivalent
+jurisdictional regimes, and the end-user through the
+content-provenance and right-to-explanation channels.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID) and IETF RFC 4122 (UUID URN)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 42001:2023 (AI management system)
+- ISO/IEC 22989:2022 (AI concepts and terminology)
+- ISO/IEC 23053:2022 (framework for AI systems using
+  ML)
+- ISO/IEC 24029-2:2023 (AI robustness via formal
+  methods)
+- ISO/IEC 23894:2023 (AI risk management)
+- IETF RFC 8259 (JSON), RFC 9457 (Problem Details)
+- C2PA (Coalition for Content Provenance and
+  Authenticity) Content Credentials specification
+  v1.4 — the operating wire format for content
+  provenance and synthetic-content marking
+- W3C Verifiable Credentials Data Model 2.0
+- HuggingFace Model Card (the de facto model-
+  documentation format) and Datasheet for Datasets
+  conventions
+- MLflow (the de facto model-tracking and registry
+  toolkit; cited as the format reference for the
+  registry record shape)
+- ONNX (the de facto open neural-network exchange
+  format; cited as the model-artefact wire format)
+- NIST AI Risk Management Framework 1.0 + NIST AI
+  600-1 GenAI Profile (Generative AI Profile)
+- US OMB M-24-10 (the US federal-agency guidance on
+  AI use cases) for federal deployments
+- US Executive Order 14110 (Safe, Secure, and
+  Trustworthy Development and Use of Artificial
+  Intelligence) and successor executive guidance
+- EU AI Act (Regulation (EU) 2024/1689) Articles 3
+  (definitions including "general-purpose AI
+  model"), 6 (high-risk classification rules), 7
+  (Annex III amendment), 8 to 17 (high-risk system
+  obligations), 25 (provider obligations), 26
+  (deployer obligations), 27 (fundamental-rights
+  impact assessment), 50 (transparency obligations
+  for AI systems intended to interact with natural
+  persons / generate content), 51 to 55 (general-
+  purpose AI model obligations), 56 (codes of
+  practice for GPAI), Annex III (high-risk areas),
+  Annex IX, Annex XI (technical documentation for
+  GPAI)
+- EU Code of Practice for General-Purpose AI Models
+  (the AI Act Article 56 published code)
+- EU GDPR (Regulation (EU) 2016/679) Articles 5, 6,
+  9, 12 to 22, 22(3), 24, 25, 32, 35
+- EU Copyright Directive 2019/790 Article 4 text-
+  and-data-mining (TDM) opt-out
+- KR AI Industry Promotion Act (인공지능 산업진흥법)
+  and KR PIPA Article 28 automated decision-making
+  discipline
+- KR Communications Commission and Personal
+  Information Protection Commission (PIPC) AI-
+  related guidance
+- OWASP Top 10 for Large Language Model Applications
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-generative-ai
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts
+a generative-AI operator (the deployer or, where
+distinct, the model provider) maintains:
 
-## §2 Manifest
+- The model registry record — model identity,
+  version, weights digest, training data manifest,
+  evaluation results.
+- The system / deployment record — the wrapper that
+  turns the model into a deployed service (system
+  prompt, tool catalogue, retrieval index, safety
+  filters).
+- The fine-tuning, alignment, and adapter record.
+- The input-output transcript record — prompts,
+  retrieved documents, tool calls, model outputs.
+- The content-provenance and synthetic-content-
+  marking record.
+- The evaluation, red-team, and ongoing monitoring
+  record.
+- The incident and complaint record.
+- The fundamental-rights impact assessment record
+  (where Article 27 applies).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "generative-ai"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Records align with ISO/IEC 42001:2023 AI management
+system requirements; the EU AI Act technical
+documentation requirements (Articles 11 and 53,
+Annexes IV and XI) are encoded in PHASE-3 §3.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name of the
+                       deployer or provider)
+operatorRole         : enum ("model-provider" |
+                       "system-deployer" |
+                       "downstream-deployer" |
+                       "evaluator" | "user-defined")
+operatorJurisdiction : array of string (ISO 3166-1)
+governingFrameworks  : array of enum ("EU-AI-ACT-2024
+                       -1689" | "EU-AI-ACT-GPAI-ART-
+                       51-55" | "EU-AI-ACT-HIGH-
+                       RISK-ANNEX-III" | "EU-AI-ACT
+                       -GPAI-COP" | "EU-COPYRIGHT-
+                       2019-790-ART-4-TDM" |
+                       "EU-GDPR-ART-22" | "US-EO-
+                       14110" | "US-OMB-M-24-10" |
+                       "NIST-AI-RMF" | "NIST-AI-600
+                       -1-GENAI-PROFILE" | "ISO-IEC
+                       -42001" | "ISO-IEC-23894-AI-
+                       RISK" | "C2PA-CONTENT-
+                       CREDENTIALS" | "KR-AI-
+                       산업진흥법" | "KR-PIPA-ART-28
+                       -AUTO-DECISION" | "OWASP-LLM
+                       -TOP-10" | "user-defined")
+modelKindAtSurface   : enum ("text-foundation" |
+                       "image-foundation" |
+                       "video-foundation" |
+                       "audio-foundation" |
+                       "multimodal-foundation" |
+                       "code-foundation" |
+                       "domain-fine-tuned" |
+                       "rag-system" | "agent-system"
+                       | "user-defined")
+gpaiClassification   : enum ("not-gpai" | "gpai-
+                       not-systemic" | "gpai-
+                       systemic-risk" | "gpai-foss-
+                       not-systemic")
+                       (per EU AI Act Article 51 the
+                       systemic-risk classification
+                       applies if the cumulative
+                       compute used for training
+                       exceeds the threshold the AI
+                       Act Annex XIII designates,
+                       or if the AI Office designates
+                       the model as systemic-risk)
+programmeStatus      : enum ("design" | "evaluating"
+                       | "operating" | "monitored" |
+                       "wind-down" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Model Registry Record
 
-## §4 Discovery
+The model registry record persists the foundation
+model's identity and provenance:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/generative-ai`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+modelRecord:
+  modelId            : string (uuidv7; the operator's
+                       internal model identifier)
+  modelName          : string (the model-card-published
+                       name)
+  providerRef        : string (the model provider's
+                       legal identity; absent when the
+                       operator is the provider)
+  modelArchitecture  : string (the architecture family
+                       — transformer-decoder,
+                       transformer-encoder-decoder,
+                       diffusion, mixture-of-experts,
+                       state-space-model, etc.)
+  parameterCount     : integer (declared parameter
+                       count; for GPAI the EU AI Act
+                       Annex XI requires disclosure)
+  weightsDigest      : string (SHA-256 of the model
+                       weights archive — preserved
+                       even when weights are not
+                       distributed)
+  trainingDataManifestRef : string (URI of the
+                       training data manifest — the
+                       Datasheet-for-Datasets-aligned
+                       record listing data sources,
+                       collection methods, copyright-
+                       opt-out filtering, content-
+                       moderation filtering, and
+                       personal-data exclusion
+                       discipline)
+  trainingComputeRef : object (the cumulative
+                       training compute in FLOP, the
+                       hardware estimator method, and
+                       the period over which compute
+                       was accumulated; required for
+                       EU AI Act Annex XI disclosure
+                       and for GPAI systemic-risk
+                       threshold evaluation)
+  modelCardRef       : string (URI of the published
+                       model card — HuggingFace
+                       format or equivalent)
+  releaseLicense     : string (the licence under
+                       which the model is released —
+                       for FOSS GPAI the AI Act
+                       Article 53(2) exemption from
+                       certain GPAI obligations
+                       applies)
+  releasedAt         : string (ISO 8601)
+```
 
-## §5 Time and Identity
+## §4 System / Deployment Record
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+systemRecord:
+  systemId           : string (uuidv7)
+  programmeRef       : string
+  modelRef           : string (PHASE-1 §3)
+  systemPrompt       : string (the system-prompt /
+                       instruction template that
+                       conditions the model's
+                       behaviour at deployment)
+  toolCatalogue      : array of object (the tools the
+                       system can invoke — function-
+                       calling specifications,
+                       authorised endpoints, tool-use
+                       safety constraints)
+  retrievalIndexRef  : string (URI of the retrieval
+                       index — the corpus and the
+                       embedding-model used to embed
+                       it; absent for non-RAG
+                       systems)
+  safetyFiltersRef   : array of string (the input-
+                       output safety filters
+                       configured — the prompt-
+                       injection filter, the unsafe-
+                       content filter, the PII
+                       filter, the secret-leakage
+                       filter)
+  intendedPurpose    : string (the intended purpose
+                       declared per EU AI Act Article
+                       3(12); high-risk systems'
+                       intended purpose drives the
+                       Article 6 classification)
+  highRiskClassification : enum ("not-high-risk" |
+                       "annex-iii-biometric" |
+                       "annex-iii-critical-
+                       infrastructure" | "annex-iii-
+                       education" | "annex-iii-
+                       employment" | "annex-iii-
+                       essential-services" | "annex-
+                       iii-law-enforcement" |
+                       "annex-iii-migration" |
+                       "annex-iii-justice" |
+                       "annex-iii-democratic-
+                       process" | "user-defined")
+  deployedAt         : string (ISO 8601)
+  retiredAt          : string (ISO 8601; absent until
+                       retired)
+```
 
-## §6 Versioning and Deprecation
+## §5 Fine-Tune / Alignment Record
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+fineTuneRecord:
+  fineTuneId         : string (uuidv7)
+  baseModelRef       : string (the model the fine-
+                       tune is derived from)
+  fineTuneKind       : enum ("supervised-fine-tune"
+                       | "rlhf-reward-model" |
+                       "rlhf-policy" | "dpo" |
+                       "lora-adapter" | "instruction-
+                       tune" | "constitutional" |
+                       "user-defined")
+  trainingDataRef    : string (URI of the fine-tune
+                       data manifest)
+  evaluationReportRef : string (URI of the evaluation
+                       report covering capability,
+                       fairness, robustness, and
+                       safety metrics)
+  approvedAt         : string (ISO 8601)
+  approvingFunctionRef : string (the operator's AI
+                       management committee or model-
+                       risk committee identifier)
+```
 
-## §7 Privacy and Security
+## §6 Input-Output Transcript Record
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+transcriptRecord:
+  transcriptId       : string (uuidv7)
+  systemRef          : string
+  userIdentityRef    : string (the end-user's
+                       identity — encrypted at rest
+                       where required by GDPR Article
+                       5 / KR PIPA)
+  startedAt          : string (ISO 8601)
+  endedAt            : string (ISO 8601)
+  promptList         : array of object (the user's
+                       prompts and any retrieved
+                       documents fetched by the RAG
+                       layer)
+  toolCalls          : array of object (the tool
+                       calls the model issued and the
+                       tool responses received)
+  outputList         : array of object (the model
+                       outputs returned to the user)
+  safetyDecisions    : array of object (the safety-
+                       filter decisions applied —
+                       block, redact, warn, allow;
+                       the rule that fired)
+  contentCredentialsRef : array of string (the C2PA
+                       Content Credentials
+                       references attached to the
+                       generated outputs — required
+                       for AI-generated content under
+                       EU AI Act Article 50(2))
+```
 
-## §8 Open Governance
+## §7 Content-Provenance and Synthetic-Content
+       Marking Record
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `generative-ai` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+contentCredentialsRecord:
+  credentialId       : string (uuidv7)
+  outputRef          : string (PHASE-1 §6 transcript
+                       output reference)
+  c2paManifestRef    : string (URI of the C2PA Content
+                       Credentials manifest — the
+                       canonical wire format for
+                       provenance assertions)
+  syntheticContentDeclaration : enum ("ai-generated"
+                       | "ai-modified" | "ai-
+                       composed" | "user-defined")
+  watermarkDetail    : object (the watermark
+                       method applied to the output
+                       — invisible cryptographic
+                       watermark, perceptual mark,
+                       or steganographic label)
+  signedBy           : string (the operator's signing
+                       key reference; the signature
+                       is verifiable per the C2PA
+                       trust list)
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §8 Evaluation and Red-Team Record
 
+```
+evaluationRecord:
+  evaluationId       : string (uuidv7)
+  systemRef          : string
+  evaluationKind     : enum ("capability-benchmark"
+                       | "fairness-evaluation" |
+                       "robustness-test" |
+                       "adversarial-red-team" |
+                       "fundamental-rights-
+                       assessment" | "post-market-
+                       monitoring" | "user-defined")
+  evaluatorRef       : string (the internal team or
+                       external organisation that
+                       performed the evaluation)
+  startedAt          : string (ISO 8601)
+  completedAt        : string (ISO 8601)
+  metricsRef         : string (URI of the metrics
+                       report)
+  findingsRef        : string (URI of the findings
+                       narrative — including any
+                       systemic-risk indicators per
+                       AI Act Article 55(1)(a))
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+## §9 Incident and Complaint Record
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```
+incidentRecord:
+  incidentId         : string (uuidv7)
+  systemRef          : string
+  reportedAt         : string (ISO 8601)
+  reporterKind       : enum ("end-user" | "operator-
+                       internal" | "downstream-
+                       deployer" | "third-party-
+                       researcher" | "regulator")
+  incidentKind       : enum ("safety-failure" |
+                       "fundamental-rights-violation"
+                       | "privacy-leak" |
+                       "fabricated-output-causing-
+                       harm" | "prompt-injection-
+                       exploit" | "copyright-
+                       infringement" | "user-
+                       defined")
+  severityKind       : enum ("minor" | "moderate" |
+                       "serious" | "critical")
+  rootCauseRef       : string (URI of the root-cause
+                       narrative; absent until
+                       investigated)
+  correctiveActions  : array of object (the
+                       operator's remediation steps
+                       and their completion times)
+  regulatorReportRef : string (URI of the regulator
+                       report under EU AI Act
+                       Article 73 serious-incident
+                       reporting; absent unless
+                       reported)
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §10 Conformance
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Implementations claiming PHASE-1 conformance maintain
+the records defined above for every deployed
+generative-AI system, preserve the model-registry and
+training-data-manifest records on the EU AI Act
+Article 18 ten-year retention discipline (for high-
+risk systems) and on the GPAI-equivalent disclosure
+discipline (Article 53(1)(a) summary of training
+content), and emit Content Credentials per EU AI Act
+Article 50(2) for every AI-generated output where the
+discipline applies.
 
-## Annex F — Adoption Roadmap
+---
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+**Document Information:**
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-generative-ai
+- **Last Updated:** 2026-04-28

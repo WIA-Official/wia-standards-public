@@ -5,237 +5,316 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-credit-scoring (Credit Scoring).
+This document defines the HTTPS API contract that a
+credit-scoring operator (lender, credit-bureau, or
+scoring provider) exposes for the records defined in
+PHASE-1. The contract is consumed by the operator's
+underwriting front-end, the credit-bureau-supplied
+data feed, the consumer-facing portal, the supervisory
+authority's examination tooling, and the operator's
+model-governance and monitoring systems.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics), RFC 9111 (HTTP
+  Caching), RFC 9457 (Problem Details), RFC 6901 /
+  6902 (JSON Pointer / Patch), RFC 8288 (Web Linking),
+  RFC 8259 (JSON), RFC 9421 (HTTP Message Signatures)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022, ISO/IEC 27701:2019
+- W3C Trace Context
+- US ECOA Regulation B (12 CFR Part 1002), FCRA
+  Regulation V (12 CFR Part 1022), TILA Regulation Z
+  (12 CFR Part 1026)
+- EU CCD recast (Directive (EU) 2023/2225) Articles
+  6, 9, 18, 26
+- EU AI Act 2024 Annex III §5(b)
+- EU GDPR Articles 12 to 22
+- KR Credit Information Use and Protection Act, KR
+  금융소비자보호법
+- ISO/IEC 42001:2023 AI management system
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-credit-scoring
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by the
+operator. Versioning uses `/v1/` path segments. The
+OpenAPI 3.1 document at `/v1/openapi.json` is canonical.
 
-## §2 Manifest
+The API is the operator-facing facade for the credit-
+scoring lifecycle. End-user channels through which the
+consumer applies for credit, receives adverse-action
+notices, exercises FCRA dispute rights, or exercises
+GDPR Article 22(3) right-to-explanation are served by
+the operator's product surface and by the consumer-
+portal subset of this API.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "credit-scoring"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Root Discovery
 
-## §3 Conformance Tiers
+```
+GET /v1/
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```json
+{
+  "standard": "WIA-credit-scoring",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":               "/v1/programmes",
+    "consumers":                "/v1/consumers",
+    "tradelines":               "/v1/tradelines",
+    "featureVectors":           "/v1/feature-vectors",
+    "models":                   "/v1/models",
+    "scores":                   "/v1/scores",
+    "creditworthinessAssessments": "/v1/creditworthiness-assessments",
+    "adverseActionNotices":     "/v1/adverse-action-notices",
+    "consentRecords":           "/v1/consent-records",
+    "consumerPortal":           "/v1/consumer-portal",
+    "openapi":                  "/v1/openapi.json"
+  }
+}
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Programme Lifecycle
 
-## §4 Discovery
+```
+GET    /v1/programmes
+GET    /v1/programmes/{programmeId}
+POST   /v1/programmes
+PATCH  /v1/programmes/{programmeId}
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/credit-scoring`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Programme creation requires the operator's model-risk
+committee approval reference; transitions between
+`design`, `validated`, `operating`, and `wind-down` are
+audited.
 
-## §5 Time and Identity
+## §4 Consumer and Tradeline Endpoints
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+GET    /v1/consumers/{consumerId}
+POST   /v1/consumers
+GET    /v1/tradelines?consumer={consumerId}
+GET    /v1/tradelines/{tradelineId}
+POST   /v1/tradelines/{tradelineId}/disputes  (FCRA
+                                              1681i)
+```
 
-## §6 Versioning and Deprecation
+The dispute endpoint records the consumer's FCRA
+dispute and triggers the operator's furnisher-
+investigation workflow per FCRA 15 USC 1681i. The
+operator MUST complete the investigation within the
+30-day window (15 USC 1681i(a)(1)(A)) extended by 15
+days where the consumer supplies relevant additional
+information.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Feature-Vector and Score Endpoints
 
-## §7 Privacy and Security
+```
+POST   /v1/feature-vectors          (compute features
+                                     for a consumer)
+GET    /v1/feature-vectors/{vectorId}
+POST   /v1/scores                   (compute a score
+                                     from a feature
+                                     vector)
+GET    /v1/scores/{scoreId}
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The score response carries the score value, the score
+band, the principal reason codes, the model reference,
+and a signed statement of the model version and the
+time of computation; the consumer-portal endpoint
+exposes the same response with additional plain-
+language explanations satisfying GDPR Article 22(3)
+and ECOA Reg B 12 CFR 1002.9.
 
-## §8 Open Governance
+## §6 Creditworthiness-Assessment Endpoints
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `credit-scoring` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST   /v1/creditworthiness-assessments
+GET    /v1/creditworthiness-assessments/{assessmentId}
+PATCH  /v1/creditworthiness-assessments/{assessmentId}
+        (manual-review override; carries the human
+         reviewer reference)
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+The endpoint produces the decision, the score-and-
+reason-code record, and — for declines — the adverse-
+action notice. The lender's policy-decision point
+applies the assessment basis declared in the request
+(US ECOA / TILA, EU CCD / MCD, KR 금융소비자보호법
+적합성, etc.).
 
+## §7 Adverse-Action Notice Endpoints
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+GET    /v1/adverse-action-notices?consumer={consumerId}
+GET    /v1/adverse-action-notices/{noticeId}
+POST   /v1/adverse-action-notices
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+The notice is delivered through the consumer's chosen
+channel (email, postal mail, in-portal); the operator
+records the delivery time-stamp and the consumer's
+acknowledgement. The notice carries the principal
+reasons, the consumer's right to a free credit-report
+copy under FCRA 15 USC 1681j(a), and the redress-
+channel URI.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Consumer-Portal Endpoints
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+GET    /v1/consumer-portal/me/scores
+GET    /v1/consumer-portal/me/adverse-action-notices
+GET    /v1/consumer-portal/me/score-explanation/{scoreId}
+GET    /v1/consumer-portal/me/credit-report-copy
+POST   /v1/consumer-portal/me/disputes
+POST   /v1/consumer-portal/me/article-22-3-review
+```
 
-## Annex F — Adoption Roadmap
+The consumer's identity is bound to the bearer token
+through the operator's IdP (consumer-side OAuth 2.1).
+The Article 22(3) review endpoint records the
+consumer's request for human review of the automated
+decision; the operator's response SLA is documented in
+the operator's GDPR Article 22 procedure.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Authentication and Authorisation
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Bearer tokens conform to OAuth 2.1 with audiences
+declared per surface (operator-facing, consumer-
+portal, supervisory-authority examination). Scopes
+follow the operator's role-and-permission catalogue
+(`scoring:read`, `scoring:write`, `disputes:write`,
+`adverse-action:read`, `examination:read`). The
+supervisory-authority examination scope (US CFPB, EU
+NCA, KR FSC / FSS) provides read-only access to the
+inspection-record surface.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 HTTP Status Codes
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+- `200 OK` — read or search success
+- `201 Created` — create success (Location header
+  carries the new resource URL)
+- `204 No Content` — delete or successful PATCH
+  response success
+- `400 Bad Request` — malformed payload (Problem
+  Details body)
+- `401 Unauthorized` — missing or invalid bearer token
+- `403 Forbidden` — discipline-rejection (the Problem
+  Details references the rejecting discipline — fair-
+  lending, model-risk, consent, or examination scope)
+- `404 Not Found` — resource not registered with the
+  operator's records
+- `409 Conflict` — version-mismatch on update (`If-
+  Match`)
+- `422 Unprocessable Content` — validation failure
+  with Problem Details issue details
+- `429 Too Many Requests` — rate-limit exceeded
+- `503 Service Unavailable` — downstream credit-
+  bureau or model-server unavailable
 
-## Annex G — Test Vectors and Conformance Evidence
+## §11 Caching and Trace-Context
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+`ETag` carries the resource's version-id. Cacheable
+PHI / NPI is cached only with `Cache-Control: private,
+no-store` for the consumer-portal endpoints; FCRA
+permissible-purpose caching restrictions apply. Trace-
+context (`traceparent`) is propagated through the
+operator's underwriting pipeline, the credit-bureau-
+supplied data feed, the model-server, and the audit
+log so that an end-to-end reconstruction of the
+decision is possible.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §12 Webhook and Event Surface
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+The operator publishes the credit-decision lifecycle
+events through a webhook channel registered by the
+LOS, the servicing system, and the consumer-portal:
 
-## Annex H — Versioning and Deprecation Policy
+- `score.computed` — a score has been computed for a
+  consumer, carrying the score-record reference.
+- `assessment.decided` — an assessment has reached a
+  decision (approve, decline, counter-offer, manual-
+  review).
+- `notice.delivered` — an adverse-action notice has
+  been delivered through the chosen channel.
+- `dispute.received` — a consumer dispute has been
+  recorded and forwarded to the relevant credit-
+  bureau.
+- `dispute.resolved` — a dispute investigation has
+  closed; the resolution outcome (updated, no-change,
+  consumer-supplied-information-incorporated) is
+  carried.
+- `article-22-3-review.received` — a GDPR Article
+  22(3) review request has been recorded; the
+  operator's human-review SLA begins.
+- `article-22-3-review.resolved` — the human-review
+  outcome has been delivered to the consumer.
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Webhook signatures use HTTP Message Signatures (RFC
+9421) so that the receiving system can verify that
+the event originated from the operator. Retry
+discipline follows the operator's published retry
+budget for transient receiver failures.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §13 Examination Surface
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+The operating jurisdiction's supervisory authority
+exercises its examination authority through:
 
-## Annex I — Interoperability Profiles
+```
+GET    /v1/examination/programmes
+GET    /v1/examination/models
+GET    /v1/examination/decisions?from={iso}&to={iso}
+GET    /v1/examination/disparate-impact-reports?period={period}
+GET    /v1/examination/audit-events?from={iso}&to={iso}
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Examination-scope tokens are read-only and carry the
+supervisory authority's identity binding. The CFPB
+Examination Manual (US), the EU Member-State NCA
+inspection authority, and the KR FSC / FSS oversight
+discipline are all served from this surface; the
+operator's response SLA is documented in the
+operator's compliance procedure.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §14 Bulk-Export and Reproducibility Surface
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The operator exposes a bulk-export endpoint for
+internal model-validation and external-audit reviewers:
+
+```
+POST   /v1/bulk-export
+GET    /v1/bulk-export/{exportId}/status
+GET    /v1/bulk-export/{exportId}/manifest
+```
+
+Bulk exports carry the model reference, the time-window,
+and the score-decision sample. The export's manifest
+declares the cryptographic digest of each NDJSON file
+produced so that the receiving reviewer can verify the
+export's integrity. Bulk exports are governed by the
+operator's data-egress policy; PHI / NPI is protected
+under HIPAA-equivalent disposal discipline.
+
+## §15 Conformance
+
+Implementations claiming PHASE-2 conformance publish
+the OpenAPI document, expose the consumer-portal
+surface for the right-of-access and right-to-
+explanation responses, expose the supervisory-
+authority examination surface, and emit the audit-
+event for every action against PHI / NPI.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-credit-scoring
+- **Last Updated:** 2026-04-28

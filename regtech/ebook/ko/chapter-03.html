@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: Phase 2 — API와 실시간 알림 스트림 | WIA-FIN-004</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #8B5CF6; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; --success: #10b981; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Georgia', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .info-box { background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        code { background: var(--bg); padding: 0.2rem 0.5rem; border-radius: 3px; font-family: 'Monaco', monospace; color: var(--success); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">제3장</p>
+        <h1>Phase 2 — API와 실시간 알림 스트림</h1>
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-top: 1rem;">이벤트 등록·스크리닝·리스크 점수·여행규칙 교환·실시간 알림 API를 다룹니다.</p>
+
+        <h2>이벤트와 스크리닝 API</h2>
+        <p><code>POST /events</code>는 컴플라이언스 이벤트를 등록하고 안정적인 식별자를 반환합니다. <code>POST /screening/sanctions</code>와 <code>POST /screening/pep</code>는 엔터티 정보를 받아 매칭 결과 봉투를 반환합니다. 매칭 결과는 출처별 점수·권장 트리아지 액션·증빙 추적 식별자를 함께 제공하므로, 컴플라이언스 분석가가 한눈에 사유를 검토할 수 있습니다.</p>
+
+        <h2>리스크 점수 API</h2>
+        <p><code>POST /risk/score</code>는 사업자의 배포 모델을 호출하여 점수와 설명을 반환합니다. 응답에는 <code>X-Model-Version</code> 헤더가 포함되어 있어, 재현 검증 시 같은 모델 버전을 호출할 수 있습니다. 모델 폐기 예정 시에는 응답에 deprecation 헤더가 추가되어 소비자가 후속 모델로 점진적으로 이행할 수 있게 합니다.</p>
+
+        <h2>여행규칙 교환 API</h2>
+        <p><code>POST /travel-rule/exchange</code>는 IVMS 101 봉투를 받아 수신 VASP에게 전달하고 수신 확인을 반환합니다. 엔드포인트는 IVMS 101 스키마 검증, 관할별 임계값 정책 검증, 수신자 공개키 봉투 검증, 메시지 단위 Ed25519 서명을 모두 수행합니다. 전달 실패는 사업자 정책에 따라 재시도되며, 재시도 예산이 소진되면 격리되고 사람의 검토를 위해 에스컬레이션됩니다.</p>
+
+        <h2>실시간 알림 WebSocket</h2>
+        <p>알림 스트림은 새로운 SAR/STR 초안·제재 리스트 갱신과 사업자 영향 요약·고위험 거래 검토 라우팅·모델 드리프트 임계 초과 등 사업자 의사결정에 즉시 영향을 주는 이벤트를 다중화합니다. 구독자는 알림 클래스별로 필터링할 수 있고, 브로커는 송신 후 24시간 이내 지수적 백오프로 재전송하여 일시적 네트워크 단절에도 누락이 없게 합니다.</p>
+
+        <h2>감사 추적 API</h2>
+        <p><code>GET /audit/{eventId}</code>는 모든 상태 전이 시 서명된 불변 감사 추적을 반환합니다. 감사 무결성은 사업자별 일별 머클 트리에 앵커링되며, 일부 사업자는 일별 머클 루트를 공개 블록체인에 추가로 앵커링합니다. 이는 사업자가 사후에 기록을 위변조할 수 없도록 합니다.</p>
+    
+        <h2>요약</h2>
+        <p>이 장에서 다룬 핵심을 한 번 더 정리합니다. 표준은 단순한 사양 문서가 아니라, 산업 전반에 걸쳐 도구와 사람이 같은 언어로 소통하기 위한 약속입니다. 본 장의 주제는 다음 장으로 자연스럽게 이어지므로, 이해가 다소 어려운 부분이 있어도 다음 장을 함께 읽고 나면 큰 그림이 또렷해집니다.</p>
+
+        <h2>참고 항목</h2>
+        <ul>
+            <li>본 표준 영문 사양: <code>spec/PHASE-1-DATA-FORMAT.md</code> 외 3개 Phase 문서</li>
+            <li>적합성 시험 모음: GitHub <code>WIA-Official/wia-regtech-conformance</code></li>
+            <li>참조 컨테이너: 도커 이미지 <code>wia/regtech-host:1.0.0</code></li>
+            <li>검증 가이드: <code>https://wiastandards.com/regtech/glossary/</code></li>
+            <li>거버넌스 위원회 회의록: 본 저장소의 <code>docs/governance/</code> 디렉토리</li>
+        </ul>
+
+        <div class="info-box">
+            <p><strong>이 표준이 추구하는 가치</strong></p>
+            <p>WIA Standards는 한 명의 학습자, 한 명의 환자, 한 명의 시민이 자기 데이터의 진정한 주인이 되어 살아갈 수 있도록 도구와 생태계의 마찰을 줄이는 것을 목표로 합니다. 표준이 잘 작동하면 사람은 표준의 존재를 의식하지 않고도 자기 권리를 누립니다. 본 표준의 모든 결정은 이 목표에 비추어 설명될 수 있어야 합니다.</p>
+            <p>적합성 시험을 통과한 구현은 표준이 보장한 인터페이스와 약속을 그대로 지킵니다. 그러나 표준은 단순히 시험을 통과하는 도구가 아니라, 그 약속이 깨지지 않도록 운영을 설계하는 마음가짐입니다. 모든 변경은 약속을 지키는 방향으로 누적되어야 하며, 약속을 깨는 변경은 충분한 폐기 기간과 공개적 합의를 거쳐야 합니다.</p>
+        </div>
+
+        <h2>자주 묻는 질문</h2>
+        <ol>
+            <li><strong>이 표준을 채택하면 비용이 얼마나 드나요?</strong> 적합성 등급에 따라 다릅니다. Tier 1 자기 선언은 도구 채택 비용만 들고, Tier 2 제3자 평가와 Tier 3 인증은 평가 기관과의 계약 비용이 추가됩니다.</li>
+            <li><strong>레거시 시스템과의 호환은 어떻게 보장되나요?</strong> 1.x 라인 안에서는 모든 봉투·엔드포인트·프로토콜이 도달 가능해야 합니다. 어댑터 패턴으로 레거시 시스템을 표준 인터페이스 뒤에 두면 점진적 이행이 가능합니다.</li>
+            <li><strong>표준이 폐기되면 어떻게 되나요?</strong> 12개월 폐기 창과 위원회 2/3 표결을 거쳐야 하므로, 이용자는 충분한 시간을 두고 마이그레이션을 계획할 수 있습니다.</li>
+        </ol>
+
+        <div class="nav-buttons">
+            <a href="chapter-02.html" class="btn" style="visibility:visible">← 이전 장</a>
+            <a href="index.html" class="btn">목차</a>
+            <a href="chapter-04.html" class="btn" style="visibility:visible">다음 장 →</a>
+        </div>
+    </div>
+</body>
+</html>
