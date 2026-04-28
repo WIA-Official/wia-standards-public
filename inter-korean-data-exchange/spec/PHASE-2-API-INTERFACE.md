@@ -5,237 +5,335 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-inter-korean-data-exchange (Inter Korean Data Exchange).
+This document defines the HTTPS API contract that an authorised
+inter-Korean exchange operator exposes for the records defined
+in PHASE-1. Consumers include the Ministry of Unification, the
+Inter-Korean Exchange and Cooperation Bureau, the Korea Red
+Cross, registered humanitarian NGOs, and the operator-side
+analytics and audit platforms.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics)
+- IETF RFC 9111 (HTTP Caching)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 6901 / 6902 (JSON Pointer / Patch)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9421 (HTTP Message Signatures)
+- IETF RFC 5322 (correspondence envelope)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022 (information security management)
+- W3C Trace Context
+- UN OCHA Common Operational Datasets
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-inter-korean-data-exchange
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by the operator.
+Versioning uses `/v1/` path segments. The OpenAPI 3.1 document
+at `/v1/openapi.json` is canonical.
 
-## §2 Manifest
+The API is consumed only on the south side. North-side
+counterparts receive paper artefacts, sealed-envelope memory
+media, or video conferencing handoffs through the inter-Korean
+liaison channel; the API never directly addresses north-side
+systems.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "inter-korean-data-exchange"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Root Discovery
 
-## §3 Conformance Tiers
+```
+GET /v1/
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```json
+{
+  "standard": "WIA-inter-korean-data-exchange",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":               "/v1/programmes",
+    "identityTokens":           "/v1/identity-tokens",
+    "familyReunions":           "/v1/family-reunions",
+    "aidManifests":             "/v1/aid-manifests",
+    "liaisonCorrespondences":   "/v1/liaison-correspondences",
+    "jointVentureInventories":  "/v1/joint-venture-inventories",
+    "evidence":                 "/v1/evidence",
+    "openapi":                  "/v1/openapi.json"
+  }
+}
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Programme Lifecycle
 
-## §4 Discovery
+```
+POST   /v1/programmes               — register a programme
+GET    /v1/programmes/{pid}         — retrieve programme
+PATCH  /v1/programmes/{pid}/status  — advance status
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/inter-korean-data-exchange`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Programme status `suspended` reflects an Inter-Korean Exchange
+and Cooperation Bureau notification of suspension (typically
+during periods of escalated political tension). Suspension
+freezes all in-flight exchange artefacts; the operator may
+not advance any record past its current status while suspended.
 
-## §5 Time and Identity
+## §4 Identity Tokens
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST   /v1/identity-tokens            — register a token (no
+                                          PII permitted in body)
+GET    /v1/identity-tokens/{tid}      — retrieve token metadata
+PATCH  /v1/identity-tokens/{tid}/eligibility
+                                       — update reunion
+                                          eligibility
+```
 
-## §6 Versioning and Deprecation
+Submissions whose body contains personal-identifying fields
+return `422` with type
+`urn:wia:inter-korean-data-exchange:pii-in-body`; the operator's
+CRM holds personal identity, never the API.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Family-Reunion Lifecycle
 
-## §7 Privacy and Security
+```
+POST   /v1/programmes/{pid}/family-reunions  — register a reunion
+GET    /v1/family-reunions/{rid}             — retrieve reunion
+PATCH  /v1/family-reunions/{rid}/match       — record north-side
+                                                 match confirmation
+PATCH  /v1/family-reunions/{rid}/outcome     — close reunion
+                                                 with outcome
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Reunion-round identifier (PHASE-1 §4) is registered separately
+through the operator's reunion-administration process; the API
+records the round identifier against each reunion but does not
+manage round scheduling. Reunion-round scheduling is governed
+by political-level inter-Korean negotiations, not by this API.
 
-## §8 Open Governance
+## §6 Humanitarian-Aid Manifests
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `inter-korean-data-exchange` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST   /v1/programmes/{pid}/aid-manifests       — register a
+                                                   manifest
+GET    /v1/aid-manifests/{mid}                  — retrieve
+                                                   manifest
+PATCH  /v1/aid-manifests/{mid}/shipped          — record
+                                                   shipment
+PATCH  /v1/aid-manifests/{mid}/received         — record
+                                                   north-side
+                                                   receipt
+                                                   confirmation
+GET    /v1/programmes/{pid}/aid-manifests?
+       beneficiary={c}&period={p}                — query
+                                                   manifests
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Manifest submissions whose `cargoLines` include a hazard class
+not authorised by the Ministry of Unification's per-shipment
+authorisation return `422` with type
+`urn:wia:inter-korean-data-exchange:hazard-class-not-authorised`.
 
+## §7 Liaison Correspondence
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST   /v1/programmes/{pid}/liaison-correspondences
+                                       — register
+                                          correspondence
+                                          (south-to-north or
+                                          north-to-south)
+GET    /v1/liaison-correspondences/{cid}
+                                       — retrieve
+                                          correspondence
+PATCH  /v1/liaison-correspondences/{cid}/received
+                                       — record
+                                          acknowledgement
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+Correspondence body URIs (`bodyRef`) point to the operator's
+secure document store; the API never returns the body inline,
+so that downstream consumers must hold an authorisation to
+fetch the body separately under the operator's correspondence-
+classification policy.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Joint-Venture Inventory
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+POST   /v1/programmes/{pid}/joint-venture-inventories
+                                       — register an inventory
+                                          snapshot
+GET    /v1/joint-venture-inventories/{iid}
+                                       — retrieve inventory
+GET    /v1/programmes/{pid}/joint-venture-inventories?
+       venture={r}&from={t}&to={t}      — query history
+```
 
-## Annex F — Adoption Roadmap
+Joint-venture records have been infrequent since the Mt Kumgang
+tour suspension (2008) and the Kaesong Industrial Complex
+closure (2016); the API supports historical inventory
+reconstruction for archival purposes and for any future
+re-opening under the Inter-Korean Exchange and Cooperation Act.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Errors
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+All error responses are `application/problem+json` per RFC 9457.
+Defined types include:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+- `urn:wia:inter-korean-data-exchange:pii-in-body`
+- `urn:wia:inter-korean-data-exchange:authorisation-revoked`
+- `urn:wia:inter-korean-data-exchange:hazard-class-not-authorised`
+- `urn:wia:inter-korean-data-exchange:correspondence-classification-restricted`
+- `urn:wia:inter-korean-data-exchange:evidence-mismatch`
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Authentication and Authorisation
 
-## Annex G — Test Vectors and Conformance Evidence
+Mutually-authenticated TLS for Ministry of Unification, Korea
+Red Cross, KOICA, and registered NGO consumers. Public read-
+only endpoints (aggregate aid-manifest statistics, anonymised
+reunion-round summaries) are reachable without a client
+certificate.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Caching and Concurrency
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Stable resources (closed reunions, received aid manifests,
+acknowledged correspondence, signed evidence packages) are
+cacheable with `Cache-Control: max-age=31536000, immutable`.
+Mutable resources (in-flight reunions, in-transit aid manifests)
+are cacheable for 60 seconds. ETags are mandatory on every
+PATCH endpoint.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §12 Audit and Observability
 
-## Annex H — Versioning and Deprecation Policy
+Every endpoint emits structured logs with `programmeId`,
+`traceId`, the issuing client certificate's subject, and the
+operator's clock skew vs the Korea Standards Time reference
+(KRISS UTC+9 service). Audit logs retain per the records-
+retention policy in PHASE-3 §8.
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §13 Worked Example: Authorisation to Receipt for Aid Shipment
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+1. The operator obtains a Ministry of Unification shipment
+   authorisation and registers an aid manifest with the
+   authorisation reference.
+2. Cargo lines are populated against the UN OCHA cluster
+   classification and the per-line UN/CEFACT unit codes.
+3. On shipment, the operator records `shippedAt` and the route
+   code; the route code reflects the actually used corridor
+   (the rail / road / maritime / third-country routes that
+   have operated at different periods).
+4. On north-side receipt confirmation through the inter-Korean
+   liaison channel, the operator records `receivedAt`.
+5. The evidence package is generated for downstream auditors
+   (Ministry of Unification, the operator's funder, the
+   public-disclosure register).
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §14 Bulk and Pagination
 
-## Annex I — Interoperability Profiles
+Bulk endpoints accept arrays for high-volume reunion list
+import and historical aid manifest backfill:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+```
+POST   /v1/bulk/family-reunions      — batched reunion import
+POST   /v1/bulk/aid-manifests        — batched manifest backfill
+GET    /v1/bulk/{operationId}        — operation status
+```
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Cursor-based pagination uses the `cursor` query parameter and
+`Link` headers (RFC 8288); cursors persist for at least 24
+hours so that reconciliation tooling that connects intermittently
+across the operator's authorisation window does not lose its
+place.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §15 Streaming Subscription
+
+Consumers subscribe via Server-Sent Events at:
+
+- `/v1/programmes/{pid}/events` — programme-wide events
+  (authorisation amendments, suspension events, sanctions
+  refresh outcomes).
+- `/v1/aid-manifests/{mid}/events` — shipment-status events
+  for an aid manifest.
+- `/v1/family-reunions/{rid}/events` — reunion-lifecycle
+  events for a registered reunion.
+
+Subscribers reconnect via the `Last-Event-ID` header (W3C
+EventSource semantics).
+
+## §16 Privacy-Preserving Aggregation
+
+Aggregate consumers (Ministry research divisions, academic
+researchers under operator-vetted programmes) fetch
+population-level statistics through aggregation endpoints
+that emit counts only:
+
+```
+GET    /v1/aggregate/reunion-completion-rate?period=...
+GET    /v1/aggregate/aid-volume-by-cluster?period=...
+```
+
+Out-of-policy queries (cohort below threshold, requests for
+per-applicant detail) return `403 Forbidden` with type
+`urn:wia:inter-korean-data-exchange:cohort-too-small`.
+
+## §17 Cultural-Exchange Endpoints
+
+```
+POST   /v1/programmes/{pid}/cultural-exchanges
+                                       — register a cultural
+                                          exchange
+GET    /v1/cultural-exchanges/{cid}    — retrieve exchange
+PATCH  /v1/cultural-exchanges/{cid}/end
+                                       — close exchange with
+                                          completion summary
+```
+
+Cultural exchanges of kind `heritage-repatriation` require an
+`artefactCatalogueRef` at registration; submissions that omit
+the catalogue return `422` with type
+`urn:wia:inter-korean-data-exchange:heritage-catalogue-required`.
+
+## §18 Provenance Endpoint
+
+```
+GET    /v1/provenance/{recordId}    — retrieve provenance entry
+                                       for any PHASE-1 record
+```
+
+Provenance entries trace a record to its parents (programme,
+authorisation, sanctions sweep, manifest, reunion, exchange)
+so that auditors can walk the chain end-to-end.
+
+## §19 Distribution Evidence Endpoints
+
+```
+POST   /v1/aid-manifests/{mid}/distribution-evidence
+                                       — register distribution
+                                          evidence
+GET    /v1/distribution-evidence/{eid} — retrieve evidence
+PATCH  /v1/distribution-evidence/{eid}/diversion-flag
+                                       — record diversion
+                                          concern
+```
+
+Evidence submissions whose `beneficiaryClassification` does
+not match the manifest's declared classification return `422`
+with type
+`urn:wia:inter-korean-data-exchange:beneficiary-classification-mismatch`.
+
+## §20 Conformance
+
+A conformant server passes the test vectors published under
+`tests/phase-vectors/phase-2-api-interface/`, emits an OpenAPI
+3.1 document, signs evidence packages per RFC 9421, and rejects
+PII in any DATA-FORMAT field that this PHASE marks as opaque.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-inter-korean-data-exchange
+- **Last Updated:** 2026-04-28

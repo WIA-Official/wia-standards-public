@@ -5,237 +5,272 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-inventory-management (Inventory Management).
+This document defines how an inventory-management programme
+integrates with the systems that surround it: ERP suites
+(SAP, Oracle, Microsoft Dynamics, NetSuite, Infor, Odoo,
+custom); 3PL provider gateways; trading-partner EDI / API
+channels (EDIFACT, X12, AS2, peppol); transportation
+management systems; cold-chain monitoring services;
+controlled-substance regulators (US DEA, EU national
+authorities, KFDA); GS1 member organisations; e-commerce
+storefronts; and long-term archives.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17065:2012 (conformity-assessment bodies)
+- ISO 8601 (date and time)
+- GS1 EPCIS 2.0 / CBV 2.0
+- GS1 Digital Link 1.4
+- UN/EDIFACT D.18B (and successor versions)
+- ANSI ASC X12 EDI specifications
+- W3C Verifiable Credentials Data Model 2.0 (optional)
 
 ---
 
-## §1 Scope
+## §1 ERP Suite Integration
 
-This PHASE document is one of four that together define the WIA-inventory-management
-standard. It addresses the integration layer of the standard.
+ERP integration carries the per-vendor adapter identifier
+(SAP IDOC mapping, Oracle Fusion Inventory adapter,
+Microsoft Dynamics WMS adapter, NetSuite native, Infor SCE
+adapter, Odoo connector, custom-built integration), the
+per-record-class master-data direction (operator-as-master
+vs ERP-as-master), and the per-event reconciliation cadence.
 
-## §2 Manifest
+ERP-as-master records (typically item master, supplier
+master, customer master) flow downward to the WMS; WMS-as-
+master records (typically stock balance, receiving,
+shipping, cycle-count results) flow upward to the ERP for
+financial-inventory reconciliation.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "inventory-management"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 3PL Provider Gateway Integration
 
-## §3 Conformance Tiers
+3PL provider integration carries the 3PL operator's
+identifier, the per-warehouse adapter manifest, the per-
+event reconciliation cadence, and the dispute-resolution
+path when 3PL-side movement events disagree with the
+operator's master record. Multi-3PL operators (omni-channel
+retailers using regional 3PLs) maintain per-3PL adapter
+mappings to a unified WIA event vocabulary.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Trading-Partner EDI / API Channel Integration
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Trading partners exchange inventory state through EDIFACT
+(D.18B and successors), X12, peppol, or trading-partner-
+specific JSON / XML APIs. Common transactions:
 
-## §4 Discovery
+- DESADV (advance shipment notification);
+- ORDERS (purchase order);
+- ORDRSP (purchase order acknowledgement);
+- INVRPT (inventory report);
+- RECADV (receiving advice);
+- RETANN (return announcement).
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/inventory-management`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Integration carries each partner's identifier, the per-
+transaction template, and the per-channel certification
+(AS2 partner certificates, peppol participant identifiers,
+X12 GS-segment identifiers).
 
-## §5 Time and Identity
+## §4 Transportation Management System Integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+TMS integration consumes shipping records (PHASE-1 §8) for
+load planning, carrier tendering, and tracking. Integration
+carries the TMS's identifier, the per-shipment data
+contract, and the proof-of-delivery (POD) ingestion
+endpoint that the TMS uses to attach POD images and
+electronic signatures back to the shipping record.
 
-## §6 Versioning and Deprecation
+## §5 Cold-Chain Monitoring Service Integration
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Cold-chain monitoring services (Sensitech, ELPRO, Berlinger,
+operator-internal IoT loggers) emit temperature trip data
+that the operator's WMS attaches to the per-shipment cold-
+chain integrity record. Integration carries the monitoring
+service's identifier, the per-logger device-id allocation,
+and the excursion-event notification endpoint that triggers
+the operator's quality-deviation workflow.
 
-## §7 Privacy and Security
+## §6 Controlled-Substance Regulator Integration
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Controlled-substance regulators (US DEA via ARCOS,
+EU national competent authorities, KFDA in Korea,
+PMDA-equivalent in Japan, equivalent authorities elsewhere)
+consume the operator's reconciliation reports and discrepancy
+notifications. Integration carries the regulator's
+identifier, the per-licence-class submission template, and
+the discrepancy-notification SLA that the operator commits
+to.
 
-## §8 Open Governance
+## §7 GS1 Member Organisation Integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `inventory-management` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+GS1 member organisations (GS1 US, GS1 UK, GS1 Korea, GS1
+Japan, GS1 Germany, equivalent national MOs) consume the
+operator's prefix-assignment and registration updates.
+Integration carries the MO's identifier, the per-prefix
+assignment record, and the operator's renewal cadence.
+Operators that participate in the GS1 Global Data Synchronization
+Network (GDSN) emit item-master synchronisation messages
+through the GDSN data pool.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §8 E-Commerce Storefront Integration
 
+E-commerce storefronts (Shopify, Magento, BigCommerce,
+WooCommerce, custom marketplaces) consume real-time stock
+balances for the available-to-promise display on product
+detail pages. Integration carries the storefront's
+identifier, the per-storefront product catalogue mapping,
+and the inventory-availability cache TTL that the storefront
+honours so that stock-out scenarios do not propagate to
+shopper carts.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §9 Evidence Package Format
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+```
+evidence/
+  manifest.json              — package manifest (signed)
+  programme.json             — programme record
+  items/                     — item master records
+  locations/                 — location records
+  lots-and-serials/          — lot and serial records
+  movement-events/           — EPCIS event log for the cited
+                                interval
+  receiving-and-shipping/    — receiving and shipping records
+  inventory-counts/          — count records and approvals
+  audit/                     — API audit log excerpts
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The package is content-addressable; the manifest is signed
+by the operator's HTTP-message-signature key (RFC 9421) and
+counter-signed by the operator's quality manager when the
+package supports a regulator submission.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §10 Manifest and Signatures
 
-## Annex F — Adoption Roadmap
+Verification tools recompute file digests, compare to the
+manifest, and reject the package on mismatch with type
+`urn:wia:inventory-management:evidence-mismatch`.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §11 well-known URI Discovery
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+A conformant operator exposes a discovery document at
+`/.well-known/wia-inventory-management` that links to the
+API root, the GS1 prefix-assignment summary, the operator's
+quality dossier, the per-jurisdiction regulator licences,
+and the catalogue of operating sites.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §12 Long-Term Archive Integration
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Operators designate a long-term archive that holds movement
+events, lot release certificates, and controlled-substance
+reconciliation reports beyond the operator's primary
+retention horizon. Quarterly deposits round-trip content-
+addresses; on programme wind-down, remaining records
+transfer to the archive with content-addresses preserved.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §13 Verifiable-Credential Re-Issuance (optional)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Operators that wish to expose attestations (GS1 prefix
+assignment, ISO 9001 conformance, ISO 22000 conformance,
+ISO/IEC 27001 certification, GDP / cGMP regulator
+certifications) to consumers of W3C Verifiable Credentials
+MAY re-issue the attestations as Verifiable Credentials
+under the Data Model 2.0 specification. Re-issuance is
+optional; the canonical record remains the JSON evidence-
+package manifest.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §14 Streaming Heartbeat
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+SSE subscribers receive a heartbeat every 30 seconds with
+`Last-Event-ID` resume support. Subscribers that disconnect
+during long receiving / shipping windows resume from the
+last seen event identifier without losing visibility of
+priority-1 events (cold-chain excursions, controlled-
+substance discrepancies, hazmat segregation violations).
 
-## Annex H — Versioning and Deprecation Policy
+## §15 Backwards-Compatibility Guarantee
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+PHASE-4 minor revisions remain backwards-compatible with
+prior-minor clients. Major revisions go through a
+deprecation window of at least one full GS1 EPCIS / CBV
+release cycle so that trading-partner integrations have
+time to migrate.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §16 Cross-Standard Linkage
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Operators that consume adjacent WIA standards (cold-chain
+monitoring, dangerous-goods compliance, supplier-quality-
+management) emit cross-standard linkage records that name
+the consuming standard and the version under which the
+linkage is claimed.
 
-## Annex I — Interoperability Profiles
+## §17 Public Catalogue (Wholesale)
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Wholesale operators that publish a public available-to-
+promise catalogue (B2B-facing) emit a JSON Feed listing
+items with their evidence-package manifest digests, the
+public available quantity, and the operator's per-region
+fulfilment expectations.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §18 Reverse-Logistics Integration
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Returns operations integrate with the operator's reverse-
+logistics 3PL through the same gateway as forward 3PL §2,
+with returns-specific event vocabulary
+(`bizStep=returning`, `disposition=returned_for_credit`,
+`disposition=destroyed`). Integration carries the returns
+3PL's identifier and the per-class refurbishment SOP.
+
+## §19 Customs and Trade Compliance Integration
+
+Cross-border operators integrate with customs broker systems
+for import / export declarations (US ACE, EU Trader Portal,
+KCS UNI-PASS in Korea, JCS in Japan, equivalent systems
+elsewhere). Integration carries the broker's identifier, the
+per-shipment harmonized-tariff-schedule line items, and the
+per-jurisdiction trade-agreement preference claim where
+applicable.
+
+## §20 Audit-Reviewer Workflow Integration
+
+External auditors (GxP auditors for regulated pharmaceutical
+and food operators, ISO 9001 / 22000 / 27001 surveillance
+auditors, internal-audit functions) consume audit-trail
+exports through dedicated client certificates. The export
+carries the API audit logs, the EPCIS event log for the
+audit window, the cycle-count and physical-inventory
+records, and the controlled-substance reconciliation reports.
+
+## §21 Reader Tooling for Operations Floor
+
+Operators publish supplementary reader tools (real-time
+dashboards for the warehouse floor, mobile picker apps,
+zone-level cycle-count companion apps, recall trace-graph
+visualisers for QA teams) alongside the canonical evidence
+package. Reader tools are non-normative; the canonical
+record remains the JSON evidence-package manifest.
+
+## §22 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated
+successfully with the operator's ERP, at least one 3PL
+provider (where applicable), at least one trading-partner
+channel, the operator's TMS (where applicable), the cold-
+chain monitoring service (for cold-chain operators), the
+controlled-substance regulator (for controlled-substance
+operators), and at least one long-term archive, and has
+published at least one externally citable evidence package.
+
+Sunsetting an integration is announced via the well-known
+discovery document at least 90 calendar days before
+removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-inventory-management
+- **Last Updated:** 2026-04-28

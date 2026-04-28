@@ -5,237 +5,291 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-interstellar-communication (Interstellar Communication).
+This document defines the protocols that govern an
+interstellar-communication operator: spectrum licensing under
+the operating jurisdiction's radio regulations, ITU-R RA.769
+radio-astronomy protection observance, post-detection
+protocol adherence, deliberate-transmission ("active SETI" /
+"METI") governance, signal-detection pipeline qualification,
+RFI catalogue stewardship, precursor-probe link operations,
+and recordkeeping.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO 19115-1 (geographic information — metadata)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
+- ITU-R RA.769 (protection criteria for radio-astronomy
+  measurements)
+- ITU-R RA.1513 (loss of data due to interference)
+- ITU-R RR Article 29 (radio astronomy service)
+- IAU Standards of Fundamental Astronomy (SOFA)
+- IAU Resolution B1 (XXVII GA, 2009) on radio frequency
+  protection
+- CCSDS 301.0-B (Time Code Formats)
+- IVOA ObsCore / ObsTAP
 
 ---
 
-## §1 Scope
+## §1 Spectrum Licensing
 
-This PHASE document is one of four that together define the WIA-interstellar-communication
-standard. It addresses the protocol layer of the standard.
+An operator MAY claim conformance to WIA-interstellar-
+communication only after the operating jurisdiction's radio
+regulator has issued a valid licence (FCC OET in the US,
+Ofcom in the UK, KCC in Korea, MIC in Japan, equivalent
+authorities elsewhere) for the operator's reception bands and,
+where the operator transmits, for the operator's transmission
+bands. Licences are recorded against the programme; revocation
+freezes the programme at its current status pending
+re-licensing.
 
-## §2 Manifest
+## §2 ITU-R RA.769 Observance
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "interstellar-communication"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Radio-astronomy programmes operating in the ITU-R RA.769
+protected bands (1400-1427 MHz, 1610.6-1613.8 MHz, 22.21-
+22.5 GHz, others) honour the recommendation's interference
+threshold and report observed interference excursions to
+the operating jurisdiction's RA.1513 reporting channel.
 
-## §3 Conformance Tiers
+Operators that observe outside the protected bands accept the
+operating environment's natural interference floor and
+reflect this in the per-pipeline RFI tagging.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Post-Detection Protocol Adherence
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Operators that adhere to the IAA SETI Permanent Committee
+post-detection protocol record their adherence in the
+`postDetectionAffiliationRef` field (PHASE-1 §2). The
+protocol prescribes:
 
-## §4 Discovery
+- the operator does not announce a candidate detection
+  publicly until follow-up observations have eliminated all
+  reasonable terrestrial-origin and natural-source
+  explanations;
+- candidate-claim adjudication flows through the operator's
+  post-detection adjudication network (collaborating
+  observatories that perform independent re-observation);
+- formal community announcement, when warranted, is
+  coordinated through the IAA SETI Permanent Committee
+  rather than as a unilateral operator press release.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/interstellar-communication`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Operators that elect not to adhere to the protocol document
+their alternative governance in the quality dossier; this
+standard does not impose adherence as a precondition for
+conformance, but the registry consumer reads the
+`postDetectionAffiliationRef` field to assess the operator's
+adjudication discipline.
 
-## §5 Time and Identity
+## §4 Reproducibility-State Lifecycle
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Candidate-signal reproducibility states (PHASE-1 §5
+`reproducibilityState`) advance under the following discipline:
 
-## §6 Versioning and Deprecation
+- `unverified` is the initial state for a fresh candidate.
+- `reproduced-on-source` requires at least one independent
+  re-observation of the same target showing the candidate's
+  signal at a consistent (or systematically-explained-shifted)
+  frequency.
+- `rfi-classified` requires positive identification of the
+  RFI source through the operator's RFI investigation
+  procedure.
+- `natural-source-classified` requires positive identification
+  of a natural astrophysical source (pulsar, fast radio
+  burst, atmospheric emission, etc.) consistent with the
+  candidate's signature.
+- `follow-up-pending` is the state for candidates that
+  warrant additional observations before classification.
+- `post-detection-escalated` is the terminal state for
+  candidates that have survived the operator's reproduction
+  and source-elimination workflow and have entered the
+  post-detection adjudication network.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+State transitions backwards (e.g. `rfi-classified` to
+`unverified`) require analyst-authorisation and are audited.
 
-## §7 Privacy and Security
+## §5 Reproduction Discipline
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Reproduction observations follow these conventions:
 
-## §8 Open Governance
+- the same target re-observed within a window short enough
+  that any putative source's frequency drift is within
+  the operator's pipeline's drift-rate tolerance;
+- a control off-source pointing to confirm the signal is
+  source-fixed rather than facility-internal;
+- re-observation by an independent facility (different
+  receiver, ideally different geographic location) to
+  rule out facility-localised interference.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `interstellar-communication` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Each reproduction observation is recorded against the
+candidate's audit log so that the post-detection adjudication
+network can review the full reproduction chain.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §6 Deliberate-Transmission Governance
 
+Any operator-proposed deliberate transmission goes through
+the operator's deliberate-transmission governance review.
+The review covers:
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+- the proposed transmission's content and rationale;
+- the proposed target and the rationale for selecting that
+  target (no transmission to inhabited-system candidates
+  without dedicated multi-discipline review);
+- the proposed transmitter's EIRP and the per-jurisdiction
+  spectrum compliance;
+- input from the operator's domain-expertise advisory panel
+  (astronomy, exobiology, ethics, communications law, public
+  policy);
+- the operator's published consultation outcomes where the
+  jurisdiction expects public consultation.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Approval requires a recorded review outcome of `approved`
+that the API verifies before allowing the transmission to
+advance to executed status (PHASE-2 §9).
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §7 Signal-Detection Pipeline Qualification
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Signal-detection pipelines (TURBO_SETI, BL-SCRUNCH,
+proprietary observatory pipelines, ML-based novel-pipeline
+candidates) are qualified per programme. Qualification
+requires:
 
-## Annex F — Adoption Roadmap
+- documented behaviour against representative synthetic-
+  signal injection tests;
+- documented behaviour against the programme's RFI
+  catalogue;
+- per-pipeline significance-metric definition and an
+  agreed escalation threshold;
+- conformance attestation from the operator's qualified
+  pipeline reviewer.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Pipelines that lose qualification are removed from the
+programme; candidates produced by removed pipelines remain
+addressable for audit but are not eligible for follow-up
+allocation.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §8 RFI Catalogue Stewardship
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The RFI catalogue (PHASE-1 §6) is maintained continuously by
+the programme's RFI analyst. New RFI sources discovered
+through candidate investigations are catalogued; cataloguing
+is bidirectional with the operating jurisdiction's
+radio-astronomy coordination forum (where one exists),
+enabling cross-observatory awareness.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §9 Precursor-Probe Link Operations
 
-## Annex G — Test Vectors and Conformance Evidence
+Precursor-probe links (PHASE-1 §7) are operated by the probe
+mission's MOC. WIA-interstellar-communication consumers
+ingest the per-link record so that interstellar-precursor
+science products (interstellar plasma measurements,
+interstellar dust impact rates, cosmic-ray spectra in the
+heliosheath and beyond) are catalogued in the WIA registry
+alongside the operator's search programmes.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §10 Records Retention
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Programme records — every observation, every candidate at
+every reproducibility state, every RFI entry, every probe-
+telemetry link, every deliberate-transmission record, and
+every API audit log — retain indefinitely. Cleared
+candidates remain addressable for retrospective review (a
+candidate cleared today as RFI may be re-examined years
+later if the operator's pipeline improves).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §11 Time Synchronisation
 
-## Annex H — Versioning and Deprecation Policy
+Operator clocks synchronise per RFC 5905 (NTPv4) against the
+operating jurisdiction's primary time reference, with sub-
+microsecond accuracy required for VLBI-style cross-
+observatory candidate confirmation. Probe-telemetry link
+records use CCSDS 301.0-B time codes for compatibility with
+the operator's deep-space mission ledger.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Cross-Observatory Coordination
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Operators that share targets, candidates, or RFI entries
+across observatories follow coordination conventions:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+- shared-target announcements through the operator's partner-
+  observatory channel so that follow-up scheduling can be
+  coordinated;
+- shared-candidate sharing only after the candidate reaches
+  `follow-up-pending` status (sharing pre-`follow-up-pending`
+  raw candidates would generate noise floods at partner
+  pipelines);
+- shared-RFI entries flow through the operating jurisdiction's
+  radio-astronomy coordination forum where one exists.
 
-## Annex I — Interoperability Profiles
+## §13 Public Engagement
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Public engagement (popular-science articles, observatory press
+releases, public talks) for cleared candidates follows the
+post-detection protocol's media coordination guidance.
+Operators do not announce putative detections in advance of
+the protocol's coordinated announcement window; pre-
+coordinated leaks are recorded as protocol-non-compliance
+events that the operator's quality manager investigates.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §14 Privacy and Researcher Identity
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Researchers contributing to the operator's programme are
+identified through the operator's IDP. The DATA-FORMAT layer
+carries operator-internal staff identifiers only as opaque
+analyst tokens; researcher publications and credit
+attributions flow through the operator's publication-
+credit workflow rather than through this API.
+
+## §15 Campaign-Level Discipline
+
+Multi-observation campaigns (PHASE-1 §10) are subject to
+campaign-design QA: the campaign's scientific rationale, the
+target-selection methodology, the per-observation cadence,
+and the campaign's expected sensitivity envelope are reviewed
+by the operator's science committee before the campaign
+launches. Campaigns that deviate materially from the approved
+design (changes to target list, observation cadence, band
+selection) re-enter the science committee's review queue.
+
+## §16 Synthetic-Injection Audit
+
+Synthetic-signal injection records (PHASE-1 §9) are reviewed
+quarterly by the operator's pipeline-QA analyst. Recovery
+rates that drift below the operator's documented thresholds
+trigger pipeline re-qualification (PHASE-3 §7); false-
+positive rates above the operator's threshold trigger an
+RFI-catalogue refresh and a candidate-significance threshold
+review.
+
+## §17 Quality Dossier
+
+The operator's quality dossier records the spectrum licence,
+the post-detection affiliation reference, the qualified
+pipeline register, the partner-observatory list, the science
+committee composition, the per-pipeline RFI catalogue
+maintainer, and the operator's incident history. The dossier
+is reviewed at least annually by the operator's quality
+manager.
+
+## §18 Conformance and Auditing
+
+A programme conformant with WIA-interstellar-communication
+publishes its spectrum licence, its post-detection
+affiliation, the catalogue of qualified pipelines, the
+catalogue of cleared candidates, and the catalogue of any
+deliberate transmissions, and answers an annual self-
+assessment that maps each clause of this PHASE to the
+operator's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-interstellar-communication
+- **Last Updated:** 2026-04-28

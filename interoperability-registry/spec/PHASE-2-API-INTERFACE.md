@@ -5,237 +5,319 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-interoperability-registry (Interoperability Registry).
+This document defines the HTTPS API contract that an
+interoperability-registry operator exposes for the records
+defined in PHASE-1. Consumers include data architects,
+integration engineers, runtime adapter binders, cross-
+registry harvesters, conformance reviewers, and the operator's
+own analytics platform.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics)
+- IETF RFC 9111 (HTTP Caching)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 6901 / 6902 (JSON Pointer / Patch)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9421 (HTTP Message Signatures)
+- IETF RFC 6920 (Naming Things with Hashes)
+- ISO 8601 (date and time)
+- ISO/IEC 11179 (metadata registries)
+- ISO/IEC 27001:2022 (information security management)
+- W3C Trace Context
+- W3C SKOS / OWL 2 / SHACL
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-interoperability-registry
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by the operator.
+Versioning uses `/v1/` path segments. The OpenAPI 3.1 document
+at `/v1/openapi.json` is canonical.
 
-## §2 Manifest
+Artefact bodies (schema files, OWL fragments, SKOS expansions)
+are content-addressed; the API returns metadata and a
+content-address that consumers fetch separately so that large
+artefacts do not bloat metadata responses.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "interoperability-registry"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Root Discovery
 
-## §3 Conformance Tiers
+```
+GET /v1/
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```json
+{
+  "standard": "WIA-interoperability-registry",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "registries":          "/v1/registries",
+    "artefacts":           "/v1/artefacts",
+    "dataElements":        "/v1/data-elements",
+    "valueSets":           "/v1/value-sets",
+    "messageSchemas":      "/v1/message-schemas",
+    "mappingSets":         "/v1/mapping-sets",
+    "ontologyFragments":   "/v1/ontology-fragments",
+    "adapterManifests":    "/v1/adapter-manifests",
+    "harvests":            "/v1/harvests",
+    "evidence":            "/v1/evidence",
+    "openapi":             "/v1/openapi.json"
+  }
+}
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Registry Lifecycle
 
-## §4 Discovery
+```
+POST   /v1/registries                  — register a registry
+GET    /v1/registries/{rid}            — retrieve registry
+PATCH  /v1/registries/{rid}/status     — advance status
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/interoperability-registry`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Status `frozen` reflects an operator decision to stop accepting
+new artefacts (typically before a successor registry takes
+over); existing artefacts remain addressable and consumable
+under the frozen registry's identifier.
 
-## §5 Time and Identity
+## §4 Artefact Lifecycle
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST   /v1/registries/{rid}/artefacts          — register
+                                                  artefact
+                                                  metadata
+PATCH  /v1/artefacts/{aid}/registration-status — advance
+                                                  registration
+                                                  status per
+                                                  ISO/IEC
+                                                  11179-6
+PATCH  /v1/artefacts/{aid}/superseded-by       — record
+                                                  successor
+GET    /v1/artefacts/{aid}                     — retrieve
+                                                  metadata
+GET    /v1/artefacts/{aid}/content             — fetch the
+                                                  content-
+                                                  addressed
+                                                  body
+```
 
-## §6 Versioning and Deprecation
+Registration-status transitions that violate the ISO/IEC
+11179-6 state machine return `422` with type
+`urn:wia:interoperability-registry:invalid-status-transition`.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Per-Class Artefact Endpoints
 
-## §7 Privacy and Security
+The per-class endpoints are syntactic sugar over the
+`/v1/artefacts` endpoints; they are provided so that consumers
+that filter by class can discover artefacts more
+ergonomically:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+GET    /v1/data-elements?registry={rid}&status={s}
+GET    /v1/value-sets?codeSystem={c}&status={s}
+GET    /v1/message-schemas?encoding={e}&status={s}
+GET    /v1/mapping-sets?source={u}&target={u}
+GET    /v1/ontology-fragments?profile={p}
+GET    /v1/adapter-manifests?adapterKind={k}
+```
 
-## §8 Open Governance
+## §6 Cross-Registry Harvest
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `interoperability-registry` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST   /v1/registries/{rid}/harvests   — initiate a harvest
+                                          from a remote
+                                          registry
+GET    /v1/harvests/{hid}              — retrieve harvest
+                                          status and outcome
+GET    /v1/harvests/{hid}/conflicts    — list per-artefact
+                                          conflicts requiring
+                                          operator review
+PATCH  /v1/harvests/{hid}/conflicts/{cid}/resolution
+                                       — record conflict
+                                          resolution
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Harvest conflict resolutions follow the protocol in PHASE-3 §6.
 
+## §7 Search and Discovery
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+GET    /v1/search?q={text}&class={c}&status={s}
+                                       — text search across
+                                          artefact slugs and
+                                          definitions
+GET    /v1/data-elements/by-binding?valueSet={u}
+                                       — list data elements
+                                          that bind a given
+                                          value set
+GET    /v1/value-sets/by-code-system?codeSystem={c}
+                                       — list value sets
+                                          drawn from a given
+                                          code system
+GET    /v1/mapping-sets/by-pair?source={u}&target={u}
+                                       — list mapping sets
+                                          between a vocabulary
+                                          pair
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+Search responses respect the registry's authorisation matrix
+so that draft artefacts do not leak through search to
+consumers without the appropriate scope.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Errors
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+All error responses are `application/problem+json` per RFC
+9457. Defined types include:
 
-## Annex F — Adoption Roadmap
+- `urn:wia:interoperability-registry:invalid-status-transition`
+- `urn:wia:interoperability-registry:naming-collision`
+- `urn:wia:interoperability-registry:harvest-conflict`
+- `urn:wia:interoperability-registry:dangling-reference`
+- `urn:wia:interoperability-registry:content-digest-mismatch`
+- `urn:wia:interoperability-registry:evidence-mismatch`
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Authentication and Authorisation
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Mutually-authenticated TLS for registrar, harvester, and
+adapter-binder consumers. Public read-only endpoints (artefact
+metadata for `standard` and `preferred-standard` artefacts,
+public search) are reachable without a client certificate;
+the artefact body is content-addressed so it is reachable
+through the operator's content store under the same
+authorisation rules that gate the metadata.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Caching and Concurrency
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Stable resources (artefacts whose `registrationStatus` is
+`standard` or `preferred-standard`, signed evidence packages)
+are cacheable with `Cache-Control: max-age=31536000,
+immutable`. Mutable resources (candidate or qualified
+artefacts, in-flight harvests) are cacheable for 60 seconds.
+ETags are mandatory on every PATCH endpoint.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §11 Streaming Subscription
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Consumers subscribe via Server-Sent Events at:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- `/v1/registries/{rid}/events` — registry-wide events
+  (artefact-status changes, harvest completions, conflict
+  notifications).
+- `/v1/artefacts/{aid}/events` — artefact-scoped events
+  (status transitions, supersession notices, dependency
+  changes).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Subscribers reconnect via the `Last-Event-ID` header (W3C
+EventSource semantics).
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Bulk Operations
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+```
+POST   /v1/bulk/artefacts          — batched artefact import
+POST   /v1/bulk/value-set-expansions — batched expansion
+                                       refresh
+GET    /v1/bulk/{operationId}      — operation status
+```
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Cursor-based pagination uses the `cursor` query parameter and
+`Link` headers (RFC 8288); cursors persist for at least 24
+hours.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Audit and Observability
 
-## Annex I — Interoperability Profiles
+Every endpoint emits structured logs with `registryId`,
+`artefactId` (where applicable), `traceId`, the issuing
+client certificate's subject, and the operator's clock skew vs
+the reference NTP source.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Worked Example: Element Registration to Adapter Binding
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+1. The data architect submits a candidate data-element record
+   with definition, value-domain reference, and data type.
+2. After internal review, the registrar advances the artefact
+   to `qualified` and then to `standard`.
+3. An integration engineer registers a message schema that
+   binds the data element through `bindingDataElements`.
+4. An adapter manifest is registered that consumes the
+   message schema and the data element.
+5. A consuming runtime fetches the adapter manifest at boot
+   and binds its data flows against the registry's content-
+   addressed identifiers.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §15 Provenance and Aggregate Endpoints
+
+```
+GET    /v1/provenance/{recordId}    — retrieve provenance entry
+                                       for any artefact
+                                       (custodian, registrar
+                                       approvals, supersession
+                                       chain)
+GET    /v1/aggregate/artefact-counts-by-status?registry={r}
+GET    /v1/aggregate/refresh-rate-by-codesystem?period=...
+GET    /v1/aggregate/conflict-volume-by-federation?period=...
+```
+
+Aggregate queries that request per-artefact attribution where
+the operator's policy disallows it return `403 Forbidden`
+with type `urn:wia:interoperability-registry:attribution-restricted`.
+
+## §16 Federation-Conflict Adjudication Endpoint
+
+```
+POST   /v1/federations/{fid}/conflicts/{cid}/adjudication
+                                       — submit an adjudication
+                                          decision from the
+                                          joint naming-authority
+                                          committee
+GET    /v1/federations/{fid}/conflicts/{cid}/adjudication
+                                       — retrieve the decision
+                                          and its rationale
+```
+
+Adjudication submissions require committee-level
+authorisation; submissions from individual member registrars
+return `403 Forbidden` with type
+`urn:wia:interoperability-registry:committee-authorisation-required`.
+
+## §17 Dependency-Graph Endpoint
+
+```
+GET    /v1/artefacts/{aid}/dependencies
+                                       — list direct upstream
+                                          and downstream
+                                          artefacts
+GET    /v1/artefacts/{aid}/dependencies/transitive
+                                       — list transitive
+                                          dependency closure
+                                          (server-rendered, with
+                                          configurable depth
+                                          limit to protect
+                                          response size)
+GET    /v1/artefacts/orphans?registry={r}
+                                       — list orphan artefacts
+                                          (no inbound
+                                          dependencies)
+```
+
+Transitive-closure responses larger than the operator's
+declared depth limit return `200 OK` with a partial result
+and a `Link: rel="next"` header that lets the consumer
+continue traversal in chunks.
+
+## §18 Conformance
+
+A conformant server passes the test vectors published under
+`tests/phase-vectors/phase-2-api-interface/`, emits an
+OpenAPI 3.1 document, signs evidence packages per RFC 9421,
+and rejects content submissions whose payload digest disagrees
+with the artefact's `contentDigest`.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-interoperability-registry
+- **Last Updated:** 2026-04-28

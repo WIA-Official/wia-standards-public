@@ -5,237 +5,380 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-iot-m2m (Iot M2m).
+This document defines the canonical data-format layer for
+WIA-iot-m2m. The standard covers the persistent record shapes
+exchanged among Internet-of-Things devices (sensors,
+actuators, gateways), Machine-to-Machine (M2M) service
+platforms (oneM2M-aligned, LwM2M-aligned, broker-based MQTT
+deployments), application servers, and the regulators or
+operators that govern an IoT-M2M deployment. The format is
+intentionally agnostic of the deployment's vertical (smart-
+city, smart-agriculture, asset-tracking, building automation)
+and addresses the cross-cutting records that every deployment
+emits.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 30141:2018 (IoT Reference Architecture)
+- ISO/IEC 30161 (IoT Data exchange platform)
+- ISO/IEC 21823-1/2/3 (IoT interoperability)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 7252 (Constrained Application Protocol — CoAP)
+- IETF RFC 8132 (PATCH and FETCH methods for CoAP)
+- IETF RFC 8259 (JSON)
+- IETF RFC 8949 (Concise Binary Object Representation — CBOR)
+- IETF RFC 9457 (Problem Details)
+- IEEE 802.15.4 (Low-Rate Wireless Personal Area Networks)
+- IEEE 802.11ah (Wi-Fi HaLow for IoT-class deployments)
+- 3GPP TS 36.300 / TS 38.300 (Cellular IoT — Cat-M / NB-IoT
+  / Reduced Capability NR)
+- oneM2M TS-0001 (Functional Architecture)
+- oneM2M TS-0004 (Service Layer Core Protocol)
+- oneM2M TS-0008 / TS-0009 (CoAP / HTTP bindings)
+- ETSI TS 102 690 (Machine-to-Machine communications;
+  functional architecture)
+- OMA Lightweight M2M (LwM2M) v1.2
+- OASIS MQTT v5.0
+- W3C Web of Things (WoT) Thing Description 1.1
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-iot-m2m
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts an
+IoT-M2M deployment produces and consumes. Implementations
+covered include:
 
-## §2 Manifest
+- Constrained-device firmware that emits sensor readings
+  and consumes actuator commands.
+- Gateway / proxy systems that bridge constrained-device
+  protocols (CoAP, BLE, Zigbee, Z-Wave) to back-end
+  service-layer protocols (oneM2M, LwM2M, MQTT, HTTP).
+- Service-layer platforms (oneM2M-aligned Common Service
+  Entities, LwM2M servers, MQTT brokers, custom IoT
+  platforms) that mediate between devices and applications.
+- Application servers that consume device telemetry and
+  emit actuation requests.
+- Lifecycle-management systems (device provisioning,
+  firmware-over-the-air updates, key rotation, decommission).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "iot-m2m"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Data analytics platforms downstream of the M2M layer (time-
+series analytics, ML inference) are out of scope; this PHASE
+defines the records that flow up to those platforms, not the
+analytics outputs.
 
-## §3 Conformance Tiers
+## §2 Deployment Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+deploymentId         : string (uuidv7)
+deploymentOperator   : string (institutional identifier of
+                         the operator)
+deploymentRegistered : string (ISO 8601 / RFC 3339)
+verticalDomain       : enum ("smart-city" |
+                         "smart-agriculture" |
+                         "smart-building" |
+                         "industrial-plant-floor" |
+                         "asset-tracking-logistics" |
+                         "metering-utilities" |
+                         "fleet-telematics" |
+                         "healthcare-remote-monitoring" |
+                         "consumer-home-automation" |
+                         "user-defined")
+serviceLayerKind     : enum ("oneM2M" | "LwM2M" |
+                         "MQTT-broker" | "WoT-native" |
+                         "custom")
+deploymentStatus     : enum ("design" | "operating" |
+                         "frozen" | "decommissioning" |
+                         "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Device Identifier and Lifecycle
 
-## §4 Discovery
+```
+device:
+  deviceId           : string (uuidv7)
+  deploymentId       : string (uuidv7)
+  manufacturerRef    : string (institutional identifier)
+  modelNumber        : string
+  hardwareRevision   : string
+  firmwareRef        : string (content-addressed firmware URI)
+  deviceClass        : enum ("constrained-class-0" |
+                         "constrained-class-1" |
+                         "constrained-class-2" |
+                         "non-constrained" |
+                         "gateway-proxy")
+  radioStack         : array of enum ("ieee-802-15-4-zigbee"
+                         | "ieee-802-15-4-thread" |
+                         "bluetooth-mesh" | "ble-classic" |
+                         "z-wave" | "wi-fi-halow" |
+                         "wi-fi-classic" |
+                         "lorawan-1.1" | "sigfox" |
+                         "nb-iot-cat-m" |
+                         "5g-redcap" |
+                         "wired-rs-485" |
+                         "wired-ethernet" |
+                         "user-defined")
+  rootKeyDerivationRef : string (URI of the device's root-
+                         key derivation record; the actual
+                         key is held in HSM and never on
+                         this API)
+  deviceStatus       : enum ("manufactured" | "provisioned"
+                         | "deployed-active" | "suspended"
+                         | "fault" | "decommissioned")
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/iot-m2m`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Thing Description Record
 
-## §5 Time and Identity
+Every device is described by a W3C WoT Thing Description so
+that downstream consumers can discover the device's
+properties, actions, and events without bespoke device
+documentation.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+thingDescription:
+  tdId               : string (uuidv7)
+  deviceRef          : string (device UUID)
+  tdJsonLdRef        : string (content-addressed URI of the
+                         WoT TD JSON-LD document conforming
+                         to W3C WoT TD 1.1)
+  tdContentDigest    : string (SHA-256)
+  affordances        : object (per-affordance summary —
+                         properties, actions, events;
+                         redundant with the TD JSON-LD but
+                         provided for indexable search)
+  protocolBindings   : array of enum ("coap" | "http" |
+                         "mqtt" | "websocket" | "modbus" |
+                         "opcua" | "user-defined")
+```
 
-## §6 Versioning and Deprecation
+## §5 Resource Tree Record (oneM2M Pattern)
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+oneM2M-aligned deployments expose a hierarchical resource
+tree (Common Service Entity, Application Entity, Container,
+ContentInstance). This standard records the canonical
+resource-tree path for each managed resource so that
+consumers can resolve resource paths without bespoke service-
+layer knowledge.
 
-## §7 Privacy and Security
+```
+resourceTreeNode:
+  nodeId             : string (uuidv7)
+  deploymentId       : string (uuidv7)
+  parentNodeId       : string (uuidv7; absent for the root)
+  nodeKind           : enum ("CSE" | "AE" | "container" |
+                         "contentInstance" |
+                         "subscription" |
+                         "accessControlPolicy" |
+                         "node" | "remoteCSE" |
+                         "user-defined")
+  resourcePath       : string (absolute path under the
+                         deployment's CSE base)
+  contentTypeHint    : string (MIME type that the
+                         contentInstance leaf carries; e.g.
+                         "application/cbor",
+                         "application/json",
+                         "application/octet-stream")
+  retentionPolicyRef : string (URI of the per-node retention
+                         policy)
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Telemetry Record
 
-## §8 Open Governance
+Telemetry is the sensor-reading flow from devices to
+applications. Records are normalized so that downstream
+consumers can ingest telemetry from heterogeneous device
+populations without per-device parsing.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `iot-m2m` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+telemetry:
+  telemetryId        : string (uuidv7)
+  deviceRef          : string (device UUID)
+  observedAt         : string (ISO 8601 / RFC 3339, with
+                         millisecond precision when the
+                         device's clock supports it)
+  sensorAffordance   : string (matches a property name from
+                         the device's Thing Description)
+  numericValue       : number (when the affordance is
+                         numeric)
+  textValue          : string (when the affordance is
+                         categorical / text)
+  binaryRef          : string (content-addressed URI when
+                         the affordance is a binary blob —
+                         image, audio, raw waveform)
+  unitCode           : string (UN/CEFACT recommendation 20
+                         common code, where applicable)
+  qualityFlag        : enum ("nominal" | "estimated" |
+                         "uncertain" | "out-of-range" |
+                         "device-fault")
+  ingestionLatencyMs : integer (operator-side measure; the
+                         delay from observedAt to
+                         service-layer ingest)
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Actuation Record
 
+```
+actuation:
+  actuationId        : string (uuidv7)
+  deviceRef          : string (device UUID)
+  requestedAt        : string (ISO 8601)
+  actionAffordance   : string (matches an action name from
+                         the device's Thing Description)
+  inputPayloadRef    : string (URI of the action input)
+  acknowledgedAt     : string (ISO 8601; absent until
+                         device acknowledges)
+  completedAt        : string (ISO 8601; absent until device
+                         signals completion)
+  outcome            : enum ("succeeded" | "failed" |
+                         "partial" | "timed-out" |
+                         "rejected-by-policy")
+  outputPayloadRef   : string (URI of the action output)
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+## §8 Firmware-Over-The-Air (FOTA) Record
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```
+fota:
+  fotaId             : string (uuidv7)
+  deviceRef          : string (device UUID)
+  initiatedAt        : string (ISO 8601)
+  fromFirmwareRef    : string (URI of prior firmware)
+  toFirmwareRef      : string (URI of new firmware;
+                         signed per the operator's
+                         firmware-signing policy)
+  fotaState          : enum ("staged" | "downloading" |
+                         "verified" | "applied" |
+                         "rolled-back" | "failed")
+  rollbackEvidenceRef: string (URI of rollback evidence;
+                         absent unless the FOTA rolled
+                         back)
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §9 Subscription and Notification Record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The subscribe-and-notify pattern is fundamental to oneM2M
+and LwM2M; subscriptions enable application servers to
+receive asynchronous notifications when device state
+changes without polling.
 
-## Annex F — Adoption Roadmap
+```
+subscription:
+  subscriptionId     : string (uuidv7)
+  deploymentId       : string (uuidv7)
+  subscriberRef      : string (application-entity identifier)
+  resourceTreeNodeRef: string (the resource-tree node the
+                         subscription targets)
+  notificationKind   : enum ("any-update" |
+                         "create-only" | "delete-only" |
+                         "update-only" |
+                         "value-threshold-crossed" |
+                         "user-defined")
+  notificationEndpointRef: string (URI of the subscriber's
+                         notification endpoint)
+  encodingPreference : enum ("json" | "cbor" | "xml")
+  expiresAt          : string (ISO 8601; subscriptions
+                         expire and require renewal)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §10 Audit Log Record
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+auditLog:
+  logId              : string (uuidv7)
+  deploymentId       : string (uuidv7)
+  occurredAt         : string (ISO 8601)
+  actorRef           : string (operator identifier of the
+                         actor — application server,
+                         operator console, device, automated
+                         workflow)
+  action             : enum ("device-provisioned" |
+                         "device-status-changed" |
+                         "td-updated" |
+                         "actuation-requested" |
+                         "fota-initiated" |
+                         "fota-rolled-back" |
+                         "subscription-created" |
+                         "subscription-expired" |
+                         "key-rotated" |
+                         "device-decommissioned" |
+                         "user-defined")
+  resourceRef        : string (URI of the affected resource)
+  outcome            : enum ("succeeded" | "failed" |
+                         "partial")
+  ipAddressOpaque    : string (opaque, hashed network-
+                         identifier; the operator records
+                         actor network position for
+                         security audit without exposing
+                         raw IP)
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §11 Gateway Aggregation Record
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Gateway devices aggregate telemetry from multiple
+constrained children (Zigbee end-devices behind a Zigbee
+coordinator gateway, BLE peripherals behind a BLE
+gateway, RS-485 sensors behind an industrial gateway).
+The aggregation record captures the parent-child binding.
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+gatewayAggregation:
+  aggregationId      : string (uuidv7)
+  gatewayDeviceRef   : string (gateway device UUID)
+  childDeviceRefs    : array of string (device UUIDs)
+  childProtocol      : enum ("zigbee" | "thread" |
+                         "bluetooth-mesh" | "ble" |
+                         "z-wave" | "modbus-rtu-485" |
+                         "modbus-tcp" | "opcua" |
+                         "user-defined")
+  bindingEstablishedAt : string (ISO 8601)
+  bindingRevokedAt   : string (ISO 8601; absent for
+                         active bindings)
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Gateway aggregation records support the operator's
+device-population analytics (which children are behind
+which gateway) and the operator's incident-response
+workflows (an unreachable gateway implies its children
+are also unreachable).
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §12 Battery and Energy Telemetry Record
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+```
+batteryTelemetry:
+  recordId           : string (uuidv7)
+  deviceRef          : string (device UUID)
+  capturedAt         : string (ISO 8601)
+  batteryLevelPct    : number (0-100, where 0 indicates the
+                         operator's defined minimum operating
+                         voltage)
+  batteryVoltageV    : number (volts)
+  estimatedRemainingHours : number (per the operator's
+                         per-device-class battery model)
+  energyHarvestedSinceLastReportJ : number (joules,
+                         for energy-harvesting devices;
+                         absent for non-harvesting devices)
+```
 
-## Annex H — Versioning and Deprecation Policy
+Battery telemetry feeds the operator's per-device-class
+battery-life trajectory model (PHASE-3 §17), which drives
+proactive replacement scheduling so that field operations
+do not encounter unexpected dead devices.
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §13 Conformance
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Implementations claiming PHASE-1 conformance emit each of
+the records defined above for every managed device and
+honour the W3C WoT TD content-addressing rule in §4.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+---
 
-## Annex I — Interoperability Profiles
+**Document Information:**
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-iot-m2m
+- **Last Updated:** 2026-04-28

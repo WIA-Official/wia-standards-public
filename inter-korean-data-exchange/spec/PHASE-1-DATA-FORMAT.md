@@ -5,237 +5,331 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-inter-korean-data-exchange (Inter Korean Data Exchange).
+This document defines the canonical data-format layer for
+WIA-inter-korean-data-exchange. The standard covers persistent
+record shapes for cross-DMZ data exchange between authorised
+South-Korean operators and their North-Korean counterparts in
+the limited domains where such exchange is permitted under the
+South Korean Inter-Korean Exchange and Cooperation Act and
+the parties' bilateral arrangements: family-reunion records,
+humanitarian-aid manifests, separated-family communication
+logs, joint-venture inventories, and inter-Korean liaison
+correspondence. The format is consumed by the Ministry of
+Unification, the Inter-Korean Exchange and Cooperation
+Bureau, designated humanitarian organisations (Korea Red
+Cross, KOICA, registered NGOs), and the operator-side IT
+systems that prepare exchange artefacts for review.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO 3166-1 (country codes; cited for KP, KR, and the
+  reciprocal-jurisdiction designations)
+- ISO 639-1 / 639-2 (language codes; both `ko` references the
+  unified Korean language while north-side and south-side
+  orthography differences are recorded separately)
+- ISO 15924 (script codes; both sides use Hangul `Hang`,
+  with limited Hanja `Hani` use on certain historical records)
+- ISO/IEC 11578 (UUID)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27701:2019 (privacy information management)
+- ISO/IEC 17025:2017 (testing and calibration laboratories;
+  cited where humanitarian-aid manifest verification is
+  performed at an accredited laboratory)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 5322 (internet message format; cited as envelope
+  for liaison correspondence)
+- W3C XML 1.1 (legacy import only)
+- UN OCHA Common Operational Datasets (cited as the reference
+  vocabulary for humanitarian-aid records)
+- Sphere Standards 2018 (humanitarian charter and minimum
+  standards in humanitarian response — cited normatively for
+  humanitarian-aid manifest classifications)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-inter-korean-data-exchange
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts produced
+and consumed by an inter-Korean exchange operator. Implementations
+covered include:
 
-## §2 Manifest
+- Family-reunion administration systems operated by the Korea
+  Red Cross and the Ministry of Unification.
+- Humanitarian-aid logistics systems operated by KOICA, the
+  Korea Red Cross, and registered humanitarian NGOs.
+- Inter-Korean liaison correspondence systems that exchange
+  formal letters and protocol documents under the Inter-Korean
+  Exchange and Cooperation Act.
+- Joint-venture inventory systems for the few cross-border
+  industrial and tourism cooperatives that have operated.
+- Cultural-exchange records for heritage repatriation,
+  scholarly cooperation, and sporting exchanges.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "inter-korean-data-exchange"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Direct citizen-to-citizen messaging across the DMZ, military
+or intelligence communications, and any commercial activity
+not authorised by the Inter-Korean Exchange and Cooperation
+Act are out of scope.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId         : string (uuidv7)
+programmeOperator   : string (institutional identifier of the
+                        South-Korean operator authorised under
+                        the Inter-Korean Exchange and
+                        Cooperation Act; e.g. Korea Red Cross,
+                        KOICA, an registered NGO)
+programmeRegistered : string (ISO 8601 / RFC 3339)
+exchangeDomains     : array of enum ("family-reunion" |
+                        "humanitarian-aid" |
+                        "liaison-correspondence" |
+                        "joint-venture-inventory" |
+                        "cultural-exchange" |
+                        "scholarly-exchange" |
+                        "sport-exchange")
+authorisationRef    : string (Inter-Korean Exchange and
+                        Cooperation Act authorisation reference
+                        issued by the Ministry of Unification)
+counterpartRef      : string (north-side counterpart organisation
+                        identifier, where the bilateral
+                        arrangement names one)
+programmeStatus     : enum ("draft" | "operating" |
+                        "suspended" | "concluded" |
+                        "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Personal-Identity Token
 
-## §4 Discovery
+The DATA-FORMAT layer never carries direct personal identity
+across the DMZ. Each subject is represented by an opaque token
+that the south-side operator's CRM maps to the subject's
+identity records held under the operator's data-protection
+policy.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/inter-korean-data-exchange`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+identityToken:
+  tokenId            : string (uuidv7)
+  side               : enum ("south" | "north")
+  jurisdiction       : enum ("KR" | "KP" | "third-country-
+                       resident-of-korean-origin")
+  ageBand            : enum ("minor" | "adult-working-age" |
+                        "elder-65-79" | "elder-80-plus")
+  reunionEligibility : enum ("registered" | "deceased-confirmed"
+                        | "deceased-unconfirmed" |
+                        "withdrawn" | "not-applicable")
+```
 
-## §5 Time and Identity
+Age-band representation is intentionally coarse so that
+downstream consumers can prioritise reunion-list ordering
+without exposing fine-grained personal data.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Family-Reunion Record
 
-## §6 Versioning and Deprecation
+```
+familyReunion:
+  reunionId           : string (uuidv7)
+  programmeId         : string (uuidv7)
+  applicantTokenRef   : string (south-side identity token)
+  counterpartTokenRef : string (north-side identity token; absent
+                         until the north side confirms a match)
+  registeredAt        : string (ISO 8601)
+  matchConfirmedAt    : string (ISO 8601; absent until matched)
+  reunionRound        : string (operator-internal round
+                         identifier for batched reunion events)
+  reunionMode         : enum ("in-person-mt-kumgang" |
+                         "in-person-other-venue" |
+                         "video-conference" |
+                         "letter-exchange" |
+                         "voice-call")
+  outcomeAt           : string (ISO 8601; absent until reunion
+                         occurred or was cancelled)
+  outcome             : enum ("completed" | "deceased-before"
+                         | "withdrawn" | "cancelled-political"
+                         | "cancelled-other")
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Humanitarian-Aid Manifest
 
-## §7 Privacy and Security
+Humanitarian-aid manifests follow UN OCHA Common Operational
+Datasets vocabulary so that aid records flowing across the DMZ
+can be reconciled against international humanitarian reporting
+without translation loss.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+aidManifest:
+  manifestId          : string (uuidv7)
+  programmeId         : string (uuidv7)
+  authorisationRef    : string (Ministry of Unification
+                         shipment authorisation)
+  packagedAt          : string (ISO 8601)
+  packagedAtFacility  : string (south-side facility identifier)
+  shippedAt           : string (ISO 8601; absent until shipped)
+  receivedAt          : string (ISO 8601; absent until receipt
+                         confirmed by north-side counterpart)
+  routeCode           : enum ("dorasan-kaesong-rail" |
+                         "dorasan-kaesong-road" |
+                         "ganghwa-haeju-sea" |
+                         "wonsan-dprk-port" |
+                         "third-country-via-china" |
+                         "third-country-via-russia" |
+                         "third-country-via-ngo-corridor")
+  cargoLines          : array of CargoLine
+  recipientCounterparty: string (north-side organisation
+                         identifier; e.g. "KP-RED-CROSS")
+  beneficiaryClassification : enum ("infants-under-5" |
+                         "pregnant-and-lactating" |
+                         "school-age-children" |
+                         "elderly" | "general-population" |
+                         "disaster-affected" | "mixed")
 
-## §8 Open Governance
+CargoLine:
+  cargoCode           : string (UN OCHA cluster classification
+                         e.g. "WASH-HYG", "FOOD-CER",
+                         "HEALTH-MED", "SHELTER-NFI")
+  description         : string (free text; redacted on export
+                         when contains operator PII)
+  quantity            : number
+  unitCode            : string (UN/CEFACT recommendation 20
+                         common code; e.g. "KGM" kilogram, "EA"
+                         each, "MTQ" cubic metre)
+  expiryDate          : string (ISO 8601 date; required for
+                         consumables)
+  hazardClass         : enum ("non-hazardous" |
+                         "un-class-3-flammable-liquid" |
+                         "un-class-6.1-toxic" |
+                         "un-class-9-misc" |
+                         "user-defined")
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `inter-korean-data-exchange` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Liaison Correspondence Record
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+liaisonCorrespondence:
+  correspondenceId    : string (uuidv7)
+  programmeId         : string (uuidv7)
+  direction           : enum ("south-to-north" |
+                         "north-to-south")
+  channel             : enum ("inter-korean-liaison-office" |
+                         "panmunjom-exchange" |
+                         "ministry-direct-courier" |
+                         "third-country-conduit")
+  sentAt              : string (ISO 8601)
+  receivedAt          : string (ISO 8601; absent until receipt
+                         acknowledged)
+  classification      : enum ("administrative" | "humanitarian"
+                         | "cultural" | "scholarly" |
+                         "joint-venture" | "ceremonial")
+  subjectRef          : string (operator-internal subject
+                         classification code)
+  bodyRef             : string (content-addressed URI of the
+                         correspondence body, redacted of any
+                         operator PII before storage)
+  signatoryRef        : string (south-side signatory token;
+                         the north-side signatory is recorded
+                         as a free-text role rather than an
+                         identity token)
+```
 
+## §7 Joint-Venture Inventory Record
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+```
+jointVentureInventory:
+  inventoryId         : string (uuidv7)
+  programmeId         : string (uuidv7)
+  ventureRef          : string (joint-venture registration
+                         reference under the Inter-Korean
+                         Exchange and Cooperation Act)
+  capturedAt          : string (ISO 8601)
+  inventoryClass      : enum ("raw-materials" |
+                         "work-in-progress" | "finished-goods"
+                         | "equipment-and-fixtures" |
+                         "intellectual-property")
+  itemLines           : array of object (per-item code,
+                         description redacted of PII, quantity,
+                         unit code, valuation in ISO 4217 KRW
+                         or USD per the ventur's accounting
+                         convention)
+  custodyLocation     : enum ("kaesong-industrial-complex" |
+                         "mt-kumgang-tourist-zone" |
+                         "rason-special-economic-zone" |
+                         "third-country-warehouse" |
+                         "south-side-bonded-warehouse")
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## §8 Cultural-Exchange Record
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+culturalExchange:
+  exchangeId          : string (uuidv7)
+  programmeId         : string (uuidv7)
+  exchangeKind        : enum ("heritage-repatriation" |
+                         "scholarly-conference" |
+                         "performing-arts-troupe" |
+                         "sport-team-exchange" |
+                         "joint-exhibition" |
+                         "language-training")
+  startedAt           : string (ISO 8601)
+  endedAt             : string (ISO 8601)
+  participantCount    : integer (south-side total; north-side
+                         total recorded separately under
+                         operator's bilateral-reporting
+                         arrangement)
+  venueRef            : string (venue identifier; for in-person
+                         exchanges, this is the negotiated
+                         venue; for virtual exchanges, the
+                         operator's relay platform)
+  artefactCatalogueRef: string (URI of the catalogue of
+                         artefacts exchanged; required for
+                         heritage-repatriation kind)
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §9 Distribution-Evidence Record
 
-## Annex F — Adoption Roadmap
+Humanitarian-aid manifests that have completed shipment
+require distribution evidence so that downstream auditors
+(Ministry of Unification, the operator's funder, the public
+disclosure register) can verify that the aid reached the
+declared beneficiaries.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+distributionEvidence:
+  evidenceId          : string (uuidv7)
+  manifestId          : string (uuidv7)
+  capturedAt          : string (ISO 8601)
+  distributorRef      : string (north-side counterpart that
+                         distributed the aid; e.g.
+                         "KP-RED-CROSS")
+  beneficiaryClassification : enum (same enum as PHASE-1 §5;
+                         MUST match the manifest's declared
+                         classification)
+  distributionLocations : array of object (north-side
+                         distribution sites named in the
+                         counterpart's distribution report)
+  evidenceArtefactRefs : array of string (URIs of
+                         distribution-report artefacts; image
+                         references are subject to the
+                         operator's image-disclosure policy)
+  diversionFlag       : boolean (true when the operator's
+                         monitoring identified diversion
+                         concerns)
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §10 Conformance
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Implementations claiming PHASE-1 conformance emit each of the
+records defined above for every authorised exchange and honour
+the identity-token rule in §3 (no direct personal identity
+across the DMZ).
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+---
 
-## Annex G — Test Vectors and Conformance Evidence
+**Document Information:**
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-inter-korean-data-exchange
+- **Last Updated:** 2026-04-28

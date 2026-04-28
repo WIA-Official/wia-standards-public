@@ -5,237 +5,270 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-inter-korean-data-exchange (Inter Korean Data Exchange).
+This document defines the protocols that govern an authorised
+inter-Korean exchange operator: Ministry of Unification
+authorisation, sanctions screening against UN Security Council
+Resolutions on the DPRK, humanitarian-aid neutrality
+discipline, family-reunion administration, liaison-channel
+coordination, joint-venture custody, records retention,
+political-suspension handling, and operator wind-down.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27701:2019 (privacy information management)
+- ISO/IEC 17025:2017 (calibration / testing laboratories;
+  cited where humanitarian-aid laboratory verification is
+  performed)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
+- UN Security Council Resolutions on the DPRK (cited
+  normatively for sanctions-screening references; the operator
+  monitors the consolidated list as updated by the relevant
+  Sanctions Committee)
+- Sphere Standards 2018 (humanitarian charter and minimum
+  standards in humanitarian response)
+- UN OCHA Common Operational Datasets
 
 ---
 
-## §1 Scope
+## §1 Ministry of Unification Authorisation
 
-This PHASE document is one of four that together define the WIA-inter-korean-data-exchange
-standard. It addresses the protocol layer of the standard.
+An operator MAY claim conformance to WIA-inter-korean-data-
+exchange only after the South Korean Ministry of Unification
+has issued a valid authorisation under the Inter-Korean
+Exchange and Cooperation Act for the exchange domains the
+operator supports. Authorisations are scoped per domain
+(family-reunion, humanitarian-aid, liaison-correspondence,
+joint-venture-inventory, cultural-exchange, scholarly-
+exchange, sport-exchange) and per shipment for the
+humanitarian-aid domain.
 
-## §2 Manifest
+Authorisations that the Ministry suspends or revokes
+immediately freeze the affected exchange domain; the API
+enforces the freeze by refusing to advance any record past
+its current status under the suspended domain.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "inter-korean-data-exchange"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 UN Sanctions Screening
 
-## §3 Conformance Tiers
+The DPRK is subject to a comprehensive UN sanctions regime.
+All cargo lines, all named counterparties, and all financial
+flows associated with an exchange artefact are screened
+against the UN Security Council Sanctions Committee's
+consolidated list and against any applicable south-side
+implementation rules.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Screening hits trigger the operator's sanctions workflow:
+investigation, Ministry of Unification notification, and
+shipment hold pending the Sanctions Committee's exemption
+ruling where one is sought. Operators do NOT release
+sanctioned goods or sanctioned counterparties under any
+operator-internal exception; only the Sanctions Committee's
+formal exemption authorises release.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Humanitarian-Aid Neutrality Discipline
 
-## §4 Discovery
+Humanitarian-aid programmes operate under the Sphere
+Standards humanitarian charter principles: humanity,
+impartiality, neutrality, and independence. Operators record
+their adherence in the quality dossier and conduct at least
+annual reviews against the Sphere Standards' Core Humanitarian
+Standard on Quality and Accountability.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/inter-korean-data-exchange`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The beneficiary classification recorded in PHASE-1 §5 is
+governed by the Sphere Standards' vulnerability framework
+(infants under 5, pregnant and lactating, school-age children,
+elderly, disaster-affected, mixed). Operators do not direct
+aid to non-beneficiary recipients (including counterpart
+political organisations) and document distribution evidence
+through the north-side counterpart's distribution reports.
 
-## §5 Time and Identity
+## §4 Family-Reunion Administration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Family-reunion lists are administered by the Korea Red Cross
+on the south side; the north-side counterpart is the DPRK Red
+Cross. Reunion-round scheduling is governed by political-
+level negotiations between the two governments and is not
+within the operator's scheduling authority.
 
-## §6 Versioning and Deprecation
+Reunion-round operating logistics (transport coordination,
+venue setup at Mt Kumgang or other agreed venues, video-
+conference relay equipment) are recorded against each
+reunion round; the API does not arbitrate scheduling but
+records the round identifier so that downstream consumers
+can correlate operating logistics against the political-
+level schedule.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Liaison-Channel Coordination
 
-## §7 Privacy and Security
+The inter-Korean liaison channel (when operating) is the
+primary conduit for liaison correspondence (PHASE-1 §6).
+Channel availability has been intermittent (Joint Liaison
+Office at Kaesong opened 2018, demolished 2020); when the
+primary channel is unavailable, operators fall back to the
+Panmunjom exchange route or to ministry-direct courier
+through third-country conduits.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The active channel per correspondence is recorded; channel
+fallback events are recorded as audit events so that
+downstream investigators can trace correspondence routes
+across periods of channel disruption.
 
-## §8 Open Governance
+## §6 Joint-Venture Custody
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `inter-korean-data-exchange` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Joint-venture inventories (PHASE-1 §7) are subject to the
+joint-venture's bilateral arrangements: who owns what, who
+holds custody, and what the wind-down disposition is when the
+joint venture is suspended. Operators record the custody
+location and the per-line valuation; valuation disputes are
+referred to the joint-venture's bilateral dispute-resolution
+mechanism, which is recorded in the venture's registration.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Custody locations recorded in PHASE-1 §7 reflect the actual
+locations that joint ventures have used: Kaesong Industrial
+Complex (closed 2016), Mt Kumgang Tourist Zone (closed 2008),
+Rason Special Economic Zone (the few ventures that operated
+through China-DPRK conduits), and bonded warehouses on either
+side.
 
+## §7 Records Retention
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Programme records — every record defined in PHASE-1, the API
+audit logs, the Ministry of Unification authorisations, the
+sanctions-screening sweep summaries, and the inter-Korean
+liaison correspondence — retain per the South Korean
+Government Records Management Act and the Ministry of
+Unification's records-retention guidance. Family-reunion
+records for elderly applicants retain indefinitely so that
+descendant requests for ancestral reunion records can be
+served decades after the original applicant's passing.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## §8 Time Synchronisation
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Operator clocks synchronise per RFC 5905 (NTPv4) against the
+Korea Research Institute of Standards and Science (KRISS)
+stratum-1 service (UTC+9 Korea Standards Time). The DPRK
+adopted Pyongyang Time (UTC+8:30) between 2015 and 2018, then
+re-aligned to UTC+9; correspondence and reunion records
+record the active north-side civil time at the time of the
+event so that historical records remain interpretable.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §9 Privacy
 
-## Annex F — Adoption Roadmap
+Personal identity associated with reunion applicants and
+correspondence signatories is held in the operator's CRM under
+the South Korean Personal Information Protection Act
+(K-PIPA). The DATA-FORMAT layer (PHASE-1) carries only opaque
+tokens; the API rejects PII submissions at the body validation
+gate. Subject-access requests are honoured through the
+operator's K-PIPA-aligned subject-access workflow.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+North-side personal identity is, by virtue of the cross-DMZ
+isolation, recorded only as an opaque match token; the
+operator never holds a north-side data-protection
+authorisation and so cannot honour a north-side subject-
+access request directly.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §10 Political-Suspension Handling
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Inter-Korean relations are subject to political volatility.
+Suspension events (Ministry of Unification suspension orders,
+DPRK-side withdrawal from cooperation agreements,
+international escalation) trigger the operator's suspension
+workflow: in-flight artefacts freeze at their current status,
+new artefact authorisations are not requested, and the
+operator publishes a suspension notification through its
+discovery document so that downstream consumers can pause
+their integrations.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Suspension lift events restart the affected exchange domain
+under fresh Ministry of Unification authorisations; the
+operator records the suspension-and-lift cycle so that
+audit consumers can reconstruct the operating timeline
+across periods of disruption.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §11 Quality Dossier
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+The operator's quality dossier records the Ministry of
+Unification authorisations, the Sphere Standards review
+outcomes, the sanctions-screening counterpart, the inter-
+Korean liaison-channel coordination history, the suspension-
+and-lift events, and the operator's incident history. The
+dossier is reviewed at least annually by the operator's
+quality manager.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §12 Cross-DMZ Data-Protection Asymmetry
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+The DPRK does not host a personal-data-protection regime that
+the south-side operator can rely on. As a consequence, the
+operator's policy is to never carry north-side personal data
+across the DMZ on south-side systems beyond what the matched
+reunion or correspondence record strictly requires; north-side
+identity is recorded only as an opaque match token (PHASE-1
+§3) and the operator's south-side records-management workflow
+never enriches that token with additional north-side personal
+attributes.
 
-## Annex H — Versioning and Deprecation Policy
+Subject-access requests received from north-side individuals
+through international intermediaries are referred to the
+Ministry of Unification's policy guidance for handling; the
+operator does not unilaterally honour the request without
+the Ministry's approval.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §13 Aid-Diversion Risk Management
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Humanitarian-aid programmes operate under the recognised risk
+that aid may be diverted from the intended beneficiaries by
+north-side authorities. Operators record their diversion-risk
+mitigation measures in the quality dossier:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+- per-shipment beneficiary classification with Sphere-aligned
+  vulnerability ranking;
+- per-shipment monitoring-and-evaluation arrangements with the
+  north-side counterpart (where the bilateral arrangement
+  permits monitoring);
+- per-programme diversion-incident response procedures.
 
-## Annex I — Interoperability Profiles
+Confirmed diversion events trigger Ministry of Unification
+notification and may suspend the programme until the operator
+documents corrective measures acceptable to the Ministry.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Cultural-Exchange Provenance Discipline
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Heritage repatriation programmes (PHASE-1 §8 kind
+`heritage-repatriation`) record provenance per artefact: the
+artefact's date and place of original creation (where known),
+the chain of custodianship through the post-1945 division and
+the Korean War, and the south-side custodial history before
+the repatriation. Provenance gaps are flagged in the artefact
+catalogue and may halt repatriation until the south-side
+custodian and the Cultural Heritage Administration agree the
+gap is acceptable.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Joint exhibitions of split-custody artefacts are subject to
+both the south-side custodian's loan-out conditions and the
+north-side custodian's reciprocal commitments; both sets of
+conditions are recorded against the exchange.
+
+## §15 Conformance and Auditing
+
+A programme conformant with WIA-inter-korean-data-exchange
+publishes its Ministry of Unification authorisations, the
+catalogue of exchange domains it supports, the suspension
+status of each domain, and the catalogue of reunion rounds
+and aid shipments it has supported, and answers an annual
+self-assessment that maps each clause of this PHASE to the
+operator's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-inter-korean-data-exchange
+- **Last Updated:** 2026-04-28

@@ -5,237 +5,327 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-iot-m2m (Iot M2m).
+This document defines the HTTPS API contract that an
+IoT-M2M deployment exposes for the records defined in
+PHASE-1. Consumers include application servers,
+provisioning consoles, lifecycle-management services,
+analytics platforms, regulators (where the deployment is
+subject to sector-specific regulation), and the operator's
+own audit and observability platforms.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics)
+- IETF RFC 9111 (HTTP Caching)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 6901 / 6902 (JSON Pointer / Patch)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9421 (HTTP Message Signatures)
+- IETF RFC 7252 (CoAP; for the device-side facade only)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022 (information security management)
+- W3C Trace Context
+- W3C WoT TD 1.1
+- oneM2M TS-0001 / TS-0008 / TS-0009
+- OMA LwM2M v1.2
+- OASIS MQTT v5.0
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-iot-m2m
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by the
+operator. Versioning uses `/v1/` path segments. The OpenAPI
+3.1 document at `/v1/openapi.json` is canonical.
 
-## §2 Manifest
+This API is the operator-facing facade. The device-facing
+facade speaks CoAP (RFC 7252), MQTT (OASIS MQTT v5.0), or
+LwM2M (OMA v1.2) directly to constrained devices and is
+documented by the underlying service-layer specifications;
+this PHASE does not redefine those device-facing protocols
+but does record the bindings (PHASE-1 §4
+`protocolBindings`).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "iot-m2m"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Root Discovery
 
-## §3 Conformance Tiers
+```
+GET /v1/
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```json
+{
+  "standard": "WIA-iot-m2m",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "deployments":          "/v1/deployments",
+    "devices":              "/v1/devices",
+    "thingDescriptions":    "/v1/thing-descriptions",
+    "resourceTreeNodes":    "/v1/resource-tree-nodes",
+    "telemetry":            "/v1/telemetry",
+    "actuations":           "/v1/actuations",
+    "fota":                 "/v1/fota",
+    "evidence":             "/v1/evidence",
+    "openapi":              "/v1/openapi.json"
+  }
+}
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Deployment Lifecycle
 
-## §4 Discovery
+```
+POST   /v1/deployments              — register a deployment
+GET    /v1/deployments/{did}        — retrieve deployment
+PATCH  /v1/deployments/{did}/status — advance status
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/iot-m2m`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Device Lifecycle
 
-## §5 Time and Identity
+```
+POST   /v1/deployments/{did}/devices         — register a
+                                                 device
+PATCH  /v1/devices/{dvid}/status             — advance status
+PATCH  /v1/devices/{dvid}/firmware-pointer   — update firmware
+                                                 reference (used
+                                                 by FOTA after a
+                                                 successful
+                                                 application)
+GET    /v1/devices/{dvid}                    — retrieve device
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Device submissions whose `radioStack` includes a regulated
+band (cellular IoT bands, LoRaWAN ISM bands per region) are
+verified against the operator's per-jurisdiction radio-band
+authorisation; mismatches return `409 Conflict` with type
+`urn:wia:iot-m2m:radio-band-not-authorised`.
 
-## §6 Versioning and Deprecation
+## §5 Thing Description Lifecycle
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+POST   /v1/devices/{dvid}/thing-description  — register or
+                                                 update the
+                                                 device's TD
+GET    /v1/thing-descriptions/{tid}          — retrieve TD
+                                                 metadata
+GET    /v1/thing-descriptions/{tid}/content  — fetch TD
+                                                 JSON-LD body
+```
 
-## §7 Privacy and Security
+TD updates that downgrade an affordance class (a property
+that becomes non-readable, an action that disappears from
+the TD) require operator authorisation and emit a
+notification to consuming applications through the streaming
+subscription.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Resource Tree
 
-## §8 Open Governance
+```
+POST   /v1/deployments/{did}/resource-tree-nodes
+                                              — register a
+                                                 resource-tree
+                                                 node
+GET    /v1/resource-tree-nodes/{nid}          — retrieve node
+GET    /v1/resource-tree-nodes/{nid}/subtree
+                                              — server-rendered
+                                                 subtree
+                                                 traversal
+                                                 (configurable
+                                                 depth limit)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `iot-m2m` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The subtree endpoint honours depth limits to bound response
+size; deep traversals receive a `Link: rel="next"` header for
+pagination.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Telemetry Ingest
 
+```
+POST   /v1/devices/{dvid}/telemetry           — append a
+                                                 telemetry
+                                                 record
+POST   /v1/bulk/telemetry                     — batched ingest
+GET    /v1/telemetry/{tid}                    — retrieve
+                                                 telemetry
+GET    /v1/devices/{dvid}/telemetry?
+       affordance={a}&from={t}&to={t}          — query window
+```
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+High-volume telemetry from gateway aggregation devices
+(thousands of constrained devices behind one gateway) flows
+through `/v1/bulk/telemetry`; ingest backpressure follows
+the operator's per-tenant rate limit.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## §8 Actuation
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+POST   /v1/devices/{dvid}/actuations          — request an
+                                                 actuation
+PATCH  /v1/actuations/{aid}/acknowledged      — record device
+                                                 acknowledgement
+PATCH  /v1/actuations/{aid}/completed         — record completion
+GET    /v1/actuations/{aid}                   — retrieve
+                                                 actuation
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Actuation requests targeted at devices in `suspended` or
+`fault` status return `409 Conflict` with type
+`urn:wia:iot-m2m:device-not-actuatable`. Actuations whose
+inputs do not validate against the device's TD action
+schema return `422` with type
+`urn:wia:iot-m2m:td-schema-violation`.
 
-## Annex F — Adoption Roadmap
+## §9 FOTA Lifecycle
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+POST   /v1/devices/{dvid}/fota                — initiate a
+                                                 FOTA event
+PATCH  /v1/fota/{fid}/state                   — advance FOTA
+                                                 state
+PATCH  /v1/fota/{fid}/rollback                — record rollback
+                                                 evidence
+GET    /v1/fota/{fid}                         — retrieve FOTA
+                                                 record
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+FOTA submissions whose `toFirmwareRef` is not signed under
+the operator's firmware-signing policy return `409` with
+type `urn:wia:iot-m2m:firmware-signature-required`.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Errors
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+All error responses are `application/problem+json` per RFC
+9457. Defined types include those above plus:
 
-## Annex G — Test Vectors and Conformance Evidence
+- `urn:wia:iot-m2m:retention-window-elapsed`
+- `urn:wia:iot-m2m:cohort-too-small`
+- `urn:wia:iot-m2m:evidence-mismatch`
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Authentication
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Mutually-authenticated TLS for application-server consumers,
+provisioning consoles, lifecycle-management services, and
+regulators. Public read-only endpoints (deployment summary,
+non-sensitive telemetry aggregates) are reachable without a
+client certificate.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Device-facing facades use device-class-appropriate
+authentication: DTLS (RFC 9147) for CoAP, OAuth 2.0
+device-flow or pre-provisioned credentials for HTTP, MQTT
+v5.0 enhanced authentication, LwM2M's pre-shared-key /
+public-key bootstrapping. This API records the operator's
+chosen credential framework but does not redefine it.
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Caching, Concurrency, Audit
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Stable resources (frozen device records for decommissioned
+devices, completed FOTA records, signed evidence packages)
+are cacheable with `Cache-Control: max-age=31536000,
+immutable`. Telemetry and actuation records are cacheable
+for 30 seconds. ETags are mandatory on every PATCH endpoint.
+Audit logs carry `deploymentId`, `deviceRef`, `traceId`,
+the issuing client certificate's subject, and the operator's
+clock skew vs the operating jurisdiction's NTP service.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §13 Streaming Subscription
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Consumers subscribe via Server-Sent Events at:
 
-## Annex I — Interoperability Profiles
+- `/v1/deployments/{did}/events` — deployment-wide events
+  (TD updates, FOTA campaigns, device-population health
+  alerts).
+- `/v1/devices/{dvid}/events` — device-scoped events (status
+  transitions, actuation completions, FOTA progress).
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Subscribers reconnect via the `Last-Event-ID` header (W3C
+EventSource semantics).
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §14 Worked Example: Provisioning to Telemetry to Actuation
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+1. The operator provisions a device through the operator's
+   provisioning console: a manufactured device receives its
+   identity, root-key derivation reference, and TD.
+2. The device's status advances to `provisioned` and then
+   to `deployed-active` upon first contact with the service
+   layer.
+3. The device emits telemetry through the device-facing
+   facade; the service layer ingests through `/v1/devices/
+   {dvid}/telemetry` (or via the gateway's bulk endpoint).
+4. An application server emits an actuation through `/v1/
+   devices/{dvid}/actuations`; the device acknowledges and
+   completes; the actuation outcome is recorded.
+5. A scheduled FOTA campaign updates the device firmware;
+   the operator monitors the FOTA roll-out through the
+   streaming subscription.
+
+## §15 Subscription and Audit Endpoints
+
+```
+POST   /v1/deployments/{did}/subscriptions    — register a
+                                                 subscription
+PATCH  /v1/subscriptions/{sid}/renew          — renew expired
+                                                 subscription
+GET    /v1/subscriptions/{sid}                — retrieve
+                                                 subscription
+GET    /v1/deployments/{did}/audit-logs?
+       from={t}&to={t}&actor={a}                — query audit
+                                                 log
+```
+
+Audit-log queries respect the operator's per-actor-class
+authorisation: per-device audit access is restricted to the
+device's owner-organisation and the operator's incident-
+response team.
+
+## §16 Provenance and Aggregation
+
+```
+GET    /v1/provenance/{recordId}    — provenance entry for
+                                       any PHASE-1 record
+GET    /v1/aggregate/device-population-by-status?period=...
+GET    /v1/aggregate/fota-success-rate?period=...
+GET    /v1/aggregate/telemetry-volume-by-vertical?period=...
+```
+
+Aggregate consumers fetch population-level statistics
+without per-device attribution. Out-of-policy queries return
+`403 Forbidden` with type
+`urn:wia:iot-m2m:cohort-too-small`.
+
+## §17 Gateway Aggregation Endpoint
+
+```
+POST   /v1/devices/{gid}/aggregations         — register a
+                                                 gateway-child
+                                                 binding
+PATCH  /v1/aggregations/{aid}/revoke          — revoke a
+                                                 binding
+GET    /v1/aggregations/{aid}                 — retrieve
+                                                 aggregation
+                                                 record
+GET    /v1/devices/{gid}/aggregations         — list children
+                                                 behind a
+                                                 gateway
+```
+
+Aggregation submissions whose gateway and child are not in
+the same deployment return `422` with type
+`urn:wia:iot-m2m:cross-deployment-binding`.
+
+## §18 Conformance
+
+A conformant server passes the test vectors published under
+`tests/phase-vectors/phase-2-api-interface/`, emits an
+OpenAPI 3.1 document, signs evidence packages per RFC 9421,
+and rejects FOTA submissions whose firmware is not signed
+under the operator's policy.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-iot-m2m
+- **Last Updated:** 2026-04-28

@@ -5,237 +5,366 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-interstellar-communication (Interstellar Communication).
+This document defines the canonical data-format layer for
+WIA-interstellar-communication. The standard covers the
+persistent record shapes for radio and optical observation
+campaigns that listen for putative interstellar artificial
+signals, for probe-to-Earth telemetry from precursor
+interstellar probes (Voyager-class spacecraft now in the
+heliosheath and beyond, future small-probe missions), and
+for any deliberate transmissions that the operator's
+governance permits. The format is consumed by radio-astronomy
+observatories conducting SETI-style surveys, by the operators
+of precursor probes, by the IAU-affiliated post-detection
+review committees, and by the regulators that license the
+operator's spectrum and hardware.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 19115-1 (geographic information — metadata; cited as
+  the metadata pattern for sky-pointing observations)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- ITU-R RA.769 (protection criteria for radio astronomy
+  measurements)
+- ITU-R RA.1513 (loss of the data due to interference for
+  radio-astronomical observations)
+- ITU-R RR Article 29 (radio astronomy service)
+- IAU Working Group on Cartographic Coordinates and Rotational
+  Elements report
+- IAU Standards of Fundamental Astronomy (SOFA)
+- IVOA (International Virtual Observatory Alliance) standards
+  — VOTable, ObsCore, ObsTAP, UCD1+ (cited as the canonical
+  metadata vocabulary for observation records)
+- IAU Resolution B1 (XXVII GA, 2009) on radio frequency
+  protection (cited as a reference policy that operators
+  recognise in observation campaigns)
+- CCSDS 301.0-B (Time Code Formats; cited for probe-to-Earth
+  link records)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-interstellar-communication
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts a
+WIA-interstellar-communication operator manages.
+Implementations covered include:
 
-## §2 Manifest
+- Radio-astronomy SETI-style search programmes operating at
+  L-band (1-2 GHz), S-band (2-4 GHz), C-band (4-8 GHz),
+  X-band (8-12 GHz), Ka-band (26-40 GHz), and the broader
+  bands that protective regulations permit.
+- Optical SETI search programmes operating at visible and
+  near-infrared wavelengths.
+- Precursor interstellar probe operators (Voyager 1/2 in
+  the interstellar medium, hypothetical near-future small
+  probes).
+- Post-detection review platforms that adjudicate candidate-
+  signal claims under the IAA SETI Permanent Committee's
+  protocols.
+- Deliberate-transmission governance reviews that adjudicate
+  any operator-proposed active SETI ("METI") transmissions.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "interstellar-communication"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Crewed interstellar travel and faster-than-light speculative
+communications are out of scope; this PHASE addresses the
+records of presently-feasible search and probe-telemetry
+programmes.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId         : string (uuidv7)
+programmeOperator   : string (institutional identifier of the
+                        observatory, university group, or
+                        agency operating the programme)
+programmeRegistered : string (ISO 8601 / RFC 3339)
+programmeKind       : enum ("radio-search-passive" |
+                        "optical-search-passive" |
+                        "precursor-probe-link" |
+                        "deliberate-transmission" |
+                        "candidate-followup")
+spectrumLicensingRef : string (operator's spectrum licence
+                        reference under the operating
+                        jurisdiction's radio regulations)
+postDetectionAffiliationRef : string (operator's affiliation
+                        with the IAA SETI Permanent
+                        Committee post-detection-protocol
+                        community, where the operator
+                        adheres to the protocol)
+programmeStatus     : enum ("design" | "operating" |
+                        "suspended" | "concluded" |
+                        "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Sky Pointing and Target Catalogue Record
 
-## §4 Discovery
+```
+target:
+  targetId            : string (uuidv7)
+  programmeId         : string (uuidv7)
+  designationKind     : enum ("hd-catalog" | "hipparcos" |
+                          "gaia-dr3" | "tic-tess" |
+                          "kic-kepler" | "exoplanet-host" |
+                          "user-defined-pointing")
+  designation         : string (catalogue identifier)
+  rightAscensionDeg   : number (J2000 equatorial right
+                          ascension, decimal degrees)
+  declinationDeg      : number (J2000 declination)
+  distanceParsec      : number (best-known distance, parsecs)
+  spectralType        : string (Morgan-Keenan spectral type
+                          where known)
+  selectionRationale  : string (why the target is on the
+                          list — e.g. "G-type within 100 pc",
+                          "TESS exoplanet host", "anomalous
+                          flux variability")
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/interstellar-communication`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Observation Record
 
-## §5 Time and Identity
+Observation records follow IVOA ObsCore semantics so that
+WIA-native observations interoperate with the broader
+astronomy data ecosystem.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+observation:
+  observationId       : string (uuidv7)
+  programmeId         : string (uuidv7)
+  targetRef           : string (target UUID)
+  startEpoch          : string (ISO 8601 / RFC 3339)
+  endEpoch            : string (ISO 8601)
+  facilityRef         : string (observing facility identifier;
+                          e.g. "GBT", "FAST", "VLA", "ATA",
+                          "MeerKAT", "ALLEN-TELESCOPE-ARRAY",
+                          "JWST" for optical SETI piggyback)
+  instrumentRef       : string (instrument identifier on the
+                          facility)
+  bandKind            : enum ("L-band" | "S-band" | "C-band"
+                          | "X-band" | "Ku-band" | "Ka-band"
+                          | "optical-visible" |
+                          "optical-nir" | "user-defined")
+  centreFrequencyHz   : number (Hz; for radio observations)
+  bandwidthHz         : number (Hz; for radio observations)
+  centreWavelengthNm  : number (nm; for optical observations;
+                          absent for radio)
+  integrationTimeS    : number (seconds)
+  pointingMode        : enum ("on-source-only" |
+                          "on-off-nodding" |
+                          "drift-scan" |
+                          "raster-mosaic" |
+                          "transit-monitoring")
+  observationArtefactRef: string (content-addressed URI of
+                          the observation data archive)
+  observationDigest   : string (SHA-256)
+```
 
-## §6 Versioning and Deprecation
+## §5 Candidate-Signal Record
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+candidate:
+  candidateId         : string (uuidv7)
+  observationId       : string (uuidv7)
+  detectedAt          : string (ISO 8601)
+  pipelineRef         : string (signal-detection pipeline
+                          identifier and version, e.g.
+                          "TURBO_SETI v2.3", "BL-SCRUNCH v1.4")
+  signalKind          : enum ("narrow-band-drift" |
+                          "wide-band-broadband" |
+                          "pulsed-modulation" |
+                          "anomalous-spectral-line" |
+                          "optical-nanosecond-flash" |
+                          "user-defined")
+  centreFrequencyHz   : number
+  driftRateHzPerS     : number (frequency drift, Hz/s; absent
+                          for non-drifting candidates)
+  significance        : number (operator's pipeline-specific
+                          significance metric; the metric
+                          definition is recorded against the
+                          pipeline)
+  reproducibilityState: enum ("unverified" |
+                          "reproduced-on-source" |
+                          "rfi-classified" |
+                          "natural-source-classified" |
+                          "follow-up-pending" |
+                          "post-detection-escalated")
+  postDetectionTokenRef: string (URI of the post-detection
+                          escalation record; absent unless
+                          escalated)
+```
 
-## §7 Privacy and Security
+The reproducibility-state lifecycle is governed by the
+post-detection protocol described in PHASE-3 §5.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Radio-Frequency-Interference (RFI) Catalogue Record
 
-## §8 Open Governance
+Most candidates that survive initial screening turn out to be
+RFI; the RFI catalogue tracks known interference sources so
+that downstream reproducibility checks can rule them out
+quickly.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `interstellar-communication` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+rfiEntry:
+  rfiId               : string (uuidv7)
+  programmeId         : string (uuidv7)
+  catalogedAt         : string (ISO 8601)
+  centreFrequencyHz   : number
+  sourceKind          : enum ("local-microwave" |
+                          "mobile-handset" |
+                          "satellite-downlink" |
+                          "weather-radar" |
+                          "aircraft-transponder" |
+                          "wifi-bluetooth" |
+                          "facility-internal" |
+                          "user-defined")
+  citationRef         : string (URI of the operator's RFI
+                          investigation report)
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Probe-Telemetry Link Record (Precursor Probes)
 
+```
+probeTelemetryLink:
+  linkId              : string (uuidv7)
+  programmeId         : string (uuidv7)
+  probeRef            : string (probe identifier; e.g.
+                          "VOYAGER-1", "VOYAGER-2", "PIONEER-10",
+                          "NEW-HORIZONS-EXTENDED",
+                          "BREAKTHROUGH-STARSHOT-N")
+  trackingFacilityRef : string (deep-space tracking facility
+                          carrying the link)
+  startEpoch          : string (ISO 8601 / CCSDS 301.0-B)
+  endEpoch            : string (ISO 8601)
+  oneWayLightTimeS    : number (light-time at window midpoint,
+                          seconds)
+  bitRateBitsPerS     : number
+  artefactRef         : string (URI of the captured
+                          telemetry archive)
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+## §8 Deliberate-Transmission Record
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+Operators that propose any deliberate transmission ("active
+SETI", "METI", or precursor-probe uplink commands) carry a
+deliberate-transmission record per transmission.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+deliberateTransmission:
+  transmissionId      : string (uuidv7)
+  programmeId         : string (uuidv7)
+  proposedAt          : string (ISO 8601)
+  governanceReviewRef : string (URI of the governance review
+                          that adjudicated the proposal;
+                          PHASE-3 §6)
+  approvalState       : enum ("proposed" |
+                          "under-governance-review" |
+                          "approved" | "rejected" |
+                          "withdrawn" | "transmitted")
+  transmittedAt       : string (ISO 8601; absent until
+                          transmission)
+  payloadRef          : string (URI of the transmission
+                          payload archive)
+  targetRef           : string (target UUID)
+  transmitterRef      : string (transmitter facility
+                          identifier and the operator's
+                          declared EIRP)
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §9 Synthetic-Signal Injection Test Record
 
-## Annex F — Adoption Roadmap
+Pipeline qualification (PHASE-3 §7) requires synthetic-signal
+injection tests so that the pipeline's recovery rate, false-
+positive rate, and per-significance-bin behaviour are
+measured against a known truth set.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+syntheticInjection:
+  injectionId         : string (uuidv7)
+  programmeId         : string (uuidv7)
+  pipelineRef         : string (signal-detection pipeline
+                          identifier and version)
+  injectedAt          : string (ISO 8601)
+  signalKind          : enum (matches §5 signalKind)
+  injectedFrequencyHz : number
+  injectedSignificance: number (the ground-truth significance
+                          per the operator's pipeline metric
+                          definition)
+  recovered           : boolean (true when the pipeline
+                          recovered the injected signal)
+  recoveredCandidateRef : string (URI of the candidate that
+                          the pipeline emitted in response;
+                          absent when not recovered)
+  recoveryDelta       : number (frequency / significance
+                          difference between injected truth
+                          and recovered candidate)
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §10 Observation Campaign Record
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Multi-observation campaigns (decade-scale surveys of a
+nearby-star catalog, multi-band coordinated campaigns)
+carry a campaign record that aggregates the constituent
+observations.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```
+campaign:
+  campaignId          : string (uuidv7)
+  programmeId         : string (uuidv7)
+  campaignName        : string (operator's display name)
+  startedAt           : string (ISO 8601)
+  endedAt             : string (ISO 8601; absent until ended)
+  scientificRationale : string (one-paragraph rationale;
+                          rendered in the public catalogue)
+  observationCount    : integer (number of observations
+                          composing the campaign)
+  candidateCount      : integer (number of candidates
+                          emitted across the campaign)
+  postDetectionEscalationCount : integer (number of
+                          post-detection escalations across
+                          the campaign; typically 0)
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+## §11 Equipment-Calibration Record
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Receiver calibration is the bedrock of candidate
+significance: a poorly-calibrated receiver attributes thermal
+or instrument noise to apparent signal. The calibration
+record documents the receiver chain's measured behaviour at
+the time of each observation campaign.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+```
+calibration:
+  calibrationId       : string (uuidv7)
+  facilityRef         : string (facility identifier)
+  receiverChainRef    : string (operator identifier of the
+                          calibrated receiver chain)
+  capturedAt          : string (ISO 8601)
+  systemTemperatureK  : number (system temperature in kelvin)
+  bandwidthHz         : number (calibrated bandwidth)
+  gainDb              : number (calibrated gain)
+  flatnessHz          : number (passband flatness FWHM)
+  calibrationArtefactRef: string (URI of the calibration
+                          dataset)
+  validUntil          : string (ISO 8601; cadence at which
+                          re-calibration is required)
+```
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+## §12 Conformance
 
-## Annex H — Versioning and Deprecation Policy
+Implementations claiming PHASE-1 conformance emit each of
+the records defined above for every observation, candidate,
+and (where applicable) probe-link or deliberate-transmission,
+and honour the post-detection protocol's reproducibility-
+state semantics in §5.
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+---
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+**Document Information:**
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-interstellar-communication
+- **Last Updated:** 2026-04-28

@@ -5,237 +5,325 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-interoperability-registry (Interoperability Registry).
+This document defines the protocols that govern an
+interoperability-registry operator: naming-authority
+governance, ISO/IEC 11179 registration-status discipline,
+artefact-review workflow, value-set expansion stewardship,
+mapping-set adjudication, cross-registry conflict resolution,
+content-addressing rules, registry federation, recordkeeping,
+and registry wind-down.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO/IEC 11179-1/2/3/4/5/6 (metadata registries)
+- ISO/IEC 19763 (metamodel framework for interoperability)
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27701:2019 (privacy information management)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
+- W3C SKOS (value-set encoding)
+- W3C OWL 2 (ontology fragments)
+- W3C SHACL (constraint shapes)
+- OASIS ebXML Registry Information Model 3.0
 
 ---
 
-## §1 Scope
+## §1 Naming-Authority Governance
 
-This PHASE document is one of four that together define the WIA-interoperability-registry
-standard. It addresses the protocol layer of the standard.
+The registry operates under a single naming authority that
+governs identifier uniqueness within the registry's namespace.
+The naming authority is named in the registry record (PHASE-1
+§2 `namingAuthorityRef`); its policies for slug formation,
+namespace partitioning, and identifier deprecation are
+recorded in the operator's quality dossier.
 
-## §2 Manifest
+Naming-authority changes (operator merger, governance
+restructuring) follow a change-control procedure that
+preserves identifier stability: existing identifiers remain
+addressable under the prior authority through a content-
+addressable redirect, and new identifiers go through the
+successor authority.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "interoperability-registry"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 ISO/IEC 11179 Registration-Status Discipline
 
-## §3 Conformance Tiers
+Artefacts move through the ISO/IEC 11179-6 registration-status
+lifecycle (PHASE-1 §3) under registrar oversight. Each
+transition requires:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- review against the operator's per-class quality bar
+  (definition clarity for data elements, expansion
+  completeness for value sets, conformance vector coverage
+  for message schemas, mapping-set reviewer signoff);
+- approval by a registrar with the per-class authorisation;
+- record of the transition rationale in the artefact's
+  audit log.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Artefacts that fail review are returned to `incomplete` with
+a documented set of corrective actions. Artefacts marked
+`retired` or `withdrawn` remain addressable but emit a
+deprecation notice through the streaming subscription so that
+binding consumers can plan migration.
 
-## §4 Discovery
+## §3 Artefact Review Workflow
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/interoperability-registry`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The review workflow is per-class:
 
-## §5 Time and Identity
+- **Data elements**: ISO/IEC 11179-4 conformance check
+  (definition clarity, distinguishability), value-domain
+  reference resolution, data-type alignment.
+- **Value sets**: SKOS-encoding well-formedness, expansion
+  reproducibility from inclusion rules, code-system
+  authority verification.
+- **Message schemas**: schema validity against the encoding's
+  meta-schema, conformance-vector coverage, binding-data-
+  element resolution.
+- **Mapping sets**: paired-vocabulary versioning, per-rule
+  reviewer rationale, mapping-method coherence (no
+  equivalence claim where rules are mostly broader/narrower).
+- **Ontology fragments**: OWL 2 profile conformance,
+  imports resolution, SHACL shape validity against the
+  fragment's vocabulary.
+- **Adapter manifests**: consumed-artefact resolution,
+  produced-artefact resolution, runtime-binding
+  reproducibility.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Value-Set Expansion Stewardship
 
-## §6 Versioning and Deprecation
+Value sets bind to underlying code systems (SNOMED CT, LOINC,
+RxNorm, ICD-11, ATC, UNECE recommendations, ISO 3166-2, etc.)
+that the registry does not control. Code-system updates
+trigger value-set expansion refreshes per the operator's
+declared cadence (typically aligned with the source code
+system's release schedule).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Expansion-refresh events emit cross-references when refreshed
+expansions materially differ from the prior expansion (added
+or removed concepts, prefLabel changes that affect display).
+Binding consumers receive the cross-references through the
+streaming subscription.
 
-## §7 Privacy and Security
+## §5 Mapping-Set Adjudication
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Mapping sets are inherently subjective; the same source-target
+vocabulary pair can support multiple mapping sets that reflect
+different application contexts. The operator's mapping
+governance records:
 
-## §8 Open Governance
+- the application context the mapping is intended for;
+- the reviewing body that adjudicated the mapping;
+- the per-rule reviewer rationale (PHASE-1 §7 MappingRule
+  comment);
+- the mapping's expected revision cadence.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `interoperability-registry` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Mapping disagreements between application contexts are
+resolved by registering parallel mapping sets, not by
+overwriting the existing mapping; consumers select the
+mapping appropriate to their context.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §6 Cross-Registry Conflict Resolution
 
+Cross-registry harvesting (PHASE-1 §10) occasionally surfaces
+conflicts: an artefact identifier exists locally with a
+different content digest than the harvested artefact. The
+conflict-resolution protocol:
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+- if both artefacts are in `candidate` or `recorded` status,
+  the operator merges the artefacts under the local
+  identifier and records the merge as the resolution;
+- if either artefact is in `qualified` or higher status, the
+  operator escalates to the joint naming-authority committee
+  that the federation has registered for this purpose;
+- if no joint committee exists, the operator records the
+  conflict as `unresolved` and notifies binding consumers
+  through the streaming subscription so that consumers can
+  select a side.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## §7 Content-Addressing Rules
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Artefact bodies are content-addressed by SHA-256 (PHASE-1 §3
+`contentDigest`). The canonical serialisation rules per
+encoding:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+- JSON / JSON Schema: RFC 8785 JSON Canonicalization Scheme
+  (JCS) before digest computation.
+- XML / XML Schema: W3C Canonical XML 1.1 before digest
+  computation.
+- SKOS / OWL / SHACL Turtle: RDF normalisation per RDFC-1.0
+  before digest computation.
+- Avro / Protobuf: schema-canonical-form serialisation
+  before digest.
 
-## Annex F — Adoption Roadmap
+Digest mismatches between submitted body and declared
+`contentDigest` cause the API to reject the submission with
+type `urn:wia:interoperability-registry:content-digest-
+mismatch`.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §8 Registry Federation
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Registries may federate so that a query against one registry
+can resolve artefacts that another registry holds. Federation
+discipline:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+- each member registry retains naming authority over its own
+  namespace; federation does not merge namespaces;
+- federation queries return the source registry's identifier
+  alongside the artefact so that consumers know which
+  registry holds the authoritative version;
+- federation member changes (joins, departures) are recorded
+  as audit events.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §9 Records Retention
 
-## Annex G — Test Vectors and Conformance Evidence
+Registry records — every artefact at every revision, the API
+audit logs, the harvest histories, the conflict-resolution
+records, and the registrar approvals — retain indefinitely.
+Retired and superseded artefacts remain addressable so that
+historical bindings continue to resolve.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §10 Time Synchronisation
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Operator clocks synchronise per RFC 5905 (NTPv4) against a
+national-metrological-laboratory stratum-1 service so that
+artefact-registration timestamps and audit logs are
+consistent across the registrar fleet.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §11 Privacy
 
-## Annex H — Versioning and Deprecation Policy
+Artefact metadata is, by design, public (or operator-internal
+for non-public artefacts). The registry holds no personal
+data; the operator's policy is that data elements that
+describe personal-data fields carry only the field-level
+description, never instance-level personal data.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Quality Dossier
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+The operator's quality dossier records the naming authority,
+the per-class review committees, the reviewer authorisation
+register, the federation memberships, the harvest sources,
+and the operator's incident history.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Registry Freeze and Wind-Down
 
-## Annex I — Interoperability Profiles
+Registries that freeze (no new artefacts accepted, existing
+artefacts continue to resolve) record the freeze rationale
+and the expected wind-down date. Wind-down archives the
+registry to a long-term archive (PHASE-4 §10) and notifies
+binding consumers so that they can redirect bindings to a
+successor registry where one exists.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Identifier-Stability Discipline
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Artefact identifiers (PHASE-1 §3) are stable for the artefact's
+operational lifetime and beyond: identifiers do not move
+between artefacts even after retirement or supersession,
+because downstream systems pin against them in long-lived
+bindings. Operator policy:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- never recycle a retired or superseded identifier under a
+  new artefact;
+- always carry the supersession chain so that consumers
+  resolving the retired identifier discover the successor;
+- treat identifier collisions across federation members
+  through the conflict-resolution protocol of §6 rather than
+  through silent overwrite.
+
+## §15 Reviewer Qualification
+
+Registrars and per-class reviewers carry qualification records
+held in the operator's HR / IDP. Qualification covers:
+
+- ISO/IEC 11179-4 definition-formulation training for
+  data-element reviewers;
+- SKOS / value-set-stewardship training for value-set
+  reviewers;
+- schema-language proficiency (XML Schema, JSON Schema,
+  Avro, Protobuf) for message-schema reviewers;
+- mapping-set adjudication training (W3C SKOS mapping
+  relations, application-context reasoning) for mapping-set
+  reviewers;
+- OWL 2 profile expertise for ontology-fragment reviewers.
+
+Qualifications expire on the operator's review cycle; expired
+qualifications demote the reviewer to read-only access until
+re-qualification.
+
+## §16 Dependency-Graph Discipline
+
+Artefacts depend on other artefacts (a data element binds a
+value set; a message schema binds data elements; an adapter
+manifest consumes message schemas; an ontology fragment
+imports other fragments). The operator maintains a
+dependency-graph view that surfaces:
+
+- transitive dependency chains so that supersession of an
+  upstream artefact propagates to all downstream artefacts;
+- cyclic dependencies that the registrar must resolve before
+  registering the cycle's artefacts at higher status;
+- orphan artefacts that no consumer references.
+
+Transitive supersession events emit per-affected-downstream
+notifications through the streaming subscription so that
+consuming systems can plan migration before the upstream
+retirement is enforced.
+
+## §17 Code-System Licensing Discipline
+
+Source code systems (PHASE-1 §5 `codeSystemRef`) carry
+licences that the consuming registry MUST honour. Licensing
+discipline:
+
+- record per-code-system licence terms in the operator's
+  quality dossier;
+- enforce per-licence access controls at the value-set
+  expansion download endpoint;
+- emit licensing notices on the per-class reader tooling so
+  that downstream binding consumers see the licence terms
+  alongside the artefact body.
+
+Licences that lapse or are amended trigger an integration
+review with the source publisher; affected value-set
+expansions enter `frozen` status until the licence is
+re-established.
+
+## §18 Cross-Class Consistency Discipline
+
+Artefacts that reference each other across classes (a message
+schema binds data elements; an adapter manifest consumes
+mappings, schemas, and value sets) follow consistency rules
+that the registrar enforces during status promotion:
+
+- a message schema cannot reach `qualified` until every
+  bound data element is at `qualified` or higher;
+- an adapter manifest cannot reach `standard` until every
+  consumed artefact (schemas, mappings, value sets) is at
+  `standard` or higher;
+- mapping sets cannot reach `preferred-standard` until both
+  the source and target vocabularies are at `standard` or
+  higher.
+
+Cross-class consistency violations during promotion attempts
+trigger a Problem-Details response and the artefact remains
+at its current status until the upstream artefacts are
+promoted.
+
+## §19 Conformance and Auditing
+
+A registry conformant with WIA-interoperability-registry
+publishes its naming-authority reference, its per-class
+review-committee register, its federation memberships, and
+the catalogue of artefacts at each registration status, and
+answers an annual self-assessment that maps each clause of
+this PHASE to the operator's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-interoperability-registry
+- **Last Updated:** 2026-04-28

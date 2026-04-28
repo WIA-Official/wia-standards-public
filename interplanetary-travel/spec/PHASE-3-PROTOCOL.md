@@ -5,237 +5,305 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-interplanetary-travel (Interplanetary Travel).
+This document defines the protocols that govern an
+interplanetary-travel programme: launch licensing under
+domestic space activities law, COSPAR planetary-protection
+category assignment, deep-space tracking network coordination,
+trajectory design quality assurance, conjunction-mitigation
+discipline, life-support consumable governance, crew radiation
+health management for crewed missions, end-of-mission
+disposal, and inter-agency cooperation.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO 14620-1 (system safety)
+- ISO 24113:2023 (space debris mitigation)
+- ISO 27852 (orbit lifetime estimation)
+- ISO 27001:2022 (information security management)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
+- CCSDS 301.0-B / 503.0-B / 504.0-B / 505.0-B / 508.0-B
+- COSPAR Planetary Protection Policy
+- NASA NPR 8020.12 (Planetary Protection)
+- ICRP Publication 132 (radiological protection from cosmic
+  radiation in aviation, applied as a baseline)
+- ITU-R RR Article 22 (deep-space telecommunications
+  protection)
+- IADC Space Debris Mitigation Guidelines
 
 ---
 
-## §1 Scope
+## §1 Launch Licensing
 
-This PHASE document is one of four that together define the WIA-interplanetary-travel
-standard. It addresses the protocol layer of the standard.
+A mission operator MAY claim conformance to WIA-interplanetary-
+travel only after the operating jurisdiction's space-
+activities authority has issued a launch licence (FAA AST in
+the US, UK Space Agency in the UK, KASA in Korea, JAXA via
+MEXT in Japan, equivalent authorities elsewhere) for the
+specific launch event(s) the mission requires. Licence
+amendments are recorded; revocation freezes the mission at
+its current status pending re-licensing.
 
-## §2 Manifest
+## §2 COSPAR Planetary-Protection Category Assignment
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "interplanetary-travel"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Every mission carries a COSPAR planetary-protection category
+(PHASE-1 §2 `cosparCategory`) per the COSPAR Planetary
+Protection Policy, with the operator's planetary-protection
+officer of record adjudicating the assignment in consultation
+with the operating space agency's PP authority. Category
+assignments follow the COSPAR matrix:
 
-## §3 Conformance Tiers
+- Category I: missions to bodies of no direct interest to
+  understanding chemical evolution or origin of life (Sun,
+  Mercury, undifferentiated metamorphosed asteroids).
+- Category II: missions to bodies where the contamination
+  threat is significant interest but not high enough to
+  require restrictive protocols (Venus, comets, most
+  asteroids, Jupiter, Saturn, Uranus, Neptune).
+- Category III / IVa-c / V: bodies of high interest where
+  restrictive protocols apply (Mars in particular, with
+  IVa-c sub-categories driving cleanroom and bioburden
+  expectations).
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Category changes require COSPAR-aligned re-review (PHASE-2 §3).
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Deep-Space Tracking Network Coordination
 
-## §4 Discovery
+Missions schedule deep-space tracking through one or more
+networks: NASA Deep Space Network (DSN), ESA ESTRACK, JAXA
+Usuda / Uchinoura, China DSN, commercial DSN providers. The
+operator's tracking schedule is recorded against the mission
+and reconciled against each network's allocation calendar.
+Spectrum allocations follow ITU-R RR Article 22 protections
+for deep-space radio.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/interplanetary-travel`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Tracking outages (network-side or spacecraft-side) are
+recorded as audit events; downstream consumers (science teams
+expecting data, partner agencies relying on shared tracking)
+receive notifications through the streaming subscription.
 
-## §5 Time and Identity
+## §4 Trajectory Design Quality Assurance
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Trajectory design follows the operator's QA framework:
 
-## §6 Versioning and Deprecation
+- per-iteration peer review by trajectory designers
+  independent of the iteration's primary author;
+- propagation of orbit-state errors through the operator's
+  Monte-Carlo navigation analysis;
+- alignment with the SPICE toolkit and the IAU body-fixed
+  reference-frame definitions;
+- cross-check against the operating jurisdiction's primary
+  ephemeris (JPL DE441 in the US, INPOP in Europe,
+  equivalent elsewhere).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Per-iteration QA outcomes are recorded against each
+trajectory; iterations that fail QA cannot advance past
+`design` status to `frozen` for operations.
 
-## §7 Privacy and Security
+## §5 Conjunction-Mitigation Discipline
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Conjunctions (PHASE-1 §7) are assessed against the operator's
+chosen Pc model and the operating jurisdiction's conjunction-
+response policy. Manoeuvre decisions follow:
 
-## §8 Open Governance
+- continuous monitoring while Pc remains below the operator's
+  notification threshold;
+- manoeuvre planning when Pc exceeds the notification
+  threshold;
+- manoeuvre execution when Pc exceeds the operator's red
+  threshold and a manoeuvre is feasible within propellant
+  reserves.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `interplanetary-travel` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Decisions to execute, decline, or defer manoeuvres are
+recorded with rationale; downstream consumers (the secondary
+object's operator, the operating jurisdiction's debris
+office) receive notifications through the agreed inter-agency
+channel.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §6 Life-Support Consumable Governance
 
+Crewed missions operate under the operator's life-support
+consumable policy: mission-design margins (typically 25-50%
+above nominal use rates depending on mission phase),
+contingency-event reserves (e.g. SPE storm shelter
+provisioning, emergency Earth-return propulsion), and the
+ECLSS closure-ratio assumptions on which the budget rests.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Consumable depletions that breach the design margin trigger
+the operator's contingency-planning workflow: re-budgeting,
+supply-mission planning where feasible, and crew-health
+review.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## §7 Crew Radiation Health Management
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Crewed missions operate under the operating space agency's
+Radiation Health Office policy. The operator records:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+- per-crew-member ionizing-radiation career limits (subject
+  to the agency's evolving guidance, with ICRP Publication
+  132 used as a baseline reference and the agency's deep-
+  space-specific adaptations applied);
+- per-mission cumulative-dose limits;
+- the per-vehicle SPE storm-shelter design;
+- the per-EVA radiation-monitoring procedure.
 
-## Annex F — Adoption Roadmap
+Radiation Ledger updates that approach a per-mission or
+career limit trigger flight-surgeon review and may require
+EVA postponement, transit-vehicle shelter occupancy, or
+mission re-planning.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §8 End-of-Mission Disposal
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+End-of-mission disposal follows ISO 24113:2023 and IADC
+guidelines:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+- bodies in COSPAR Category III/IV that the spacecraft has
+  not been protected to land on require disposal trajectories
+  that avoid impact within the COSPAR-defined exclusion
+  window (typically 50 years for Mars);
+- Earth-return vehicles for Category V-restricted missions
+  follow the COSPAR-aligned containment protocol upon return;
+- spacecraft remaining in heliocentric orbit follow the
+  operating jurisdiction's debris-mitigation rules.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Disposal decisions are recorded against the mission and
+referenced in the end-of-mission report.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §9 Inter-Agency Cooperation
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Multi-agency missions operate under the agencies' bilateral
+or multilateral cooperation agreements (NASA-ESA, NASA-JAXA,
+NASA-CNES, ESA-Roscosmos, etc.). The cooperation agreement
+governs:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- per-agency deliverables and ownership;
+- per-instrument data-rights and embargo periods;
+- per-component planetary-protection responsibility;
+- the joint mission-operations protocol.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §10 Records Retention
 
-## Annex H — Versioning and Deprecation Policy
+Mission records — every record defined in PHASE-1, the API
+audit logs, the regulator submissions, the COSPAR PP
+documentation, the inter-agency cooperation artefacts —
+retain indefinitely. Crew radiation-health records retain in
+the agency's medical archives per the agency's medical-
+records policy, typically for the crew member's lifetime
+plus a documented post-decease period.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 Time Synchronisation
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Operator clocks synchronise per RFC 5905 (NTPv4) against the
+operating jurisdiction's primary time reference. Mission
+elapsed time, spacecraft event time, and ground time are
+encoded per CCSDS 301.0-B; reconciliation between spacecraft
+clock and ground clock is recorded continuously through the
+deep-space tracking link.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §12 Quality Dossier
 
-## Annex I — Interoperability Profiles
+The operator's quality dossier records the launch licences,
+the COSPAR PP officer of record, the deep-space tracking
+network bookings, the trajectory-design QA outcomes, the
+conjunction history, the life-support governance reviews,
+the radiation-health policy version, and the operator's
+incident history. The dossier is reviewed at least annually
+by the operator's chief safety officer.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §13 Communications-Schedule Discipline
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Communications schedules (PHASE-1 §9) are subject to the
+operator's tracking-pass-priority hierarchy: anomaly
+recovery and time-critical events take precedence over
+nominal science downlink, which takes precedence over
+opportunistic engineering passes. Conflicts between the
+operator's requested cadence and a tracking network's
+allocation are resolved through the network's published
+priority procedure, with the operator's allocation request
+documented at each step.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Missed station-side passes (network outage, weather hold,
+tracker re-prioritisation) and missed spacecraft-side passes
+(spacecraft-side anomaly, attitude excursion) are recorded
+against the schedule with rationale.
+
+## §14 Arrival Operations
+
+Arrival operations (PHASE-1 §10) follow the operator's
+arrival-rehearsal procedure: per-event end-to-end rehearsal
+in a high-fidelity simulator, per-anomaly contingency-
+playbook activation drill, and the per-event final-go review
+at L-7 days, L-1 day, and the immediate go/no-go window.
+Rehearsal outcomes are recorded against the arrival.
+
+For EDL events, the operator records the predicted entry
+state, the predicted descent profile, the predicted touchdown
+target, and the post-event reconstructed state from observed
+telemetry. Arrival outcomes drive the operator's downstream
+operations posture: nominal arrivals advance to commissioning;
+off-nominal arrivals enter recovery; loss events enter the
+anomaly-investigation board described in §15.
+
+## §15 Cross-Mission Resource Sharing
+
+Interplanetary missions occasionally share resources with
+contemporaneous missions: relay communications through
+mission-A's orbiter for mission-B's surface asset (Mars
+relay between MRO/MAVEN/TGO and surface rovers/landers is
+a recurring example), shared instrument calibration with a
+co-located science target, joint observation campaigns
+during planetary opposition windows. Resource-sharing
+arrangements are recorded in the mission's quality dossier
+and referenced from each beneficiary mission's records so
+that downstream consumers can resolve the shared-resource
+provenance.
+
+## §16 Public Engagement and Naming Conventions
+
+Public engagement (mission name, instrument names, target
+names) follows the IAU's naming conventions for
+interplanetary objects (asteroids, comets, planetary
+features) and the operator's internal naming-convention
+policy for spacecraft and instruments. Public engagement
+artefacts (press releases, mission-imagery captions, public
+educational content) cite the IAU-confirmed names where
+applicable.
+
+## §17 Anomaly Investigation Discipline
+
+Anomaly records (PHASE-1 §11) follow a structured workflow:
+detection, triage by the operator's mission-anomaly-response
+team, root-cause investigation by the responsible engineering
+team, corrective-action planning, implementation, and
+closure verification. Anomaly records reference the mission
+artefact (trajectory iteration, consumable budget, ledger,
+arrival event) at which the anomaly was observed so that
+historical investigators can resolve the operating context.
+
+Critical and loss-class anomalies follow the agency-level
+anomaly-investigation board procedure (PHASE-4 §21);
+findings flow back into the mission's audit chain and into
+adjacent missions through the operator's lessons-learned
+catalogue.
+
+## §18 Conformance and Auditing
+
+A mission conformant with WIA-interplanetary-travel publishes
+its launch licence references, its COSPAR PP category, its
+trajectory-design QA outcomes, the conjunction catalogue, and
+the post-end-of-mission disposition record, and answers an
+annual self-assessment that maps each clause of this PHASE
+to the mission's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-interplanetary-travel
+- **Last Updated:** 2026-04-28

@@ -5,237 +5,325 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-inventory-management (Inventory Management).
+This document defines the HTTPS API contract that an
+inventory-management programme exposes for the records
+defined in PHASE-1. Consumers include WMS / ERP integrations,
+3PL provider gateways, trading-partner EDI bridges, demand-
+planning dashboards, and the operator's own analytics and
+audit platforms.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics)
+- IETF RFC 9111 (HTTP Caching)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 6901 / 6902 (JSON Pointer / Patch)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9421 (HTTP Message Signatures)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022 (information security management)
+- W3C Trace Context
+- GS1 EPCIS 2.0 / CBV 2.0
+- GS1 General Specifications
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-inventory-management
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by the
+operator. Versioning uses `/v1/` path segments. The OpenAPI
+3.1 document at `/v1/openapi.json` is canonical.
 
-## §2 Manifest
+The API supports both bidirectional partner integrations
+(trading-partner inbound ASN consumption, outbound ASN
+emission) and read-only consumer integrations (analytics
+dashboards, executive reports).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "inventory-management"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Root Discovery
 
-## §3 Conformance Tiers
+```
+GET /v1/
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```json
+{
+  "standard": "WIA-inventory-management",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":         "/v1/programmes",
+    "items":              "/v1/items",
+    "locations":          "/v1/locations",
+    "stockBalances":      "/v1/stock-balances",
+    "lots":               "/v1/lots",
+    "serials":            "/v1/serials",
+    "movementEvents":     "/v1/movement-events",
+    "receiving":          "/v1/receiving",
+    "shipping":           "/v1/shipping",
+    "inventoryCounts":    "/v1/inventory-counts",
+    "evidence":           "/v1/evidence",
+    "openapi":            "/v1/openapi.json"
+  }
+}
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Item Master and Location
 
-## §4 Discovery
+```
+POST   /v1/programmes/{pid}/items         — register an item
+GET    /v1/items/{iid}                    — retrieve item
+PATCH  /v1/items/{iid}/status             — advance status
+POST   /v1/programmes/{pid}/locations     — register a
+                                              location
+GET    /v1/locations/{lid}                — retrieve location
+PATCH  /v1/locations/{lid}/capacity       — update capacity
+                                              profile
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/inventory-management`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Item submissions whose `itemControl=controlled-substance`
+must reference a regulator-issued controlled-substance
+licence; submissions without the reference return `409`
+with type
+`urn:wia:inventory-management:controlled-substance-licence-required`.
 
-## §5 Time and Identity
+## §4 Stock Balances
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST   /v1/items/{iid}/stock-balances     — record a balance
+                                              snapshot
+GET    /v1/stock-balances/{bid}           — retrieve balance
+GET    /v1/items/{iid}/stock-balances?
+       location={lid}&from={t}&to={t}      — query window
+```
 
-## §6 Versioning and Deprecation
+Stock balances for lot-controlled items that omit the
+`lotRef` and `expirationDate` return `422` with type
+`urn:wia:inventory-management:lot-fields-required`.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Lot and Serial Lifecycle
 
-## §7 Privacy and Security
+```
+POST   /v1/items/{iid}/lots               — register a lot
+PATCH  /v1/lots/{lid}/qa-release          — attach QA release
+                                              certificate
+POST   /v1/items/{iid}/serials            — register a serial
+PATCH  /v1/serials/{sid}/warranty         — update warranty
+                                              window
+GET    /v1/lots/{lid}                     — retrieve lot
+GET    /v1/serials/{sid}                  — retrieve serial
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Regulated-product items (pharmaceutical, medical-device,
+food, cosmetic) require an attached QA release before stock
+balances under the lot can transition to disposition
+`available_for_sale`.
 
-## §8 Open Governance
+## §6 Movement Events (EPCIS 2.0)
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `inventory-management` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST   /v1/programmes/{pid}/movement-events
+                                          — register an EPCIS
+                                              event
+POST   /v1/bulk/movement-events           — batched event
+                                              ingest
+GET    /v1/movement-events/{eid}          — retrieve event
+GET    /v1/programmes/{pid}/movement-events?
+       bizStep={s}&disposition={d}&from={t}&to={t}
+                                          — query events
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Movement-event submissions that violate the EPCIS 2.0
+schema or use a CBV 2.0 vocabulary term not in the published
+profile return `422` with type
+`urn:wia:inventory-management:epcis-violation` and the
+operator's reconciliation workflow runs against the source
+system.
 
+## §7 Receiving and Shipping
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST   /v1/programmes/{pid}/receiving     — register a
+                                              receiving record
+PATCH  /v1/receiving/{rid}/discrepancy    — append a
+                                              discrepancy
+PATCH  /v1/receiving/{rid}/putaway-completed
+                                          — close receiving
+POST   /v1/programmes/{pid}/shipping      — register a
+                                              shipping record
+PATCH  /v1/shipping/{sid}/proof-of-delivery
+                                          — attach POD
+                                              reference
+GET    /v1/receiving/{rid}                — retrieve receiving
+GET    /v1/shipping/{sid}                 — retrieve shipping
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+Receiving discrepancies above the operator's threshold
+trigger an automatic supplier-side notification through the
+trading-partner integration described in PHASE-4 §5.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Cycle-Count and Physical-Inventory
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+POST   /v1/programmes/{pid}/inventory-counts
+                                          — register a count
+PATCH  /v1/inventory-counts/{cid}/results — append count
+                                              results
+PATCH  /v1/inventory-counts/{cid}/approve — approve variance
+                                              posting
+GET    /v1/inventory-counts/{cid}         — retrieve count
+```
 
-## Annex F — Adoption Roadmap
+Variance posting requires an approval reference for any
+adjustment beyond the operator's variance-tolerance
+threshold; submissions without approval return `409` with
+type
+`urn:wia:inventory-management:variance-approval-required`.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Errors
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+All error responses are `application/problem+json` per RFC
+9457. Defined types include those above plus:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+- `urn:wia:inventory-management:expired-lot-shipment-blocked`
+- `urn:wia:inventory-management:cold-chain-excursion`
+- `urn:wia:inventory-management:hazmat-segregation-violation`
+- `urn:wia:inventory-management:evidence-mismatch`
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Authentication
 
-## Annex G — Test Vectors and Conformance Evidence
+Mutually-authenticated TLS for trading-partner, 3PL provider,
+and regulator consumers. Internal operator-to-operator
+endpoints (analytics dashboards, internal QA tools)
+authenticate through the operator's IDP.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Caching, Concurrency, Audit
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Stable resources (closed receiving / shipping records,
+approved inventory counts, signed evidence packages) are
+cacheable with `Cache-Control: max-age=31536000, immutable`.
+Stock balance and movement event mutable resources are
+cacheable for 30 seconds — short to support near-real-time
+allocate-to-promise workflows. ETags are mandatory on every
+PATCH endpoint. Audit logs carry `programmeId`, `traceId`,
+the issuing client certificate's subject, and the operator's
+clock skew vs the operating jurisdiction's NTP service.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §12 Streaming Subscription
 
-## Annex H — Versioning and Deprecation Policy
+Consumers subscribe via Server-Sent Events at:
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+- `/v1/programmes/{pid}/events` — programme-wide events
+  (cold-chain excursion alerts, hazmat segregation
+  violations, controlled-substance discrepancy escalations).
+- `/v1/items/{iid}/events` — item-scoped events (stock-out
+  warnings, low-stock alerts, expiration-approaching
+  notifications).
+- `/v1/receiving/{rid}/events` — receiving-scoped events
+  (discrepancy notifications, put-away completion).
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Subscribers reconnect via the `Last-Event-ID` header.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Worked Example: Receipt to Sale
 
-## Annex I — Interoperability Profiles
+1. The supplier transmits an ASN; the operator registers a
+   receiving record referencing the ASN.
+2. The dock receives the trailer, scans SSCCs, and emits
+   `ObjectEvent`s with `bizStep=receiving`,
+   `disposition=in_progress`.
+3. The WMS plans put-away; movement events emit
+   `bizStep=arriving` and `bizStep=storing` against active
+   pick-face locations.
+4. Stock balances refresh against the new on-hand at the
+   pick-face locations.
+5. An outbound order picks against the pick-face locations,
+   emitting `ObjectEvent`s with `bizStep=picking` and a
+   shipping record on completion.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Bulk and Pagination
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+POST   /v1/bulk/items                    — batched item master
+                                            sync from ERP
+POST   /v1/bulk/movement-events          — batched event ingest
+POST   /v1/bulk/stock-balances           — batched balance
+                                            snapshot
+GET    /v1/bulk/{operationId}            — operation status
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Cursor-based pagination uses the `cursor` query parameter and
+`Link` headers (RFC 8288). Bulk operations honour the per-
+ingest backpressure protocol so that a high-volume EPCIS
+event stream from a busy distribution centre does not exceed
+the operator's per-tenant rate limit.
+
+## §15 Available-to-Promise Endpoint
+
+```
+GET    /v1/items/{iid}/atp?location={lid}&horizon={d}
+                                          — server-computed
+                                            available-to-
+                                            promise quantity
+                                            for the requested
+                                            horizon, accounting
+                                            for inbound,
+                                            allocated, and
+                                            committed
+                                            inventory
+```
+
+ATP responses are cacheable for 30 seconds; storefront
+integrations honour the cache TTL so that shopper-facing
+availability does not lag the actual stock state by more
+than the cache window.
+
+## §16 Provenance and Aggregate Endpoints
+
+```
+GET    /v1/provenance/{recordId}    — provenance entry for
+                                       any PHASE-1 record
+GET    /v1/aggregate/inventory-turns?period=...
+GET    /v1/aggregate/cycle-count-variance?period=...
+GET    /v1/aggregate/cold-chain-excursion-count?period=...
+```
+
+## §17 Recall Endpoints
+
+```
+POST   /v1/programmes/{pid}/recalls       — initiate a recall
+                                            event
+PATCH  /v1/recalls/{rid}/status           — advance recall
+                                            status
+PATCH  /v1/recalls/{rid}/affected-stock   — append affected
+                                            stock identifiers
+GET    /v1/recalls/{rid}/trace            — server-rendered
+                                            trace graph from
+                                            affected lots /
+                                            serials to
+                                            current locations
+                                            and customer-side
+                                            destinations
+GET    /v1/recalls/{rid}                  — retrieve recall
+```
+
+Recall trace queries respect the operator's per-customer
+data-protection policy; per-end-customer detail is returned
+only to authorised regulator and operator-internal
+consumers.
+
+## §18 Conformance
+
+A conformant server passes the test vectors published under
+`tests/phase-vectors/phase-2-api-interface/`, emits an OpenAPI
+3.1 document, signs evidence packages per RFC 9421, and
+rejects EPCIS 2.0 submissions that violate the schema.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-inventory-management
+- **Last Updated:** 2026-04-28

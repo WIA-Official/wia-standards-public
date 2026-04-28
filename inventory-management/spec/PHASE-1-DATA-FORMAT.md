@@ -5,237 +5,358 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-inventory-management (Inventory Management).
+This document defines the canonical data-format layer for
+WIA-inventory-management. The standard covers persistent
+record shapes for inventory operations across multi-site
+warehouse, retail, and manufacturing environments: item
+master records, lot and serial controlled inventory,
+location-controlled stock balances, receiving and put-away,
+order picking and shipping, cycle-count and physical-
+inventory reconciliations, and the lifecycle of returned
+goods. The format is consumed by Warehouse Management
+Systems (WMS), Enterprise Resource Planning (ERP) modules,
+Transportation Management Systems (TMS), 3PL provider
+integrations, and the EDI / API channels through which
+trading partners exchange inventory state.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO 4217 (currency codes)
+- ISO 3166-1 / 3166-2 (country and subdivision codes)
+- ISO/IEC 11578 (UUID)
+- ISO 6346 (intermodal container coding)
+- ISO 28219 (item identification — specifications for
+  identification using bar code symbols)
+- ISO/IEC 15962 (RFID for item management — data protocol —
+  data encoding rules and logical memory functions)
+- ISO/IEC 19987 (EPCglobal Electronic Product Code
+  Information Services — EPCIS)
+- ISO/IEC 19988 (EPCglobal Core Business Vocabulary — CBV)
+- ISO/IEC 27001:2022 (information security management)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- GS1 General Specifications (cited normatively for AI
+  application identifiers and the SSCC / GTIN / GLN /
+  GRAI / GIAI identifier families)
+- GS1 EPCIS 2.0 / CBV 2.0 (canonical event vocabulary for
+  inventory events)
+- GS1 Digital Link 1.4 (URI representation of GS1 keys)
+- UN/CEFACT recommendation 20 (codes for units of measure
+  used in international trade)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-inventory-management
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent record shapes for the artefacts
+an inventory-management programme manages. Implementations
+covered include:
 
-## §2 Manifest
+- WMS deployments at distribution centres, retail back-of-
+  store stockrooms, and manufacturing materials departments.
+- ERP inventory-module integrations (Oracle, SAP, Microsoft
+  Dynamics, Infor, NetSuite, Odoo, custom).
+- 3PL provider gateways for inbound, outbound, and
+  cross-dock operations.
+- Trading-partner EDI and API channels for advance shipment
+  notifications, purchase-order acknowledgements, and
+  inventory-available-to-promise feeds.
+- Cycle-count and physical-inventory governance platforms.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "inventory-management"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Demand-forecasting, replenishment-planning, and pricing-
+optimisation systems are out of scope; this PHASE addresses
+the records of inventory state and movement, not the upstream
+demand engines.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+programmeOperator    : string (institutional identifier of
+                         the operator)
+programmeRegistered  : string (ISO 8601 / RFC 3339)
+operatingSites       : array of string (per-site GS1 GLN
+                         identifiers; the operator's facilities
+                         and 3PL nodes that participate in
+                         the programme's inventory)
+inventoryClasses     : array of enum ("retail-finished-goods" |
+                         "wholesale-distribution" |
+                         "manufacturing-raw-materials" |
+                         "manufacturing-work-in-progress" |
+                         "manufacturing-finished-goods" |
+                         "spare-parts" |
+                         "consumables-mro" |
+                         "controlled-substances" |
+                         "perishable-cold-chain" |
+                         "hazardous-materials")
+programmeStatus      : enum ("draft" | "operating" |
+                         "frozen" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Item Master Record
 
-## §4 Discovery
+```
+itemMaster:
+  itemId             : string (uuidv7)
+  programmeId        : string (uuidv7)
+  primaryGtin        : string (GS1 GTIN-14, mandatory for
+                         retail and wholesale items)
+  alternateIdentifiers : array of object (per-identifier
+                         scheme and value; e.g. operator-
+                         internal SKU, manufacturer part
+                         number, supplier item number,
+                         UNSPSC classification code)
+  description        : string (UTF-8; localised descriptions
+                         held in the localisation registry)
+  unitOfMeasure      : string (UN/CEFACT recommendation 20
+                         common code; e.g. "EA" each, "KGM"
+                         kilogram, "MTR" metre, "L" litre)
+  packagingHierarchy : object (each / inner / case / pallet
+                         conversion factors and per-level
+                         GS1 identifiers — GTIN at each level
+                         where applicable)
+  itemControl        : enum ("none" | "lot-controlled" |
+                         "serial-controlled" |
+                         "lot-and-serial-controlled" |
+                         "expiration-controlled" |
+                         "controlled-substance")
+  hazardClassification : enum ("non-hazardous" |
+                         "un-class-1-explosive" |
+                         "un-class-2-gas" |
+                         "un-class-3-flammable-liquid" |
+                         "un-class-4-flammable-solid" |
+                         "un-class-5-oxidizer" |
+                         "un-class-6-toxic-infectious" |
+                         "un-class-7-radioactive" |
+                         "un-class-8-corrosive" |
+                         "un-class-9-misc")
+  coldChainProfile   : enum ("ambient" | "chilled-2-8c" |
+                         "frozen-minus-18c" |
+                         "ultra-cold-minus-70c" |
+                         "user-defined")
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/inventory-management`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Location Record
 
-## §5 Time and Identity
+```
+location:
+  locationId         : string (uuidv7)
+  siteRef            : string (GS1 GLN; per §2)
+  locationKind       : enum ("receiving-dock" |
+                         "putaway-staging" |
+                         "active-pick-face" |
+                         "reserve-pallet-rack" |
+                         "case-flow" |
+                         "very-narrow-aisle" |
+                         "bulk-floor" |
+                         "cold-room" |
+                         "freezer" |
+                         "controlled-substance-cage" |
+                         "haz-mat-room" |
+                         "shipping-staging" |
+                         "yard-trailer-spot" |
+                         "user-defined")
+  locationCode       : string (operator's bin / slot
+                         identifier; e.g. "A-12-03-B")
+  capacityProfile    : object (volume / weight / SKU-mix
+                         constraints that the WMS honours
+                         during put-away assignment)
+  controlledClassification : enum (matches itemControl;
+                         locations that hold controlled-
+                         substance items carry the matching
+                         classification so that put-away and
+                         picking workflows respect the
+                         classification)
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 Stock Balance Record
 
-## §6 Versioning and Deprecation
+The stock balance is the on-hand-at-location quantity for an
+item, optionally further qualified by lot and serial.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+stockBalance:
+  balanceId          : string (uuidv7)
+  itemRef            : string (item UUID)
+  locationRef        : string (location UUID)
+  capturedAt         : string (ISO 8601 / RFC 3339)
+  onHandQuantity     : number (in itemMaster's
+                         unitOfMeasure)
+  allocatedQuantity  : number (allocated to in-flight orders)
+  inboundQuantity    : number (expected from in-transit
+                         receipts)
+  lotRef             : string (lot UUID; absent for non-lot-
+                         controlled items)
+  serialRefs         : array of string (serial UUIDs; absent
+                         for non-serial-controlled items)
+  expirationDate     : string (ISO 8601 date; required for
+                         expiration-controlled and lot-
+                         controlled items)
+```
 
-## §7 Privacy and Security
+## §6 Lot and Serial Records
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+lot:
+  lotId              : string (uuidv7)
+  itemRef            : string (item UUID)
+  lotCode            : string (manufacturer or supplier lot
+                         number; e.g. "L240312-A1")
+  manufacturedAt     : string (ISO 8601 date)
+  expirationDate     : string (ISO 8601 date; required for
+                         expiration-controlled items)
+  manufacturerRef    : string (GS1 GLN of the manufacturer)
+  countryOfOrigin    : string (ISO 3166-1 alpha-2)
+  qaReleaseRef       : string (URI of the lot's QA release
+                         certificate; required for regulated
+                         products)
 
-## §8 Open Governance
+serial:
+  serialId           : string (uuidv7)
+  itemRef            : string (item UUID)
+  lotRef             : string (lot UUID; required when item
+                         is lot-and-serial-controlled)
+  serialNumber       : string (manufacturer or operator-
+                         assigned serial number)
+  warrantyStartAt    : string (ISO 8601 date)
+  warrantyEndAt      : string (ISO 8601 date)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `inventory-management` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §7 Inventory Movement Event
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Movement events follow GS1 EPCIS 2.0 ObjectEvent / AggregationEvent
+/ TransactionEvent / TransformationEvent semantics so that
+WIA-native events interoperate with the broader supply-chain
+ecosystem.
 
+```
+movementEvent:
+  eventId            : string (uuidv7)
+  programmeId        : string (uuidv7)
+  eventTime          : string (ISO 8601 / RFC 3339)
+  recordTime         : string (ISO 8601 / RFC 3339)
+  epcisEventKind     : enum ("ObjectEvent" |
+                         "AggregationEvent" |
+                         "TransactionEvent" |
+                         "TransformationEvent" |
+                         "AssociationEvent")
+  bizStep            : string (CBV 2.0 vocabulary; e.g.
+                         "receiving", "shipping", "picking",
+                         "packing", "stocking", "void_shipping")
+  disposition        : string (CBV 2.0 vocabulary; e.g.
+                         "in_progress", "in_transit",
+                         "available_for_sale",
+                         "non_sellable_other",
+                         "destroyed")
+  readPointRef       : string (GS1 GLN of the read point —
+                         dock door, pick face, packing station)
+  bizLocationRef     : string (GS1 GLN of the business location)
+  itemEpcs           : array of string (GS1 EPC URI per
+                         affected item; e.g. SGTIN, SSCC,
+                         GIAI)
+  parentEpc          : string (parent EPC for aggregation
+                         events; e.g. SSCC for case-on-
+                         pallet)
+  bizTransactionRefs : array of object (purchase-order, ASN,
+                         despatch-advice, return-merchandise-
+                         authorisation references)
+  sourceDestination  : array of object (source / destination
+                         party identifiers per CBV 2.0)
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+## §8 Receiving and Shipping Record
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```
+receiving:
+  receivingId        : string (uuidv7)
+  asnRef             : string (advance shipment notification
+                         reference)
+  carrierRef         : string (carrier identifier)
+  trailerSealNumber  : string
+  receivedAt         : string (ISO 8601)
+  putawayCompletedAt : string (ISO 8601; absent until put-
+                         away done)
+  discrepancyRecords : array of object (per-line under-,
+                         over-, or damaged-shipment
+                         discrepancies)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+shipping:
+  shippingId         : string (uuidv7)
+  orderRef           : string (operator's outbound-order
+                         reference)
+  carrierRef         : string
+  trackingNumber     : string
+  shippedAt          : string (ISO 8601)
+  packagedSscc       : array of string (GS1 SSCC for each
+                         shipped pallet or case)
+  proofOfDeliveryRef : string (URI of the proof-of-delivery
+                         artefact; absent until delivered)
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §9 Cycle-Count and Physical-Inventory Record
 
-## Annex F — Adoption Roadmap
+```
+inventoryCount:
+  countId            : string (uuidv7)
+  programmeId        : string (uuidv7)
+  countKind          : enum ("cycle-count-abc" |
+                         "cycle-count-random" |
+                         "spot-count-discrepancy-investigation"
+                         | "wall-to-wall-physical")
+  countedAt          : string (ISO 8601)
+  counterRef         : string (opaque associate token; clinical
+                         identity in operator HR)
+  scopedLocationRefs : array of string (location UUIDs counted)
+  countResults       : array of object (per-item per-location
+                         counted quantity vs system quantity
+                         and computed variance)
+  approvalRef        : string (URI of the count adjustment
+                         approval record; required to post
+                         variance adjustments)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §10 Recall Record
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+recall:
+  recallId           : string (uuidv7)
+  programmeId        : string (uuidv7)
+  initiatedAt        : string (ISO 8601)
+  recallKind         : enum ("manufacturer-initiated" |
+                         "regulator-mandated" |
+                         "operator-initiated-quality-hold")
+  recallClassification : enum ("class-i-imminent-health-risk" |
+                         "class-ii-potential-health-risk" |
+                         "class-iii-non-health-related")
+  affectedLots       : array of string (lot UUIDs)
+  affectedSerials    : array of string (serial UUIDs;
+                         optional — recalls are typically
+                         lot-level, serial-level recalls
+                         exist for high-value or
+                         individually-traceable items)
+  rootCauseRef       : string (URI of the root-cause
+                         narrative)
+  customerCommunicationRef : string (URI of the customer
+                         communication template)
+  regulatorNotificationRef : string (URI of the regulator
+                         notification artefact)
+  closedAt           : string (ISO 8601; absent until closed)
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §11 Conformance
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Implementations claiming PHASE-1 conformance emit each of the
+records defined above for every operating site and honour the
+GS1 EPCIS 2.0 / CBV 2.0 vocabulary in §7.
 
-## Annex G — Test Vectors and Conformance Evidence
+---
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+**Document Information:**
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-inventory-management
+- **Last Updated:** 2026-04-28
