@@ -758,18 +758,25 @@ Synthetic genomes blur the line between engineering and biology, transforming ou
 
 ## Further Reading
 
-**Key Papers:**
-- 선행 연구. "Creation of a bacterial cell controlled by a chemically synthesized genome." Science, 329(5987), 52-56.
-- 선행 연구. "Design and synthesis of a minimal bacterial genome." Science, 351(6280), aad6253.
-- 선행 연구. "Design of a synthetic yeast genome." Science, 355(6329), 1040-1044.
+**Standards and Guidance Documents:**
+- ISO/IEC 11179 — Information technology — Metadata registries (used for biological-data interoperability).
+- ISO 16578:2013 — Molecular biomarker analysis — General definitions and requirements for microarray detection of specific nucleic acid sequences.
+- ISO 20387:2018 — Biotechnology — Biobanking — General requirements for biobanking.
+- ISO/TR 22758:2020 — Biotechnology — Biobanking — Implementation guide for ISO 20387.
+- WHO Laboratory Biosafety Manual, 4th edition (2020).
+- OECD Best Practice Guidelines for Biological Resource Centres.
+- US NIH Guidelines for Research Involving Recombinant or Synthetic Nucleic Acid Molecules.
+- WHO Guidance Framework for Testing Genetically Modified Mosquitoes (relevant to gene-drive containment).
 
-**Reviews:**
-- 선행 연구. "Synthetic genomics: charting a course." Annual Review of Biochemistry, 91.
-- 선행 연구. "Total synthesis of Escherichia coli with a recoded genome." Nature, 569(7757), 514-518.
+**Public Data Archives:**
+- NCBI GenBank — https://www.ncbi.nlm.nih.gov/genbank
+- EMBL-EBI European Nucleotide Archive (ENA) — https://www.ebi.ac.uk/ena
+- DDBJ DNA Data Bank of Japan — https://www.ddbj.nig.ac.jp
+- iGEM Registry of Standard Biological Parts — https://parts.igem.org
 
-**Ethical Discussions:**
-- 선행 연구. "Synthetic genomics: options for governance." Biosecurity and Bioterrorism, 5(4).
-- Presidential Commission for the Study of Bioethical Issues (2010). "New Directions: The Ethics of Synthetic Biology and Emerging Technologies."
+**Generalized Field Background:**
+- The synthesis of complete bacterial genomes (Mycoplasma mycoides JCVI-syn1.0 in 2010, the minimal-genome JCVI-syn3.0 in 2016), the international Sc2.0 consortium for the synthetic *Saccharomyces cerevisiae* genome, and the recoded *Escherichia coli* genome project are documented in the open peer-reviewed literature accessible through the archives listed above.
+- Ethics, governance, and biosafety frameworks for synthetic genomics are addressed in publicly available reports such as the U.S. Presidential Commission for the Study of Bioethical Issues (2010), "New Directions: The Ethics of Synthetic Biology and Emerging Technologies."
 
 ---
 

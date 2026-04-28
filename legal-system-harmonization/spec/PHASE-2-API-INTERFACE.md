@@ -1,241 +1,455 @@
-# WIA-legal-system-harmonization PHASE 2 — API-INTERFACE Specification
+# WIA-legal-system-harmonization PHASE 2 — API Interface Specification
 
 **Standard:** WIA-legal-system-harmonization
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-legal-system-harmonization (Legal System Harmonization).
+This PHASE defines the API surfaces that WIA-legal-
+system-harmonization participants expose so that
+official-publishing authorities, courts, regulatory
+agencies, treaty depositaries, citizen-information
+services, legal-research providers, and audit
+authorities can publish and consume legal artefacts,
+resolve cross-jurisdiction citations, and reconcile
+harmonisation maps through a single contract.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- OpenAPI Specification 3.1
+- IETF RFC 9110 (HTTP Semantics), RFC 9457 (Problem Details)
+- IETF RFC 7515 (JWS), RFC 7519 (JWT), RFC 9421 (HTTP Message Signatures)
+- IETF RFC 5005 (Atom paged feeds), RFC 9530 (Digest Fields)
+- OASIS LegalDocML (Akoma Ntoso 1.0), OASIS LegalRuleML 1.0
+- ELI / ECLI Council Conclusions
+- W3C JSON-LD 1.1, W3C SHACL
+- ISO 17442:2020 (LEI)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-legal-system-harmonization
-standard. It addresses the api-interface layer of the standard.
+This PHASE specifies the HTTP-based interfaces between
+publishing authorities, repositories, citizen-
+information services, courts, treaty depositaries,
+legal-research providers, harmonisation-map
+publishers, and audit authorities.
 
-## §2 Manifest
+## §2 Operation groups
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "legal-system-harmonization"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+| Prefix              | Group                                           |
+|---------------------|-------------------------------------------------|
+| `/v1/works`         | work registry                                    |
+| `/v1/expressions`   | expression registry, consolidated text           |
+| `/v1/manifestations`| manifestation registry (binary artefacts)        |
+| `/v1/items`         | item registry (repository copies)                |
+| `/v1/authorities`   | authority register                               |
+| `/v1/citations`     | citation graph                                   |
+| `/v1/treaties`      | treaty registry and ratifications                |
+| `/v1/harmonisation` | harmonisation maps                               |
+| `/v1/registry`      | registry directory                               |
 
-## §3 Conformance Tiers
+## §3 Authentication
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Read endpoints are public. Write endpoints require a
+JWT bearer (RFC 7519) bound to an authority record
+with the corresponding LEI. Treaty depositary
+endpoints accept signatures from depositary
+identities only.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 Work / expression operations
 
-## §4 Discovery
+### 4.1 Publish work
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/legal-system-harmonization`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+POST /v1/works
+```
 
-## §5 Time and Identity
+Body: work record (PHASE-1 §3) signed by the
+enacting authority. The registry verifies the
+signature against the authority's JWKS.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### 4.2 Publish expression
 
-## §6 Versioning and Deprecation
+```
+POST /v1/expressions
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Body: expression record (PHASE-1 §4) plus the
+Akoma Ntoso XML. The registry verifies the document
+against Akoma Ntoso 1.0 schema.
 
-## §7 Privacy and Security
+### 4.3 Lookup expression
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+GET /v1/expressions/{expressionRef}
+```
 
-## §8 Open Governance
+Returns the canonical expression record. Conditional
+GET via `ETag` is honoured.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `legal-system-harmonization` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+### 4.4 Consolidated text
+
+```
+GET /v1/expressions/{expressionRef}/consolidated?at=<ISO8601>
+```
+
+Returns the consolidated text effective at the given
+date. The response carries the list of expressions
+consolidated and their effective dates.
+
+## §5 Manifestation / item operations
+
+### 5.1 Publish manifestation
+
+```
+POST /v1/manifestations
+```
+
+Body: manifestation record (PHASE-1 §5) plus the
+binary artefact (PDF, EPUB, HTML, RTF, AKN).
+
+### 5.2 Lookup item
+
+```
+GET /v1/items/{itemRef}
+```
+
+Returns the canonical item record and the URL of the
+holding repository.
+
+## §6 Authority operations
+
+### 6.1 Register authority
+
+```
+POST /v1/authorities
+```
+
+Body: authority record (PHASE-1 §7) including LEI
+attestation.
+
+### 6.2 Lookup
+
+```
+GET /v1/authorities?lei={lei}
+```
+
+Returns the authority record. The LEI lookup is
+delegated to GLEIF where the authority does not
+self-publish.
+
+## §7 Citation graph
+
+### 7.1 Resolve citation
+
+```
+GET /v1/citations?source={uri}&target={uri}
+```
+
+Returns the citation record(s) describing the
+relationship.
+
+### 7.2 Walk graph
+
+```
+POST /v1/citations/walk
+```
+
+Body: a starting URI and a relation filter (`amends`,
+`repeals`, `transposes`). Response: an ordered list
+of citations forming the walk.
+
+## §8 Treaty operations
+
+### 8.1 Publish treaty
+
+```
+POST /v1/treaties
+```
+
+Body: treaty record (PHASE-1 §9) signed by the
+treaty depositary.
+
+### 8.2 Append ratification
+
+```
+POST /v1/treaties/{treatyRef}/ratifications
+```
+
+Body: a ratification record (party LEI, date, scope,
+reservations, declarations) signed by the ratifying
+state's authority.
+
+## §9 Harmonisation operations
+
+### 9.1 Publish map
+
+```
+POST /v1/harmonisation
+```
+
+Body: harmonisation map record (PHASE-1 §10).
+
+### 9.2 Resolve mapping
+
+```
+GET /v1/harmonisation?src={uri}&tgt={uri}
+```
+
+Returns mappings between the source and target
+expressions. Mappings carry the `mappingKind`,
+provenance, and effective date.
+
+## §10 Error semantics
+
+Errors are `application/problem+json` (RFC 9457)
+namespaced under
+`https://wiastandards.com/errors/legal-system-harmonization/`.
+
+## §11 Caching and rate limits
+
+Manifestation and item endpoints serve immutable
+content with `Cache-Control: public, max-age=31536000,
+immutable`. Expression and citation endpoints serve
+mutable content with strong `ETag` and short max-age.
+Rate-limit headers follow the draft-ietf-httpapi-
+ratelimit-headers convention.
+
+## Annex A — OpenAPI 3.1 fragment
+
+```yaml
+openapi: 3.1.0
+info: {title: WIA-legal-system-harmonization API, version: 1.0.0}
+paths:
+  /v1/expressions:
+    post:
+      summary: Publish an expression
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: 'ExpressionRecord.schema.json'}
+      responses:
+        '201': {description: Expression published}
+```
+
+## Annex B — Idempotency
+
+Mutating operations honour `Idempotency-Key`. Results
+are persisted for 24h.
+
+## Annex C — Webhook subscriptions
+
+Subscribers receive events on `expression.published`,
+`expression.consolidated`, `treaty.ratified`,
+`citation.added`, `harmonisation.published`. Delivery
+is signed with HMAC-SHA-256.
+
+## Annex D — Atom paged feeds
+
+The registry exposes Atom feeds (RFC 5005) for each
+operation group so that legal-research providers can
+ingest deltas without polling individual resources.
+
+## Annex E — Bulk export
+
+`POST /v1/registry/export` returns a signed URL to a
+`tar.zst` of the deployment's records filtered by
+jurisdiction, date range, and act type.
+
+## Annex F — Sandbox endpoints
+
+`/v1/sandbox` mirrors the production surface with
+synthetic jurisdictions and ephemeral state.
+
+## Annex G — Quotas
+
+Per-authority publish quotas default to 1,000
+expressions per hour and 10,000 per day. The registry
+surfaces remaining quota in `X-Quota-Remaining`.
+
+## Annex H — Webhook payload shape
+
+```json
+{
+  "event": "expression.consolidated",
+  "expressionRef": "/eli/eu/dir/2016/679/oj/2026-04-28",
+  "consolidatedFrom": ["/eli/eu/dir/2016/679/oj/2016-04-27"],
+  "effectiveAt": "2026-04-28"
+}
+```
+
+## Annex I — Audit feed
+
+`GET /v1/registry/audit?since=<timestamp>` returns
+mutating-operation events. JWT scope
+`audit-feed:read` required.
+
+## Annex J — Apostille e-register interop
+
+```
+GET /v1/items/{itemRef}/apostille
+```
+
+Returns the Hague Apostille e-register record bound
+to the item, when the publishing authority is a
+Hague Convention apostille issuer.
+
+## Annex K — Public introspection
+
+`GET /v1/registry/stats` returns aggregate counters
+(authority count, expression count, citation count,
+treaty count). Counters are eventually consistent.
+
+## Annex L — Concept scheme management
+
+```
+POST /v1/registry/concept-schemes
+GET  /v1/registry/concept-schemes/{schemeId}
+```
+
+Submits and retrieves SKOS concept schemes used as
+subject matter taxonomies. Schemes are versioned
+with Semantic Versioning 2.0.0; major bumps require
+a new scheme identifier with the prior scheme
+preserved for citation continuity.
+
+## Annex M — Citation graph diff
+
+```
+POST /v1/citations/diff
+```
+
+Body: two timestamps. Response: the citation graph
+delta between the two timestamps (added, removed,
+re-targeted citations). Auditors use the diff to
+verify graph consistency against authoritative
+publication events.
+
+## Annex N — Treaty signature ceremony
+
+```
+POST /v1/treaties/{treatyRef}/signature-ceremony
+```
+
+Body: signing authority LEI, ceremony location,
+witness LEIs. Response: ceremony record with
+attached signed protocol. Used for high-profile
+treaty signings where multiple state parties append
+signatures concurrently.
+
+## Annex O — Researcher subscription
+
+```
+POST /v1/registry/subscriptions
+```
+
+Body: a SHACL filter over the artefact graph (e.g.
+"all GDPR-related expressions across EU member
+states"). Response: a webhook endpoint that
+receives matching events.
+
+## Annex P — Bulk consolidation
+
+```
+POST /v1/expressions/bulk-consolidate
+```
+
+Body: a list of `expressionRef` and an effective
+date. Response: a single consolidated expression
+record bound to all inputs and signed by the
+publishing authority.
+
+## Annex Q — Document compare
+
+```
+POST /v1/expressions/compare
+```
+
+Body: two `expressionRef`. Response: a structural
+diff at the Akoma Ntoso eId level showing additions,
+deletions, and reordering between the two
+expressions.
+
+## Annex R0 — Court hierarchy endpoint
+
+```
+GET /v1/authorities/{authorityRef}/courts
+```
+
+Returns the court hierarchy beneath the authority.
+Used by citation walkers to resolve appellate
+relationships.
+
+## Annex R1 — Reservation list endpoint
+
+```
+GET /v1/treaties/{treatyRef}/reservations
+```
+
+Returns the per-party reservation and declaration
+records. Pagination is mandatory beyond 100 records.
+
+## Annex R — Harmonisation map review
+
+```
+POST /v1/harmonisation/{harmonisationRef}/review
+```
+
+Body: a reviewer LEI and a verdict (`endorsed`,
+`disputed`, `superseded`). Reviews are signed by the
+reviewer and accumulate as a publication trail; the
+registry surfaces the latest endorsement state on
+the map record.
+
+## Annex S — Provenance chain endpoint
+
+```
+GET /v1/citations/{citationRef}/provenance
+```
+
+Returns the per-authority provenance chain for the
+citation: publisher LEI, signature, timestamp, and
+any subsequent amendments. The response is paginated
+when the chain exceeds 100 hops.
+
+## Annex T — Long-term archival hand-off
+
+```
+POST /v1/manifestations/{manifestationRef}/archive
+```
+
+Body: archival authority LEI and target archive
+identifier (e.g. LOCKSS network, Portico repository,
+sovereign national archives). Response: archival
+event record with the archive's confirmation
+signature.
+
+## Annex U — ELI / ECLI registration
+
+```
+POST /v1/registry/eli
+POST /v1/registry/ecli
+```
+
+Submits a new ELI or ECLI binding to the registry.
+Bindings are reviewed by the publishing authority
+before activation; the binding becomes resolvable
+once the authority signs the activation event.
+
+## Annex V — Multi-language consolidation
+
+When a work is consolidated across multiple language
+expressions concurrently, the publisher submits the
+consolidation as a multi-part request:
+
+```
+POST /v1/expressions/multi-consolidate
+Content-Type: multipart/form-data
+```
+
+Body: one part per language, each containing the
+language tag and the Akoma Ntoso XML. Response: a
+list of `expressionRef`, one per language.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
-
-
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.

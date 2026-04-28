@@ -1,241 +1,522 @@
-# WIA-plugins PHASE 2 — API-INTERFACE Specification
+# WIA-plugins PHASE 2 — API Interface Specification
 
 **Standard:** WIA-plugins
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-plugins (Plugins).
+This PHASE defines the API surfaces that WIA-plugins
+participants expose so that publishers, plugin
+registries, hosts, marketplaces, and audit
+authorities can publish, search, install, update,
+and audit plugins through a single contract.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- OpenAPI Specification 3.1
+- IETF RFC 9110 (HTTP Semantics), RFC 9457 (Problem Details)
+- IETF RFC 7515 (JWS), RFC 7519 (JWT), RFC 9530 (Digest Fields)
+- IETF RFC 9421 (HTTP Message Signatures), RFC 7234 (HTTP cache)
 - CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- Semantic Versioning 2.0.0
+- Web Bundle / WebExtensions Manifest (informative)
+- WebAssembly Component Model
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-plugins
-standard. It addresses the api-interface layer of the standard.
+This PHASE specifies the HTTP-based interfaces
+between plugin publishers, plugin registries,
+hosts, marketplaces, and audit authorities. It
+does not specify the in-host plugin lifecycle API;
+that is governed by the host's own documentation.
 
-## §2 Manifest
+## §2 Operation groups
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "plugins"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+| Prefix              | Group                                           |
+|---------------------|-------------------------------------------------|
+| `/v1/plugins`       | plugin record registry                           |
+| `/v1/manifests`     | manifest validation and lookup                   |
+| `/v1/releases`      | release record store                             |
+| `/v1/sboms`         | SBOM upload and lookup                           |
+| `/v1/capabilities`  | capability declaration registry                  |
+| `/v1/hosts`         | host catalogue                                   |
+| `/v1/locales`       | locale-bundle store                              |
+| `/v1/registry`      | registry directory                               |
 
-## §3 Conformance Tiers
+## §3 Authentication
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Read endpoints are publicly accessible. Write
+endpoints require a JWT bound to the publisher
+identity. Publish-from-CI flows accept ephemeral
+signing identities bound to a workload-identity
+OIDC token.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 Plugin operations
 
-## §4 Discovery
+### 4.1 Register plugin
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/plugins`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+POST /v1/plugins
+```
 
-## §5 Time and Identity
+Body: plugin record (PHASE-1 §2). Response:
+`pluginRef`.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### 4.2 Search
 
-## §6 Versioning and Deprecation
+```
+GET /v1/plugins?q=<text>&host=<hostRef>&category=<cat>
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Returns matching plugins; pagination mandatory
+beyond 100 results.
 
-## §7 Privacy and Security
+### 4.3 Lookup
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+GET /v1/plugins/{pluginRef}
+```
 
-## §8 Open Governance
+Returns the canonical plugin record with
+conditional GET via `ETag`.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `plugins` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Manifest operations
+
+### 5.1 Validate
+
+```
+POST /v1/manifests/validate
+```
+
+Body: a candidate manifest. Response: a Problem
+Details (RFC 9457) report listing JSON-Schema
+violations and any cross-field constraint failures.
+
+### 5.2 Diff
+
+```
+POST /v1/manifests/diff
+```
+
+Body: two manifest documents. Response: a
+structured diff classifying changes into
+`breaking`, `additive`, `editorial` per Semantic
+Versioning 2.0.0.
+
+## §6 Release operations
+
+### 6.1 Publish release
+
+```
+POST /v1/releases
+```
+
+Body: release record (PHASE-1 §6) plus the
+attached archive and SBOM in a multipart form. The
+registry MUST verify:
+
+- the archive digest matches the declared digest;
+- the SBOM is parseable;
+- the manifest version follows semver bumps from
+  prior releases.
+
+### 6.2 Lookup
+
+```
+GET /v1/releases/{releaseRef}
+```
+
+Returns the canonical release record.
+
+### 6.3 Yank
+
+```
+PUT /v1/releases/{releaseRef}/yank
+```
+
+Body: justification. Yanked releases remain
+queryable but are excluded from default install
+flows; new installs must explicitly accept yanked
+releases.
+
+## §7 SBOM operations
+
+### 7.1 Upload SBOM
+
+```
+POST /v1/sboms
+```
+
+Body: CycloneDX 1.5 or SPDX 2.3 with attached JWS
+signature.
+
+### 7.2 Vulnerability join
+
+```
+GET /v1/sboms/{sbomRef}/vulnerabilities
+```
+
+Returns OSV.dev advisories that match any
+component in the SBOM.
+
+## §8 Capability operations
+
+### 8.1 Register
+
+```
+POST /v1/capabilities
+```
+
+Body: capability declaration record (PHASE-1 §4).
+
+### 8.2 Lookup
+
+```
+GET /v1/capabilities/{capabilityRef}
+```
+
+Returns the declaration. Hosts MAY refuse
+installation when a declaration exceeds the host's
+permission model.
+
+## §9 Host operations
+
+### 9.1 Register host
+
+```
+POST /v1/hosts
+```
+
+Body: host descriptor with API surface URL and
+runtime-profile reference.
+
+### 9.2 Compatibility check
+
+```
+POST /v1/hosts/{hostRef}/compat
+```
+
+Body: a manifest reference. Response: a
+compatibility verdict (`compatible`, `partial`,
+`incompatible`) with unmet requirements.
+
+## §10 Locale operations
+
+### 10.1 Upload bundle
+
+```
+POST /v1/locales
+```
+
+Body: locale-bundle record (PHASE-1 §8) with
+messages JSON.
+
+### 10.2 Lookup
+
+```
+GET /v1/plugins/{pluginRef}/locales/{lang}
+```
+
+Returns the bundle for the language; falls back to
+BCP 47 lookup.
+
+## §11 Error semantics
+
+Errors are `application/problem+json` (RFC 9457)
+namespaced under
+`https://wiastandards.com/errors/plugins/`.
+
+## §12 Caching and rate limits
+
+Release archives carry `Cache-Control: public,
+max-age=31536000, immutable`. Manifest records
+carry strong `ETag` with short max-age. Rate limit
+headers follow the draft-ietf-httpapi-ratelimit-
+headers convention.
+
+## Annex A — OpenAPI 3.1 fragment
+
+```yaml
+openapi: 3.1.0
+info: {title: WIA-plugins API, version: 1.0.0}
+paths:
+  /v1/plugins:
+    post:
+      summary: Register a plugin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: 'PluginRecord.schema.json'}
+      responses:
+        '201': {description: Plugin registered}
+```
+
+## Annex B — Idempotency
+
+Mutating operations honour `Idempotency-Key` for
+24h.
+
+## Annex C — Webhook subscriptions
+
+Subscribers receive events on `plugin.registered`,
+`release.published`, `release.yanked`,
+`vulnerability.surfaced`. Delivery is signed with
+HMAC-SHA-256.
+
+## Annex D — Federation
+
+Federation between sister registries follows the
+discovery contract in PHASE-3. Cross-registry
+queries follow `X-WIA-Federation-Path`.
+
+## Annex E — Bulk export
+
+`POST /v1/registry/export` returns a signed URL to
+a `tar.zst` of the deployment's records filtered
+by host and date range.
+
+## Annex F — Sandbox
+
+`/v1/sandbox` mirrors production with synthetic
+plugins.
+
+## Annex G — Quotas
+
+Per-publisher quotas: 100 releases / hour;
+1000 / day.
+
+## Annex H — Audit feed
+
+`GET /v1/registry/audit?since=<timestamp>`.
+
+## Annex I — Public introspection
+
+`GET /v1/registry/stats` returns aggregate
+counters.
+
+## Annex J — Webhook payload shape
+
+```json
+{
+  "event": "release.published",
+  "releaseRef": "https://reg.example.org/releases/foo/1.4.0",
+  "publishedAt": "2026-04-28T11:32:00+09:00"
+}
+```
+
+## Annex K — Bulk SBOM export
+
+```
+POST /v1/sboms/export
+```
+
+Body: filter by publisher and date range. Response:
+a signed URL to a `tar.zst` of SBOMs.
+
+## Annex L — Vendor catalogue
+
+```
+GET /v1/registry/publishers/{publisherRef}
+```
+
+Returns the publisher's catalogue with the
+attestation chain (domain ownership, identity
+verification).
+
+## Annex M — Plugin install endpoints
+
+```
+POST /v1/plugins/{pluginRef}/install-token
+```
+
+Body: requesting host identity and version range.
+Response: a short-lived signed install token plus
+the canonical archive URL. The install token
+contains the SHA-512 of the archive so that the
+host can verify integrity before extraction.
+
+## Annex N — Plugin uninstall reporting
+
+```
+POST /v1/plugins/{pluginRef}/uninstall-report
+```
+
+Body: anonymised reason categories (e.g.
+`functional-replacement`, `performance`,
+`compatibility`, `unwanted`). Reports feed into
+the registry's anonymised usage analytics.
+
+## Annex O — Telemetry consent
+
+```
+POST /v1/plugins/{pluginRef}/telemetry-consent
+```
+
+Body: user consent state (`granted`, `denied`,
+`withdrawn`). The host stores the consent locally
+and reports the aggregate consent ratio to the
+registry without identifying users.
+
+## Annex P — Locale negotiation
+
+```
+GET /v1/plugins/{pluginRef}/locales
+```
+
+Returns the locale catalogue available for the
+plugin. The host uses this list when surfacing the
+plugin's UI strings to the user.
+
+## Annex Q — Compatibility report endpoint
+
+```
+GET /v1/registry/compatibility?host={hostRef}&hostVersion={ver}
+```
+
+Returns a per-plugin compatibility verdict for the
+host version. Used by hosts to power upgrade-check
+flows.
+
+## Annex R — Reverse dependency graph
+
+```
+GET /v1/plugins/{pluginRef}/reverse-deps
+```
+
+Returns plugins that depend on the given plugin.
+Used by maintainers planning a major bump to
+estimate the downstream impact.
+
+## Annex S — Plugin marketplace mirroring
+
+```
+POST /v1/registry/mirror
+```
+
+Body: target marketplace identity and a SHACL
+filter selecting plugins to mirror. Response: a
+mirror plan with cadence and signature
+preservation.
+
+## Annex T — SBOM bulk import
+
+```
+POST /v1/sboms/bulk
+Content-Type: application/jsonl
+```
+
+Body: a JSON-Lines stream of CycloneDX or SPDX
+documents. Response: a per-line verdict.
+
+## Annex U — Capability survey
+
+```
+GET /v1/registry/capabilities/survey
+```
+
+Returns aggregate counters of which capabilities
+are declared most frequently across the plugin
+catalogue. Used by host maintainers planning
+permission-model changes.
+
+## Annex V — Plugin moderation
+
+```
+POST /v1/plugins/{pluginRef}/moderation
+```
+
+Body: moderation action (`flag`, `quarantine`,
+`unflag`) and justification. Moderation actions
+are signed by the registry operator and visible to
+publishers via the audit feed.
+
+## Annex W — Webhook payload signature
+
+Webhook payloads are canonicalised per RFC 8785
+before HMAC-SHA-256 signing. The signature is
+delivered in `X-WIA-Signature: sha256=<hex>`.
+
+## Annex X — Audit-grade publisher report
+
+```
+POST /v1/registry/publisher-report
+```
+
+Body: publisher reference and date range. Response:
+a tar.zst archive of the publisher's catalogue,
+release records, SBOM signatures, and audit feed
+entries.
+
+## Annex Y — Plugin lifecycle webhook
+
+Subscribers receive `lifecycle.installed`,
+`lifecycle.activated`, `lifecycle.deactivated`,
+`lifecycle.updated`, `lifecycle.uninstalled`
+events from hosts that opt into reporting.
+Reporting is opt-in per host and respects user
+telemetry preferences.
+
+## Annex Z — Capability negotiation API
+
+```
+POST /v1/capabilities/negotiate
+```
+
+Body: a host's permission profile and a plugin's
+capability declaration. Response: the negotiated
+intersection plus a list of capabilities that the
+host refused.
+
+## Annex AA — Plugin catalogue Atom feed
+
+```
+GET /v1/plugins/feed
+```
+
+Returns a paginated Atom 1.0 feed (RFC 5005) of
+plugin events: registrations, updates, yanks. The
+feed exposes a `<link rel="hub">` for WebSub
+subscribers.
+
+## Annex AB — Per-host install statistics
+
+```
+GET /v1/registry/stats?host={hostRef}
+```
+
+Returns aggregate counters per host: total
+plugins, daily active installs, average update
+lag. Statistics are eventually consistent.
+
+## Annex AC — Cross-host equivalence
+
+```
+GET /v1/plugins/{pluginRef}/equivalents
+```
+
+Returns plugins that the publisher has declared as
+equivalent across hosts (e.g. the VS Code and
+JetBrains versions of the same plugin). Used by
+hosts to prompt users about cross-host options.
+
+## Annex AD — Reviewer queue endpoint
+
+```
+GET /v1/registry/moderation/queue
+```
+
+Returns the moderation queue for the registry
+operator. Used by moderators reviewing flagged
+plugins. Access requires the
+`moderation:read` JWT scope.
+
+## Annex AE — Quotas
+
+Per-publisher publish quotas: 100 releases / hour;
+1000 / day; 10 yanks / hour. The registry surfaces
+remaining quota in `X-Quota-Remaining` on every
+write response.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
-
-
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.

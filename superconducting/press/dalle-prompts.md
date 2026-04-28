@@ -1,0 +1,10 @@
+# DALL-E Prompts for WIA-QUA-007 Press Materials
+
+## Prompt 1: Hero Image - Superconducting Quantum System
+A pristine laboratory setup showing superconducting quantum computer with golden superconducting qubits suspended in ultra-cold dilution refrigerator at 10 millikelvin, glowing with indigo (#6366F1) quantum energy. Visualize Cooper pairs flowing with zero resistance through NbTi superconducting wires, Josephson junctions enabling quantum tunneling, and SQUID magnetometer detecting femtotesla magnetic fields. Cryogenic cooling systems with liquid helium maintaining critical temperature. Futuristic quantum physics laboratory, clean room environment, precision instrumentation photography.
+
+## Prompt 2: Problem Scenario - Conventional Conductor Limitations
+Frustrating scenes showing limitations of normal conductors: electrical power lines losing 7% energy to resistance heating creating massive waste, MRI magnets requiring constant power consumption, conventional computers generating excessive heat requiring loud cooling fans, and slow communication systems limited by resistive losses. Show energy bills, environmental impact from waste heat, and technological limitations. Industrial documentary style emphasizing inefficiency, energy waste, and performance constraints of resistive materials.
+
+## Prompt 3: Solution Visualization - Zero-Resistance Superconducting Future
+A beautiful futuristic cityscape powered by superconducting technology: zero-loss power transmission cables delivering electricity with 100% efficiency, ultra-powerful MRI machines diagnosing diseases with unprecedented clarity, quantum computers solving previously impossible problems, maglev trains levitating effortlessly at 600 km/h above superconducting tracks. Dashboard shows critical temperature achievements: YBCO at 92K (liquid nitrogen), zero electrical resistance, perfect magnetic levitation. Clean, efficient, revolutionary technology transforming society. Optimistic future technology photography celebrating scientific breakthroughs.

@@ -1,241 +1,351 @@
-# WIA-lms PHASE 3 — PROTOCOL Specification
+# WIA-lms PHASE 3 — Protocol Specification
 
 **Standard:** WIA-lms
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-lms (Lms).
+This PHASE defines the wire-level protocols used by
+WIA-lms participants for discovery, LTI 1.3 launch
+flow, OneRoster sync, Caliper / xAPI transport,
+QTI delivery, content-package distribution, signed
+publication, and credential verification.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9110 (HTTP Semantics), RFC 9112 (HTTP/1.1), RFC 9114 (HTTP/3)
+- IETF RFC 8446 (TLS 1.3), RFC 6797 (HSTS)
+- IETF RFC 8615 (Well-Known URIs), RFC 7517 (JWK), RFC 7515 (JWS)
+- IETF RFC 9421 (HTTP Message Signatures), RFC 9530 (Digest Fields)
+- IMS LTI 1.3 / Advantage (Deep Linking 2.0, NRPS 2.0, AGS 2.0)
+- IMS Caliper 1.2, IMS QTI 3.0
+- IMS OneRoster 1.2 (REST and CSV)
+- IEEE 1484.20.1 xAPI 1.0.3
+- W3C VC 2.0, W3C BitstringStatusList, W3C SHACL
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-lms
-standard. It addresses the protocol layer of the standard.
+This PHASE defines the on-the-wire behaviour between
+LMS deployments, LTI tools, SIS systems, content
+publishers, credential verifiers, and audit
+authorities.
 
-## §2 Manifest
+## §2 Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "lms"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+A WIA-lms deployment serves a discovery document at:
 
-## §3 Conformance Tiers
+```
+GET /.well-known/wia/lms
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Response (`application/json`):
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```json
+{
+  "lms": "https://lms.wiastandards.com",
+  "openapi": "https://lms.wiastandards.com/openapi.json",
+  "lti": {
+    "platform": "https://lms.wiastandards.com/lti",
+    "deepLinking": "/lti/dl",
+    "nrps": "/lti/nrps",
+    "ags": "/lti/ags"
+  },
+  "oneroster": "https://lms.wiastandards.com/v1/oneroster",
+  "caliperEndpoint": "https://lms.wiastandards.com/v1/caliper",
+  "keySet": "https://lms.wiastandards.com/.well-known/jwks.json"
+}
+```
 
-## §4 Discovery
+The discovery document is signed (RFC 9421).
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/lms`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Transport
 
-## §5 Time and Identity
+HTTPS with TLS 1.3 and HSTS preload. LTI 1.3
+launches use HTTPS with form-post bindings; Caliper
+push uses HTTP/2 streams.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Content negotiation
 
-## §6 Versioning and Deprecation
+| Accept                                 | Use                                     |
+|----------------------------------------|-----------------------------------------|
+| `application/json`                     | record bodies                           |
+| `application/vnd.imscc+zip`            | Common Cartridge 1.3                    |
+| `application/qti+xml`                  | QTI 3.0 tests                           |
+| `application/x-imscaliper+json`        | Caliper envelopes                       |
+| `application/vc+jwt`                   | Verifiable Credentials (JWT proof)      |
+| `application/vc+ld+json`               | Verifiable Credentials (Data Integrity) |
+| `application/vnd.ims.oneroster+csv`    | OneRoster CSV bundle                    |
+| `application/openbadgecredential+json` | Open Badges 3.0                         |
+| `application/problem+json`             | error                                   |
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 LTI 1.3 launch flow
 
-## §7 Privacy and Security
+LTI 1.3 launches use OpenID Connect 1.0 login
+initiation:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+1. Tool initiates login at
+   `loginInitiationUrl` with `iss`, `client_id`,
+   `target_link_uri`, `lti_message_hint`.
+2. Platform returns an authentication response with
+   the `id_token` JWT signed by the platform.
+3. Tool validates the `id_token` against the
+   platform's JWKS.
+4. Tool launches the activity at `target_link_uri`.
 
-## §8 Open Governance
+The `id_token` MUST include `nonce` and `state` to
+prevent replay.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `lms` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 LTI Advantage services
+
+| Service                               | Purpose                                  |
+|---------------------------------------|------------------------------------------|
+| Deep Linking 2.0                      | Tool returns content selection           |
+| NRPS 2.0 (Names and Role Provisioning)| Tool retrieves course roster             |
+| AGS 2.0 (Assignment and Grade)        | Tool posts scores back to gradebook      |
+| Proctoring Services 1.0               | Tool participates in proctored events    |
+
+Service calls authenticate with OAuth 2.0
+client-credentials grants using JWT-bearer
+assertions signed by the tool's JWKS.
+
+## §7 OneRoster sync
+
+OneRoster 1.2 REST endpoints follow the IMS
+specification (`/users`, `/classes`, `/enrollments`,
+`/academicSessions`). The CSV binding is supported
+for nightly bulk sync and uses the standard CSV
+bundle layout with manifest.
+
+## §8 Caliper / xAPI transport
+
+Caliper Sensor envelopes POST to the LMS Caliper
+endpoint with Bearer JWT auth. xAPI statements POST
+to the embedded LRS at
+`/v1/sessions/{sessionRef}/xapi`.
+
+## §9 Identifiers
+
+| Identifier         | Format                                          |
+|--------------------|-------------------------------------------------|
+| `institutionRef`   | UUID (RFC 4122)                                 |
+| `courseRef`        | URI                                             |
+| `enrolmentRef`     | UUID                                            |
+| `contentRef`       | URI                                             |
+| `activityRef`      | URI                                             |
+| `assessmentRef`    | UUID                                            |
+| `gradebookRef`     | UUID                                            |
+| `credentialRef`    | URI per W3C VC 2.0                              |
+| `toolRef`          | URI                                             |
+
+## §10 Caching and immutability
+
+Content packages and credentials are immutable;
+they carry `Cache-Control: public, max-age=31536000,
+immutable`. Course catalogue, enrolment, and
+gradebook records are mutable with strong `ETag`.
+
+## §11 Replay and tombstoning
+
+Credential revocations are distributed via the
+W3C VC 2.0 BitstringStatusList. Enrolment
+withdrawals tombstone the prior enrolment record.
+Gradebook entries are append-only; corrections emit
+a new entry with `corrects` set to the prior entry.
+
+## §12 Error semantics
+
+Errors are `application/problem+json` (RFC 9457).
+Protocol-level codes:
+
+| Code | Meaning                                              |
+|------|------------------------------------------------------|
+| 200  | success                                              |
+| 304  | conditional GET unchanged                            |
+| 400  | malformed LTI / OneRoster / QTI                      |
+| 401  | missing or invalid token                             |
+| 403  | role mismatch                                        |
+| 410  | revoked credential, withdrawn enrolment              |
+| 422  | schema violation                                     |
+| 503  | LTI tool unavailable                                 |
+
+## §13 Observability
+
+Servers SHOULD emit OpenTelemetry traces with
+`wia.lms.operation`, `wia.lms.courseRef`,
+`wia.lms.toolRef`, and `wia.lms.actor`
+(pseudonymised) attributes.
+
+## Annex A — Conformance levels
+
+- **Tier 1 — Self-declared:** discovery served,
+  LTI 1.3 platform exposed.
+- **Tier 2 — Verified:** LTI Advantage / OneRoster
+  / QTI / Caliper interop tested.
+- **Tier 3 — Anchored:** continuous evidence stream
+  per PHASE-4 Annex G.
+
+## Annex B — LTI 1.3 token validation rules
+
+- `iss` matches the platform's identity URL;
+- `aud` matches the tool's `client_id`;
+- `nonce` is unique within a 24h window;
+- `iat` within 5 minutes of receipt clock;
+- `exp` not yet passed;
+- signature verified against platform JWKS.
+
+## Annex C — Discovery document signature
+
+The signature over `/.well-known/wia/lms` covers
+`@authority`, `@path`, `content-digest` (RFC 9530),
+and `content-type`.
+
+## Annex D — Cross-Origin Resource Sharing
+
+LMS read endpoints serve `Access-Control-Allow-
+Origin: *` with `ETag`, `Link`, and Caliper-related
+headers exposed.
+
+## Annex E — Trust anchor rotation
+
+Platform signing keys rotate on a 24-month rolling
+schedule with a 6-month overlap window.
+
+## Annex F — Replay protection on AGS scoring
+
+AGS score posts carry `iat`/`exp` claims (max 1h)
+in their JWT bearer. The platform rejects scores
+whose `iat` exceeds the freshness window.
+
+## Annex G — Connection management
+
+Caliper sensors use HTTP/2 streams. A sensor
+emitting a continuous Caliper envelope stream
+SHOULD reuse a single connection over multiple
+courses; the LMS terminates idle connections after
+60 seconds.
+
+## Annex H — Federation hop cap
+
+Federated NRPS 2.0 queries carry an
+`X-WIA-Federation-Hops` header; queries with
+`Hops > 3` are dropped.
+
+## Annex I — Cross-Origin LTI launch
+
+Browser launches MAY cross origins; the LMS
+reflects launch origins in its `Sec-Fetch-Site`
+allowlist for the configured tool's origin only.
+
+## Annex J — TLS profile baseline
+
+TLS 1.3 with PFS-only cipher suites; NIST SP 800-52
+Rev. 2 baseline. TLS 1.2 acceptable as fallback for
+legacy SCORM tools but only over the
+`/v1/legacy/scorm` endpoint.
+
+## Annex K — Common Cartridge ingest pipeline
+
+Common Cartridge 1.3 archives are ingested
+asynchronously. The pipeline:
+
+1. Verify the archive signature.
+2. Validate the manifest against the IMS schema.
+3. Transcode SCORM 2004 4th Edition assets to cmi5
+   where present.
+4. Materialise courses, content packages, and
+   activities into the LMS records.
+5. Emit a `course.imported` webhook event.
+
+Failures at any step abort the import and surface
+a Problem Details report to the publisher.
+
+## Annex L — AGS line-item idempotency
+
+AGS score posts MUST carry an `Idempotency-Key`
+header. The platform persists the key for 24 hours
+so that retried posts do not duplicate gradebook
+entries.
+
+## Annex M — Caliper firehose backpressure
+
+When the Caliper sensor sustains a rate above the
+deployment's quota, the LMS responds with `429 Too
+Many Requests` and `Retry-After` per the standard
+back-pressure pattern. Sensors back off and resume
+on the indicated time.
+
+## Annex N — LTI tool deep-linking response signing
+
+Deep Linking 2.0 response payloads are signed by
+the tool with `state` and `nonce` matching the
+launch. The platform verifies the signature
+against the tool's JWKS before accepting selected
+content into the course.
+
+## Annex O — iCalendar feed signing
+
+iCalendar feeds carry an HTTP Message Signature
+(RFC 9421) covering `@authority`, `@path`,
+`content-digest`, and `content-type`. Calendar
+clients that consume the signed feed verify the
+signature against the deployment's JWKS before
+trusting the events.
+
+## Annex P — Discussion thread anti-spam
+
+Discussion threads accept posts only from enrolled
+learners or course staff. Anonymous posts are
+disabled by default; the institution may enable
+pseudonymous posting where the underlying enrolment
+is preserved server-side. Rate-limit headers apply
+to posting.
+
+## Annex Q — Background-job semantics
+
+Long-running jobs (cartridge import, gradebook
+recalculation, bulk credential issuance) accept a
+202 Accepted with a polling URL and a webhook
+subscription option. Polling responses include a
+progress percentage and an estimated completion
+timestamp.
+
+## Annex R — Notification delivery channels
+
+Notifications use three delivery channels: in-LMS
+inbox (always), email (per recipient subscription),
+push (per recipient device registration). The
+deployment's notification policy declares which
+channels are mandatory for which severities.
+
+Each channel attempt is recorded so that delivery
+SLAs can be audited; delivery to an opted-out
+channel is suppressed and recorded as
+`delivery.suppressed`.
+
+## Annex S — Course-copy idempotency
+
+Course-copy jobs accept an `Idempotency-Key`
+header. The platform persists the key for 24 hours
+so that retried copies do not duplicate the target
+course. The key is namespaced per source-target
+pair.
+
+## Annex T — Sec-Fetch and CSP coordination
+
+LMS pages set Content-Security-Policy directives
+that allow only the configured LTI tool origins for
+`frame-src` and `connect-src`. Browser
+`Sec-Fetch-Site` headers verify that cross-origin
+requests originate from the registered tool's
+origin. Mismatches surface as `csp.violation` and
+`sec-fetch.mismatch` events in the audit feed.
+
+## Annex U — Service worker boundary
+
+Service workers MAY cache static course assets but
+MUST NOT cache gradebook, AGS, or NRPS responses.
+The LMS sets `Cache-Control: no-store, private` on
+mutating-data endpoints to enforce the boundary.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
-
-
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.

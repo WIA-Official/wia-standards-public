@@ -817,7 +817,6 @@ As technologies mature and costs decline, synthetic biology-based medicines will
 ## Further Reading
 
 **Reviews:**
-- 선행 연구. "Gene therapy comes of age." Science, 359(6372), eaan4672.
 - June, C. H., & Sadelain, M. (2018). "Chimeric antigen receptor therapy." New England Journal of Medicine, 379(1), 64-73.
 
 **Clinical Trial Databases:**

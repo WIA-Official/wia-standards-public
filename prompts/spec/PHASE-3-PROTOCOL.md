@@ -1,241 +1,356 @@
-# WIA-prompts PHASE 3 — PROTOCOL Specification
+# WIA-prompts PHASE 3 — Protocol Specification
 
 **Standard:** WIA-prompts
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-prompts (Prompts).
+This PHASE defines the wire-level protocols used by
+WIA-prompts participants for discovery, signed
+prompt publication, conversation streaming,
+evaluation result transport, safety-policy
+distribution, and federation.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9110 (HTTP Semantics), RFC 9112 (HTTP/1.1), RFC 9114 (HTTP/3)
+- IETF RFC 8446 (TLS 1.3), RFC 6797 (HSTS)
+- IETF RFC 8615 (Well-Known URIs), RFC 7517 (JWK), RFC 7515 (JWS)
+- IETF RFC 9421 (HTTP Message Signatures), RFC 9530 (Digest Fields)
+- IETF RFC 8259 (JSON), RFC 8785 (JCS)
+- W3C Trace Context, W3C Server-Sent Events
+- WHATWG Fetch (CORS, redirect handling)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-prompts
-standard. It addresses the protocol layer of the standard.
+This PHASE defines the on-the-wire behaviour
+between prompt publishers and registries; between
+deployment platforms and model vendors; and
+between federated registries.
 
-## §2 Manifest
+## §2 Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "prompts"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+A WIA-prompts registry serves a discovery document
+at:
 
-## §3 Conformance Tiers
+```
+GET /.well-known/wia/prompts
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Response (`application/json`):
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```json
+{
+  "registry": "https://prompts.wiastandards.com",
+  "openapi": "https://prompts.wiastandards.com/openapi.json",
+  "operationGroups": ["/v1/prompts", "/v1/templates",
+                      "/v1/contracts", "/v1/models",
+                      "/v1/evaluations", "/v1/safety",
+                      "/v1/conversations", "/v1/registry"],
+  "supportedRenderEngines": ["mustache", "handlebars",
+                             "jinja2", "wia-prompt-dsl-1.0"],
+  "keySet": "https://prompts.wiastandards.com/.well-known/jwks.json"
+}
+```
 
-## §4 Discovery
+The discovery document is signed (RFC 9421).
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/prompts`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Transport
 
-## §5 Time and Identity
+HTTPS with TLS 1.3 and HSTS preload. Conversation
+streaming uses Server-Sent Events or WebSocket
+over TLS depending on the platform's preference.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Content negotiation
 
-## §6 Versioning and Deprecation
+| Accept                                | Use                                      |
+|---------------------------------------|------------------------------------------|
+| `application/json`                    | record bodies                            |
+| `application/ld+json`                 | JSON-LD records (model cards, policies)  |
+| `text/event-stream`                   | streaming conversation responses         |
+| `application/problem+json`            | error                                    |
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Signed publication
 
-## §7 Privacy and Security
+Prompt, template, model-card, evaluation-result,
+and safety-policy records are signed with detached
+JWS (RFC 7515) over the canonical JSON form (RFC
+8785). The `kid` references the publisher's key
+in the registry's JWKS.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Identifiers
 
-## §8 Open Governance
+| Identifier         | Format                                          |
+|--------------------|-------------------------------------------------|
+| `promptRef`        | UUID (RFC 4122)                                 |
+| `templateRef`      | URI                                             |
+| `contractRef`      | URI                                             |
+| `modelRef`         | URI                                             |
+| `suiteRef`         | URI                                             |
+| `resultRef`        | UUID                                            |
+| `policyRef`        | URI                                             |
+| `conversationRef`  | UUID                                            |
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `prompts` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §7 Streaming responses
+
+Conversation responses MAY be streamed via Server-
+Sent Events. Each event carries `id`, `event`,
+`data`, and optional `retry`. Stream resumption
+follows SSE `Last-Event-ID`. Streaming responses
+include the model's signature only at the final
+event (`event: complete`); intermediate events
+carry the running response without signature.
+
+## §8 Caching and immutability
+
+Prompt and template records at a specific version
+are immutable; updates emit new versions. Model
+cards are mutable through versioning. Evaluation
+results and safety policies are immutable once
+published.
+
+## §9 Federation
+
+Federated registries form a directed graph in the
+discovery document. Cross-registry queries follow
+the graph and carry an `X-WIA-Federation-Path`
+header.
+
+## §10 Replay protection
+
+Signed publications carry `iat`/`exp` JWS claims
+(max 24h). Conversation submissions carry per-
+conversation nonces; duplicate turn submissions
+are rejected as replay.
+
+## §11 Error semantics
+
+Errors are `application/problem+json` (RFC 9457).
+Protocol-level codes:
+
+| Code | Meaning                                              |
+|------|------------------------------------------------------|
+| 200  | success                                              |
+| 304  | conditional GET unchanged                            |
+| 400  | malformed JSON / SHACL violation                     |
+| 401  | missing or invalid token                             |
+| 403  | publisher not authorised for the prompt scope        |
+| 410  | tombstone (withdrawn prompt, retired model)          |
+| 422  | schema violation                                     |
+| 429  | rate limit                                           |
+| 503  | model vendor unavailable                             |
+
+## §12 Observability
+
+Servers SHOULD emit OpenTelemetry traces with
+`wia.prompts.operation`, `wia.prompts.promptRef`,
+`wia.prompts.modelRef`, and
+`wia.prompts.conversationRef` attributes.
+
+Trace IDs propagate via W3C Trace Context.
+
+## Annex A — Conformance levels
+
+- **Tier 1 — Self-declared:** discovery served,
+  prompts signed.
+- **Tier 2 — Verified:** evaluation interop tested
+  against a reference suite; model-card schema
+  audited.
+- **Tier 3 — Anchored:** continuous evidence stream
+  per PHASE-4 Annex G; EU AI Act Article 43
+  conformity assessment if high-risk.
+
+## Annex B — SSE event format
+
+Conversation streaming events carry a `data`
+field containing a JSON object with `delta`
+(append-only token stream), `tokenCount`, and an
+optional `metadata` block.
+
+## Annex C — Discovery document signature
+
+The signature over `/.well-known/wia/prompts`
+covers `@authority`, `@path`, `content-digest`
+(RFC 9530), and `content-type`.
+
+## Annex D — Cross-Origin Resource Sharing
+
+Read endpoints serve `Access-Control-Allow-Origin:
+*` with `ETag`, `Link`, and Trace Context headers
+exposed.
+
+## Annex E — Trust anchor rotation
+
+Publisher signing keys rotate per the publisher's
+policy. Recommended cadence is 12 months for
+high-volume publishers.
+
+## Annex F — Federation hop cap
+
+Federated lookups carry an
+`X-WIA-Federation-Hops` header; queries with
+`Hops > 3` are dropped.
+
+## Annex G — TLS profile baseline
+
+TLS 1.3 with PFS-only cipher suites; NIST SP
+800-52 Rev. 2 baseline.
+
+## Annex H — Streaming back-pressure
+
+Server-Sent Event streams honour client back-
+pressure: when a client falls behind, the server
+buffers up to 64 KB then closes the stream with
+`event: error` and `data: {"reason":
+"client-stalled"}`.
+
+## Annex I — Sandbox endpoints
+
+`/v1/sandbox` mirrors production with synthetic
+prompts and ephemeral state.
+
+## Annex J — Replay-resistant conversation submit
+
+Conversation turn submissions carry an
+`Idempotency-Key` and a per-conversation sequence
+number. Duplicates are deduplicated server-side
+within the 24h idempotency window.
+
+## Annex K — Hardware-backed publisher key
+
+Publisher signing keys MAY be hardware-bound (HSM,
+FIDO2, smart card). Hardware binding is mandatory
+for prompts that fall under EU AI Act high-risk
+classification. The registry records the
+attestation in the publisher record.
+
+## Annex L — JSON canonicalisation
+
+JSON-bearing records are canonicalised per RFC
+8785 prior to JWS signature so that signatures
+verify across implementations.
+
+## Annex M — Discovery cache TTL
+
+The discovery document carries
+`Cache-Control: public, max-age=300,
+stale-while-revalidate=60` so that consumers
+cache it briefly without missing key rotations.
+
+## Annex N — SSE keepalive
+
+SSE streams emit a keepalive comment every 15
+seconds to maintain the connection across NAT and
+proxy timeout windows. Disconnects without a
+clean close trigger a `conversation.disconnect`
+audit event.
+
+## Annex O — Webhook delivery
+
+Webhook deliveries follow at-least-once semantics
+with exponential backoff (2, 4, 8, 16, 32, 64,
+128, 256, 512 seconds) capped at 9 attempts.
+Failed deliveries enter a dead-letter queue.
+
+## Annex P — Tool-call streaming
+
+Tool calls emitted by the model during a
+conversation are streamed inline with the SSE
+event sequence. Each tool-call event carries a
+`tool_call_id` so that the client can correlate
+the call with the subsequent tool-result.
+
+## Annex Q — Cross-Origin Resource Sharing
+
+Read endpoints serve `Access-Control-Allow-Origin:
+*` with `ETag`, `Link`, and Trace Context
+headers exposed. Browser clients fetching
+streaming responses use `withCredentials: true`
+when authenticated.
+
+## Annex R — Connection coalescing
+
+HTTP/2 clients MAY coalesce connections across
+sub-domains served by the same certificate. The
+registry publishes the coalescing policy in the
+discovery document.
+
+## Annex S — Compression preferences
+
+Read endpoints declare
+`Accept-Encoding: br, zstd, gzip`. Streaming
+responses use chunked transfer encoding without
+compression so that real-time delivery is not
+delayed by buffering.
+
+## Annex T — Sandbox endpoints
+
+`/v1/sandbox` mirrors production with synthetic
+prompts and ephemeral state.
+
+## Annex U — Replay protection on signed prompt
+##           publish
+
+Prompt publishes carry `iat`/`exp` JWS claims
+(max 24h). The registry rejects replays whose
+`iat` is older than the max window or whose
+`jti` was already seen.
+
+## Annex V — Discovery JWKS rotation
+
+Discovery JWKS rotation cadence is 24 months
+with a 6-month overlap. Old keys remain in the
+JWKS during overlap. Clients re-resolve JWKS on
+every cache TTL boundary.
+
+## Annex W — Server-Sent Event reconnection
+
+Clients reconnect using `Last-Event-ID`. The
+server replays from the last event the client
+acknowledged, up to a 60s window after which
+replay is unavailable.
+
+## Annex X — Trust matrix surface
+
+The discovery document carries a peer trust
+matrix listing each peer's accepted operation
+groups and JWKS URL. Trust matrix changes are
+surfaced as audit events.
+
+## Annex Y — Conformance attestation lookup
+
+```
+GET /v1/registry/attestations
+```
+
+Returns the deployment's active compliance
+attestations (ISO/IEC 42001, NIST AI RMF, EU AI
+Act conformity) with effective and expiry dates.
+
+## Annex Z — Streaming response chunked encoding
+
+Streaming responses use chunked transfer encoding
+with no compression so that delivery is real-
+time. Final-event signatures cover the full
+response body assembled by the client; the
+client recomputes the canonical assembly before
+verification.
+
+## Annex AA — Trace context propagation
+
+W3C Trace Context headers (`traceparent`,
+`tracestate`) propagate across the full
+conversation lifecycle: client → registry →
+model vendor → tool host. Cross-org boundaries
+preserve the traceparent so that auditors can
+reconstruct end-to-end timelines.
+
+## Annex AB — TLS PSK resumption
+
+TLS 1.3 session resumption via PSK is permitted.
+Resumed sessions inherit authentication state
+but cannot extend privileges beyond the original
+session scope.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
-
-
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.

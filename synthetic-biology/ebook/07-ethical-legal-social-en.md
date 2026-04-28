@@ -793,7 +793,6 @@ Navigating these issues requires ongoing dialogue among scientists, ethicists, p
 - National Academies (2018). "Biodefense in the Age of Synthetic Biology."
 
 **Governance:**
-- 선행 연구. "Regulating gene drives." Science, 345(6197), 626-628.
 - Jasanoff, S., Hurlbut, J. B., & Saha, K. (2015). "CRISPR democracy: Gene editing and the need for inclusive deliberation." Issues in Science and Technology, 32(1), 37.
 
 ---

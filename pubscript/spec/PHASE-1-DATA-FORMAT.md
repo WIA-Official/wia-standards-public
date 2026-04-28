@@ -1,241 +1,313 @@
-# WIA-pubscript PHASE 1 — DATA-FORMAT Specification
+# WIA-pubscript PHASE 1 — Data Format Specification
 
 **Standard:** WIA-pubscript
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-pubscript (Pubscript).
+This PHASE defines the canonical data format for
+WIA-pubscript, the multi-sensory publishing
+interoperability standard. The records bind every
+publication, sensory representation, accessibility
+declaration, narration timing, and cross-format
+manifest to documented publishing standards so
+that visual, auditory, tactile, spatial, and
+gestural representations are produced and
+consumed as equal first-class citizens.
+
+The standard's design principle: every reader
+deserves an authored representation in the modality
+they prefer; no modality is the "default".
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- W3C EPUB 3.3, EPUB Accessibility 1.1 (WCAG 2.2 AA)
+- W3C Web Publications, W3C Audiobooks Manifest
+- W3C Synchronized Multimedia Integration Language (SMIL) 3.0
+- W3C Media Overlays (EPUB Media Overlays 3.3)
+- W3C ARIA in EPUB 1.1, W3C Web Accessibility Guidelines 2.2
+- W3C Pronunciation Lexicon Specification (PLS) 1.0
+- W3C SSML 1.1 (Speech Synthesis Markup Language)
+- W3C TTML2, WebVTT 1.0
+- IDPF EPUB Open Container Format (OCF) 3.3
+- ISO 14289-1:2014 (PDF/UA-1, accessible PDF)
+- ISO/IEC 21778:2017 (JSON), IETF RFC 8259, RFC 8785 (JCS)
+- ISO/IEC 14496-12 (ISO Base Media File Format)
+- ONIX for Books 3.1 (book metadata)
+- Schema.org `Book`, `Audiobook`
+- Dublin Core ISO 15836-1:2017
+- BCP 47 / RFC 5646, ISO 639-3, ISO 15924
+- Unicode 15.1, Unicode Braille Patterns block (U+2800..U+28FF)
+- ISO 17025 (signage / Braille production calibration, informative)
+- IEEE 1857.9 (immersive media coding, informative)
+- IETF RFC 4122 (UUID), RFC 7515 (JWS), RFC 9421 (HTTP Message Signatures)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-pubscript
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to records that describe a
+publication and its sensory representations. The
+publication may be a literary work, a textbook, a
+news article, a musical score, a research dataset
+narrative, a scriptural reading, or a sovereign-
+issued public document.
 
-## §2 Manifest
+In scope: publication record, representation
+record (one per modality), narration record,
+accessibility declaration, cross-format manifest,
+language version record, contributor record, and
+the cross-references binding each record to its
+publisher identity, ONIX metadata, and signed
+provenance.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "pubscript"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Out of scope: editorial workflows in publishing
+houses (governed by the publisher's CMS); rights
+clearance and royalty accounting (governed by the
+publisher's contract systems).
 
-## §3 Conformance Tiers
+## §2 Publication record
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Every publication carries:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `publicationRef`     | UUID (RFC 4122) opaque                          |
+| `isbn`               | ISO 2108 ISBN-13 when applicable                |
+| `doi`                | DOI when issued                                 |
+| `title`              | localised title (BCP 47 keys)                   |
+| `subtitle`           | localised subtitle                              |
+| `creator[]`          | contributor records (this PHASE §7)             |
+| `publisher`          | publisher identity URI                          |
+| `publishedAt`        | ISO 8601                                        |
+| `languages[]`        | BCP 47 tags of available language versions      |
+| `genre`              | ONIX List 91 / sovereign-equivalent             |
+| `audience`           | ONIX List 28                                    |
+| `licenseRef`         | SPDX or sovereign equivalent                    |
+| `signingKeyRef`      | JWKS URL                                        |
 
-## §4 Discovery
+`publicationRef` is the only invariant identifier
+across edition revisions; ISBN may change between
+print and ebook editions.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/pubscript`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Representation record
 
-## §5 Time and Identity
+A representation is a complete sensory rendering of
+the publication.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `representationRef`  | URI                                             |
+| `publicationRef`     | this PHASE §2                                   |
+| `modality`           | `visual`, `auditory`, `tactile`, `spatial`,     |
+|                      | `gestural`                                       |
+| `format`             | per-modality format (see §3.1)                  |
+| `language`           | BCP 47 tag                                      |
+| `accessibilityRef`   | this PHASE §5                                   |
+| `digestRef`          | SHA-512 of the canonical artefact                |
+| `signature`          | RFC 7515 detached JWS                           |
+| `runtime`            | runtime requirements (e.g., reader, app, device) |
 
-## §6 Versioning and Deprecation
+### 3.1 Per-modality formats
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+| Modality   | Canonical formats                               |
+|------------|-------------------------------------------------|
+| Visual     | EPUB 3.3, PDF/UA-1, HTML5, Web Publication      |
+| Auditory   | Audiobook (W3C), MP3, AAC, FLAC, Opus, SSML 1.1 |
+| Tactile    | BRF (Braille Ready Format), Unified English      |
+|            | Braille (UEB), Korean Braille (KS X 1026), 3-D  |
+|            | tactile graphics (BANA tactile graphic guidelines)|
+| Spatial    | glTF 2.0, USDZ, OpenXR scene graph, IEEE 1857.9 |
+| Gestural   | sign-language video (ISO 639-3 sign codes),     |
+|            | SignWriting per Sutton, motion-capture BVH      |
 
-## §7 Privacy and Security
+Modalities are equally authoritative; the
+publisher's intent is that consumers may choose
+any representation without diminished content
+fidelity.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §4 Narration record
 
-## §8 Open Governance
+Narration binds visual content to its auditory or
+gestural rendering.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `pubscript` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `narrationRef`       | UUID                                            |
+| `representationRef`  | this PHASE §3                                   |
+| `mediaOverlayRef`    | EPUB Media Overlays 3.3 reference (SMIL)        |
+| `voice`              | voice-talent identity or synthesiser model      |
+| `pronunciationRef`   | W3C PLS 1.0 reference                           |
+| `ssmlRef`            | SSML 1.1 reference for synthetic narration      |
+| `signLanguageRef`    | sign-language video reference                   |
+| `synchronisation`    | per-paragraph or per-sentence granularity       |
+
+## §5 Accessibility declaration
+
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `accessibilityRef`   | URI                                             |
+| `representationRef`  | this PHASE §3                                   |
+| `epubAccessibility`  | EPUB Accessibility 1.1 conformance level         |
+|                      | (`a`, `aa`, `aaa`)                              |
+| `wcagConformance`    | WCAG 2.2 conformance level                      |
+| `pdfUaConformance`   | ISO 14289-1 conformance flag                    |
+| `ace`                | Ace by DAISY conformance evidence URI            |
+| `mathML`             | boolean — MathML 4 used                         |
+| `imageDescriptions`  | `none`, `partial`, `complete`                   |
+| `colourContrast`     | `WCAG-AA`, `WCAG-AAA`                            |
+| `dyslexiaFriendly`   | optional declared dyslexia-friendly font and    |
+|                      | spacing settings                                 |
+
+## §6 Cross-format manifest
+
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `manifestRef`        | URI                                             |
+| `publicationRef`     | this PHASE §2                                   |
+| `representations[]`  | per-modality representationRef list             |
+| `defaultModality`    | `none`; the publisher MUST NOT impose a default |
+| `equivalenceClaim`   | `verified-equivalent`, `partial-equivalent`,    |
+|                      | `derivative`                                     |
+
+The default modality is intentionally `none`: this
+standard does not designate a "fallback"; every
+modality is authored as primary.
+
+## §7 Contributor record
+
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `contributorRef`     | UUID                                            |
+| `name`               | localised name (BCP 47 keys)                    |
+| `role`               | ONIX List 17 contributor role                   |
+| `did`                | optional DID per W3C DID 1.0                    |
+| `attribution`        | display attribution string                      |
+
+## §8 Language version record
+
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `languageVersionRef` | URI                                             |
+| `publicationRef`     | this PHASE §2                                   |
+| `language`           | BCP 47 tag                                      |
+| `script`             | ISO 15924 four-letter code                      |
+| `region`             | ISO 3166-1 alpha-2                              |
+| `translatorRef[]`    | contributor references                          |
+
+Language versions share `publicationRef`; each
+version carries its own representation set.
+
+## §9 Cross-domain references (informative)
+
+- WIA-language-bridge — translation provenance
+- WIA-prompts — prompt-mediated narration
+- WIA-multiverse-interface — XR/spatial reading
+- WIA-plugins — reading-app plugin extensions
+
+## Annex A — Conformance disclosure
+
+Implementations declare the schema versions they
+support, the canonicalisation form (RFC 8785), and
+the JWS key set used to sign publication and
+representation records.
+
+## Annex B — Worked publication record (informative)
+
+```json
+{
+  "publicationRef": "f63f4f04-9a76-4d2c-9f53-2c4d09a1bbb1",
+  "isbn": "979-11-90000-12-3",
+  "title": {"ko": "삼국지 365", "en": "Three Kingdoms 365"},
+  "publisher": "https://wiabook.com",
+  "publishedAt": "2026-04-27"
+}
+```
+
+## Annex C — Versioning
+
+Field additions are minor; field removals or
+semantic redefinition require a major bump
+synchronised with EPUB / ONIX major revisions.
+
+## Annex D — Conformance level
+
+Conformance is "Core" (publication + at least two
+modality representations + accessibility
+declaration) or "Full" (adds narration,
+cross-format manifest with verified equivalence,
+and language version records).
+
+## Annex E — Privacy
+
+Consumer reading analytics are out of scope; the
+publisher's reading-app records analytics under
+the app's own privacy regime.
+
+## Annex F — Equal-representation principle
+
+The standard refuses to designate a "default"
+modality. Reading apps MAY surface the modality
+the user previously chose, but no modality is
+authoritatively privileged over another. This
+principle is enforced by the
+`defaultModality: none` constraint in §6.
+
+## Annex G — Music notation interoperability
+
+Music publications carry a music notation
+representation (MusicXML 4.0, MNX-Common, or
+MEI 5.0) alongside visual / auditory / tactile
+modalities. Music notation is treated as a
+specialised visual modality with auxiliary
+auditory rendering via SSML 1.1 or MIDI.
+
+## Annex H — Mathematical content
+
+Mathematical expressions use MathML 4 in EPUB
+representations and may be rendered to:
+
+- LaTeX-source for fallback;
+- Nemeth Braille (en-US) or sovereign-equivalent
+  mathematical Braille for tactile;
+- speech-rule-based audio narration for auditory.
+
+Equation accessibility evidence references the
+authoring tool (e.g., MathJax accessibility,
+Pearson MathML reader).
+
+## Annex I — Image description authoring
+
+Images carry alt text per WCAG 2.2 AA. Long-form
+descriptions use the `aria-describedby`
+mechanism in EPUB and the `<Figure>` /
+`<Caption>` / `<P>` flow in PDF/UA. Tactile
+graphics are produced per BANA tactile graphic
+guidelines.
+
+## Annex J — Reading order metadata
+
+Reading order is recorded in the EPUB Package
+Document `<spine>`. Web Publication manifests
+declare the reading order in the
+`readingOrder` array. Tactile and spatial
+representations may diverge from the visual
+reading order; the divergence is recorded with
+the equivalence claim.
+
+## Annex K — Voice characteristics
+
+Synthetic narration declares voice
+characteristics:
+
+| Field          | Source / Binding                              |
+|----------------|-----------------------------------------------|
+| `voiceFamily`  | language-and-region voice family               |
+| `gender`       | `male`, `female`, `neutral`, `unspecified`    |
+| `ageRange`     | broad age category                            |
+| `speakingRate` | words per minute                              |
+| `pitch`        | semitone offset relative to neutral           |
+
+Voice characteristics support per-character
+narration consistency across chapters.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
-
-
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.

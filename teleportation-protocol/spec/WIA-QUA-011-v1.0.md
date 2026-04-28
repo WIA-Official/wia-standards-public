@@ -65,7 +65,7 @@ The standard covers:
 
 ### 2.1 Standard Protocol
 
-The original 선행 연구 protocol for teleporting an arbitrary quantum state.
+The standard protocol for teleporting an arbitrary quantum state, as established in foundational quantum information theory.
 
 #### 2.1.1 Initial Setup
 
@@ -1586,41 +1586,23 @@ FOM = F × R × log(D)
 
 ## 13. References
 
-### 13.1 Foundational Papers
+### 13.1 Normative References
 
-1. 선행 연구. "Teleporting an unknown quantum state via dual classical and Einstein-Podolsky-Rosen channels." *Physical Review Letters*, 70(13), 1895.
+The following standards from international standards bodies are normative for implementations conforming to WIA-QUA-011.
 
-2. 선행 연구. "Experimental quantum teleportation." *Nature*, 390(6660), 575-579.
+1. ITU-T Y.3800 (2019) — Overview on networks supporting quantum key distribution.
+2. ITU-T Y.3801 (2020) — Functional requirements for quantum key distribution networks.
+3. ITU-T Y.3802 (2020) — Quantum key distribution networks — Functional architecture.
+4. ITU-T Y.3803 (2020) — Quantum key distribution networks — Key management.
+5. ITU-T Y.3804 (2020) — Quantum key distribution networks — Control and management.
+6. ISO/IEC 23837-1:2023 — Information security — Security requirements, test and evaluation methods for quantum key distribution — Part 1: Requirements.
+7. ISO/IEC 23837-2:2023 — Information security — Security requirements, test and evaluation methods for quantum key distribution — Part 2: Evaluation activities.
+8. ETSI GS QKD 002 — Quantum Key Distribution; Use cases.
+9. ETSI GS QKD 014 — Quantum Key Distribution; Protocol and data format of REST-based key delivery API.
 
-3. 선행 연구. "Experimental realization of teleporting an unknown pure quantum state via dual classical and Einstein-Podolsky-Rosen channels." *Physical Review Letters*, 80(6), 1121.
+### 13.2 Informative References
 
-4. Braunstein, S.L., & Kimble, H.J. (1998). "Teleportation of continuous quantum variables." *Physical Review Letters*, 80(4), 869.
-
-### 13.2 Multi-Qubit and Advanced
-
-5. 선행 연구. "Deterministic quantum teleportation of atomic qubits." *Nature*, 429(6993), 737-739.
-
-6. 선행 연구. "Deterministic quantum teleportation with atoms." *Nature*, 429(6993), 734-737.
-
-7. 선행 연구. "Quantum teleportation between light and matter." *Nature*, 443(7111), 557-560.
-
-8. 선행 연구. "Deterministic quantum teleportation between distant atomic objects." *Nature Physics*, 9(7), 400-404.
-
-### 13.3 Recent Advances
-
-9. 선행 연구. "Ground-to-satellite quantum teleportation." *Nature*, 549(7670), 70-73.
-
-10. 선행 연구. "Teleportation systems toward a quantum internet." *PRX Quantum*, 1(2), 020317.
-
-11. 선행 연구. "Qubit teleportation between non-neighbouring nodes in a quantum network." *Nature*, 605(7911), 663-668.
-
-### 13.4 Matter Teleportation Theory
-
-12. Christandl, M., & Wehner, S. (2005). "Quantum anonymous transmissions." *International Conference on the Theory and Application of Cryptology and Information Security*, 217-235.
-
-13. 선행 연구. "Remote control of restricted sets of operations: Teleportation of angles." *Physical Review A*, 63(4), 042303.
-
-14. Vaidman, L. (1994). "Teleportation of quantum states." *Physical Review A*, 49(2), 1473.
+Foundational results in quantum teleportation — including the original protocol formulation, photonic and atomic experimental demonstrations, ground-to-satellite teleportation, and quantum-internet network experiments — are documented in the peer-reviewed quantum information literature accessible through standard scientific databases (e.g., arXiv quant-ph, NASA ADS, INSPIRE-HEP). Implementers seeking historical and experimental context are referred to those archives rather than to specific bibliographic entries reproduced here.
 
 ---
 

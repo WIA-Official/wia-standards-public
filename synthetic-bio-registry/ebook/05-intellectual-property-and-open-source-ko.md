@@ -127,7 +127,7 @@ iGEM 레지스트리의 부품 개발자들은 종종 다음과 같은 딜레마
 (https://parts.igem.org/BBa_J23100),
 designed by John Anderson [1]."
 
-[1] 선행 연구.
+[1] 관련 분야 자료.
 Construction of a genetic AND gate in E. coli.
 ACS Synthetic Biology, 2(5), 234-238.
 ```

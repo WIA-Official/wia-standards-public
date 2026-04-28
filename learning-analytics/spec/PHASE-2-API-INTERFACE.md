@@ -1,241 +1,461 @@
-# WIA-learning-analytics PHASE 2 — API-INTERFACE Specification
+# WIA-learning-analytics PHASE 2 — API Interface Specification
 
 **Standard:** WIA-learning-analytics
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-learning-analytics (Learning Analytics).
+This PHASE defines the API surfaces that WIA-learning-
+analytics participants expose so that learning record
+stores (LRSs), Caliper sensors, learning management
+systems, predictive-model providers, dashboard
+authors, and audit authorities can submit statements,
+register profiles, run model evaluations, deliver
+interventions, and reconcile dashboards through a
+single contract.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- OpenAPI Specification 3.1
+- IETF RFC 9110 (HTTP Semantics), RFC 9457 (Problem Details)
+- IETF RFC 7515 (JWS), RFC 7519 (JWT)
+- IETF RFC 9421 (HTTP Message Signatures)
+- IEEE 1484.20.1 xAPI 1.0.3 (LRS contract)
+- IMS Caliper 1.2 (Sensor API)
+- ISO/IEC 20748-3 Reference Architecture
+- IMS LTI 1.3 / Advantage (NRPS, AGS)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-learning-analytics
-standard. It addresses the api-interface layer of the standard.
+This PHASE specifies the HTTP-based interfaces between
+sensors (LMSs, browsers, mobile clients, immersive
+runtimes), LRSs, profile servers, model providers,
+dashboards, and audit authorities. The PHASE does not
+specify the in-process analytics algorithm or the
+on-disk storage layout of the LRS.
 
-## §2 Manifest
+## §2 Operation groups
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "learning-analytics"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+| Prefix              | Group                                           |
+|---------------------|-------------------------------------------------|
+| `/v1/statements`    | xAPI / Caliper statement ingest and query        |
+| `/v1/profiles`      | xAPI Profile registry                            |
+| `/v1/activities`    | activity (object) registry                       |
+| `/v1/actors`        | actor pseudonymisation registry                  |
+| `/v1/models`        | predictive-model registry and evaluation         |
+| `/v1/interventions` | intervention orchestration                       |
+| `/v1/dashboards`    | dashboard registry and access policy             |
+| `/v1/registry`      | registry directory                               |
 
-## §3 Conformance Tiers
+## §3 Authentication
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+xAPI ingest endpoints accept the xAPI Basic and OAuth
+2.0 client-credentials grants. Caliper endpoints
+accept Bearer JWT (RFC 7519). Authorisation scopes
+(`statements:write`, `statements:read`, `profiles:write`,
+`models:evaluate`) are advertised in the discovery
+document.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 Statement operations
 
-## §4 Discovery
+### 4.1 Submit statements
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/learning-analytics`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+PUT /v1/statements
+POST /v1/statements
+```
 
-## §5 Time and Identity
+Body: a single xAPI statement or an array of
+statements, or a Caliper envelope. Response: 204 with
+`X-Experience-API-Statement-ID` header listing the
+assigned statement IDs.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### 4.2 Query
 
-## §6 Versioning and Deprecation
+```
+GET /v1/statements?actor=<json>&verb=<URI>&since=<ISO8601>&until=<ISO8601>
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Returns matching statements per xAPI 1.0.3 §7.2.4.
+Pagination uses the `more` field with an opaque cursor.
 
-## §7 Privacy and Security
+### 4.3 Voiding
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+A statement is voided by emitting a new statement with
+verb `http://adlnet.gov/expapi/verbs/voided` and
+object `{"objectType": "StatementRef", "id": <ref>}`.
 
-## §8 Open Governance
+## §5 Profile operations
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `learning-analytics` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+### 5.1 Publish profile
+
+```
+POST /v1/profiles
+Content-Type: application/json
+```
+
+Body: an xAPI Profile JSON document. The registry
+validates against xAPI Profile schema and rejects
+profiles whose concepts collide with existing
+profiles unless the publisher owns both.
+
+### 5.2 Lookup
+
+```
+GET /v1/profiles/{profileRef}
+```
+
+Returns the canonical profile document. Conditional
+GET via `ETag` is honoured.
+
+### 5.3 Conformance check
+
+```
+POST /v1/profiles/{profileRef}/check
+```
+
+Body: an array of statements. Response: per-statement
+verdict (`conformant`, `non-conformant`) with the
+specific template or pattern violated.
+
+## §6 Activity operations
+
+### 6.1 Register activity
+
+```
+POST /v1/activities
+```
+
+Body: object record (PHASE-1 §4) with attached LOM
+metadata.
+
+### 6.2 Lookup
+
+```
+GET /v1/activities/{activityRef}
+```
+
+Returns the canonical activity record and any
+authoritative profile linkage.
+
+## §7 Actor operations
+
+### 7.1 Resolve pseudonym
+
+```
+POST /v1/actors/resolve
+```
+
+Body: a `homePage` + `name` pair. Response: the
+opaque `actorRef`. Resolution is rate-limited to
+prevent enumeration.
+
+### 7.2 Withdraw consent
+
+```
+DELETE /v1/actors/{actorRef}/consent
+```
+
+Marks the actor's analytics consent withdrawn. New
+statements about this actor are rejected; historical
+statements remain visible to the actor and are
+embargoed from federated analytics.
+
+## §8 Model operations
+
+### 8.1 Register model
+
+```
+POST /v1/models
+```
+
+Body: model record (PHASE-1 §7) with model card URL.
+
+### 8.2 Evaluate
+
+```
+POST /v1/models/{modelRef}/evaluate
+```
+
+Body: an actor reference and a context window.
+Response: the model's prediction with confidence
+interval and `humanReviewRequired` boolean per
+GDPR Article 22 / EU AI Act.
+
+## §9 Intervention operations
+
+### 9.1 Schedule
+
+```
+POST /v1/interventions
+```
+
+Body: intervention record (PHASE-1 §8). Response:
+`interventionRef` and the assigned reviewer pool if
+human review is required.
+
+### 9.2 Outcome
+
+```
+POST /v1/interventions/{interventionRef}/outcome
+```
+
+Body: outcome statementRef and an instructor
+narrative. Outcomes feed back into the model
+registry for ongoing fairness audits.
+
+## §10 Dashboard operations
+
+### 10.1 Register dashboard
+
+```
+POST /v1/dashboards
+```
+
+Body: dashboard record (PHASE-1 §9) with WCAG 2.2 AA
+conformance evidence URL.
+
+### 10.2 Access policy
+
+```
+GET /v1/dashboards/{dashboardRef}/policy
+```
+
+Returns the access policy: audiences, opt-out path,
+and the profile-derived data scope.
+
+## §11 Error semantics
+
+Errors are `application/problem+json` (RFC 9457)
+namespaced under
+`https://wiastandards.com/errors/learning-analytics/`.
+
+## §12 Caching and rate limits
+
+Statement query endpoints are not cached. Profile,
+activity, and model registry endpoints carry strong
+`ETag` and short max-age. Dashboard policy is cached
+for 5 minutes with `stale-while-revalidate`.
+
+## Annex A — OpenAPI 3.1 fragment
+
+```yaml
+openapi: 3.1.0
+info: {title: WIA-learning-analytics API, version: 1.0.0}
+paths:
+  /v1/statements:
+    post:
+      summary: Submit xAPI statements
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: 'StatementArray.schema.json'}
+      responses:
+        '204': {description: Stored}
+```
+
+## Annex B — Idempotency
+
+Statement IDs are client-provided UUIDs. The LRS
+deduplicates on ID; resubmitting an existing
+statement returns 204 with the original ID.
+
+## Annex C — Webhook subscriptions
+
+Subscribers receive events on `statement.stored`,
+`profile.published`, `model.registered`,
+`intervention.scheduled`, `dashboard.opted-out`.
+
+## Annex D — Federation
+
+Federated LRSs propagate statements across peers when
+both peers declare the same profile in common. Cross-
+LRS queries follow `X-WIA-Federation-Path`.
+
+## Annex E — Statement-level signing
+
+A statement MAY be signed by attaching a JWS over the
+canonical statement (RFC 8785). The signature appears
+as an attachment with `usageType =
+http://adlnet.gov/expapi/attachments/signature`.
+
+## Annex F — Bulk export
+
+`POST /v1/registry/export` returns a signed URL to a
+`tar.zst` of the deployment's statements filtered by
+profile and date range. PII fields are redacted.
+
+## Annex G — Sandbox endpoints
+
+`/v1/sandbox` mirrors the production surface with
+synthetic actors and ephemeral state.
+
+## Annex H — Quotas
+
+Per-deployment publish quotas default to 10,000
+statements per minute and 5,000,000 per day.
+`X-Quota-Remaining` is surfaced on every write.
+
+## Annex I — Webhook payload shape
+
+```json
+{
+  "event": "intervention.scheduled",
+  "interventionRef": "f63f4f04-...",
+  "modelRef": "model-2026-04-28",
+  "actorRef": "actor-072",
+  "humanReviewRequired": true
+}
+```
+
+## Annex J — Audit feed
+
+`GET /v1/registry/audit?since=<timestamp>` returns
+mutating-operation events for the deployment. JWT
+scope `audit-feed:read` required.
+
+## Annex K — Reviewer queue
+
+```
+GET /v1/interventions/queue?reviewerRef={ref}
+```
+
+Returns the reviewer's pending queue with deadlines.
+Reviewers acknowledge interventions before delivery.
+
+## Annex L — Data subject access
+
+```
+GET /v1/actors/{actorRef}/export
+```
+
+Returns the actor's full data subject access export
+per GDPR Article 15. Requests are rate-limited.
+
+## Annex M — Profile pattern engine
+
+```
+POST /v1/profiles/{profileRef}/match
+```
+
+Body: an ordered statement sequence and a target
+pattern. Response: a verdict (`match`, `partial`,
+`mismatch`) with the position of divergence. The
+pattern engine is reproducible from the open-source
+implementation referenced in the response header
+`X-WIA-PatternEngine-Source`.
+
+## Annex N — Cohort definition
+
+```
+POST /v1/registry/cohorts
+```
+
+Body: a SHACL shape constraining the actor record
+schema. Response: an opaque `cohortRef` that can be
+referenced from dashboard records and aggregate
+queries. Cohorts are versioned with Semantic
+Versioning 2.0.0; redefining a cohort produces a new
+ref with the prior cohort tombstoned.
+
+## Annex O — Statement attachments
+
+xAPI statements MAY carry attachments (e.g. signed
+evidence, candidate response media). The LRS persists
+attachments out-of-band and surfaces them via:
+
+```
+GET /v1/statements/{statementRef}/attachments/{usageType}
+```
+
+Attachment content type is whatever the publisher
+declared at submission. Access policy follows the
+statement's `actor` consent state.
+
+## Annex P — Profile authority
+
+The profile registry distinguishes between
+`registry-published` profiles (signed by the
+registry), `community-published` profiles (signed by
+their author), and `imported` profiles (cloned from
+xAPI Profile Server with the upstream signature
+preserved). Consumers MAY filter by authority class
+when querying.
+
+## Annex Q0 — Statement signing endpoints
+
+Publishers may submit statements pre-signed by
+attaching a JWS attachment with `usageType =
+http://adlnet.gov/expapi/attachments/signature`. The
+LRS verifies the signature against the publisher's
+JWKS before persisting. Statements that fail signature
+verification are rejected with a Problem Details
+fragment listing the JWS error.
+
+## Annex Q1 — Researcher access endpoint
+
+Researchers retrieve de-identified statement extracts
+via:
+
+```
+POST /v1/registry/researcher-extract
+```
+
+Body: a SHACL shape, a date range, and a project
+identifier resolvable in the researcher access
+catalogue. Response: a short-lived signed URL to a
+`tar.zst` archive of redacted extracts. Audit
+records every extraction in the deployment's audit
+feed.
+
+## Annex Q — Bulk actor opt-out
+
+For institutional opt-out events (a class graduates,
+a programme closes), administrators submit a bulk
+opt-out via:
+
+```
+POST /v1/actors/bulk-opt-out
+```
+
+Body: a list of `actorRef` plus a justification.
+The LRS marks each actor's consent withdrawn and
+queues a delayed export of historical statements to
+each actor's verified contact channel.
+
+## Annex R — Profile dependency resolution
+
+Profiles may declare dependencies on other profiles
+(`prefLabel: dependsOn`). The registry resolves
+dependencies transitively at lookup time and returns
+the closure as a single response. Cyclic
+dependencies are forbidden; the registry rejects
+profiles whose dependency graph contains a cycle.
+
+## Annex S — Statement state surface
+
+The xAPI State API is exposed at:
+
+```
+PUT /v1/activities/state?stateId=<id>&activityId=<id>&agent=<json>
+GET /v1/activities/state?stateId=<id>&activityId=<id>&agent=<json>
+```
+
+State surfaces are bound to the actor's consent and
+are deleted when consent is withdrawn.
+
+## Annex T — Aggregate query endpoint
+
+```
+POST /v1/registry/aggregate
+```
+
+Body: a SHACL shape over the cohort, a verb URI, and
+a date range. Response: aggregate counters (count,
+mean, percentiles) honouring the deployment's
+k-anonymity floor. Cells with counts below the floor
+are surfaced as `< k` rather than the actual value.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
-
-
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.

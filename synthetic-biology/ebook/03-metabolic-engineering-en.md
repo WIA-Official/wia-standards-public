@@ -981,7 +981,6 @@ Metabolic engineering is central to the bioeconomy, enabling sustainable product
 
 **Key Papers:**
 - Keasling, J. D. (2010). "Manufacturing molecules through metabolic engineering." Science, 330(6009), 1355-1358.
-- 선행 연구. "High-level semi-synthetic production of the potent antimalarial artemisinin." Nature, 496(7446), 528-532.
 
 **Reviews:**
 - Nielsen, J., & Keasling, J. D. (2016). "Engineering cellular metabolism." Cell, 164(6), 1185-1197.

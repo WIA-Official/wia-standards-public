@@ -1,241 +1,454 @@
-# WIA-language-learning PHASE 2 — API-INTERFACE Specification
+# WIA-language-learning PHASE 2 — API Interface Specification
 
 **Standard:** WIA-language-learning
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-language-learning (Language Learning).
+This PHASE defines the API surfaces that WIA-language-
+learning participants expose so that providers,
+sovereign testing authorities, learning management
+systems, employers, and credential verifiers can
+exchange enrolments, sessions, assessments, scores,
+accommodations, and credentials through a single
+contract.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- OpenAPI Specification 3.1
+- IETF RFC 9110 (HTTP Semantics), RFC 9457 (Problem Details)
+- IETF RFC 7515 (JWS), RFC 7519 (JWT)
+- IEEE 1484.20.1 (xAPI), IMS Caliper 1.2
+- IMS LTI 1.3 / Advantage, IMS OneRoster 1.2, IMS QTI 3.0
+- IMS Open Badges 3.0
+- W3C Verifiable Credentials Data Model 2.0
+- W3C Decentralized Identifiers 1.0
+- ISO/IEC 23988 (Assessment delivery)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-language-learning
-standard. It addresses the api-interface layer of the standard.
+This PHASE specifies the HTTP-based interfaces between
+language-learning providers, sovereign testing
+authorities, learning management systems (via LTI
+1.3), and credential verifiers. The PHASE does not
+specify pedagogy or item-bank content; those remain
+provider-internal.
 
-## §2 Manifest
+## §2 Operation groups
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "language-learning"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+| Prefix              | Group                                           |
+|---------------------|-------------------------------------------------|
+| `/v1/learners`      | learner record management                        |
+| `/v1/courses`       | course catalogue                                 |
+| `/v1/sessions`      | session lifecycle and attendance                 |
+| `/v1/assessments`   | assessment delivery                              |
+| `/v1/scores`        | score issuance and lookup                        |
+| `/v1/credentials`   | credential issuance and verification             |
+| `/v1/accommodations`| accommodation request and approval               |
+| `/v1/registry`      | registry directory                               |
 
-## §3 Conformance Tiers
+## §3 Authentication
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Read endpoints accept anonymous or JWT-bearer access
+per the deployment's policy. Write endpoints require
+a JWT bound to a provider, sovereign authority, or
+learner identity. High-stakes assessment endpoints
+also require a remote-proctoring identity assertion.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 Learner operations
 
-## §4 Discovery
+### 4.1 Register learner
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/language-learning`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+POST /v1/learners
+```
 
-## §5 Time and Identity
+Body: learner record (PHASE-1 §2). Response:
+`learnerRef`. Personal data minimisation rules apply;
+the registry rejects records containing fields not
+declared in PHASE-1 §2.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### 4.2 Lookup
 
-## §6 Versioning and Deprecation
+```
+GET /v1/learners/{learnerRef}
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Returns the canonical learner record. Field exposure
+follows the requesting principal's role (learner self,
+guardian, instructor, auditor).
 
-## §7 Privacy and Security
+## §5 Course operations
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+### 5.1 Publish course
 
-## §8 Open Governance
+```
+POST /v1/courses
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `language-learning` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Body: course record (PHASE-1 §4) with attached LOM
+(IEEE 1484.12.1) JSON.
+
+### 5.2 Search
+
+```
+GET /v1/courses?targetLanguage=ko&level=B2&mode=online-async
+```
+
+Returns courses matching the filter.
+
+### 5.3 LTI launch
+
+```
+GET /v1/courses/{courseRef}/lti-launch
+```
+
+Returns an LTI 1.3 launch payload bound to the
+requesting LMS context.
+
+## §6 Session operations
+
+### 6.1 Open session
+
+```
+POST /v1/sessions
+```
+
+Body: session record (PHASE-1 §5) excluding `endTime`.
+
+### 6.2 Append xAPI / Caliper
+
+```
+POST /v1/sessions/{sessionRef}/xapi
+POST /v1/sessions/{sessionRef}/caliper
+```
+
+Append xAPI statements or Caliper envelopes.
+
+### 6.3 Close session
+
+```
+PUT /v1/sessions/{sessionRef}/close
+```
+
+Body: `endTime` and final attendance state.
+
+## §7 Assessment operations
+
+### 7.1 Schedule assessment
+
+```
+POST /v1/assessments
+```
+
+Body: assessment record (PHASE-1 §6) without
+`assessmentDate`. Response: scheduled date and
+delivery channel (proctored seat, remote proctor,
+self-delivery URL).
+
+### 7.2 Deliver QTI test
+
+```
+GET /v1/assessments/{assessmentRef}/qti
+```
+
+Returns the IMS QTI 3.0 test bound to the assessment.
+Items are randomised per the test's blueprint.
+
+### 7.3 Submit response
+
+```
+POST /v1/assessments/{assessmentRef}/responses
+```
+
+Body: QTI 3.0 result XML / JSON.
+
+## §8 Score operations
+
+### 8.1 Issue score
+
+```
+POST /v1/scores
+```
+
+Body: score record (PHASE-1 §7) signed by the rater(s)
+and, for high-stakes, the issuing authority.
+
+### 8.2 Lookup
+
+```
+GET /v1/scores/{scoreRef}
+```
+
+Returns the canonical score record.
+
+### 8.3 Re-rate request
+
+```
+POST /v1/scores/{scoreRef}/re-rate
+```
+
+Body: justification and additional rater scope.
+Response: a new `scoreRef` referencing the original.
+
+## §9 Credential operations
+
+### 9.1 Issue
+
+```
+POST /v1/credentials
+```
+
+Body: credential payload per W3C VC 2.0. Response:
+`credentialRef` plus the verification URL.
+
+### 9.2 Verify
+
+```
+POST /v1/credentials/verify
+```
+
+Body: a Verifiable Presentation per VC 2.0. Response:
+the verification verdict, the issuer DID resolution,
+and the proof check.
+
+### 9.3 Revoke
+
+```
+PUT /v1/credentials/{credentialRef}/revoke
+```
+
+Body: justification. The registry adds the credential
+to the issuer's revocation list per W3C VC 2.0
+revocation profile.
+
+## §10 Accommodation operations
+
+### 10.1 Request
+
+```
+POST /v1/accommodations
+```
+
+Body: accommodation record (PHASE-1 §8) with evidence
+URI.
+
+### 10.2 Approve
+
+```
+PUT /v1/accommodations/{accommodationRef}/approve
+```
+
+Body: approving authority and validity window.
+
+## §11 Error semantics
+
+Errors are `application/problem+json` (RFC 9457)
+namespaced under
+`https://wiastandards.com/errors/language-learning/`.
+
+## §12 Caching and rate limits
+
+Course catalogue and credential verification endpoints
+are cached. Score and assessment endpoints are not.
+
+## Annex A — OpenAPI 3.1 fragment
+
+```yaml
+openapi: 3.1.0
+info: {title: WIA-language-learning API, version: 1.0.0}
+paths:
+  /v1/scores:
+    post:
+      summary: Issue a score
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: 'ScoreRecord.schema.json'}
+      responses:
+        '201': {description: Score issued}
+```
+
+## Annex B — Idempotency
+
+Mutating operations honour `Idempotency-Key`. Results
+are persisted for 24h.
+
+## Annex C — Webhook subscriptions
+
+Subscribers receive events on `assessment.completed`,
+`score.issued`, `credential.issued`,
+`credential.revoked`, `accommodation.approved`.
+Delivery is signed with HMAC-SHA-256.
+
+## Annex D — LTI 1.3 / Advantage compatibility
+
+The course catalogue exposes LTI 1.3 platform metadata
+under `/v1/courses/.well-known/lti`. Deep Linking 2.0,
+Names and Role Provisioning Services 2.0, and
+Assignment and Grade Services 2.0 are supported.
+
+## Annex E — OneRoster compatibility
+
+Class-roster sync follows IMS OneRoster 1.2 with the
+`enrollments`, `users`, `classes`, `courses` resources
+mapped to PHASE-1 §2..§4 records.
+
+## Annex F — Public introspection
+
+`GET /v1/registry/stats` returns aggregate counters
+(learner count, supported tags, supported frameworks,
+high-stakes assessments per quarter). Counters are
+eventually consistent.
+
+## Annex G — Bulk export
+
+`POST /v1/registry/export` returns a signed URL
+referencing a `tar.zst` of the deployment's records
+filtered by date range and framework. PII is redacted
+for non-authoritative requesters.
+
+## Annex H — Sandbox endpoints
+
+`/v1/sandbox` mirrors the production surface with
+synthetic learners, fictional levels, and ephemeral
+state. Sandbox responses carry `X-WIA-Sandbox: true`.
+Sandbox state clears on a 24h rolling window.
+
+## Annex I — Quotas
+
+Per-provider publish quotas default to 5,000 score
+issuances per hour and 100,000 per day. The registry
+surfaces remaining quota in `X-Quota-Remaining`.
+
+## Annex J — Webhook payload shape
+
+```json
+{
+  "event": "score.issued",
+  "scoreRef": "f63f4f04-...",
+  "issuedAt": "2026-04-28T11:32:00+09:00",
+  "framework": "CEFR",
+  "level": "B2"
+}
+```
+
+## Annex K — Score reissuance
+
+A score MAY be reissued when a clerical error is
+discovered, when a re-rate panel revises the original
+verdict, or when a sovereign authority compels
+correction. Reissuance creates a new `scoreRef` that
+references the original via the `supersedes` field.
+The original is tombstoned but remains
+cryptographically verifiable so that historical
+verifiers can resolve the chain. Reissuance windows
+are bounded by the framework's authoritative
+appeal-window rules — typically 90 days for CEFR-
+aligned high-stakes assessments and 60 days for ACTFL.
+
+## Annex L — Item-bank exposure control
+
+The QTI test endpoint serves items only within the
+declared assessment window. After the window closes,
+items are eligible for retirement to the public
+practice bank or hold-back to the secure bank per
+the test publisher's policy. Item exposure metrics
+are published in the registry's audit feed but not
+bound to individual candidates.
+
+## Annex M — Roster reconciliation
+
+OneRoster 1.2 sync is reconciled nightly. The
+registry surfaces drift (mismatched class membership,
+stale enrolment) in the `/v1/registry/onerost/drift`
+endpoint so that LMS owners can act before high-
+stakes events.
+
+## Annex N — Bulk credential issuance
+
+Issuers MAY submit a batch of credentials in a single
+request:
+
+```
+POST /v1/credentials/batch
+Content-Type: application/jsonl
+```
+
+Body: a JSON-Lines stream of credential payloads.
+Response: a per-line verdict with the issued
+`credentialRef` or a Problem Details fragment.
+
+## Annex O — Sovereign authority registration
+
+Sovereign testing authorities register their issuer
+DID and signing key set via:
+
+```
+POST /v1/registry/authorities
+```
+
+Body: authority record with declared frameworks,
+working language pairs, and a verified domain
+attestation (DNS TXT or ACME-bound HTTPS) tying the
+DID to the authority's public domain. Registration is
+gated by the registry's authority-vetting committee;
+a self-asserted authority appears as `claimed` until
+the committee promotes it to `verified`.
+
+## Annex P — Re-examination and retake policy
+
+Each framework declares its retake policy in the
+publisher's metadata:
+
+| Framework | Min wait | Max attempts / 12mo |
+|-----------|----------|----------------------|
+| CEFR (Goethe) | 21 days | typically 3      |
+| ACTFL OPI     | 60 days | 4                |
+| IELTS         | none    | unlimited        |
+| TOPIK         | 60 days | varies by edition|
+| ICAO ELP      | sovereign | typically 2    |
+
+Retake records carry a `retakeOf` reference linking
+each attempt to the candidate's prior attempts.
+
+## Annex Q — Audit trail introspection
+
+```
+GET /v1/registry/audit?since=<timestamp>
+```
+
+Returns the audit feed of mutating operations across
+the deployment within the requested window. Auditors
+authenticate with a JWT scoped to the
+`audit-feed:read` permission.
+
+## Annex R — Anonymous practice runs
+
+Self-study learners MAY run practice assessments
+without a learner record. The practice endpoint
+issues an ephemeral session token bound to the
+device fingerprint; no personal data is collected;
+practice scores are not surfaced as authoritative
+proficiency claims.
+
+## Annex S0 — Webhook delivery retry policy
+
+Webhook deliveries follow at-least-once semantics with
+exponential backoff (2, 4, 8, 16, 32, 64, 128, 256,
+512 seconds) capped at 9 attempts. After exhaustion
+the delivery enters a dead-letter queue inspectable
+at `/v1/registry/webhooks/{id}/deliveries/dead`.
+
+## Annex S — Item statistics feed
+
+The registry publishes anonymised item statistics
+(p-value, point-biserial discrimination, time-on-
+item) to assessment authorities under a separate
+`item-stats:read` JWT scope. The feed supports
+psychometric calibration without exposing
+candidate-identifying response data.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
-
-
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.

@@ -831,9 +831,6 @@ The power to edit genomes carries profound responsibility. Ensuring that CRISPR 
 ## Further Reading
 
 **Key Papers:**
-- 선행 연구. "A programmable dual-RNA-guided DNA endonuclease in adaptive bacterial immunity." Science, 337(6096), 816-821.
-- 선행 연구. "Programmable editing of a target base in genomic DNA without double-stranded DNA cleavage." Nature, 533(7603), 420-424.
-- 선행 연구. "Search-and-replace genome editing without double-strand breaks or donor DNA." Nature, 576(7785), 149-157.
 
 **Books:**
 - Doudna, J. A., & Sternberg, S. H. (2017). "A Crack in Creation: Gene Editing and the Unthinkable Power to Control Evolution."

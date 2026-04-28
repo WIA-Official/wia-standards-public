@@ -1,241 +1,342 @@
-# WIA-legal-system-harmonization PHASE 4 — INTEGRATION Specification
+# WIA-legal-system-harmonization PHASE 4 — Integration Specification
 
 **Standard:** WIA-legal-system-harmonization
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-legal-system-harmonization (Legal System Harmonization).
+This PHASE describes how WIA-legal-system-
+harmonization integrates with adjacent ecosystems
+(official-publishing authorities, courts, treaty
+depositaries, Hague Apostille e-registers, EUR-Lex,
+WIPO, sovereign administrative-law systems, and
+downstream WIA standards), how conformance evidence
+is produced, and how deployments are governed.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- ISO/IEC 17065:2012 (Conformity assessment)
+- ISO/IEC 27001:2022, ISO/IEC 27701:2019, ISO 17442:2020
+- IETF RFC 7515 (JWS), RFC 9421 (HTTP Message Signatures)
+- OASIS LegalDocML (Akoma Ntoso 1.0), OASIS LegalRuleML 1.0
+- ELI / ECLI Council Conclusions
+- IFLA FRBR, Dublin Core ISO 15836-1:2017
+- W3C JSON-LD 1.1, W3C SHACL, W3C ODRL 2.2
+- HCCH Apostille e-Register, Hague Conference
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-legal-system-harmonization
-standard. It addresses the integration layer of the standard.
+This PHASE covers integration points outside the
+PHASE-1..3 scope: how WIA-legal-system-harmonization
+consumes upstream specifications (Akoma Ntoso, ELI,
+ECLI), how downstream WIA standards reference legal
+artefacts, and how conformance is assessed,
+recorded, and audited.
 
-## §2 Manifest
+## §2 Upstream integration
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "legal-system-harmonization"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+### 2.1 OASIS
 
-## §3 Conformance Tiers
+Akoma Ntoso 1.0 and LegalRuleML 1.0 are consumed at
+their published versions. Errata are absorbed
+editorially.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+### 2.2 EU institutional
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+ELI Council Conclusion 2012/C 325/02 and ECLI
+Council Conclusion 2011/C 127/01 are the
+authoritative identifier schemes for European
+artefacts. National adoption variants are recorded
+in the jurisdiction record (PHASE-1 §2).
 
-## §4 Discovery
+### 2.3 IFLA
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/legal-system-harmonization`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+FRBR / FRBRoo levels (Work, Expression,
+Manifestation, Item) underpin the record model.
 
-## §5 Time and Identity
+### 2.4 ISO
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+ISO 17442 LEI is the canonical authority identifier.
+ISO 8601 is the canonical date/time format.
 
-## §6 Versioning and Deprecation
+### 2.5 Hague Conference (HCCH)
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The Apostille e-Register specification is consumed
+for international authentication of public documents.
 
-## §7 Privacy and Security
+## §3 EUR-Lex / national publication integration
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+National publication systems push their daily
+gazette deltas into the registry via authenticated
+Atom feeds. The registry mirrors EUR-Lex through a
+read-only mirror to make EU acts available alongside
+national counterparts. Mirror cadence is hourly for
+the recent window (last 7 days) and daily for older
+content.
 
-## §8 Open Governance
+## §4 Court system integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `legal-system-harmonization` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Courts publish decisions with ECLI identifiers and
+Akoma Ntoso markup. The registry mirrors decisions
+into the citation graph, generating implicit
+citations from the decision body's `<ref>` elements.
+
+## §5 Conformance
+
+### 5.1 Evidence package
+
+Every conformant deployment publishes:
+
+- declared schema versions (Akoma Ntoso, LegalRuleML,
+  ELI, ECLI);
+- declared authority register with LEI attestations;
+- declared SKOS subject-matter scheme set;
+- the test-vector matrix per Annex G of each PHASE;
+- the JWS signing key set used for expressions and
+  manifestations.
+
+### 5.2 Auditor responsibilities
+
+Under ISO/IEC 17065:2012:
+
+1. Akoma Ntoso documents validate against schema 1.0.
+2. LEI references resolve at GLEIF.
+3. Citation walks return reproducible results for
+   reference seed sets.
+4. Consolidation history is replayable from the
+   prior expression list.
+5. ELI / ECLI resolution returns a single
+   authoritative target for unambiguous queries.
+
+### 5.3 Tier promotion
+
+| Tier            | Auditor                              | Cadence      |
+|-----------------|--------------------------------------|--------------|
+| Self-declared   | none                                 | annual       |
+| Verified        | independent third-party              | 24 months    |
+| Anchored        | accredited body (ISO/IEC 17065)      | 12 months    |
+
+## §6 Cross-domain references (normative)
+
+| Standard                 | Integration point                       |
+|--------------------------|-----------------------------------------|
+| WIA-legal-knowledge      | citation graph search                   |
+| WIA-policy-research      | comparative legal study                 |
+| WIA-language-bridge      | official translation                    |
+| WIA-pubscript            | legal publication formatting            |
+| WIA-smart-contract       | regulatory machine-readable rules       |
+
+## §7 Privacy
+
+Personal data appearing in court decisions is
+processed under the publishing court's privacy
+regime. Anonymisation rules differ across
+jurisdictions; the registry preserves the publisher's
+form rather than re-anonymising.
+
+## §8 Security
+
+Authority signing key compromise triggers immediate
+JWKS rotation and a public revocation list update.
+Compromised manifestations are tombstoned and the
+underlying work is republished under a new
+`expressionRef`.
+
+## §9 ODRL policy binding
+
+When an expression's manifestation carries a license
+or rights statement, the rights are expressed as a
+W3C ODRL 2.2 policy bound to the manifestation. The
+ODRL policy is informative; it does not override the
+publishing authority's legal terms.
+
+## §10 Localisation
+
+Multilingual artefacts are catalogued as one
+expression per language. The registry surfaces a
+union view across languages so that researchers can
+study harmonisation across linguistic versions of
+the same work.
+
+## §11 Accessibility
+
+HTML manifestations conform to WCAG 2.2 AA. PDF
+manifestations expose tagged structure (PDF/UA-1
+ISO 14289-1) so that assistive technology can
+navigate sections, articles, and footnotes.
+
+## §12 Verifiable presentation of legal artefacts
+
+Verifiable presentations of legal artefacts (e.g.
+proof of an apostille) follow W3C VC 2.0 patterns.
+The presentation links the apostille e-register
+record, the underlying manifestation, and the
+verifying authority's signature.
+
+## Annex A — Conformance disclosure
+
+Implementations link to the conformance evidence URL
+from their landing page and from the README under a
+`## Conformance` heading.
+
+## Annex B — Worked harmonisation map (informative)
+
+```json
+{
+  "harmonisationRef": "/v1/harmonisation/gdpr-uk-dpa",
+  "srcExpressionRef": "/eli/eu/dir/2016/679/oj/2018-05-25",
+  "tgtExpressionRef": "/eli/uk/ukpga/2018/12",
+  "mappingKind": "partial",
+  "conceptScheme": "EuroVoc",
+  "provenance": "529900T8BM49AURSDO55",
+  "effectiveAt": "2020-12-31"
+}
+```
+
+## Annex C — Versioning
+
+Field additions are minor; field removals or
+semantic redefinition require a major bump
+synchronised with Akoma Ntoso, ELI, ECLI revisions.
+
+## Annex D — Open governance
+
+Issues and proposals are tracked at
+`github.com/WIA-Official/wia-standards/issues` with
+the `legal-system-harmonization` label.
+
+## Annex E — Withdrawal procedure
+
+A deployment withdraws conformance by tombstoning
+its evidence package. Tombstones are immutable.
+
+## Annex F — Reproducibility
+
+Evidence is reproducible from publicly available
+inputs: authority register, LEI attestations, ELI /
+ECLI resolution traces, citation graph snapshots,
+and the registry's signing key set.
+
+## Annex G — Test vectors
+
+Every normative requirement in PHASE-1..3 has at
+least one positive vector and one negative vector
+under `tests/phase-vectors/`.
+
+## Annex H — National adoption catalogue
+
+| Region | Authority                          | Standards in use         |
+|--------|------------------------------------|--------------------------|
+| EU     | Publications Office (EUR-Lex)      | ELI, ECLI, Akoma Ntoso   |
+| UK     | TNA (legislation.gov.uk)           | CLML, Akoma Ntoso        |
+| US     | OFR (govinfo)                      | USLM, Akoma Ntoso (pilot)|
+| KR     | Ministry of Government Legislation | Akoma Ntoso (pilot)      |
+| JP     | E-Gov                              | LAWS XML                 |
+| BR     | Senado / LexML                     | LexML / Akoma Ntoso       |
+
+## Annex I — Risk register
+
+| Risk                                  | Mitigation                |
+|---------------------------------------|---------------------------|
+| Authority key compromise              | Immediate JWKS rotation   |
+| Akoma Ntoso schema drift              | Vector matrix gate        |
+| Citation walk loop                    | 1024-hop cap              |
+| LEI revocation                        | Authority record amend    |
+| Apostille e-register downtime         | Cached binding fallback   |
+| Withdrawal of treaty ratification     | Atom feed event           |
+
+## Annex J — Sustainability
+
+Registry deployments SHOULD declare their estimated
+energy cost per published expression and per
+resolved ELI / ECLI request. Declarations are
+informative.
+
+## Annex K — Researcher access programme
+
+Comparative-law researchers request access to
+restricted artefacts (e.g. unredacted court
+dossiers, treaty negotiation drafts) via the
+registry's researcher access programme. Each
+request is reviewed by an authority-appointed
+gatekeeper and a documented data-use agreement.
+
+## Annex L — Continuous improvement programme
+
+Each conformant deployment publishes an annual
+improvement plan addressing schema drift, citation
+gaps, harmonisation map stale-rate, and
+accessibility regressions.
+
+## Annex M — Multi-jurisdiction citation crosswalk
+
+A citation that spans jurisdictions (e.g. an EU
+directive cited by a UK statute) is surfaced both
+in the source registry's citation graph and in any
+peering registry that subscribes to the relevant
+Atom feed. The crosswalk preserves the source
+authority's declaration; the destination registry
+adds derivative citations only as informational
+overlays.
+
+## Annex N — Long-term archival preservation
+
+Manifestations are archived in a digital
+preservation system (LOCKSS, Portico, or sovereign
+national archives) with at least three geographic
+copies. The archive records the SHA-512 digest, the
+publishing authority's signature, and the archival
+event timestamp.
+
+## Annex O — Open data license
+
+Where the publishing jurisdiction permits, the
+registry expresses the artefact's license as a W3C
+ODRL 2.2 policy. Common licenses (CC0, CC-BY,
+Open Government License v3) are pre-cached as
+named ODRL profiles.
+
+## Annex P — Citation provenance chain
+
+Each citation carries a provenance chain: the
+publisher of the citing artefact, the date the
+citation was first asserted, and any amendments to
+the citation since. The chain is signed by each
+authority that touches the citation so that
+downstream consumers can verify the chain end-to-
+end.
+
+## Annex Q — Common Cartography for civil-common
+
+A civil-law expression frequently lacks a direct
+common-law analogue. The registry catalogues
+common-cartography mappings under
+`/v1/registry/cartography` so that researchers can
+navigate concept gaps without misrepresenting
+equivalence. Cartography entries carry
+`mappingKind: cartographic` to distinguish them
+from binding harmonisation maps.
+
+## Annex R — Sovereign immunity and procedural overlay
+
+Some artefacts (military justice acts, intelligence
+oversight rulings) are subject to sovereign-immunity
+overlays. The registry permits the publishing
+authority to mark an artefact `restrictedAccess`
+with a public summary while keeping the body
+behind authentication. Auditors verify the
+restriction's lawful basis but do not override the
+publishing authority's decision.
+
+## Annex S — Citizen information services
+
+National citizen-information services (e.g.
+data.gov.uk, EUR-Lex SUMMARY, BÉN public-info
+portals) integrate via Atom feeds and a SHACL
+filter declaring the topical scope of interest.
+The registry surfaces aggregate counters of which
+artefacts are republished by which services so that
+publishing authorities can monitor reach.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
-
-
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.

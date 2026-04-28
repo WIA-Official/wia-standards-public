@@ -706,10 +706,8 @@ Standard error codes:
 ### 10.1 Foundational Papers
 
 1. Elowitz, M.B. & Leibler, S. (2000). "A synthetic oscillatory network of transcriptional regulators"
-2. 선행 연구. "Construction of a genetic toggle switch in E. coli"
 3. Endy, D. (2005). "Foundations for engineering biology"
 4. Keasling, J.D. (2008). "Synthetic biology for synthetic chemistry"
-5. 선행 연구. "Realizing the potential of synthetic biology"
 
 ### 10.2 Assembly Standards
 
