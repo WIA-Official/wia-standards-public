@@ -1,169 +1,290 @@
-# Ride Sharing — Phase 3: Protocol Specification
+# WIA-AUTO-014 — Phase 3: Protocol
 
-> **Version:** 1.0.0
-> **Status:** Official
-> **Last Updated:** 2025-01-01
-> **Philosophy:** 弘益人間 (Benefit All Humanity)
+> Privacy, security, and performance-requirement protocol layer. The driver/rider verification chain and the safety-feature exchanges are wire-level with replay defence applied uniformly.
 
----
+## 10. Privacy and Security
 
-## 1. Overview
+### 10.1 Data Protection
 
-Phase 3 defines communication protocols for real-time data exchange between Ride Sharing components, including management systems and technology platforms. This specification ensures secure, efficient, and interoperable data streaming.
+**Personal data minimization:**
+- Collect only necessary information
+- Anonymize data after 90 days
+- Delete inactive accounts after 2 years
+- Encrypt all PII (Personally Identifiable Information)
 
-### 1.1 Protocol Stack
+**Encryption standards:**
+- Data in transit: TLS 1.3+
+- Data at rest: AES-256
+- Database: Encrypted columns for sensitive data
+- Backups: Encrypted with separate keys
 
+### 10.2 Location Privacy
+
+**Location data handling:**
 ```
-┌─────────────────────────────────────┐
-│      Application Layer              │
-│   (ride-sharing Messages)             │
-├─────────────────────────────────────┤
-│      Presentation Layer             │
-│   (JSON / Protocol Buffers)         │
-├─────────────────────────────────────┤
-│      Session Layer                  │
-│   (Connection Management)           │
-├─────────────────────────────────────┤
-│      Transport Layer                │
-│   (WebSocket / gRPC / MQTT)         │
-├─────────────────────────────────────┤
-│      Security Layer                 │
-│   (TLS 1.3 / mTLS)                 │
-└─────────────────────────────────────┘
-```
+1. Precise location (GPS) shared only during:
+   - Active ride request
+   - Accepted trip
+   - Driver en route or trip in progress
 
----
+2. After trip completion:
+   - Precise locations fuzzy to 100m radius
+   - Exact addresses removed after 30 days
+   - Only city-level data retained for analytics
 
-## 2. Transport Layer
-
-### 2.1 Supported Transports
-
-| Transport | Port | Use Case | Latency |
-|-----------|------|----------|---------|
-| WebSocket | 443 | Web clients, dashboards | Low |
-| gRPC | 443 | Server-to-server, high throughput | Very Low |
-| MQTT | 8883 | IoT devices, sensors | Low |
-| HTTP/2 | 443 | REST fallback, batch operations | Medium |
-
-### 2.2 Connection Management
-
-- Heartbeat interval: 30 seconds
-- Connection timeout: 60 seconds
-- Maximum reconnection attempts: 10 with exponential backoff
-- Session resumption supported via session tokens
-
----
-
-## 3. Message Format
-
-### 3.1 Message Envelope
-
-```json
-{
-  "header": {
-    "messageId": "uuid-v4",
-    "type": "DATA|COMMAND|EVENT|ACK|ERROR",
-    "source": "node-id",
-    "destination": "node-id-or-broadcast",
-    "timestamp": "2025-01-15T10:30:00.000Z",
-    "correlationId": "uuid-v4",
-    "version": "1.0.0"
-  },
-  "payload": {},
-  "signature": "base64-encoded-hmac"
-}
+3. Location sharing controls:
+   - User can disable location when app not in use
+   - Must consent to background location (for safety)
+   - Can review location history
+   - Can request location data deletion
 ```
 
-### 3.2 Message Types
+### 10.3 Phone Number Privacy
 
-| Type | Direction | Description |
-|------|-----------|-------------|
-| DATA | Uni/Bi | operational data transmission |
-| COMMAND | Request | Control instruction |
-| EVENT | Publish | State change notification |
-| ACK | Response | Delivery confirmation |
-| ERROR | Response | Error notification |
-
----
-
-## 4. Protocol Flow
-
-### 4.1 Connection Establishment
-
+**Anonymous communication:**
 ```
-Client                          Server
-  │                                │
-  │─── 1. TLS Handshake ─────────▶│
-  │◀── 2. Certificate Verify ─────│
-  │─── 3. Auth Token ────────────▶│
-  │◀── 4. Session Established ────│
-  │─── 5. Subscribe Channels ────▶│
-  │◀── 6. Subscription ACK ──────│
-  │                                │
-  │◀══ 7. Data Stream ═══════════▶│
+- Use proxy phone numbers for rider-driver communication
+- Calls routed through platform (no number exposure)
+- SMS relayed with masked numbers
+- Numbers revealed only after mutual consent
+- Communication available only during active trip ± 24 hours
 ```
 
-### 4.2 Data Exchange
+### 10.4 Payment Security
 
-1. Publisher sends DATA message to designated channel
-2. Server validates message schema and permissions
-3. Server routes to subscribed consumers
-4. Consumers send ACK upon successful processing
-5. Server tracks delivery status per consumer
+**PCI DSS compliance:**
+- Never store full card numbers
+- Use tokenization for payment methods
+- 3D Secure for card verification
+- Fraud detection algorithms
+- Transaction monitoring
 
----
+### 10.5 Access Control
 
-## 5. State Machine
+**Role-based access:**
+```
+Riders:
+- View/edit own profile
+- Request rides
+- View trip history
+- Rate drivers
 
-### 5.1 Connection States
+Drivers:
+- View/edit own profile
+- Accept/reject rides
+- View earnings
+- Rate riders
 
-| State | Description | Transitions |
-|-------|-------------|-------------|
-| DISCONNECTED | No active connection | → CONNECTING |
-| CONNECTING | Handshake in progress | → CONNECTED, DISCONNECTED |
-| CONNECTED | Authenticated session | → SUBSCRIBED, DISCONNECTED |
-| SUBSCRIBED | Receiving data | → CONNECTED, DISCONNECTED |
-| RECONNECTING | Auto-reconnect | → CONNECTED, DISCONNECTED |
+Admins:
+- View aggregated data
+- Manage accounts
+- Resolve disputes
+- Access audit logs
 
-### 5.2 Message Processing States
+Safety Team:
+- Access trip data during incidents
+- View GPS tracks
+- Listen to emergency recordings
+- Contact users
+```
 
-| State | Description |
-|-------|-------------|
-| PENDING | Message queued for delivery |
-| DELIVERED | Message received by consumer |
-| PROCESSED | Consumer acknowledged processing |
-| FAILED | Delivery or processing failed |
-| EXPIRED | TTL exceeded |
+### 10.6 Audit Logging
 
----
+```
+Log all security-relevant events:
+- Login attempts (success/failure)
+- Account changes
+- Payment transactions
+- Trip start/complete
+- Emergency activations
+- Admin actions
+- Data exports
+- System access
 
-## 6. Quality of Service
-
-| QoS Level | Guarantee | Use Case |
-|-----------|-----------|----------|
-| 0 | At most once | Telemetry, non-critical |
-| 1 | At least once | Standard operations |
-| 2 | Exactly once | Financial, safety-critical |
-
----
-
-## 7. Security
-
-### 7.1 Requirements
-
-- TLS 1.3 mandatory for all connections
-- Mutual TLS (mTLS) for server-to-server
-- Message-level signing with HMAC-SHA256
-- Token rotation every 3600 seconds
-
-### 7.2 Access Control
-
-Channel-based permissions with role-based access control (RBAC):
-- `publish`: Send messages to channel
-- `subscribe`: Receive messages from channel
-- `admin`: Manage channel configuration
+Retention: 7 years minimum
+```
 
 ---
 
-**© 2025 SmileStory Inc. / WIA - World Certification Industry Association**
-**弘益人間 · Benefit All Humanity**
+
+## 11. Performance Requirements
+
+### 11.1 API Response Times
+
+```
+Endpoint                    Target      Maximum
+-------------------------------------------------
+Fare estimate              < 200ms     500ms
+Ride request               < 500ms     1s
+Driver match               < 2s        5s
+Location update            < 100ms     300ms
+Trip status                < 200ms     500ms
+Payment processing         < 1s        3s
+```
+
+### 11.2 Availability
+
+```
+Service Level Agreement (SLA):
+- Uptime: 99.9% (< 8.76 hours downtime/year)
+- Peak hours: 99.95%
+- Planned maintenance: < 4 hours/month
+- Incident response: < 15 minutes
+```
+
+### 11.3 Scalability
+
+```
+System must support:
+- 1M+ concurrent users
+- 100K+ active drivers
+- 10K+ requests/second
+- 1M+ trips/day
+- 100GB+ data/day
+
+Auto-scaling triggers:
+- CPU > 70%: Scale up
+- Request queue > 1000: Add instances
+- Response time > target × 2: Alert + scale
+```
+
+### 11.4 Location Update Frequency
+
+```
+Driver location updates:
+- Active trip: Every 5 seconds
+- Waiting for trip: Every 30 seconds
+- Driver heading to pickup: Every 5 seconds
+
+Rider location (for pickup):
+- Shared only when requested
+- Updated every 10 seconds
+- Stopped after pickup
+```
+
+---
+
+
+
+## A.1 Privacy-preserving matching
+
+Naive matching reveals every rider's pickup point to every
+nearby driver. The privacy-preserving matching protocol shows
+each driver only the matched rider's pickup point, never the
+queue of unmatched candidates. The protocol envelopes carry
+encrypted pickup points; the platform decrypts only the matched
+pickup before sending to the matched driver.
+
+## A.2 Safety and security exchanges
+
+Safety-feature exchanges (SOS button, in-trip check-in, share-trip
+with trusted contact) flow as signed envelopes audited per the
+standard's discipline. The audit log replicates across at least
+two storage backends with retention sized to regulatory
+requirements (typically 5 years for safety-incident records).
+
+## A.3 Performance requirements
+
+The standard recommends performance targets:
+
+| Operation | Target latency | Failure budget |
+|-----------|----------------|----------------|
+| Ride request → matched driver | ≤ 30 s | 1% per month |
+| Driver location update → rider's app | ≤ 5 s | 0.5% per month |
+| SOS button press → safety operations centre | ≤ 3 s | 0.01% per month |
+| Trip-end → fare settlement | ≤ 60 s | 1% per month |
+
+Hosts publishing performance below these targets MUST emit a
+warning envelope; sustained breach triggers a regulator notification
+in jurisdictions with explicit ride-sharing oversight.
+
+## A.4 Replay defence
+
+Standard 96-bit nonce + 300-second skew window + 600-second
+seen-nonce cache.
+
+
+## Z.1 Glossary
+
+The companion glossary at `https://wiastandards.com/ride-sharing/glossary/`
+expands every term used throughout this Phase. Implementers
+unfamiliar with the domain should treat it as load-bearing reading.
+
+## Z.2 Cross-standard composition
+
+This Phase composes with: **WIA-OMNI-API** (credential storage),
+**WIA-AIR-SHIELD** (runtime trust list), **WIA-SOCIAL Phase 3 §5**
+(federation handshake), and **WIA-INTENT** (workload intent
+declaration).
+
+## Z.3 Conformance test suite + reference container
+
+A black-box conformance test suite at
+`https://github.com/WIA-Official/wia-ride-sharing-conformance` walks
+every public endpoint and protocol exchange. The reference
+container at `wia/ride-sharing-host:1.0.0` implements every Phase 2
+endpoint with mock data so integrators exercise their bridge
+before production. The companion CLI at `cli/ride-sharing.sh` ships
+sample envelope generators (validate, info, plus phase-specific
+subcommands) so an implementer can produce conformant payloads
+without hand-rolling JSON.
+
+## Z.4 Implementation runbook
+
+A first implementation typically follows: (1) stand up reference
+container, (2) run conformance suite against it, (3) replace mock
+backend with real backend one endpoint at a time, (4) wire up audit
+log replication, (5) onboard a single trusted peer for federation,
+(6) expand to multiple peers, (7) promote to production with
+warning-envelope subscription.
+
+## Z.5 Backwards-compatibility promise + governance
+
+Within the 1.x line every Phase 1 envelope shape, every Phase 2
+endpoint, and every Phase 3 protocol exchange MUST remain reachable.
+Hosts MAY add optional fields and new envelopes; hosts MUST NOT
+remove existing ones. Breaking changes ride a major version bump
+with a 12-month deprecation window per IETF RFC 8594 / 9745, and
+require a two-thirds Committee vote.
+
+弘益人間 — Benefit All Humanity.
+
+
+## Z.6 Closing implementer note
+
+This Phase fits inside the larger ride-sharing standard's four-Phase
+architecture. The Phase 1 envelopes are the wire-format
+contract; Phase 2 surfaces them through HTTPS; Phase 3 wraps
+them in protocol exchanges that cross trust boundaries; Phase
+4 integrates with the broader ecosystem of regulators, peer
+standards, and existing platform tooling.
+
+A first implementation of this Phase typically takes one
+engineer-week for a team already familiar with the underlying
+domain; subsequent phases of the same standard build on the
+identity, signature, and audit infrastructure laid down here
+so each phase is faster than the previous.
+
+
+
+## A.5 Federation across operators
+
+Cross-operator ride-share federation lets a rider on platform A be
+matched with a driver on platform B. The federation envelope reuses
+WIA-SOCIAL Phase 3 §5 receipt shape; trust lists carry the peer
+operators identity plus revenue-sharing rules.
+
+## A.6 Audit log replication
+
+Audit envelopes are written to an append-only log replicated across
+at least two storage backends. Retention is sized to the longest
+applicable regulatory window: 5 years for safety-incident records
+in most jurisdictions, 7 years for tax-related ride records.
+
+## A.7 Closing protocol note
+
+Ride-sharing protocols are sensitive to abuse: fake matches, GPS
+spoofing, fare manipulation, identity fraud. The standards
+discipline is intentionally rigid to limit the abuse surface;
+operators weakening it must opt out explicitly and log the opt-out
+in the audit trail.

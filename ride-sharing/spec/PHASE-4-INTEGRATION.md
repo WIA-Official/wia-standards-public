@@ -1,182 +1,255 @@
-# Ride Sharing — Phase 4: Integration Specification
+# WIA-AUTO-014 — Phase 4: Integration
 
-> **Version:** 1.0.0
-> **Status:** Official
-> **Last Updated:** 2025-01-01
-> **Philosophy:** 弘益人間 (Benefit All Humanity)
+> References and worked-example appendix that anchor the entire specification.
+
+## 12. References
+
+### 12.1 Related Standards
+
+- **WIA-INTENT**: Intent-based ride booking
+- **WIA-OMNI-API**: Universal API gateway
+- **WIA-PAYMENT**: Payment processing standard
+- **WIA-IDENTITY**: Identity verification standard
+- **WIA-LOCATION**: Location services standard
+- **WIA-SOCIAL**: Social features and sharing
+
+### 12.2 External References
+
+1. **Transportation Research**: "Shared Mobility: Current Practices and Guiding Principles" (FHWA, 2016)
+2. **Dynamic Pricing**: ISO/IEC 19770 series — Software Asset Management baseline conventions for usage-based pricing models
+3. **Route Optimization**: OGC GeoPackage and ISO 19156 Observations and Measurements for time-windowed routing inputs
+4. **Safety Standards**: "ISO 39001:2012 Road traffic safety management systems"
+5. **Data Privacy**: "GDPR Compliance for Ride-Sharing Platforms" (EU, 2018)
+
+### 12.3 Industry Best Practices
+
+- **NHTSA**: Automated Vehicle Guidelines
+- **PCI DSS**: Payment Card Industry Data Security Standard
+- **WCAG 2.1**: Web Content Accessibility Guidelines
+- **ISO 27001**: Information Security Management
 
 ---
 
-## 1. Overview
 
-Phase 4 defines integration patterns and requirements for deploying Ride Sharing within existing infrastructure. This specification covers system architecture, integration patterns, testing requirements, and deployment guidelines for management systems and technology platforms.
+## Appendix A: Example Calculations
 
-### 1.1 Integration Goals
-
-- **Interoperability:** Seamless data exchange with existing Technology systems
-- **Scalability:** Support for deployments from single-node to enterprise scale
-- **Reliability:** 99.9% uptime SLA with graceful degradation
-- **Security:** End-to-end encryption and compliance with data regulations
-
----
-
-## 2. System Architecture
-
-### 2.1 Reference Architecture
+### A.1 Fare Calculation Example
 
 ```
-┌─────────────────────────────────────────────┐
-│                 API Gateway                  │
-│            (Rate Limiting, Auth)             │
-└──────────────────┬──────────────────────────┘
-                   │
-         ┌─────────┼─────────┐
-         │         │         │
-    ┌────┴────┐ ┌──┴───┐ ┌──┴──────┐
-    │  Core   │ │ Data │ │Analytics│
-    │ Service │ │ Store│ │ Engine  │
-    └────┬────┘ └──┬───┘ └──┬──────┘
-         │         │         │
-    ┌────┴─────────┴─────────┴────┐
-    │       Message Queue          │
-    │   (Event-Driven Backbone)    │
-    └──────────────┬───────────────┘
-                   │
-         ┌─────────┼─────────┐
-         │         │         │
-    ┌────┴────┐ ┌──┴───┐ ┌──┴──────┐
-    │External │ │ IoT  │ │  Third  │
-    │ Systems │ │Bridge│ │  Party  │
-    └─────────┘ └──────┘ └─────────┘
+Trip details:
+- Distance: 15.3 km
+- Duration: 25 minutes
+- Vehicle: Sedan
+- Time: Evening rush hour (6:30 PM)
+- Demand/Supply ratio: 2.5
+
+Calculation:
+1. Base fare:
+   B_base = $3.50
+   D × R_distance = 15.3 × $1.20 = $18.36
+   T × R_time = 25 × $0.35 = $8.75
+   B = $3.50 + $18.36 + $8.75 = $30.61
+
+2. Surge multiplier:
+   S = max(0, min(3.0, 1.0 × ln(2.5)))
+   S = min(3.0, 0.916) = 0.916
+   S_rounded = 1.0 (no surge)
+
+3. Time coefficient:
+   P_peak = 0.15 (evening rush)
+   T_coef = 0.15
+
+4. Final price:
+   P = $30.61 × (1 + 0) × (1 + 0) × (1 + 0.15)
+   P = $30.61 × 1.15 = $35.20
+
+5. Fare range:
+   Fare_min = $35.20 × 0.85 = $29.92
+   Fare_max = $35.20 × 1.15 = $40.48
+
+Display: $30 - $40 (estimated $35)
 ```
 
-### 2.2 Component Responsibilities
+### A.2 Matching Score Example
 
-| Component | Responsibility |
-|-----------|---------------|
-| API Gateway | Request routing, authentication, rate limiting |
-| Core Service | Business logic, validation, orchestration |
-| Data Store | Persistent storage, caching, indexing |
-| Analytics Engine | Real-time and batch analytics |
-| Message Queue | Async communication, event distribution |
-| IoT Bridge | Device protocol translation |
+```
+Scenario:
+- Rider at (37.7749, -122.4194)
+- Driver A: 2.5 km away, rating 4.9, ETA 5 min
+- Driver B: 5.0 km away, rating 4.5, ETA 10 min
 
----
+Driver A:
+D(A,r) = 1 - (2.5 / 10) = 0.75
+T(A,r) = 1 - (5 / 15) = 0.67
+R(A) = (4.9 - 3.0) / (5.0 - 3.0) = 0.95
+V(A,r) = 1.0 (vehicle matches)
 
-## 3. Integration Patterns
+M(A,r) = 0.35×0.75 + 0.25×0.67 + 0.20×0.95 + 0.10×0.8 + 0.10×1.0
+       = 0.2625 + 0.1675 + 0.19 + 0.08 + 0.10
+       = 0.80
 
-### 3.1 Adapter Pattern
+Driver B:
+D(B,r) = 1 - (5.0 / 10) = 0.50
+T(B,r) = 1 - (10 / 15) = 0.33
+R(B) = (4.5 - 3.0) / (5.0 - 3.0) = 0.75
+V(B,r) = 1.0
 
-For connecting legacy management systems:
-- Implement the `WIAride_sharingAdapter` interface
-- Handle data transformation between formats
-- Manage connection lifecycle and error recovery
+M(B,r) = 0.35×0.50 + 0.25×0.33 + 0.20×0.75 + 0.10×0.8 + 0.10×1.0
+       = 0.175 + 0.0825 + 0.15 + 0.08 + 0.10
+       = 0.5875
 
-### 3.2 Event-Driven Integration
-
-```json
-{
-  "pattern": "publish-subscribe",
-  "channels": [
-    "ride-sharing.data.ingested",
-    "ride-sharing.resource.updated",
-    "ride-sharing.alert.triggered"
-  ]
-}
+Result: Driver A matched (higher score)
 ```
 
-### 3.3 Batch Integration
-
-For bulk data operations:
-- Maximum batch size: 10,000 records
-- Supported formats: JSON Lines, CSV, Parquet
-- Scheduling: Cron-based or event-triggered
-
 ---
 
-## 4. Testing Requirements
+**弘益人間 (홍익인간) · Benefit All Humanity**
 
-### 4.1 Conformance Tests
+*WIA-AUTO-014 Specification v1.0*
+*© 2025 SmileStory Inc. / WIA*
 
-| Test Category | Description | Required |
-|---------------|-------------|----------|
-| Schema Validation | Verify data format compliance | Yes |
-| API Contract | Test all endpoints per Phase 2 | Yes |
-| Protocol Compliance | Verify message flow per Phase 3 | Yes |
-| Performance | Load testing under expected traffic | Yes |
-| Security | Penetration testing, auth verification | Yes |
-| Integration | End-to-end with reference systems | Yes |
 
-### 4.2 Performance Benchmarks
+## A.1 Privacy and security integration
 
-| Metric | Target |
-|--------|--------|
-| API Response Time (p95) | < 200ms |
-| Throughput | > 1000 req/s per node |
-| Data Ingestion Latency | < 500ms |
-| System Availability | 99.9% |
+Ride-sharing data is highly sensitive: location traces, identity,
+payment, and behavioural patterns. The standard requires:
 
-### 4.3 Certification
+- **Location privacy**: pickup and dropoff are encrypted at rest;
+  only the matched rider/driver pair sees the unencrypted
+  endpoints during the ride window
+- **Identity verification**: WIA-OMNI-API credentials with
+  third-party verification (DMV, ID document scan)
+- **Payment isolation**: PCI-DSS-compliant tokenisation
+- **Lawful intercept compatibility**: declared in discovery document
+  per jurisdiction; envelopes carry the lawful-intercept attestation
+  when applicable
 
-Implementations must pass the WIA conformance test suite to receive certification. Test results are submitted to the WIA Certification Portal.
+## A.2 Regulatory integration
 
----
+Ride-sharing is regulated jurisdiction-by-jurisdiction. The
+standard's discovery document declares the operator's licensed
+jurisdictions and the regulatory mode applied (full TNC licence,
+limited livery licence, etc.). Envelopes carry the jurisdiction
+identifier so the regulator can subscribe to relevant audit feeds.
 
-## 5. Deployment Guide
+## A.3 Bridges to existing platforms
 
-### 5.1 Prerequisites
+The bridge profile maps to: SAE J3216 (Cooperative Driving
+Automation), GTFS-Flex (demand-responsive transport), and
+TransitData reporting frameworks for ride-sharing-as-public-transit
+deployments.
 
-- Runtime: Container-based (Docker/Kubernetes) or VM
-- Database: PostgreSQL 14+ or compatible
-- Message Queue: Apache Kafka, RabbitMQ, or NATS
-- TLS certificates from trusted CA
+## A.4 References
 
-### 5.2 Configuration
+- ISO 6709 — Geographic point representation
+- ISO 4217 — Currency codes
+- ISO/IEC 27001 — information security management
+- IETF RFC 3339 — Date and Time
+- W3C DID Core — decentralised identifiers
+- WIA-OMNI-API credentials standard
 
-Environment variables:
-```
-WIA_STANDARD=ride-sharing
-WIA_VERSION=1.0.0
-WIA_LOG_LEVEL=info
-WIA_DB_URL=postgresql://...
-WIA_QUEUE_URL=nats://...
-WIA_TLS_CERT=/path/to/cert.pem
-WIA_TLS_KEY=/path/to/key.pem
-```
+## A.5 Roadmap
 
-### 5.3 Health Checks
+| Version | Focus |
+|---------|-------|
+| 1.0.0 | Initial publication: matching, dynamic pricing, safety, payment stable |
+| 1.1.x | Additive: autonomous-vehicle integration patterns |
+| 1.2.x | Additive: confidential ride records inside TEEs |
+| 2.0.0 | Possible breaking change: post-quantum signature suite migration |
 
-| Endpoint | Description |
-|----------|-------------|
-| /health/live | Liveness probe |
-| /health/ready | Readiness probe (all dependencies) |
-| /health/version | Version and build info |
 
-### 5.4 Monitoring
+## Z.1 Glossary
 
-- Metrics: Prometheus-compatible `/metrics` endpoint
-- Logging: Structured JSON logs (ELK/Loki compatible)
-- Tracing: OpenTelemetry support for distributed tracing
+The companion glossary at `https://wiastandards.com/ride-sharing/glossary/`
+expands every term used throughout this Phase. Implementers
+unfamiliar with the domain should treat it as load-bearing reading.
 
----
+## Z.2 Cross-standard composition
 
-## 6. Migration Guide
+This Phase composes with: **WIA-OMNI-API** (credential storage),
+**WIA-AIR-SHIELD** (runtime trust list), **WIA-SOCIAL Phase 3 §5**
+(federation handshake), and **WIA-INTENT** (workload intent
+declaration).
 
-### 6.1 From Legacy Systems
+## Z.3 Conformance test suite + reference container
 
-1. Deploy adapter alongside existing system
-2. Enable dual-write mode for data synchronization
-3. Validate data consistency between old and new systems
-4. Gradually shift traffic to WIA-compliant system
-5. Decommission legacy components after validation period
+A black-box conformance test suite at
+`https://github.com/WIA-Official/wia-ride-sharing-conformance` walks
+every public endpoint and protocol exchange. The reference
+container at `wia/ride-sharing-host:1.0.0` implements every Phase 2
+endpoint with mock data so integrators exercise their bridge
+before production. The companion CLI at `cli/ride-sharing.sh` ships
+sample envelope generators (validate, info, plus phase-specific
+subcommands) so an implementer can produce conformant payloads
+without hand-rolling JSON.
 
-### 6.2 Version Upgrades
+## Z.4 Implementation runbook
 
-- Minor versions: Rolling update, no downtime
-- Major versions: Blue-green deployment recommended
-- Database migrations: Automated via migration scripts
+A first implementation typically follows: (1) stand up reference
+container, (2) run conformance suite against it, (3) replace mock
+backend with real backend one endpoint at a time, (4) wire up audit
+log replication, (5) onboard a single trusted peer for federation,
+(6) expand to multiple peers, (7) promote to production with
+warning-envelope subscription.
 
----
+## Z.5 Backwards-compatibility promise + governance
 
-**© 2025 SmileStory Inc. / WIA - World Certification Industry Association**
-**弘益人間 · Benefit All Humanity**
+Within the 1.x line every Phase 1 envelope shape, every Phase 2
+endpoint, and every Phase 3 protocol exchange MUST remain reachable.
+Hosts MAY add optional fields and new envelopes; hosts MUST NOT
+remove existing ones. Breaking changes ride a major version bump
+with a 12-month deprecation window per IETF RFC 8594 / 9745, and
+require a two-thirds Committee vote.
+
+弘益人間 — Benefit All Humanity.
+
+## A.6 TEE-protected matching
+
+Confidential matching runs the matching algorithm inside a TEE so
+even the platform operator cannot observe the queue of unmatched
+candidates. This raises the privacy bar from current industry
+practice; jurisdictions with strong location-privacy laws (EU under
+GDPR, KR under PIPA) increasingly require this level of protection.
+
+## A.7 Autonomous-vehicle integration
+
+When ride-sharing fleets adopt autonomous vehicles, the standard's
+ride-request envelope flows directly to the autonomous vehicle's
+mission-planning stack. The bridge profile maps the ride request to
+SAE J3016 levels of automation and the fallback-driver attestation
+when applicable.
+
+## A.8 Cross-platform federation
+
+Cross-platform federation (a rider on Platform A matched with a
+driver on Platform B) uses WIA-SOCIAL Phase 3 §5 federation
+receipts. The two platforms share signed match envelopes with
+documented revenue-sharing per ride.
+
+## A.9 Closing implementer note
+
+Ride-sharing is one of the most location-sensitive standards in the
+WIA family. The privacy discipline is mandatory rather than
+recommended: hosts that fail privacy conformance are refused on the
+public registry. The reference container ships with privacy-by-default
+configuration; operators MUST consciously opt in to weaker privacy
+modes (e.g., for jurisdictions that mandate plain-text dispatch logs)
+and MUST log every opt-in to the audit trail.
+
+
+
+## A.10 Roadmap
+
+The next decade of ride-sharing will see: full autonomous-vehicle
+fleets entering service, regulatory unification across cities, and
+greater privacy expectations from riders. The standards envelope
+schema is designed to absorb these transitions without breaking
+existing implementations.
+
+## A.11 Reference deployment
+
+A first deployment typically targets a single metropolitan area
+with a fleet of 1000-5000 drivers and 100k-500k riders. The
+reference deployment guide documents per-region capacity sizing,
+per-region regulatory mapping, and the operations runbook for the
+first 90 days of production.
