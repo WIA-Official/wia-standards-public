@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 4-03: Smart Pointers - Rust NRT Academy</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e94560;
+            overflow: hidden;
+        }
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            display: none;
+            flex-direction: column;
+        }
+        .slide.active { display: flex; }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+        .logo { font-size: 28px; font-weight: bold; color: #e94560; }
+        .episode-tag {
+            background: linear-gradient(90deg, #e94560, #ff6b6b);
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-size: 18px;
+            color: white;
+        }
+        .lang-toggle { display: flex; gap: 10px; }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 2px solid #e94560;
+            background: transparent;
+            color: #e94560;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .lang-btn.active { background: #e94560; color: white; }
+
+        h1 {
+            font-size: 68px;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #e94560, #ff6b6b, #ffc371);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+        h2 { font-size: 48px; color: #ff6b6b; margin-bottom: 30px; }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .code-block {
+            background: #0a0a12;
+            border-radius: 20px;
+            padding: 35px;
+            margin: 15px 0;
+            border: 2px solid #e94560;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 24px;
+            line-height: 1.5;
+            position: relative;
+        }
+        .code-block::before {
+            content: 'RUST';
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            color: #e94560;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateX(-30px);
+            animation: slideIn 0.5s forwards;
+        }
+        @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+
+        .keyword { color: #ff6b6b; }
+        .type { color: #ffc371; }
+        .string { color: #a8e6cf; }
+        .comment { color: #6b7280; font-style: italic; }
+        .function { color: #74b9ff; }
+        .number { color: #fab1a0; }
+        .macro { color: #a29bfe; }
+        .pointer { color: #00cec9; }
+
+        .concept-box {
+            background: linear-gradient(135deg, rgba(233, 69, 96, 0.2), rgba(255, 107, 107, 0.1));
+            border: 2px solid #e94560;
+            border-radius: 20px;
+            padding: 30px;
+            margin: 15px 0;
+        }
+
+        .flex-container { display: flex; gap: 30px; align-items: flex-start; }
+        .flex-item { flex: 1; }
+
+        .highlight { color: #ffc371; font-weight: bold; }
+
+        .pointer-box {
+            background: rgba(0, 206, 201, 0.1);
+            border: 2px solid #00cec9;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 10px 0;
+        }
+
+        .diagram {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .box {
+            padding: 20px 40px;
+            border-radius: 15px;
+            font-size: 22px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .box-stack {
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+            color: white;
+        }
+        .box-heap {
+            background: linear-gradient(135deg, #00cec9, #74b9ff);
+            color: white;
+        }
+        .arrow {
+            font-size: 36px;
+            color: #ffc371;
+        }
+
+        .bullet-list {
+            list-style: none;
+            font-size: 24px;
+            line-height: 1.8;
+        }
+        .bullet-list li::before { content: '🦀 '; }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #e94560, #ffc371);
+            transition: width 0.3s;
+        }
+        .slide-number {
+            position: fixed;
+            bottom: 20px;
+            right: 40px;
+            font-size: 24px;
+            color: #e94560;
+        }
+        .nav-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 40px;
+            font-size: 18px;
+            color: #6b7280;
+        }
+
+        .ko { display: block; }
+        .en { display: none; }
+        body.lang-en .ko { display: none; }
+        body.lang-en .en { display: block; }
+
+        .center { text-align: center; }
+        .subtitle { font-size: 28px; color: #a8e6cf; text-align: center; margin-bottom: 30px; }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 20px;
+        }
+        .comparison-table th, .comparison-table td {
+            padding: 15px;
+            text-align: left;
+            border: 2px solid #e94560;
+        }
+        .comparison-table th { background: rgba(233, 69, 96, 0.3); color: #ffc371; }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">EP 4-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="content center">
+            <h1>Smart Pointers</h1>
+            <p class="subtitle ko">스마트 포인터: Box, Rc, RefCell</p>
+            <p class="subtitle en">Smart Pointers: Box, Rc, RefCell</p>
+            <div class="diagram">
+                <div class="box box-stack">Stack<br>📦 Box&lt;T&gt;</div>
+                <div class="arrow">→</div>
+                <div class="box box-heap">Heap<br>💾 Data</div>
+            </div>
+            <p style="font-size: 26px; color: #6b7280; margin-top: 30px;">
+                <span class="ko">포인터 + 추가 기능 = 메모리 관리의 혁신</span>
+                <span class="en">Pointers + Extra Features = Memory Management Revolution</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Slide 2: Box<T> -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Box&lt;T&gt;</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">Box&lt;T&gt; - 힙 할당의 기본</h2>
+        <h2 class="en">Box&lt;T&gt; - The Basics of Heap Allocation</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// 스택에 저장 (기본)</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="keyword">let</span> x = <span class="number">5</span>;  <span class="comment">// i32는 스택에</span></div>
+                <div class="code-line" style="animation-delay: 0.4s"></div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="comment">// 힙에 저장 (Box 사용)</span></div>
+                <div class="code-line" style="animation-delay: 0.6s"><span class="keyword">let</span> boxed = <span class="pointer">Box</span>::<span class="function">new</span>(<span class="number">5</span>);  <span class="comment">// i32가 힙에!</span></div>
+                <div class="code-line" style="animation-delay: 0.8s"></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="comment">// 재귀적 타입 정의에 필수!</span></div>
+                <div class="code-line" style="animation-delay: 1.0s"><span class="keyword">enum</span> <span class="type">List</span> {</div>
+                <div class="code-line" style="animation-delay: 1.1s">    <span class="type">Cons</span>(<span class="type">i32</span>, <span class="pointer">Box</span>&lt;<span class="type">List</span>&gt;),  <span class="comment">// 자기 참조!</span></div>
+                <div class="code-line" style="animation-delay: 1.2s">    <span class="type">Nil</span>,</div>
+                <div class="code-line" style="animation-delay: 1.3s">}</div>
+                <div class="code-line" style="animation-delay: 1.5s"></div>
+                <div class="code-line" style="animation-delay: 1.6s"><span class="keyword">let</span> list = <span class="type">Cons</span>(<span class="number">1</span>, <span class="pointer">Box</span>::<span class="function">new</span>(<span class="type">Cons</span>(<span class="number">2</span>, <span class="pointer">Box</span>::<span class="function">new</span>(<span class="type">Nil</span>))));</div>
+            </div>
+            <div class="concept-box">
+                <p style="font-size: 22px;">
+                    <span class="ko">💡 <span class="highlight">Box</span>는 단일 소유권을 가진 힙 포인터입니다. 스코프를 벗어나면 자동 해제!</span>
+                    <span class="en">💡 <span class="highlight">Box</span> is a heap pointer with single ownership. Auto-freed when out of scope!</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 3: Rc<T> -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Rc&lt;T&gt;</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">Rc&lt;T&gt; - 참조 카운팅 (공유 소유권)</h2>
+        <h2 class="en">Rc&lt;T&gt; - Reference Counting (Shared Ownership)</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">use</span> std::rc::<span class="pointer">Rc</span>;</div>
+                <div class="code-line" style="animation-delay: 0.3s"></div>
+                <div class="code-line" style="animation-delay: 0.4s"><span class="keyword">let</span> data = <span class="pointer">Rc</span>::<span class="function">new</span>(<span class="string">"Hello, Rust!"</span>);</div>
+                <div class="code-line" style="animation-delay: 0.6s"></div>
+                <div class="code-line" style="animation-delay: 0.7s"><span class="comment">// clone()은 데이터 복사 아님! 참조 카운트만 증가</span></div>
+                <div class="code-line" style="animation-delay: 0.8s"><span class="keyword">let</span> a = <span class="pointer">Rc</span>::<span class="function">clone</span>(&amp;data);  <span class="comment">// count: 2</span></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="keyword">let</span> b = <span class="pointer">Rc</span>::<span class="function">clone</span>(&amp;data);  <span class="comment">// count: 3</span></div>
+                <div class="code-line" style="animation-delay: 1.1s"></div>
+                <div class="code-line" style="animation-delay: 1.2s"><span class="macro">println!</span>(<span class="string">"참조 수: {}"</span>, <span class="pointer">Rc</span>::<span class="function">strong_count</span>(&amp;data));  <span class="comment">// 3</span></div>
+                <div class="code-line" style="animation-delay: 1.4s"></div>
+                <div class="code-line" style="animation-delay: 1.5s"><span class="keyword">drop</span>(a);  <span class="comment">// count: 2</span></div>
+                <div class="code-line" style="animation-delay: 1.6s"><span class="keyword">drop</span>(b);  <span class="comment">// count: 1</span></div>
+                <div class="code-line" style="animation-delay: 1.7s"><span class="comment">// data가 마지막이면 메모리 해제!</span></div>
+            </div>
+            <div class="pointer-box">
+                <p style="font-size: 22px;">
+                    <span class="ko">⚠️ <span class="highlight">Rc</span>는 단일 스레드 전용입니다. 멀티스레드에서는 <span class="highlight">Arc</span>를 사용하세요!</span>
+                    <span class="en">⚠️ <span class="highlight">Rc</span> is single-threaded only. Use <span class="highlight">Arc</span> for multi-threading!</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: RefCell<T> -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">RefCell&lt;T&gt;</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">RefCell&lt;T&gt; - 내부 가변성</h2>
+        <h2 class="en">RefCell&lt;T&gt; - Interior Mutability</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">use</span> std::cell::<span class="pointer">RefCell</span>;</div>
+                <div class="code-line" style="animation-delay: 0.3s"></div>
+                <div class="code-line" style="animation-delay: 0.4s"><span class="comment">// 불변 참조로 가변 데이터 수정!</span></div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="keyword">let</span> data = <span class="pointer">RefCell</span>::<span class="function">new</span>(<span class="number">5</span>);</div>
+                <div class="code-line" style="animation-delay: 0.7s"></div>
+                <div class="code-line" style="animation-delay: 0.8s"><span class="comment">// borrow_mut()로 가변 참조 얻기</span></div>
+                <div class="code-line" style="animation-delay: 0.9s">*data.<span class="function">borrow_mut</span>() += <span class="number">10</span>;</div>
+                <div class="code-line" style="animation-delay: 1.1s"></div>
+                <div class="code-line" style="animation-delay: 1.2s"><span class="comment">// borrow()로 불변 참조</span></div>
+                <div class="code-line" style="animation-delay: 1.3s"><span class="macro">println!</span>(<span class="string">"{}"</span>, *data.<span class="function">borrow</span>());  <span class="comment">// 15</span></div>
+                <div class="code-line" style="animation-delay: 1.5s"></div>
+                <div class="code-line" style="animation-delay: 1.6s"><span class="comment">// ⚠️ 런타임에 빌림 규칙 검사!</span></div>
+                <div class="code-line" style="animation-delay: 1.7s"><span class="comment">// 동시에 여러 가변 참조 → panic!</span></div>
+            </div>
+            <div class="concept-box">
+                <p style="font-size: 22px;">
+                    <span class="ko">💡 <span class="highlight">RefCell</span>은 컴파일 타임이 아닌 런타임에 빌림 규칙을 검사합니다.</span>
+                    <span class="en">💡 <span class="highlight">RefCell</span> checks borrowing rules at runtime, not compile time.</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 5: Rc + RefCell -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Rc + RefCell</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">Rc&lt;RefCell&lt;T&gt;&gt; - 황금 조합</h2>
+        <h2 class="en">Rc&lt;RefCell&lt;T&gt;&gt; - The Golden Combination</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">use</span> std::rc::<span class="pointer">Rc</span>;</div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="keyword">use</span> std::cell::<span class="pointer">RefCell</span>;</div>
+                <div class="code-line" style="animation-delay: 0.4s"></div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="comment">// 여러 소유자가 가변 데이터 공유!</span></div>
+                <div class="code-line" style="animation-delay: 0.6s"><span class="keyword">let</span> shared = <span class="pointer">Rc</span>::<span class="function">new</span>(<span class="pointer">RefCell</span>::<span class="function">new</span>(<span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]));</div>
+                <div class="code-line" style="animation-delay: 0.8s"></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="keyword">let</span> a = <span class="pointer">Rc</span>::<span class="function">clone</span>(&amp;shared);</div>
+                <div class="code-line" style="animation-delay: 1.0s"><span class="keyword">let</span> b = <span class="pointer">Rc</span>::<span class="function">clone</span>(&amp;shared);</div>
+                <div class="code-line" style="animation-delay: 1.2s"></div>
+                <div class="code-line" style="animation-delay: 1.3s"><span class="comment">// a를 통해 수정</span></div>
+                <div class="code-line" style="animation-delay: 1.4s">a.<span class="function">borrow_mut</span>().<span class="function">push</span>(<span class="number">4</span>);</div>
+                <div class="code-line" style="animation-delay: 1.6s"></div>
+                <div class="code-line" style="animation-delay: 1.7s"><span class="comment">// b에서도 변경 확인!</span></div>
+                <div class="code-line" style="animation-delay: 1.8s"><span class="macro">println!</span>(<span class="string">"{:?}"</span>, b.<span class="function">borrow</span>());  <span class="comment">// [1, 2, 3, 4]</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 6: Comparison Table -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">비교</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">스마트 포인터 비교</h2>
+        <h2 class="en">Smart Pointer Comparison</h2>
+        <div class="content">
+            <table class="comparison-table">
+                <tr>
+                    <th class="ko">타입</th>
+                    <th class="en">Type</th>
+                    <th class="ko">소유권</th>
+                    <th class="en">Ownership</th>
+                    <th class="ko">가변성</th>
+                    <th class="en">Mutability</th>
+                    <th class="ko">스레드</th>
+                    <th class="en">Thread</th>
+                    <th class="ko">용도</th>
+                    <th class="en">Use Case</th>
+                </tr>
+                <tr>
+                    <td><span class="pointer">Box&lt;T&gt;</span></td>
+                    <td class="ko">단일</td>
+                    <td class="en">Single</td>
+                    <td class="ko">mut 필요</td>
+                    <td class="en">Requires mut</td>
+                    <td>Any</td>
+                    <td class="ko">힙 할당, 재귀 타입</td>
+                    <td class="en">Heap alloc, recursive types</td>
+                </tr>
+                <tr>
+                    <td><span class="pointer">Rc&lt;T&gt;</span></td>
+                    <td class="ko">공유 (카운트)</td>
+                    <td class="en">Shared (counted)</td>
+                    <td class="ko">불변만</td>
+                    <td class="en">Immutable only</td>
+                    <td class="ko">단일</td>
+                    <td class="en">Single</td>
+                    <td class="ko">공유 읽기 전용</td>
+                    <td class="en">Shared read-only</td>
+                </tr>
+                <tr>
+                    <td><span class="pointer">Arc&lt;T&gt;</span></td>
+                    <td class="ko">공유 (원자적)</td>
+                    <td class="en">Shared (atomic)</td>
+                    <td class="ko">불변만</td>
+                    <td class="en">Immutable only</td>
+                    <td class="ko">멀티</td>
+                    <td class="en">Multi</td>
+                    <td class="ko">스레드 간 공유</td>
+                    <td class="en">Cross-thread sharing</td>
+                </tr>
+                <tr>
+                    <td><span class="pointer">RefCell&lt;T&gt;</span></td>
+                    <td class="ko">단일</td>
+                    <td class="en">Single</td>
+                    <td class="ko">내부 가변</td>
+                    <td class="en">Interior mut</td>
+                    <td class="ko">단일</td>
+                    <td class="en">Single</td>
+                    <td class="ko">런타임 빌림 검사</td>
+                    <td class="en">Runtime borrow check</td>
+                </tr>
+                <tr>
+                    <td><span class="pointer">Mutex&lt;T&gt;</span></td>
+                    <td class="ko">공유</td>
+                    <td class="en">Shared</td>
+                    <td class="ko">내부 가변</td>
+                    <td class="en">Interior mut</td>
+                    <td class="ko">멀티</td>
+                    <td class="en">Multi</td>
+                    <td class="ko">스레드 안전 가변</td>
+                    <td class="en">Thread-safe mutation</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Slide 7: Deref Trait -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Deref</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">Deref 트레이트 - 역참조의 마법</h2>
+        <h2 class="en">Deref Trait - The Magic of Dereferencing</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">let</span> boxed = <span class="pointer">Box</span>::<span class="function">new</span>(<span class="string">"Hello"</span>);</div>
+                <div class="code-line" style="animation-delay: 0.3s"></div>
+                <div class="code-line" style="animation-delay: 0.4s"><span class="comment">// *로 역참조 가능! (Deref 트레이트 덕분)</span></div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="macro">println!</span>(<span class="string">"{}"</span>, *boxed);  <span class="comment">// "Hello"</span></div>
+                <div class="code-line" style="animation-delay: 0.7s"></div>
+                <div class="code-line" style="animation-delay: 0.8s"><span class="comment">// Deref coercion: 자동 역참조</span></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="keyword">fn</span> <span class="function">greet</span>(s: &amp;<span class="type">str</span>) { <span class="macro">println!</span>(<span class="string">"Hi, {}"</span>, s); }</div>
+                <div class="code-line" style="animation-delay: 1.1s"></div>
+                <div class="code-line" style="animation-delay: 1.2s"><span class="keyword">let</span> name = <span class="pointer">Box</span>::<span class="function">new</span>(<span class="type">String</span>::<span class="function">from</span>(<span class="string">"Rust"</span>));</div>
+                <div class="code-line" style="animation-delay: 1.3s"><span class="function">greet</span>(&amp;name);  <span class="comment">// Box → String → &str 자동 변환!</span></div>
+            </div>
+            <div class="concept-box">
+                <p style="font-size: 22px;">
+                    <span class="ko">💡 <span class="highlight">Deref coercion</span> 덕분에 스마트 포인터를 일반 참조처럼 사용할 수 있습니다.</span>
+                    <span class="en">💡 <span class="highlight">Deref coercion</span> lets you use smart pointers like regular references.</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">정리</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">EP 4-03 요약</h2>
+        <h2 class="en">EP 4-03 Summary</h2>
+        <div class="content">
+            <div class="flex-container">
+                <div class="flex-item">
+                    <div class="pointer-box">
+                        <h3 style="color: #00cec9; margin-bottom: 15px;">핵심 스마트 포인터</h3>
+                        <ul class="bullet-list" style="font-size: 20px;">
+                            <li class="ko"><span class="highlight">Box&lt;T&gt;</span>: 힙 할당</li>
+                            <li class="en"><span class="highlight">Box&lt;T&gt;</span>: Heap allocation</li>
+                            <li class="ko"><span class="highlight">Rc&lt;T&gt;</span>: 공유 소유권</li>
+                            <li class="en"><span class="highlight">Rc&lt;T&gt;</span>: Shared ownership</li>
+                            <li class="ko"><span class="highlight">RefCell&lt;T&gt;</span>: 내부 가변성</li>
+                            <li class="en"><span class="highlight">RefCell&lt;T&gt;</span>: Interior mutability</li>
+                            <li class="ko"><span class="highlight">Arc&lt;T&gt;</span>: 멀티스레드 공유</li>
+                            <li class="en"><span class="highlight">Arc&lt;T&gt;</span>: Multi-threaded sharing</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #e94560; margin-bottom: 15px;">언제 사용?</h3>
+                        <ul class="bullet-list" style="font-size: 20px;">
+                            <li class="ko">재귀적 타입 → Box</li>
+                            <li class="en">Recursive types → Box</li>
+                            <li class="ko">여러 소유자 → Rc/Arc</li>
+                            <li class="en">Multiple owners → Rc/Arc</li>
+                            <li class="ko">불변으로 가변 → RefCell</li>
+                            <li class="en">Mutable from immutable → RefCell</li>
+                            <li class="ko">스레드 안전 가변 → Mutex</li>
+                            <li class="en">Thread-safe mutation → Mutex</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 40px;">
+                <p style="font-size: 28px; color: #ffc371;">
+                    <span class="ko">다음 레벨: 동시성 프로그래밍! 🚀</span>
+                    <span class="en">Next Level: Concurrency! 🚀</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="progress-bar" id="progress"></div>
+    <div class="slide-number" id="slideNum">1 / 8</div>
+    <div class="nav-hint">← → 키 또는 클릭으로 이동</div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+
+        function showSlide(n) {
+            if (n < 1) n = 1;
+            if (n > totalSlides) n = totalSlides;
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            document.getElementById('progress').style.width = (n / totalSlides * 100) + '%';
+            document.getElementById('slideNum').textContent = n + ' / ' + totalSlides;
+            animateSlide();
+        }
+
+        function nextSlide() { showSlide(currentSlide + 1); }
+        function prevSlide() { showSlide(currentSlide - 1); }
+
+        function animateSlide() {
+            const slide = document.getElementById('slide' + currentSlide);
+            const lines = slide.querySelectorAll('.code-line');
+            lines.forEach((line, i) => {
+                line.style.animation = 'none';
+                line.offsetHeight;
+                line.style.animation = `slideIn 0.5s ${i * 0.1}s forwards`;
+            });
+        }
+
+        function setLang(lang) {
+            document.body.classList.remove('lang-en');
+            if (lang === 'en') document.body.classList.add('lang-en');
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.includes(lang === 'ko' ? '한국어' : 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                if (e.clientX > window.innerWidth / 2) nextSlide();
+                else prevSlide();
+            }
+        });
+
+        showSlide(1);
+    </script>
+</body>
+</html>

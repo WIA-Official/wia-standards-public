@@ -5,237 +5,339 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-electronic-skin (Electronic Skin).
+This document defines how an electronic-skin
+operator integrates with the systems that
+surround a body-conformal medical device: the
+notified body issuing the EU MDR Annex IX
+conformity assessment; the certification body
+issuing the ISO 13485 QMS certificate; the
+testing laboratory running ISO 10993
+biocompatibility tests; the device's IEC 60601
+type-test laboratory; the IEEE 11073-10101
+nomenclature secretariat; the institutional
+review board approving a clinical investigation;
+the healthcare provider's FHIR R5 server
+ingesting the observation envelope; the device's
+software-update distribution service; the post-
+market surveillance authority receiving vigilance
+reports; the supervisory data-protection
+authority overseeing cross-border transfers; and
+— where the device is sold across jurisdictions
+— the regulatory authority of each market.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IEC 60601-1, IEC 80601-2-49, and the per-
+  modality particular standards cited in PHASE-1
+  references
+- IEEE 11073-10101:2019 and the IEEE 11073
+  specialisation profiles cited in PHASE-1
+  references
+- IEEE 802.15.6:2012
+- ISO 14971:2019, ISO 13485:2016+A11:2021, IEC
+  62304:2006+AMD1:2015, IEC 62366-1:2015+AMD1:
+  2020
+- ISO 10993-1, ISO 10993-5, ISO 10993-10, ISO
+  10993-23 (and ISO 10993-18 chemical
+  characterisation, where the device declares
+  extractables)
+- HL7 FHIR R5 (RESTful API, SMART-on-FHIR launch
+  sequence, Bulk Data export)
+- ISO/IEC 17021-1:2015 (audit and certification),
+  ISO/IEC 17065:2012 (product certification),
+  ISO/IEC 17025:2017 (testing-laboratory
+  competence)
+- IETF RFC 8259, RFC 9457, RFC 8615, RFC 9421,
+  RFC 6962
+- W3C Verifiable Credentials Data Model 2.0
+- EU Medical Device Regulation (EU) 2017/745
+  (Annex I, II, III, IX), EU MDCG guidance
+  documents (the MDCG harmonised technical
+  guidance series)
+- US 21 CFR Part 820 (QSR), 21 CFR Part 803
+  (MDR), 21 CFR Part 11 (electronic records and
+  signatures)
+- KR 의료기기법 (Medical Devices Act), KR
+  PIPA Articles 17 / 23 / 28-2
+- KS C ISO 13485 (Korean adoption of ISO 13485)
+- KS C IEC 60601-1 (Korean adoption of IEC 60601-1)
 
 ---
 
-## §1 Scope
+## §1 Notified-Body Integration
 
-This PHASE document is one of four that together define the WIA-electronic-skin
-standard. It addresses the integration layer of the standard.
+### §1.1 EU MDR Annex IX conformity assessment
 
-## §2 Manifest
+A class IIa, IIb, or III device per EU MDR
+Regulation (EU) 2017/745 Annex VIII undergoes a
+notified-body conformity assessment under Annex
+IX (full quality system + technical documentation
+review). The operator's API binds the device
+record to the notified body's certificate
+identifier and the certificate's expiry date so
+that the device's market-status flag can be
+derived without bilateral integration. The
+notified body's published certificate register is
+queried on each device-registration request; a
+suspended or withdrawn certificate triggers the
+device's post-market surveillance team to issue
+a market-status update.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "electronic-skin"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+### §1.2 Annex IX surveillance audit
 
-## §3 Conformance Tiers
+The notified body conducts a surveillance audit
+on the operator's QMS at least once a year per
+EU MDR Annex IX §3. The operator's audit envelope
+records the audit findings, the corrective
+actions, and the closure date so that the
+notified body's audit trail is preserved across
+audit cycles.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §2 Certification-Body Integration
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+### §2.1 ISO 13485 certificate register
 
-## §4 Discovery
+The operator's QMS certification reference
+declared in the programme record is bound to the
+issuing certification body's ISO/IEC 17021-1
+accreditation. The operator's API queries the
+certification body's published register on each
+device-registration request; a withdrawn
+certificate returns `410 Gone` for the
+registration endpoint until the certificate is
+re-issued.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/electronic-skin`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Testing-Laboratory Integration
 
-## §5 Time and Identity
+### §3.1 ISO 10993 biocompatibility laboratory
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The biocompatibility test laboratory referenced
+in a biocompatibility record is verified against
+the issuing accreditation body's ISO/IEC 17025
+register on each upload. The accreditation scope
+MUST cover the declared test method (ISO 10993-5
+cytotoxicity, ISO 10993-10 / ISO 10993-23
+irritation, ISO 10993-18 chemical
+characterisation).
 
-## §6 Versioning and Deprecation
+### §3.2 IEC 60601 type-test laboratory
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The IEC 60601 type-test laboratory issuing the
+device's safety-and-performance test report is
+bound to the device record. The test report
+identifier is published in the technical-
+documentation summary so that the notified body
+can locate the report during the Annex IX
+review.
 
-## §7 Privacy and Security
+## §4 IEEE 11073-10101 Vocabulary Integration
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The operator's API binds the channel modality
+declared in PHASE-1 §3 `signalChannels` to the
+IEEE 11073-10101 term code. The IEEE 11073
+secretariat publishes nomenclature updates on a
+multi-year cycle; the operator subscribes to the
+secretariat's publishing endpoint and triggers
+an internal review cycle when an update is
+published. A term code that is deprecated by
+IEEE is marked deprecated in the operator's
+enumeration set but is not removed for the
+duration of the operator's record-retention
+period so that already-published observations
+remain decodable.
 
-## §8 Open Governance
+## §5 Healthcare-Provider Integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `electronic-skin` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+### §5.1 SMART-on-FHIR launch
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+A treating clinician launches the operator's
+patient-side observation viewer through the
+SMART-on-FHIR launch sequence. The operator
+publishes the launch endpoint in the discovery
+document and exchanges OAuth-style scopes with
+the provider's authorisation server (the
+operator's FHIR endpoint enforces scope-bound
+access).
 
+### §5.2 FHIR Bulk Data export for population
+       analytics
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+The operator publishes a FHIR Bulk Data export
+endpoint per the HL7 FHIR R5 Bulk Data Access
+specification. The export is gated on the
+clinical investigation's institutional-review-
+board approval, on the patient's consent flag at
+de-identified-research scope, and on the
+provider's data-use agreement.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## §6 Post-Market Surveillance Integration
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+### §6.1 EU MDR vigilance reporting
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+A serious incident as defined by EU MDR Article
+2(64) triggers a vigilance report under Article
+87. The operator's API records the report
+identifier and the regulator's
+acknowledgement reference so that the
+regulator's audit trail is preserved across
+vigilance cycles.
 
-## Annex F — Adoption Roadmap
+### §6.2 US FDA Medical Device Reporting
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+A device-related death, serious injury, or
+malfunction reportable under US 21 CFR Part 803
+triggers an MDR submission to the FDA. The
+operator's API records the eMDR submission
+identifier and the FDA acknowledgement so that
+the regulator's audit trail is preserved.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+### §6.3 KR 의료기기 부작용 보고
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A device-related adverse event in the KR market
+is reported to the Ministry of Food and Drug
+Safety under the KR Medical Devices Act and the
+KR Adverse Event Reporting Regulation. The
+operator's API records the submission identifier
+and the regulator's acknowledgement.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §7 Software-Update Distribution Integration
 
-## Annex G — Test Vectors and Conformance Evidence
+The operator's software-update distribution
+service publishes the IEC 62304-conforming
+update package signed by the operator's signing
+key. The device-side update agent verifies the
+signature against the operator's public-key set
+published at the discovery endpoint. A signature
+mismatch refuses the update; a refusal event is
+recorded as a chain-of-custody event so that
+the operator's QMS can investigate the refusal
+under the ISO 13485 §8.2.4 monitoring-and-
+measurement-of-product clause.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §8 Patient-Portal and Re-Issuance
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+### §8.1 Patient-portal export
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+A patient retrieves the patient's own observation
+record through the operator's patient-portal
+endpoint. The endpoint authenticates the patient
+through the operator's identity provider and
+returns the FHIR Bundle with the patient's
+observations, device records, and consent
+directives so that the patient can satisfy the
+HIPAA 45 CFR 164.524 access right or the GDPR
+Article 15 right of access.
 
-## Annex H — Versioning and Deprecation Policy
+### §8.2 Verifiable-credentials re-issuance
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+A patient receiving a regulatory-grade
+attestation (the device's CE marking validity,
+the device's FDA clearance reference, the
+biocompatibility attestation summary) can re-
+issue the attestation as a W3C Verifiable
+Credential signed by the operator's public-key
+set so that a downstream healthcare provider can
+validate the attestation without contacting the
+operator directly.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §9 KR-Jurisdiction Integration
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+### §9.1 KS C IEC 60601-1 / KS C ISO 13485
+       adoption
 
-## Annex I — Interoperability Profiles
+A KR-jurisdiction operator declares the KS C
+IEC 60601-1 and KS C ISO 13485 adoption
+references in the programme record's
+`governingFrameworks`. The KR Ministry of Food
+and Drug Safety operates the KR medical-device
+品目허가번호 register; the operator's API queries
+the register on device-registration and on each
+retrieval after the caching TTL.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+### §9.2 KR PIPA sensitive-information binding
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+A KR-jurisdiction patient's body-borne sensor
+data is sensitive personal information under KR
+PIPA Article 23. The operator's API records the
+KR PIPA Article 18 third-party-disclosure consent
+where the data is shared with an external
+analytics service, and the operator publishes
+the privacy notice that names the recipient,
+the purpose of disclosure, and the retention
+period.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §10 References (consolidated)
+
+The references list across PHASE-1 to PHASE-4 is
+the canonical citation set for the WIA-
+electronic-skin standard. Implementations cite
+the standards by their issuing organisation
+(IEC, ISO, IEEE, HL7, IETF, W3C, EU regulatory
+text, US FDA regulatory text, KS) and the
+publication year so that a downstream consumer
+can locate the authoritative text. Updates to a
+cited standard (for example, an amendment to ISO
+10993-23) trigger an internal review cycle in
+the operator's quality-management discipline
+declared in PHASE-3 §11 before the new revision
+is bound into the operator's enumeration set.
+
+## §11 Clinical-Investigation Sponsor Integration
+
+A sponsor running a clinical investigation under
+EU MDR Annex XV (or the equivalent US FDA IDE
+regulation under 21 CFR Part 812) integrates
+with the operator's API by registering the
+investigation identifier (the EU MDR investigation
+number, the FDA IDE number, the KR 의료기기
+임상시험 계획 승인 번호), the institutional
+review-board approval reference, and the
+investigation-protocol identifier. The operator's
+API gates the per-patient observation upload on
+the patient's enrolment in the registered
+investigation and on the patient's investigation-
+specific consent.
+
+## §12 Adverse-Event Cross-Border Federation
+
+A device sold across multiple jurisdictions
+generates adverse-event reports that satisfy the
+reporting requirements of each market. The
+operator's API publishes a per-event report
+package that includes the EU MDR vigilance
+report, the US FDA MDR submission, and the KR
+부작용 보고 in the machine-readable form that
+each regulator's intake system accepts. The
+operator's audit envelope records each
+acknowledgement so that the regulator audit
+trail is preserved.
+
+## §13 KR PIPA Cross-Border-Transfer Discipline
+
+Where a KR-jurisdiction patient's body-borne
+sensor data is transferred to an analytics
+service in another jurisdiction, the operator's
+API binds the transfer to the KR PIPA Article
+17(3) cross-border-transfer notice and consent.
+The transfer is recorded in the chain-of-custody
+record, and the operator publishes the per-
+transfer privacy notice that names the recipient,
+the recipient's privacy framework, the purpose
+of the transfer, and the retention period in the
+recipient's jurisdiction.
+
+## §14 Verifiable Credentials for Compliance Re-
+       Issuance
+
+The operator publishes a verifiable-credentials
+bundle covering the device's CE marking, the FDA
+clearance reference, the ISO 13485 QMS
+certificate, and the most recent ISO 10993
+biocompatibility attestation. The bundle is
+signed under W3C Verifiable Credentials Data
+Model 2.0 with the operator's public-key set so
+that a downstream healthcare provider, hospital
+procurement office, or insurance reimbursement
+system can validate the compliance package
+without bilateral integration with the operator
+or with each issuing authority.

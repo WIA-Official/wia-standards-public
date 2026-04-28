@@ -5,237 +5,399 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-eco-friendly-material (Eco Friendly Material).
+This document defines the HTTPS API contract that
+an eco-friendly-material operator (material
+producer, EPD programme operator, Type I scheme
+operator, Type II self-declarant, verification
+body, organisation-level or project-level GHG
+reporter) exposes for the records defined in
+PHASE-1. The contract carries the material-
+registration, life-cycle assessment upload,
+environmental-product-declaration publication,
+Type II self-declared claim attestation,
+organisation- and project-level GHG report
+ingestion, and chain-of-custody anchoring
+endpoints.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics), RFC 9111 (HTTP
+  Caching), RFC 9457 (Problem Details), RFC 8288
+  (Web Linking), RFC 6901 / 6902 (JSON Pointer /
+  Patch), RFC 8259 (JSON), RFC 4122 (UUID), RFC
+  9421 (HTTP Message Signatures), RFC 8615 (well-
+  known URIs)
+- W3C Trace Context
+- ISO/IEC 27001:2022, ISO/IEC 17021-1:2015, ISO/IEC
+  17065:2012
+- ISO 14040:2006/Amd 1:2020 and ISO 14044:2006/Amd
+  1:2017/Amd 2:2020 (LCA principles, requirements)
+- ISO 14025:2006 (Type III EPD), ISO 14021:2016
+  (Type II claims), ISO 14024:2018 (Type I labels)
+- ISO 14067:2018 (carbon footprint of products)
+- ISO 14064-1:2018 / 14064-2:2019 / 14064-3:2019
+  and ISO 14065:2020
+- EN 15804:2012+A2:2019, EN 15978:2011, ISO
+  21930:2017
+- EU Construction Products Regulation (EU)
+  305/2011 and EU Carbon Border Adjustment
+  Mechanism Regulation (EU) 2023/956 (the
+  declaration fields carried by the registration
+  endpoint in §3)
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-eco-friendly-material
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by
+the operator. The OpenAPI 3.1 document at
+`/v1/openapi.json` is canonical for the WIA
+endpoints declared in this PHASE. Schema changes
+follow the non-breaking conventions in PHASE-1 §2
+(additive fields, additive enum values, no
+semantic re-use of existing field names). Every
+endpoint carries a per-request signature using HTTP
+Message Signatures (RFC 9421) anchored to the
+operator's accreditation reference (where the
+operator is a verification body), to the
+operator's manufacturer registration (where the
+operator is a Type II self-declarant), or to the
+EPD programme operator's published instructions
+(where the operator publishes Type III EPDs); the
+signature key set is published at
+`/.well-known/wia/eco-friendly-material/keys.json`.
 
-## §2 Manifest
+## §2 Root Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "eco-friendly-material"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /v1/
+```
 
-## §3 Conformance Tiers
+```json
+{
+  "standard": "WIA-eco-friendly-material",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":         "/v1/programmes",
+    "materials":          "/v1/materials",
+    "lcaRecords":         "/v1/lca-records",
+    "epdRecords":         "/v1/epd-records",
+    "type2Claims":        "/v1/type2-claims",
+    "ghgRecords":         "/v1/ghg-records",
+    "custody":            "/v1/custody-events",
+    "openapi":            "/v1/openapi.json",
+    "wellKnown":          "/.well-known/wia/eco-friendly-material"
+  }
+}
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Material Registration Endpoints
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+### §3.1 Register a material
 
-## §4 Discovery
+```
+POST /v1/materials
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/eco-friendly-material`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Request body carries the §3 record from PHASE-1
+(materialFamily, ecoAttribute, declaredUnit,
+productCategoryRule). The server returns `201
+Created` with the canonical resource URL at
+`/v1/materials/{materialId}` and validates the
+declared `ecoAttribute` set against the
+`materialFamily`: a `compostable` attribute
+declared on a `metal` material is rejected with
+`422 Unprocessable Entity` carrying an RFC 9457
+problem document at `/problems/eco-attribute-
+material-family-mismatch` and the position of the
+offending field expressed as a JSON Pointer (RFC
+6901).
 
-## §5 Time and Identity
+### §3.2 Retrieve a material
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+GET /v1/materials/{materialId}
+Accept: application/json
+```
 
-## §6 Versioning and Deprecation
+The response carries the registered material
+record, the link set covering its LCA records,
+EPDs, Type II claims, and GHG inventories. A `Link`
+header (RFC 8288) points at the related resources.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+### §3.3 Search the material registry
 
-## §7 Privacy and Security
+```
+GET /v1/materials?family={family}&ecoAttribute={attr}
+&pcr={pcrId}&jurisdiction={iso3166}
+&page={cursor}&size={size}
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The response is an RFC 8288 `Link`-paginated
+collection.
 
-## §8 Open Governance
+## §4 LCA Upload Endpoints
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `eco-friendly-material` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+### §4.1 Submit an LCA
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+POST /v1/lca-records
+Content-Type: multipart/form-data; boundary=...
+Signature: <RFC 9421 signature>
+```
 
+The multipart body carries one JSON part with the
+§4 record from PHASE-1 (systemBoundary,
+modulesCovered, impactCategories, inventoryDataset,
+cutoffRules, allocationRules, uncertaintyAnalysis)
+and one or more file parts holding the LCI dataset
+files referenced by `inventoryDataset`. The server
+stores the dataset files under a content-addressable
+URI (the SHA-256 hex digest is the path segment)
+so that PHASE-3 §6 can later reference the artefact
+by hash.
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+The server enforces the modules-covered
+enumeration against the system-boundary
+declaration: a `cradle-to-gate` boundary with a
+`B7` module is rejected with `422 Unprocessable
+Entity` and a problem document explaining that the
+B-modules belong to the use stage, which is outside
+a `cradle-to-gate` boundary.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+### §4.2 Retrieve an LCA
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+GET /v1/lca-records/{lcaId}
+Accept: application/json
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The response carries the LCA envelope and the
+links to the dataset file at
+`/v1/lca-records/{lcaId}/dataset` and to the
+sibling LCA records carried by the same material.
 
-## Annex F — Adoption Roadmap
+## §5 EPD Publication Endpoints
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+### §5.1 Publish an EPD
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+POST /v1/epd-records
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Request body carries the §5 record from PHASE-1.
+The server verifies that the `programmeRef` is a
+known EPD programme operator under ISO 14025 §7,
+that the `pcrIdentifier` resolves to a published
+PCR, and that the `verificationType` and
+`verifierReference` match the declared
+`verificationType` enumeration. A `verificationType`
+of `third-party-individual` requires
+`verifierReference.iso14065AccreditationRef` to be
+present; missing accreditation returns `422
+Unprocessable Entity` at `/problems/iso14025-
+verification-incomplete`.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+### §5.2 Retrieve an EPD
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+GET /v1/epd-records/{epdId}
+Accept: application/json
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+The response carries the EPD envelope, the
+machine-readable summary suitable for ingestion
+into a building-level EN 15978 assessment tool,
+and the verification-report reference.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+### §5.3 Search EPDs
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+```
+GET /v1/epd-records?materialRef={id}
+&pcr={pcrId}&validBetween={iso8601}/{iso8601}
+&verificationType={type}
+&page={cursor}&size={size}
+```
 
-## Annex H — Versioning and Deprecation Policy
+## §6 Type II Self-Declared Claim Endpoints
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+### §6.1 Attest a Type II claim
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+```
+POST /v1/type2-claims
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Request body carries the §6 record from PHASE-1.
+The server enforces the ISO 14021 §7 evaluation-
+method binding: a claim of `recyclable` whose
+`evaluationMethod` is `ISO-14021-§7-recycled-
+content-evaluation` is rejected with `422
+Unprocessable Entity` at `/problems/iso14021-
+evaluation-method-mismatch`.
 
-## Annex I — Interoperability Profiles
+The server also enforces the ISO 14021 §7
+evidence requirement: a `recycled-content` claim
+whose `evidenceArtefacts` does not include a mass-
+balance attestation is rejected.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+### §6.2 Retrieve a Type II claim
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+GET /v1/type2-claims/{claimId}
+Accept: application/json
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §7 GHG Report Endpoints
+
+### §7.1 Submit a GHG report
+
+```
+POST /v1/ghg-records
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+Request body carries the §7 record from PHASE-1.
+The server validates the scope envelope against
+the `reportLevel` declaration: an `organisation-
+iso-14064-1` report MUST carry Scope 1, Scope 2,
+and at least one of the Scope 3 categories per
+ISO 14064-1 §6.4; a `project-iso-14064-2` report
+MUST carry the project baseline and project
+emissions per ISO 14064-2 §5.4.
+
+### §7.2 Verify a GHG report
+
+```
+POST /v1/ghg-records/{ghgId}/verifications
+Content-Type: application/json
+Signature: <RFC 9421 signature from a verifier
+            with an ISO 14065:2020 accreditation>
+```
+
+The verifier's accreditation reference is checked
+against the issuing accreditation body's published
+register; the `verificationLevel` declared in the
+report (`limited-iso-14064-3` or `reasonable-iso-
+14064-3`) is bound to the verifier's report
+envelope.
+
+## §8 Chain-of-Custody Endpoint
+
+### §8.1 Anchor a custody event
+
+```
+POST /v1/custody-events
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+Request body carries the §8 record from PHASE-1.
+The server appends the event to the per-artefact
+custody chain. PHASE-3 §6 specifies how the chain
+is anchored to a public transparency log.
+
+## §9 Error Reporting
+
+Errors are returned using RFC 9457 Problem
+Details. The problem-type identifiers are stable
+strings rooted at `/problems/` and are documented
+in the OpenAPI document. Validation errors carry a
+`pointer` field whose value is a JSON Pointer (RFC
+6901) into the offending request body. The server
+emits a per-request `traceparent` header (W3C
+Trace Context) so that a downstream call chain
+can be reconstructed for post-incident review.
+
+## §10 Programme Operator Reciprocal Recognition
+
+```
+GET /v1/programmes/{programmeId}/recognised-peers
+Accept: application/json
+```
+
+ISO 14025 §7.6 encourages mutual recognition
+between EPD programme operators. The operator
+publishes the list of programme operators whose
+EPDs the operator accepts as equivalent under a
+mutual-recognition agreement. The list carries
+the peer programme operator's identifier, the
+peer's published instructions URI, and the date
+the mutual-recognition agreement was signed. A
+downstream consumer running a query that filters
+by `mutualRecognition: peer-programme-id` returns
+the union of the operator's own EPDs and the
+peer's EPDs that satisfy the query.
+
+## §11 Bulk EPD Export
+
+```
+GET /v1/epd-records:bulk
+Accept: application/x-ndjson
+```
+
+A buyer running a portfolio-level analysis (a
+construction-project designer integrating many
+products into a single building-level
+assessment, or a public-procurement authority
+running a bulk environmental analysis) requests
+the operator's EPD register as a newline-
+delimited JSON stream. The endpoint streams the
+EPDs in publication-date order; a consumer
+resuming the stream provides an `If-Resume-After`
+header carrying the last-received publication
+timestamp.
+
+## §12 Verifier Webhook
+
+```
+POST /v1/programmes/{programmeId}/webhooks
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+A verifier registers a webhook to receive a push
+notification when a publication assigned to the
+verifier is uploaded. The webhook envelope
+carries the operator's signing key reference, the
+event type (EPD upload, GHG report upload, Type
+II claim upload), and the resource identifier;
+the verifier's webhook receiver verifies the
+signature against the operator's public-key set
+before queuing the work item.
+
+## §13 Schema-Validation Note
+
+The OpenAPI 3.1 document at `/v1/openapi.json`
+carries JSON Schema 2020-12 schemas for every
+request and response envelope. Schemas are
+published with a `$schema` declaration and an
+`additionalProperties: false` setting on the
+top-level objects so that an unknown field
+returned by a malformed implementation is
+detected at the consumer side. The Schema URIs
+are stable across non-breaking schema additions;
+breaking schema changes are introduced under a
+new major version with a parallel base path
+`/v2/`.
+
+## §14 Cache and Concurrency Discipline
+
+Every retrieval endpoint emits an `ETag` header
+(RFC 9110 §8.8.3) computed over the canonical
+representation of the resource. Conditional
+requests (`If-Match`, `If-None-Match`) are honoured
+on update endpoints so that a concurrent
+publication does not overwrite a peer's update.
+The server returns `412 Precondition Failed`
+where the conditional request does not match,
+together with an RFC 9457 problem document
+carrying the current ETag so that the consumer
+can refresh and retry.

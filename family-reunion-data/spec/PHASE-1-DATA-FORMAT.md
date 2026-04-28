@@ -5,237 +5,474 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-family-reunion-data (Family Reunion Data).
+This document defines the canonical data-format
+layer for WIA-family-reunion-data. The standard
+covers the persistent record shapes that a
+humanitarian operator (a Red Cross or Red
+Crescent national society running a Restoring
+Family Links service, the UNHCR field office
+operating a ProGres registration, an IOM field
+office running a Displacement Tracking Matrix
+operation, a national Ministry of the Interior
+operating a missing-persons register, an inter-
+country adoption central authority, a child-
+protection authority running a separated-or-
+unaccompanied-minor case file, a war-graves
+commission), an inter-agency coordination body
+(the Inter-Agency Standing Committee, the
+UNHCR Operational Data Portal), an academic or
+civil-society observer auditing the
+humanitarian-data discipline, and a
+supervisory data-protection authority oversee-
+ing GDPR Article 9 special-category processing
+maintain when registering a separated person,
+recording a tracing request, anchoring a
+positive identification, transferring the
+case file to a partner agency under a documented
+data-sharing agreement, and tracking the per-
+case chain-of-custody trail. Records are
+consumed by the registered person, by the
+named relatives requesting reunion, by the
+partner agency receiving the transferred case,
+by the destination state's reception
+authorities, and — where the person is a
+minor — by the child-protection authority and
+the appointed guardian.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- 1949 Geneva Conventions and their 1977
+  Additional Protocols — the international
+  humanitarian law framework cited normatively
+  for the per-case humanitarian principle
+  declaration in §3
+- 1951 Convention Relating to the Status of
+  Refugees and its 1967 Protocol — the
+  refugee-protection framework cited where the
+  registered person is a refugee or asylum-
+  seeker
+- 1989 United Nations Convention on the
+  Rights of the Child (CRC), particularly
+  Articles 7 (registration, name and
+  nationality), 8 (preservation of identity),
+  9 (separation from parents), 10 (family
+  reunification), 11 (illicit transfer abroad),
+  20 (children deprived of family
+  environment), 22 (refugee children), and 35
+  (abduction)
+- 1993 Hague Convention on Protection of
+  Children and Co-operation in respect of
+  Inter-country Adoption — the framework
+  cited where the case is in scope of inter-
+  country adoption
+- 1980 Hague Convention on the Civil Aspects
+  of International Child Abduction — cited
+  where the case involves cross-border child
+  abduction
+- 1963 Vienna Convention on Consular Relations
+  (Article 36) — cited where the case
+  requires consular notification
+- 1961 Convention on the Reduction of
+  Statelessness — cited where the registered
+  person is stateless
+- ICRC Restoring Family Links (RFL) Strategy
+  for the International Red Cross and Red
+  Crescent Movement (2008-2018, 2020-2025) —
+  the governing framework for the RFL
+  service of national Red Cross and Red
+  Crescent societies
+- ICRC Professional Standards for Protection
+  Work — the methodological framework cited
+  for the per-case protection-monitoring
+  envelope
+- UNHCR ProGres v4 (Profile Global
+  Registration System) — the UNHCR
+  registration database schema cited
+  normatively for the per-individual
+  registration envelope in §4
+- UNHCR Policy on the Protection of Personal
+  Data of Persons of Concern (2015 and its
+  2018 update)
+- IOM Displacement Tracking Matrix (DTM)
+  Methodological Framework
+- IOM Data Protection Manual
+- Humanitarian Exchange Language (HXL)
+  Standard maintained by the OCHA Centre for
+  Humanitarian Data
+- Sphere Handbook (Humanitarian Charter and
+  Minimum Standards in Humanitarian
+  Response, edition cited in the operator's
+  governance declaration)
+- ISO 19115-1:2014 / 19115-2:2019 (geographic
+  information metadata) and ISO 19139-1:2019
+  (XML implementation)
+- ISO 6709:2008 (geographic point location)
+- ISO 3166-1 (country codes), ISO 3166-2
+  (subdivision codes), ISO 639 (language
+  codes), ISO 4217 (currency codes), ISO 5218
+  (sex code)
+- ISO 8601 (date and time), IETF RFC 8259
+  (JSON), RFC 4122 (UUID)
+- W3C Verifiable Credentials Data Model v2.0
+  (cited where the operator binds the
+  registered person's identity to a verifiable
+  credential)
+- W3C Open Digital Rights Language (ODRL) 2.2
+  (cited for the rights expression carried by
+  the case envelope)
+- ISO/IEC 27001:2022 and ISO/IEC 27018:2019
+  (PII protection in public clouds)
+- IETF RFC 6234 (SHA-256), RFC 8032 (Ed25519)
+- EU Regulation (EU) 2016/679 (GDPR), Articles
+  6, 9 (special categories of personal data —
+  including health, biometric, ethnicity, and
+  religious-belief data carried by the case
+  envelope), 12-22, 46-49 (cross-border
+  transfer), 89 (archiving in the public
+  interest)
+- EU Council Directive 2003/86/EC (right to
+  family reunification)
+- KR 출입국관리법 (Immigration Control Act)
+  and KR 난민법 (Refugee Act)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-family-reunion-data
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the
+artefacts exchanged when a humanitarian
+operator registers a separated person, opens a
+tracing request from a named relative, anchors
+a positive identification between two registered
+persons, transfers the case file to a partner
+agency, integrates the case into an inter-
+agency coordination dashboard under HXL, and
+publishes the per-case outcome under privacy-
+preserving safeguards. Implementations covered
+include:
 
-## §2 Manifest
+- A national Red Cross or Red Crescent society
+  running an RFL service that registers
+  refugees, internally displaced persons,
+  separated migrants, missing persons in armed
+  conflict, and disaster-separated families.
+- A UNHCR field office operating a ProGres v4
+  registration during a refugee influx.
+- An IOM field office running a DTM operation
+  during a population displacement.
+- A child-protection authority running a
+  separated-or-unaccompanied-minor case file
+  under the 1989 CRC framework.
+- An inter-country adoption central authority
+  under the 1993 Hague Convention.
+- A war-graves commission registering identified
+  remains and reconciling them with named-
+  relatives' tracing requests.
+- A national Ministry of the Interior operating
+  a missing-persons register coordinating with
+  international counterparts under Interpol's
+  Yellow Notice mechanism.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "family-reunion-data"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The RFL case file, the UNHCR ProGres
+registration, the IOM DTM site assessment, the
+Hague-1993 inter-country adoption record, and
+the war-graves identification record receive
+distinct encodings in this PHASE; the
+additional safeguards required by each
+humanitarian regime are encoded in PHASE-3 §3.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name of the
+                       operator — national Red
+                       Cross / Red Crescent
+                       society, UNHCR office, IOM
+                       office, Ministry of the
+                       Interior, child-protection
+                       authority, inter-country
+                       adoption central authority,
+                       or war-graves commission)
+operatorRole         : enum ("rcrc-national-
+                       society" | "unhcr-field-
+                       office" | "iom-field-
+                       office" | "moi-missing-
+                       persons-register" |
+                       "child-protection-
+                       authority" | "icca-1993" |
+                       "war-graves-commission" |
+                       "inter-agency-coordination"
+                       | "user-defined")
+operatorJurisdiction : array of string (ISO
+                       3166-1 country codes)
+governingFrameworks  : array of enum ("GENEVA-
+                       CONVENTIONS-1949-AP" |
+                       "REFUGEE-CONVENTION-1951" |
+                       "CRC-1989" |
+                       "HAGUE-1993-ICA" |
+                       "HAGUE-1980-ICCA" |
+                       "VCCR-1963-ART-36" |
+                       "STATELESSNESS-1961" |
+                       "ICRC-RFL-STRATEGY" |
+                       "ICRC-PSP" |
+                       "UNHCR-PROGRES-V4" |
+                       "UNHCR-PERSONAL-DATA-
+                       2015" |
+                       "IOM-DTM-METHOD" |
+                       "IOM-DATA-PROTECTION" |
+                       "HXL-STANDARD" |
+                       "SPHERE-HANDBOOK" |
+                       "ISO-19115" |
+                       "ISO-27001" |
+                       "ISO-27018" |
+                       "EU-GDPR" |
+                       "EU-FAMILY-REUNION-2003-
+                       86" |
+                       "KR-출입국관리법" |
+                       "KR-난민법" |
+                       "user-defined")
+icrcCoordinationRef  : string (the operator's
+                       ICRC-coordinated case-
+                       file network reference,
+                       where applicable)
+programmeStatus      : enum ("design" |
+                       "operating" | "limited-
+                       rollout" | "wind-down" |
+                       "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Person Registration Record
 
-## §4 Discovery
+```
+personRecord:
+  personId           : string (uuidv7; the
+                       operator's internal
+                       person-record identifier)
+  registrationContext : enum ("rfl-self-
+                       registration" |
+                       "unhcr-progres-individual"
+                       | "iom-dtm-individual" |
+                       "missing-persons-tracing-
+                       requested-by-relative" |
+                       "icca-1993-adoption" |
+                       "war-graves-remains-
+                       identification" |
+                       "user-defined")
+  identifierBindings : array of object (per-
+                       authority identifier —
+                       the UNHCR ProGres
+                       individual identifier,
+                       the IOM DTM individual
+                       identifier, the operator's
+                       case file number, the
+                       Interpol Yellow Notice
+                       identifier where
+                       applicable; each carrying
+                       the issuing authority and
+                       the scope of use)
+  givenName          : array of string
+  familyName         : string
+  alternativeNames   : array of string (per the
+                       person's declared
+                       linguistic context)
+  dateOfBirth        : object (per ISO 8601;
+                       partial-date support
+                       where the person's
+                       documentation does not
+                       carry a full date)
+  placeOfBirth       : object (ISO 3166-1
+                       country code, ISO 3166-2
+                       subdivision code, declared
+                       locality)
+  sexCode            : enum (per ISO 5218 —
+                       0 not known, 1 male, 2
+                       female, 9 not applicable)
+  nationalityCodes   : array of string (ISO
+                       3166-1; carrying the
+                       statelessness flag where
+                       applicable per the 1961
+                       Convention)
+  spokenLanguages    : array of string (BCP 47
+                       language tags)
+  protectionStatus   : enum ("refugee-1951" |
+                       "asylum-seeker" |
+                       "stateless-1961" |
+                       "internally-displaced" |
+                       "separated-migrant" |
+                       "missing-conflict-
+                       related" | "missing-
+                       disaster-related" |
+                       "separated-minor-
+                       unaccompanied" |
+                       "user-defined")
+  vulnerabilityFlags : array of enum
+                       ("unaccompanied-minor" |
+                       "separated-minor" |
+                       "elderly-without-care" |
+                       "person-with-disability" |
+                       "survivor-of-violence" |
+                       "torture-survivor" |
+                       "single-parent-with-
+                       dependants" | "user-
+                       defined")
+  consentDirective   : object (the GDPR Article
+                       9(2) processing basis,
+                       the UNHCR Personal Data
+                       Policy purpose
+                       declaration, and the per-
+                       channel sharing consent
+                       envelope)
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/family-reunion-data`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Tracing Request Record
 
-## §5 Time and Identity
+```
+tracingRequest:
+  tracingId          : string (uuidv7)
+  requesterRef       : string (the requesting
+                       person's PHASE-1 §3
+                       reference, where
+                       registered, or the
+                       requester's declared
+                       identity envelope where
+                       not yet registered)
+  soughtPersonRef    : string (a partial PHASE-1
+                       §3 reference for the
+                       sought person, or a
+                       declared identity-
+                       descriptor envelope
+                       where no record is yet
+                       known)
+  relationshipDeclared : enum ("parent-child" |
+                       "sibling" | "spouse-or-
+                       partner" | "extended-
+                       family" | "user-defined")
+  separationContext  : object (the separation
+                       date, the separation
+                       location, the
+                       circumstances declared by
+                       the requester)
+  tracingChannels    : array of enum ("rcrc-
+                       network" | "unhcr-
+                       protection-network" |
+                       "moi-missing-persons-
+                       register" | "icrc-online-
+                       trace" | "interpol-yellow-
+                       notice" | "user-defined")
+  rfStatus           : enum ("open" | "positive-
+                       identification" |
+                       "presumed-deceased" |
+                       "closed-no-result" |
+                       "closed-by-requester" |
+                       "user-defined")
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 Identification Anchor Record
 
-## §6 Versioning and Deprecation
+```
+identificationAnchor:
+  anchorId           : string (uuidv7)
+  partyAref          : string (PHASE-1 §3
+                       reference for one party
+                       to the identification)
+  partyBref          : string (PHASE-1 §3
+                       reference for the other
+                       party)
+  matchEvidence      : object (the documented
+                       evidence — biometric
+                       match outcome under the
+                       operator's biometric
+                       policy, photographic
+                       cross-match, narrative
+                       cross-match,
+                       documentary cross-match,
+                       relative-confirmation)
+  attestation        : object (the operator's
+                       legal-entity attestation
+                       and the supervising
+                       protection-officer
+                       reference under ICRC PSP)
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 Inter-Agency Transfer Record
 
-## §7 Privacy and Security
+```
+transferRecord:
+  transferId         : string (uuidv7)
+  caseRef            : string (the PHASE-1 §3
+                       case reference)
+  fromOperator       : string (the operator's
+                       legal-entity reference)
+  toOperator         : string (the receiving
+                       operator's legal-entity
+                       reference)
+  legalBasis         : object (the GDPR Article
+                       46-49 transfer basis, the
+                       operator's data-sharing
+                       agreement reference, the
+                       receiving authority's
+                       reception arrangement)
+  consentRef         : string (the per-case
+                       consent declaration)
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 HXL Coordination Record
 
-## §8 Open Governance
+```
+hxlRecord:
+  hxlId              : string (uuidv7)
+  coordinationContext : enum ("ocha-3w" |
+                       "iasc-cluster" |
+                       "iom-dtm-site" |
+                       "unhcr-pip" | "user-
+                       defined")
+  hxlTagVersion      : enum ("HXL-1-1" | "user-
+                       defined")
+  datasetUri         : string (URI of the
+                       per-coordination dataset
+                       carrying HXL-tagged rows)
+  refreshFrequency   : enum ("realtime" |
+                       "daily" | "weekly" |
+                       "monthly" | "user-
+                       defined")
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `family-reunion-data` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §8 Chain-of-Custody Record
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+custodyRecord:
+  custodyId          : string (uuidv7)
+  artefactRef        : string (the person,
+                       tracing, anchor, transfer,
+                       or HXL record identifier)
+  custodyEvent       : enum ("registered" |
+                       "tracing-opened" |
+                       "tracing-closed" |
+                       "identification-anchored"
+                       | "transferred" |
+                       "case-closed" |
+                       "redaction-applied" |
+                       "withdrawn" | "user-
+                       defined")
+  eventTimestamp     : string (ISO 8601 date-
+                       time)
+  performingParty    : string (legal entity)
+  hashOfArtefacts    : string (SHA-256 hex
+                       digest per RFC 6234)
+```
 
+## §9 Manifest
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations publish a signed manifest
+carrying `standardSlug` (constant value
+"family-reunion-data"), `version`,
+`implementation`, the operator's
+`icrcCoordinationRef` envelope, and the
+`profile` declaration that selects which of
+the optional records (tracing, anchor,
+transfer, HXL) the implementation supports.
+The manifest is signed using a key whose
+public part is published on the operator's
+`.well-known/wia/family-reunion-data/`
+discovery endpoint declared in PHASE-2.

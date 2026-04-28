@@ -1,241 +1,399 @@
-# WIA-education-robot PHASE 1 — DATA-FORMAT Specification
+# WIA-education-robot PHASE 1 — Data Format Specification
 
 **Standard:** WIA-education-robot
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-education-robot (Education Robot).
+This document defines the canonical data-format
+layer for WIA-education-robot. The standard
+covers the persistent record shapes that an
+education-robot operator (a personal-care
+robotic-tutor manufacturer, a programmable
+educational-robot kit producer, a school-based
+service-robot deployer, an after-school robotics
+academy operator, an inclusive-education
+robotics-tutor for special-needs learners, a
+museum-based robotic docent operator, a
+telepresence-robot for hospitalised learners
+operator, an ISO 13482 personal-care-robot
+manufacturer, an industrial-classroom IEC
+62443-compliant robotics deployer) maintains
+when registering an education-robot platform,
+classifying its safety profile under ISO 13482
+or ISO 10218, declaring its educational-content
+binding under IEEE Std 1872 ontology, recording
+the learner-robot interaction event log, and
+tracking the robot's lifecycle and recall
+discipline. Records are consumed by the school's
+ICT-and-safety committee approving the deployment,
+by the parent or guardian providing the consent
+for a minor learner's interaction with the robot,
+by the manufacturer's quality team running the
+post-market surveillance, and by the supervisory
+education-or-product-safety regulator (the EU CE
+marking authority, the US Consumer Product Safety
+Commission CPSC, the KR 산업통상자원부 KATS
+agency).
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 13482:2014 (robots and robotic devices —
+  safety requirements for personal care robots
+  — covering mobile servant robot, physical
+  assistant robot, and person carrier robot)
+- ISO 10218-1:2011 / ISO 10218-2:2011 (robots
+  and robotic devices — safety requirements for
+  industrial robots — Part 1 robot, Part 2
+  robot system and integration; the ISO
+  10218-1:2011 / 10218-2:2011 are anchored
+  under ISO TC 299)
+- ISO/TS 15066:2016 (robots and robotic devices
+  — collaborative robots — for the
+  collaborative-classroom robot binding)
+- ISO 9241 series (ergonomics of human-system
+  interaction) — ISO 9241-210:2019 (human-
+  centred design for interactive systems),
+  ISO 9241-110:2020 (interaction principles)
+- IEC 62366-1:2015/Amd 1:2020 (medical devices
+  — application of usability engineering to
+  medical devices, applied as the analogue
+  reference for the inclusive-education robot
+  binding)
+- IEC 61508 series (functional safety of
+  electrical / electronic / programmable
+  electronic safety-related systems)
+- IEEE Std 1872-2015 (Standard Ontologies for
+  Robotics and Automation; the CORA — Core
+  Ontologies for Robotics and Automation —
+  reference)
+- IEEE Std 1872.2-2021 (Autonomous Robotics
+  ontology, the AuR ontology)
+- IEC 62443 series (industrial automation and
+  control systems security — for the school-
+  network-isolated deployment)
+- IEC 60601-1:2005+AMD1:2012+AMD2:2020 (medical
+  electrical equipment — used as the analogue
+  reference for an inclusive-education robot
+  with medical attributes)
+- ISO 22989:2022 (information technology —
+  artificial intelligence — concepts and
+  terminology)
+- ISO/IEC 23894:2023 (information technology —
+  artificial intelligence — guidance on risk
+  management) and ISO/IEC 42001:2023
+  (artificial intelligence management system)
+- W3C WebRTC 1.0 (Real-Time Communication —
+  for the telepresence-robot binding)
+- IEEE 11073-10101 (medical-device nomenclature
+  — used for the inclusive-education vital-
+  sign-correlation binding)
+- IEC 60950-1:2005+AMD2:2013 / IEC 62368-1:
+  2018+AMD1:2020 (information-technology and
+  audio-video safety)
+- EU Machinery Directive 2006/42/EC (succeeded
+  by EU Machinery Regulation (EU) 2023/1230)
+- EU AI Act (Regulation (EU) 2024/1689) — the
+  high-risk classification for an education-
+  robot operating as a high-risk AI system
+- KR 산업안전보건법, KR 학교안전사고 예방 및
+  보상에 관한 법률, KR 어린이제품 안전 특별법
+- IETF RFC 8259 (JSON), RFC 4122 (UUID), ISO
+  8601 (date-time)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-education-robot
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the
+artefacts exchanged when an education-robot
+platform is registered, classified under ISO
+13482 / ISO 10218, characterised through IEEE
+Std 1872 ontology binding, and tracked across
+its lifecycle. Implementations covered include:
 
-## §2 Manifest
+- A primary-school programmable robot kit (a
+  cubic-style block-based programmable robot
+  deployed in a coding-introduction class)
+  registered against ISO 8124 toy-safety baseline
+  and the EU CE Toy Safety Directive 2009/48/EC.
+- A secondary-school robotic competition platform
+  (an autonomous mobile robot operating in a
+  competition arena) registered against the
+  ISO 10218 industrial-robot safety baseline.
+- An after-school robotics-academy humanoid
+  robot (a desktop social-interaction humanoid)
+  registered against ISO 13482 personal-care-
+  robot baseline.
+- An inclusive-education robot for autism-
+  spectrum-disorder learners (a humanoid robot
+  delivering social-skill-training sessions
+  under therapist supervision) registered
+  against the IEC 62366-1 usability discipline
+  with the operator's consent and clinical-
+  supervision envelope.
+- A telepresence robot for a hospitalised
+  learner (a remote-presence robot allowing the
+  learner to attend the home classroom from the
+  hospital ward) registered with the W3C WebRTC
+  signalling discipline and the operator's
+  privacy envelope.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "education-robot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The mechanical-safety envelope under ISO 13482,
+the educational-content binding under IEEE Std
+1872, and the privacy-and-consent envelope under
+GDPR / KR 개인정보 보호법 receive distinct
+encodings in this PHASE; the additional
+safeguards required by each deployment context
+are encoded in PHASE-3 §3.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name of the
+                       operator — robot
+                       manufacturer, school
+                       deployer, after-school
+                       academy, inclusive-
+                       education programme)
+operatorRole         : enum ("robot-manufacturer"
+                       | "robot-system-integrator"
+                       | "school-deployer" |
+                       "academy-operator" |
+                       "inclusive-education-
+                       provider" | "user-defined")
+governingFrameworks  : array of enum ("ISO-13482"
+                       | "ISO-10218-1" |
+                       "ISO-10218-2" |
+                       "ISO-TS-15066" |
+                       "ISO-9241-210" |
+                       "ISO-9241-110" |
+                       "IEC-62366-1" |
+                       "IEC-61508" |
+                       "IEEE-1872" |
+                       "IEEE-1872.2" |
+                       "IEC-62443-3-3" |
+                       "IEC-60601-1" |
+                       "ISO-22989" |
+                       "ISO-IEC-23894" |
+                       "ISO-IEC-42001" |
+                       "EU-Machinery-2023-1230" |
+                       "EU-AI-Act-2024-1689" |
+                       "EU-Toy-Safety-2009-48-EC"
+                       | "KR-산업안전보건법" |
+                       "KR-학교안전사고-예방-보상-
+                       법률" | "KR-어린이제품-안전-
+                       특별법" | "user-defined")
+accreditationStatus  : object (the ISO/IEC 17025
+                       accreditation reference for
+                       the testing laboratory, the
+                       ISO/IEC 17065 accreditation
+                       reference for the product-
+                       certification body, the EU
+                       notified-body designation
+                       reference for the CE-
+                       marking conformity
+                       assessment)
+programmeStatus      : enum ("design" | "operating"
+                       | "limited-rollout" |
+                       "wind-down" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Robot Platform Record
 
-## §4 Discovery
+```
+robotRecord:
+  robotId            : string (uuidv7)
+  identifierBindings : array of object (per-
+                       jurisdiction product
+                       identifiers — for example
+                       the EU CE Declaration of
+                       Conformity reference, the
+                       UL Recognised Component
+                       identifier, the KR 어린이
+                       제품 안전인증 번호 — each
+                       carrying the issuing
+                       authority and the scope
+                       of use)
+  robotKind          : enum ("programmable-block-
+                       robot" | "mobile-servant-
+                       robot" | "physical-
+                       assistant-robot" |
+                       "person-carrier-robot" |
+                       "industrial-collaborative-
+                       robot" | "humanoid-social-
+                       robot" | "telepresence-
+                       robot" | "robotic-arm-
+                       educational" | "drone-
+                       educational" | "user-
+                       defined")
+  iso13482Class      : enum ("mobile-servant" |
+                       "physical-assistant" |
+                       "person-carrier" | "n/a-
+                       industrial" | "user-
+                       defined")
+  payload            : object (declared payload
+                       in kg, with operating
+                       speed in m/s)
+  workspaceClass     : enum ("classroom" |
+                       "laboratory" | "competition-
+                       arena" | "home-deployment"
+                       | "hospital-room" |
+                       "museum-floor" | "user-
+                       defined")
+  intendedAgeBand    : enum ("3-5" | "6-9" |
+                       "10-13" | "14-18" |
+                       "adult" | "user-defined")
+  intendedSupervision : enum ("teacher-supervised"
+                       | "therapist-supervised" |
+                       "self-paced" | "remote-
+                       supervised" | "user-
+                       defined")
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/education-robot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 IEEE Std 1872 Ontology Binding Record
 
-## §5 Time and Identity
+```
+ontologyRecord:
+  ontologyRecordId   : string (uuidv7)
+  robotRef           : string (PHASE-1 §3 record
+                       reference)
+  coraClassBinding   : object (the IEEE Std 1872
+                       CORA class binding —
+                       Robot, RobotPart, Sensor,
+                       Effector, Environment,
+                       Position, Orientation —
+                       per the standard's
+                       ontology declaration)
+  aurBehaviour       : object (the IEEE Std
+                       1872.2 AuR ontology
+                       behaviour binding —
+                       autonomous-behaviour
+                       declaration, sensor-fusion
+                       binding, decision-making
+                       envelope)
+  educationalOutcome : object (the per-platform
+                       educational-outcome
+                       declaration — the learning
+                       outcome the platform
+                       delivers, the per-outcome
+                       assessment binding)
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 Safety-Conformity Record
 
-## §6 Versioning and Deprecation
+```
+safetyRecord:
+  safetyRecordId     : string (uuidv7)
+  robotRef           : string (PHASE-1 §3 record
+                       reference)
+  testStandard       : enum ("ISO-13482" | "ISO-
+                       10218-1" | "ISO-10218-2" |
+                       "ISO-TS-15066" | "IEC-
+                       61508-SIL-2" | "IEC-61508-
+                       SIL-3" | "EU-Machinery-
+                       2023-1230" | "user-
+                       defined")
+  testLaboratory     : object (laboratory name +
+                       the laboratory's ISO/IEC
+                       17025 accreditation
+                       reference + the laboratory's
+                       safety-test report
+                       identifier)
+  measurementResult  : object (per-method derived
+                       quantities — separation
+                       distance per ISO-TS-15066,
+                       quasi-static-pressure
+                       limit per ISO-TS-15066
+                       Annex A, transient-pressure
+                       limit, force-and-pressure
+                       maps for the collaborative
+                       workspace)
+  passOrFail         : enum ("pass" | "fail" |
+                       "conditional")
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 Interaction-Event Log
 
-## §7 Privacy and Security
+```
+interactionEvent:
+  eventId            : string (uuidv7)
+  robotRef           : string (PHASE-1 §3 record
+                       reference)
+  learnerRef         : string (pseudonymous
+                       learner identifier per
+                       §8 privacy discipline)
+  sessionStart       : string (ISO 8601 date-time)
+  sessionEnd         : string (ISO 8601 date-time)
+  sessionContent     : object (the ontology-bound
+                       content reference — for
+                       example a programming
+                       lesson, a social-skill-
+                       training session, a
+                       remote-presence connection)
+  consentRef         : string (the parent-or-
+                       guardian-consent envelope
+                       reference where the learner
+                       is a minor)
+  supervisionRef     : string (the supervising
+                       teacher or therapist
+                       identifier)
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 Lifecycle and Recall Record
 
-## §8 Open Governance
+```
+lifecycleRecord:
+  lifecycleId        : string (uuidv7)
+  robotRef           : string (PHASE-1 §3 record
+                       reference)
+  lifecycleEvent     : enum ("commissioned" |
+                       "firmware-update" |
+                       "maintenance-performed" |
+                       "incident-reported" |
+                       "recall-issued" |
+                       "decommissioned" |
+                       "user-defined")
+  eventTimestamp     : string (ISO 8601 date-time)
+  performingParty    : string (legal entity)
+  notes              : string (the operator's
+                       narrative description of
+                       the lifecycle event)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `education-robot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §8 Chain-of-Custody Record
+
+```
+custodyRecord:
+  custodyId          : string (uuidv7)
+  artefactRef        : string (the safety-test,
+                       interaction-event, or
+                       lifecycle identifier)
+  custodyEvent       : enum ("safety-test-
+                       conducted" | "ce-marking-
+                       applied" | "deployment-
+                       commissioned" | "incident-
+                       reported" | "recall-
+                       executed" | "shipment" |
+                       "user-defined")
+  eventTimestamp     : string (ISO 8601 date-time)
+  performingParty    : string (legal entity)
+  hashOfArtefacts    : string (SHA-256 hex digest)
+```
+
+## §9 Manifest
+
+Implementations publish a signed manifest carrying
+`standardSlug` (constant value "education-robot"),
+`version`, `implementation`, the operator's
+`accreditationStatus`, and the `profile`
+declaration that selects which of the optional
+records (ontology, safety-conformity,
+interaction-event, lifecycle) the implementation
+supports. The manifest is signed using a key
+whose public part is published on the operator's
+`.well-known/wia/education-robot/` discovery
+endpoint declared in PHASE-2.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
-
-
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.

@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-SEC-005 Zero Trust Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 2rem 0;
+            border-bottom: 2px solid #8B5CF6;
+            margin-bottom: 2rem;
+        }
+
+        .lang-toggle {
+            position: absolute;
+            top: 2rem;
+            right: 2rem;
+            display: flex;
+            gap: 0.5rem;
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 0.25rem;
+        }
+
+        .lang-btn {
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .lang-btn.active {
+            background: #8B5CF6;
+            color: white;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #1e293b;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 1rem 1.5rem;
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn:hover {
+            color: #e2e8f0;
+            background: #1e293b;
+        }
+
+        .tab-btn.active {
+            color: #8B5CF6;
+            border-bottom-color: #8B5CF6;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .section {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .section h2 {
+            color: #8B5CF6;
+            margin-bottom: 1rem;
+            font-size: 1.8rem;
+        }
+
+        .section h3 {
+            color: #8B5CF6;
+            margin: 1.5rem 0 1rem 0;
+            font-size: 1.3rem;
+        }
+
+        .code-block {
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-left: 4px solid #8B5CF6;
+            overflow-x: auto;
+        }
+
+        .code-block pre {
+            margin: 0;
+            color: #e2e8f0;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .interactive-demo {
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 1.5rem 0;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #8B5CF6;
+            font-weight: 600;
+        }
+
+        .input-group input,
+        .input-group select,
+        .input-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: #1e293b;
+            border: 2px solid #334155;
+            border-radius: 6px;
+            color: #e2e8f0;
+            font-size: 1rem;
+        }
+
+        .input-group input:focus,
+        .input-group select:focus,
+        .input-group textarea:focus {
+            outline: none;
+            border-color: #8B5CF6;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: #8B5CF6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #7C3AED;
+        }
+
+        .output {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background: #1e293b;
+            border-radius: 8px;
+            border-left: 4px solid #8B5CF6;
+        }
+
+        .trust-score {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 0.5rem 0;
+        }
+
+        .trust-high {
+            background: #10b981;
+            color: white;
+        }
+
+        .trust-medium {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .trust-low {
+            background: #ef4444;
+            color: white;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .card {
+            background: #0f172a;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 2px solid #334155;
+        }
+
+        .card h4 {
+            color: #8B5CF6;
+            margin-bottom: 0.5rem;
+        }
+
+        .qr-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            text-align: center;
+            margin: 1.5rem 0;
+        }
+
+        .qr-canvas {
+            max-width: 300px;
+            margin: 0 auto;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 1rem;
+            padding: 0.5rem 1rem;
+            background: #1e293b;
+            color: #8B5CF6;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .back-link:hover {
+            background: #334155;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+        }
+
+        th {
+            background: #0f172a;
+            color: #8B5CF6;
+            font-weight: 600;
+        }
+
+        .info-box {
+            background: #0f172a;
+            border-left: 4px solid #3b82f6;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 6px;
+        }
+
+        .warning-box {
+            background: #0f172a;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 6px;
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+
+        nav.top-nav {
+            background: #0f172a;
+            padding: 14px 24px;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            gap: 18px;
+            flex-wrap: wrap;
+        }
+        nav.top-nav a {
+            color: #93c5fd;
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+        nav.top-nav a.muted {
+            color: #94a3b8;
+        }
+        nav.top-nav a:hover {
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+<nav class="top-nav">
+  <a href="https://wiastandards.com">← WIA Standards</a>
+  <a href="../">↑ simulator</a>
+  <a href="../README.md" class="muted">README</a>
+  <a href="../spec/" class="muted">Spec</a>
+  <a href="../api/" class="muted">API</a>
+  <a href="../cli/" class="muted">CLI</a>
+  <a href="../ebook/en/" class="muted">eBook EN</a>
+  <a href="../ebook/ko/" class="muted">eBook KO</a>
+  <a href="../simulator/" class="muted">Simulator</a>
+  <a href="../press/" class="muted">Press</a>
+</nav>
+
+    <div class="lang-toggle">
+        <button class="lang-btn active" data-lang="en">EN</button>
+        <button class="lang-btn" data-lang="ko">한국어</button>
+    </div>
+
+    <div class="container">
+        <a href="../index.html" class="back-link" data-en="← Back to Main" data-ko="← 메인으로">← Back to Main</a>
+
+        <header>
+            <h1 data-en="Zero Trust Architecture Simulator 🔐" data-ko="제로 트러스트 아키텍처 시뮬레이터 🔐">Zero Trust Architecture Simulator 🔐</h1>
+            <p data-en="Interactive demonstrations of Zero Trust concepts and implementations" data-ko="제로 트러스트 개념 및 구현의 인터랙티브 데모">Interactive demonstrations of Zero Trust concepts and implementations</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="tab1" data-en="📊 Data Format" data-ko="📊 데이터 형식">📊 Data Format</button>
+            <button class="tab-btn" data-tab="tab2" data-en="⚙️ Algorithms" data-ko="⚙️ 알고리즘">⚙️ Algorithms</button>
+            <button class="tab-btn" data-tab="tab3" data-en="🔄 Protocol" data-ko="🔄 프로토콜">🔄 Protocol</button>
+            <button class="tab-btn" data-tab="tab4" data-en="🔌 Integration" data-ko="🔌 통합">🔌 Integration</button>
+            <button class="tab-btn" data-tab="tab5" data-en="📱 QR & VC" data-ko="📱 QR & VC">📱 QR & VC</button>
+        </div>
+
+        <!-- Tab 1: Data Format -->
+        <div id="tab1" class="tab-content active">
+            <div class="section">
+                <h2 data-en="Trust Score Data Format" data-ko="신뢰 점수 데이터 형식">Trust Score Data Format</h2>
+
+                <h3 data-en="User Trust Score" data-ko="사용자 신뢰 점수">User Trust Score</h3>
+                <div class="code-block">
+                    <pre>{
+  "userId": "user-12345",
+  "timestamp": "2025-12-25T10:30:00Z",
+  "userTrust": {
+    "identityScore": 95,
+    "authenticationMethod": "mfa",
+    "behaviorScore": 88,
+    "riskFactors": {
+      "unusualLocation": false,
+      "unusualTime": false,
+      "newDevice": false,
+      "failedAttempts": 0
+    },
+    "overallScore": 91.5
+  }
+}</pre>
+                </div>
+
+                <h3 data-en="Device Trust Score" data-ko="디바이스 신뢰 점수">Device Trust Score</h3>
+                <div class="code-block">
+                    <pre>{
+  "deviceId": "device-67890",
+  "timestamp": "2025-12-25T10:30:00Z",
+  "deviceTrust": {
+    "complianceScore": 92,
+    "securityPosture": {
+      "osVersion": "up-to-date",
+      "encryptionEnabled": true,
+      "antivirusActive": true,
+      "firewallEnabled": true,
+      "lastPatchDate": "2025-12-20"
+    },
+    "deviceHealth": 95,
+    "registrationStatus": "managed",
+    "overallScore": 93.5
+  }
+}</pre>
+                </div>
+
+                <h3 data-en="Network Context" data-ko="네트워크 컨텍스트">Network Context</h3>
+                <div class="code-block">
+                    <pre>{
+  "sessionId": "session-abc123",
+  "timestamp": "2025-12-25T10:30:00Z",
+  "networkContext": {
+    "sourceIP": "192.168.1.100",
+    "location": {
+      "country": "US",
+      "city": "San Francisco",
+      "latitude": 37.7749,
+      "longitude": -122.4194
+    },
+    "networkType": "corporate-wifi",
+    "vpnActive": true,
+    "threatIntel": {
+      "ipReputation": "clean",
+      "knownThreats": false
+    },
+    "networkTrustScore": 88
+  }
+}</pre>
+                </div>
+
+                <div class="interactive-demo">
+                    <h3 data-en="Calculate Trust Score" data-ko="신뢰 점수 계산">Calculate Trust Score</h3>
+                    <div class="grid">
+                        <div class="input-group">
+                            <label data-en="Identity Score (0-100)" data-ko="신원 점수 (0-100)">Identity Score (0-100)</label>
+                            <input type="number" id="identityScore" min="0" max="100" value="95">
+                        </div>
+                        <div class="input-group">
+                            <label data-en="Device Compliance (0-100)" data-ko="디바이스 준수 (0-100)">Device Compliance (0-100)</label>
+                            <input type="number" id="deviceScore" min="0" max="100" value="92">
+                        </div>
+                        <div class="input-group">
+                            <label data-en="Behavior Score (0-100)" data-ko="행동 점수 (0-100)">Behavior Score (0-100)</label>
+                            <input type="number" id="behaviorScore" min="0" max="100" value="88">
+                        </div>
+                        <div class="input-group">
+                            <label data-en="Network Trust (0-100)" data-ko="네트워크 신뢰 (0-100)">Network Trust (0-100)</label>
+                            <input type="number" id="networkScore" min="0" max="100" value="88">
+                        </div>
+                    </div>
+                    <button class="btn" onclick="calculateTrustScore()" data-en="Calculate Overall Trust Score" data-ko="전체 신뢰 점수 계산">Calculate Overall Trust Score</button>
+                    <div id="trustOutput" class="output" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Algorithms -->
+        <div id="tab2" class="tab-content">
+            <div class="section">
+                <h2 data-en="Zero Trust Algorithms" data-ko="제로 트러스트 알고리즘">Zero Trust Algorithms</h2>
+
+                <h3 data-en="1. Trust Score Calculation Algorithm" data-ko="1. 신뢰 점수 계산 알고리즘">1. Trust Score Calculation Algorithm</h3>
+                <div class="code-block">
+                    <pre>// Weighted trust score calculation
+function calculateTrustScore(factors) {
+    const weights = {
+        identity: 0.30,      // 30%
+        device: 0.25,        // 25%
+        behavior: 0.25,      // 25%
+        network: 0.20        // 20%
+    };
+
+    let score =
+        factors.identity * weights.identity +
+        factors.device * weights.device +
+        factors.behavior * weights.behavior +
+        factors.network * weights.network;
+
+    // Apply risk modifiers
+    score = applyRiskModifiers(score, factors.riskFactors);
+
+    return Math.min(100, Math.max(0, score));
+}
+
+function applyRiskModifiers(score, riskFactors) {
+    if (riskFactors.unusualLocation) score -= 15;
+    if (riskFactors.unusualTime) score -= 10;
+    if (riskFactors.newDevice) score -= 20;
+    if (riskFactors.failedAttempts > 0) score -= (riskFactors.failedAttempts * 5);
+
+    return score;
+}</pre>
+                </div>
+
+                <h3 data-en="2. Continuous Verification Algorithm" data-ko="2. 지속적 검증 알고리즘">2. Continuous Verification Algorithm</h3>
+                <div class="code-block">
+                    <pre>// Re-verify trust every N minutes
+function continuousVerification(session) {
+    const VERIFICATION_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+    setInterval(async () => {
+        const currentTrust = await calculateCurrentTrustScore(session);
+
+        if (currentTrust < MINIMUM_TRUST_THRESHOLD) {
+            // Revoke access immediately
+            await revokeAccess(session);
+            await notifyUser(session.userId, 'ACCESS_REVOKED');
+        } else if (currentTrust < STEP_UP_THRESHOLD) {
+            // Require additional authentication
+            await requireStepUpAuth(session);
+        }
+
+        // Log for audit
+        await auditLog({
+            sessionId: session.id,
+            trustScore: currentTrust,
+            timestamp: new Date().toISOString()
+        });
+    }, VERIFICATION_INTERVAL);
+}</pre>
+                </div>
+
+                <h3 data-en="3. Risk Assessment Algorithm" data-ko="3. 위험 평가 알고리즘">3. Risk Assessment Algorithm</h3>
+                <div class="code-block">
+                    <pre>function assessRisk(accessRequest) {
+    let riskScore = 0;
+
+    // Analyze access patterns
+    if (isAnomalousAccess(accessRequest)) {
+        riskScore += 30;
+    }
+
+    // Check threat intelligence
+    if (isKnownThreatIP(accessRequest.sourceIP)) {
+        riskScore += 40;
+    }
+
+    // Evaluate resource sensitivity
+    const resourceSensitivity = getResourceSensitivity(accessRequest.resource);
+    riskScore += resourceSensitivity * 0.3;
+
+    // Time-based risk
+    if (isOutsideBusinessHours(accessRequest.timestamp)) {
+        riskScore += 15;
+    }
+
+    // Geographic risk
+    if (isUnusualLocation(accessRequest.location)) {
+        riskScore += 20;
+    }
+
+    return {
+        score: riskScore,
+        level: getRiskLevel(riskScore),
+        factors: identifyRiskFactors(accessRequest)
+    };
+}
+
+function getRiskLevel(score) {
+    if (score >= 70) return 'CRITICAL';
+    if (score >= 50) return 'HIGH';
+    if (score >= 30) return 'MEDIUM';
+    return 'LOW';
+}</pre>
+                </div>
+
+                <div class="interactive-demo">
+                    <h3 data-en="Risk Assessment Demo" data-ko="위험 평가 데모">Risk Assessment Demo</h3>
+                    <div class="grid">
+                        <div class="input-group">
+                            <label data-en="Anomalous Access" data-ko="비정상 액세스">Anomalous Access</label>
+                            <select id="anomalousAccess">
+                                <option value="false">No</option>
+                                <option value="true">Yes</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label data-en="Known Threat IP" data-ko="알려진 위협 IP">Known Threat IP</label>
+                            <select id="threatIP">
+                                <option value="false">No</option>
+                                <option value="true">Yes</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label data-en="Resource Sensitivity (0-100)" data-ko="리소스 민감도 (0-100)">Resource Sensitivity (0-100)</label>
+                            <input type="number" id="resourceSensitivity" min="0" max="100" value="50">
+                        </div>
+                        <div class="input-group">
+                            <label data-en="Outside Business Hours" data-ko="업무 시간 외">Outside Business Hours</label>
+                            <select id="outsideHours">
+                                <option value="false">No</option>
+                                <option value="true">Yes</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label data-en="Unusual Location" data-ko="비정상 위치">Unusual Location</label>
+                            <select id="unusualLocation">
+                                <option value="false">No</option>
+                                <option value="true">Yes</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn" onclick="assessRisk()" data-en="Assess Risk" data-ko="위험 평가">Assess Risk</button>
+                    <div id="riskOutput" class="output" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Protocol -->
+        <div id="tab3" class="tab-content">
+            <div class="section">
+                <h2 data-en="Zero Trust Protocol Flow" data-ko="제로 트러스트 프로토콜 흐름">Zero Trust Protocol Flow</h2>
+
+                <div class="info-box">
+                    <strong data-en="Never Trust, Always Verify Protocol" data-ko="절대 신뢰하지 말고, 항상 검증하라 프로토콜">Never Trust, Always Verify Protocol</strong>
+                    <p data-en="Every access request goes through a complete verification process, regardless of the source." data-ko="모든 액세스 요청은 출처에 관계없이 완전한 검증 프로세스를 거칩니다.">Every access request goes through a complete verification process, regardless of the source.</p>
+                </div>
+
+                <h3 data-en="Protocol Sequence Diagram" data-ko="프로토콜 시퀀스 다이어그램">Protocol Sequence Diagram</h3>
+                <div class="code-block">
+                    <pre>User/Device                Policy Engine          Resource
+     |                          |                      |
+     |-- 1. Access Request ---->|                      |
+     |                          |                      |
+     |                          |-- 2. Verify Identity |
+     |                          |                      |
+     |                          |-- 3. Check Device    |
+     |                          |    Compliance        |
+     |                          |                      |
+     |                          |-- 4. Assess Context  |
+     |                          |    (location, time)  |
+     |                          |                      |
+     |                          |-- 5. Calculate Trust |
+     |                          |    Score             |
+     |                          |                      |
+     |                          |-- 6. Apply Policies  |
+     |                          |                      |
+     |<-- 7. Decision ----------|                      |
+     |    (Allow/Deny/StepUp)   |                      |
+     |                          |                      |
+     |-- 8. Access Resource ----|--------------------->|
+     |                          |                      |
+     |                          |-- 9. Continuous      |
+     |                          |    Monitoring        |
+     |                          |                      |</pre>
+                </div>
+
+                <h3 data-en="Access Request Protocol" data-ko="액세스 요청 프로토콜">Access Request Protocol</h3>
+                <div class="code-block">
+                    <pre>POST /api/v1/access/request
+Content-Type: application/json
+
+{
+  "requestId": "req-abc123",
+  "userId": "user-12345",
+  "deviceId": "device-67890",
+  "resource": {
+    "type": "application",
+    "id": "app-finance-dashboard",
+    "action": "read"
+  },
+  "context": {
+    "sourceIP": "192.168.1.100",
+    "userAgent": "Mozilla/5.0...",
+    "timestamp": "2025-12-25T10:30:00Z"
+  },
+  "authentication": {
+    "method": "mfa",
+    "token": "eyJhbGciOiJIUzI1NiIs..."
+  }
+}
+
+Response:
+{
+  "decision": "ALLOW",
+  "trustScore": 91.5,
+  "conditions": {
+    "maxDuration": 3600,
+    "requireReauth": false,
+    "allowedActions": ["read"],
+    "monitoringLevel": "standard"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "expiresAt": "2025-12-25T11:30:00Z"
+}</pre>
+                </div>
+
+                <h3 data-en="Step-Up Authentication Protocol" data-ko="단계별 인증 프로토콜">Step-Up Authentication Protocol</h3>
+                <div class="code-block">
+                    <pre>// When trust score is below threshold but above minimum
+{
+  "decision": "STEP_UP_REQUIRED",
+  "trustScore": 72.5,
+  "reason": "Unusual location detected",
+  "requiredActions": [
+    {
+      "type": "additional_mfa",
+      "method": "biometric",
+      "challenge": "fingerprint_required"
+    },
+    {
+      "type": "security_question",
+      "question": "What is your mother's maiden name?"
+    }
+  ],
+  "challengeId": "challenge-xyz789",
+  "expiresAt": "2025-12-25T10:35:00Z"
+}</pre>
+                </div>
+
+                <div class="interactive-demo">
+                    <h3 data-en="Simulate Access Request" data-ko="액세스 요청 시뮬레이션">Simulate Access Request</h3>
+                    <div class="input-group">
+                        <label data-en="Resource Sensitivity" data-ko="리소스 민감도">Resource Sensitivity</label>
+                        <select id="protocolResource">
+                            <option value="low">Low (Public Documents)</option>
+                            <option value="medium">Medium (Internal Tools)</option>
+                            <option value="high">High (Financial Data)</option>
+                            <option value="critical">Critical (Customer PII)</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label data-en="User Trust Score (0-100)" data-ko="사용자 신뢰 점수 (0-100)">User Trust Score (0-100)</label>
+                        <input type="number" id="protocolTrustScore" min="0" max="100" value="85">
+                    </div>
+                    <div class="input-group">
+                        <label data-en="Anomaly Detected" data-ko="이상 감지됨">Anomaly Detected</label>
+                        <select id="protocolAnomaly">
+                            <option value="false">No</option>
+                            <option value="true">Yes</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="simulateAccessRequest()" data-en="Simulate Request" data-ko="요청 시뮬레이션">Simulate Request</button>
+                    <div id="protocolOutput" class="output" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Integration -->
+        <div id="tab4" class="tab-content">
+            <div class="section">
+                <h2 data-en="Zero Trust Integration Architecture" data-ko="제로 트러스트 통합 아키텍처">Zero Trust Integration Architecture</h2>
+
+                <h3 data-en="IAM (Identity & Access Management) Integration" data-ko="IAM (신원 및 액세스 관리) 통합">IAM (Identity & Access Management) Integration</h3>
+                <div class="code-block">
+                    <pre>// Integration with IAM systems (Okta, Azure AD, etc.)
+class IAMIntegration {
+    async verifyIdentity(token) {
+        // Validate JWT token with IAM provider
+        const decoded = await this.iamProvider.validateToken(token);
+
+        // Fetch user attributes
+        const userAttributes = await this.iamProvider.getUserAttributes(decoded.userId);
+
+        // Check group memberships
+        const groups = await this.iamProvider.getUserGroups(decoded.userId);
+
+        return {
+            userId: decoded.userId,
+            attributes: userAttributes,
+            groups: groups,
+            mfaVerified: decoded.amr?.includes('mfa'),
+            identityTrustScore: this.calculateIdentityScore(decoded, userAttributes)
+        };
+    }
+
+    async enforcePolicy(userId, resource) {
+        // Check RBAC policies
+        const roles = await this.iamProvider.getUserRoles(userId);
+        const permissions = await this.iamProvider.getRolePermissions(roles);
+
+        // Apply ABAC policies
+        const attributes = await this.getUserAttributes(userId);
+        const contextualPolicies = await this.evaluatePolicies(attributes, resource);
+
+        return {
+            allowed: this.checkPermissions(permissions, resource),
+            policies: contextualPolicies
+        };
+    }
+}</pre>
+                </div>
+
+                <h3 data-en="SIEM (Security Information & Event Management) Integration" data-ko="SIEM (보안 정보 및 이벤트 관리) 통합">SIEM (Security Information & Event Management) Integration</h3>
+                <div class="code-block">
+                    <pre>// Send zero trust events to SIEM
+class SIEMIntegration {
+    async logAccessEvent(event) {
+        const siemEvent = {
+            timestamp: new Date().toISOString(),
+            eventType: 'zero_trust_access',
+            severity: this.calculateSeverity(event),
+            source: {
+                userId: event.userId,
+                deviceId: event.deviceId,
+                ip: event.sourceIP,
+                location: event.location
+            },
+            target: {
+                resource: event.resource,
+                action: event.action
+            },
+            decision: event.decision,
+            trustScore: event.trustScore,
+            riskFactors: event.riskFactors,
+            rawEvent: event
+        };
+
+        // Send to SIEM (Splunk, ELK, etc.)
+        await this.siemProvider.sendEvent(siemEvent);
+
+        // Trigger alerts if needed
+        if (event.trustScore < ALERT_THRESHOLD) {
+            await this.siemProvider.createAlert({
+                title: 'Low Trust Score Detected',
+                description: `User ${event.userId} has trust score ${event.trustScore}`,
+                severity: 'HIGH',
+                event: siemEvent
+            });
+        }
+    }
+}</pre>
+                </div>
+
+                <h3 data-en="EDR (Endpoint Detection & Response) Integration" data-ko="EDR (엔드포인트 탐지 및 대응) 통합">EDR (Endpoint Detection & Response) Integration</h3>
+                <div class="code-block">
+                    <pre>// Integrate with EDR for device health assessment
+class EDRIntegration {
+    async getDeviceHealth(deviceId) {
+        // Query EDR agent on device
+        const edrData = await this.edrProvider.getDeviceStatus(deviceId);
+
+        return {
+            deviceId: deviceId,
+            compliance: {
+                osVersion: edrData.os.version,
+                osPatched: edrData.os.lastPatchDate,
+                antivirusActive: edrData.antivirus.running,
+                antivirusUpdated: edrData.antivirus.lastUpdate,
+                firewallEnabled: edrData.firewall.enabled,
+                encryptionEnabled: edrData.encryption.enabled
+            },
+            threats: {
+                activeThreat: edrData.threats.active.length > 0,
+                threatCount: edrData.threats.active.length,
+                lastScan: edrData.lastScan,
+                quarantinedItems: edrData.quarantine.length
+            },
+            healthScore: this.calculateDeviceHealthScore(edrData)
+        };
+    }
+
+    async enforceDevicePolicy(deviceId, policy) {
+        // Push policy to EDR agent
+        await this.edrProvider.applyPolicy(deviceId, {
+            requireEncryption: policy.encryption,
+            requireAntivirus: policy.antivirus,
+            allowedApplications: policy.applicationWhitelist,
+            blockedApplications: policy.applicationBlacklist
+        });
+    }
+}</pre>
+                </div>
+
+                <div class="grid">
+                    <div class="card">
+                        <h4 data-en="IAM Integration Benefits" data-ko="IAM 통합 이점">IAM Integration Benefits</h4>
+                        <ul>
+                            <li data-en="Centralized identity management" data-ko="중앙 집중식 신원 관리">Centralized identity management</li>
+                            <li data-en="MFA enforcement" data-ko="MFA 강제">MFA enforcement</li>
+                            <li data-en="Role-based access control" data-ko="역할 기반 액세스 제어">Role-based access control</li>
+                            <li data-en="Attribute-based policies" data-ko="속성 기반 정책">Attribute-based policies</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h4 data-en="SIEM Integration Benefits" data-ko="SIEM 통합 이점">SIEM Integration Benefits</h4>
+                        <ul>
+                            <li data-en="Centralized logging" data-ko="중앙 집중식 로깅">Centralized logging</li>
+                            <li data-en="Real-time alerting" data-ko="실시간 알림">Real-time alerting</li>
+                            <li data-en="Threat correlation" data-ko="위협 상관관계">Threat correlation</li>
+                            <li data-en="Compliance reporting" data-ko="규정 준수 보고">Compliance reporting</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h4 data-en="EDR Integration Benefits" data-ko="EDR 통합 이점">EDR Integration Benefits</h4>
+                        <ul>
+                            <li data-en="Device health monitoring" data-ko="디바이스 상태 모니터링">Device health monitoring</li>
+                            <li data-en="Threat detection" data-ko="위협 탐지">Threat detection</li>
+                            <li data-en="Automated response" data-ko="자동화된 대응">Automated response</li>
+                            <li data-en="Compliance enforcement" data-ko="규정 준수 강제">Compliance enforcement</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h3 data-en="Integration Architecture Diagram" data-ko="통합 아키텍처 다이어그램">Integration Architecture Diagram</h3>
+                <div class="code-block">
+                    <pre>┌─────────────────────────────────────────────────────────────┐
+│                    Zero Trust Policy Engine                  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │  Trust   │  │  Policy  │  │  Risk    │  │  Access  │   │
+│  │  Scoring │  │  Engine  │  │  Engine  │  │  Control │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+└─────────────────────────────────────────────────────────────┘
+         │              │              │              │
+         ▼              ▼              ▼              ▼
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│     IAM     │ │    SIEM     │ │     EDR     │ │  Firewall   │
+│  (Identity) │ │  (Logging)  │ │  (Endpoint) │ │  (Network)  │
+└─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
+         │              │              │              │
+         └──────────────┴──────────────┴──────────────┘
+                             │
+                             ▼
+                    Protected Resources</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 5: QR & VC -->
+        <div id="tab5" class="tab-content">
+            <div class="section">
+                <h2 data-en="Zero Trust Certificate with QR & Verifiable Credentials" data-ko="QR 및 검증 가능한 자격 증명을 통한 제로 트러스트 인증서">Zero Trust Certificate with QR & Verifiable Credentials</h2>
+
+                <div class="info-box">
+                    <strong data-en="Verifiable Credentials (VC)" data-ko="검증 가능한 자격 증명 (VC)">Verifiable Credentials (VC)</strong>
+                    <p data-en="W3C standard for cryptographically verifiable digital credentials that can prove trust status." data-ko="신뢰 상태를 증명할 수 있는 암호화 방식으로 검증 가능한 디지털 자격 증명을 위한 W3C 표준입니다.">W3C standard for cryptographically verifiable digital credentials that can prove trust status.</p>
+                </div>
+
+                <h3 data-en="Zero Trust Verifiable Credential Format" data-ko="제로 트러스트 검증 가능한 자격 증명 형식">Zero Trust Verifiable Credential Format</h3>
+                <div class="code-block">
+                    <pre>{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://wia.org/credentials/zero-trust/v1"
+  ],
+  "id": "https://wia.org/credentials/zt/12345",
+  "type": ["VerifiableCredential", "ZeroTrustCredential"],
+  "issuer": {
+    "id": "did:wia:issuer:corporate-policy-engine",
+    "name": "Corporate Zero Trust Policy Engine"
+  },
+  "issuanceDate": "2025-12-25T10:30:00Z",
+  "expirationDate": "2025-12-25T11:30:00Z",
+  "credentialSubject": {
+    "id": "did:wia:user:12345",
+    "trustScore": {
+      "overall": 91.5,
+      "identity": 95,
+      "device": 92,
+      "behavior": 88,
+      "network": 88
+    },
+    "deviceCompliance": {
+      "deviceId": "device-67890",
+      "compliant": true,
+      "osPatched": true,
+      "antivirusActive": true,
+      "encryptionEnabled": true
+    },
+    "accessGrant": {
+      "resources": ["app-finance-dashboard"],
+      "actions": ["read"],
+      "conditions": {
+        "maxDuration": 3600,
+        "requireContinuousVerification": true
+      }
+    }
+  },
+  "proof": {
+    "type": "Ed25519Signature2020",
+    "created": "2025-12-25T10:30:00Z",
+    "verificationMethod": "did:wia:issuer:corporate-policy-engine#key-1",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z3FXQsWzG...base64encoded..."
+  }
+}</pre>
+                </div>
+
+                <div class="interactive-demo">
+                    <h3 data-en="Generate Zero Trust Certificate" data-ko="제로 트러스트 인증서 생성">Generate Zero Trust Certificate</h3>
+                    <div class="grid">
+                        <div class="input-group">
+                            <label data-en="User ID" data-ko="사용자 ID">User ID</label>
+                            <input type="text" id="vcUserId" value="user-12345">
+                        </div>
+                        <div class="input-group">
+                            <label data-en="Device ID" data-ko="디바이스 ID">Device ID</label>
+                            <input type="text" id="vcDeviceId" value="device-67890">
+                        </div>
+                        <div class="input-group">
+                            <label data-en="Trust Score" data-ko="신뢰 점수">Trust Score</label>
+                            <input type="number" id="vcTrustScore" min="0" max="100" value="91.5">
+                        </div>
+                        <div class="input-group">
+                            <label data-en="Access Duration (seconds)" data-ko="액세스 기간 (초)">Access Duration (seconds)</label>
+                            <input type="number" id="vcDuration" value="3600">
+                        </div>
+                    </div>
+                    <button class="btn" onclick="generateVC()" data-en="Generate Certificate & QR Code" data-ko="인증서 및 QR 코드 생성">Generate Certificate & QR Code</button>
+
+                    <div id="vcOutput" class="output" style="display: none;">
+                        <h4 data-en="Generated Verifiable Credential" data-ko="생성된 검증 가능한 자격 증명">Generated Verifiable Credential</h4>
+                        <div class="code-block">
+                            <pre id="vcJson"></pre>
+                        </div>
+
+                        <div class="qr-container">
+                            <h4 style="color: #1e293b;" data-en="QR Code for Mobile Verification" data-ko="모바일 검증용 QR 코드">QR Code for Mobile Verification</h4>
+                            <canvas id="qrCanvas" class="qr-canvas"></canvas>
+                            <p style="color: #64748b; margin-top: 1rem;" data-en="Scan this QR code with a Zero Trust mobile app to verify credentials" data-ko="Zero Trust 모바일 앱으로 이 QR 코드를 스캔하여 자격 증명 확인">Scan this QR code with a Zero Trust mobile app to verify credentials</p>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 data-en="Verification Process" data-ko="검증 프로세스">Verification Process</h3>
+                <div class="code-block">
+                    <pre>// Verify Zero Trust Credential
+async function verifyZeroTrustCredential(vc) {
+    // 1. Verify cryptographic proof
+    const proofValid = await verifyProof(vc.proof, vc.credentialSubject);
+
+    // 2. Check expiration
+    const now = new Date();
+    const expiration = new Date(vc.expirationDate);
+    const notExpired = now < expiration;
+
+    // 3. Verify issuer is trusted
+    const issuerTrusted = await verifyIssuer(vc.issuer.id);
+
+    // 4. Check revocation status
+    const notRevoked = await checkRevocationStatus(vc.id);
+
+    // 5. Validate trust score meets minimum
+    const trustScoreValid = vc.credentialSubject.trustScore.overall >= MINIMUM_TRUST;
+
+    return {
+        valid: proofValid && notExpired && issuerTrusted && notRevoked && trustScoreValid,
+        checks: {
+            proofValid,
+            notExpired,
+            issuerTrusted,
+            notRevoked,
+            trustScoreValid
+        }
+    };
+}</pre>
+                </div>
+
+                <div class="warning-box">
+                    <strong data-en="Security Best Practices" data-ko="보안 모범 사례">Security Best Practices</strong>
+                    <ul>
+                        <li data-en="Always verify credentials cryptographically" data-ko="항상 자격 증명을 암호화 방식으로 검증">Always verify credentials cryptographically</li>
+                        <li data-en="Use short expiration times (1 hour or less)" data-ko="짧은 만료 시간 사용 (1시간 이하)">Use short expiration times (1 hour or less)</li>
+                        <li data-en="Implement credential revocation mechanisms" data-ko="자격 증명 취소 메커니즘 구현">Implement credential revocation mechanisms</li>
+                        <li data-en="Store credentials securely (never in plain text)" data-ko="자격 증명을 안전하게 저장 (평문으로 저장 금지)">Store credentials securely (never in plain text)</li>
+                        <li data-en="Use QR codes only over secure channels" data-ko="안전한 채널을 통해서만 QR 코드 사용">Use QR codes only over secure channels</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script>
+        // Language toggle
+        const langButtons = document.querySelectorAll('.lang-btn');
+        const elementsToTranslate = document.querySelectorAll('[data-en][data-ko]');
+        const savedLang = localStorage.getItem('wia-lang') || 'en';
+        setLanguage(savedLang);
+
+        langButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const lang = btn.dataset.lang;
+                setLanguage(lang);
+                localStorage.setItem('wia-lang', lang);
+            });
+        });
+
+        function setLanguage(lang) {
+            langButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.lang === lang);
+            });
+            elementsToTranslate.forEach(el => {
+                el.textContent = el.dataset[lang];
+            });
+            document.documentElement.lang = lang === 'ko' ? 'ko' : 'en';
+        }
+
+        // Tab functionality
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.dataset.tab;
+
+                tabButtons.forEach(b => b.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+
+                btn.classList.add('active');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // Tab 1: Trust Score Calculator
+        function calculateTrustScore() {
+            const identity = parseFloat(document.getElementById('identityScore').value);
+            const device = parseFloat(document.getElementById('deviceScore').value);
+            const behavior = parseFloat(document.getElementById('behaviorScore').value);
+            const network = parseFloat(document.getElementById('networkScore').value);
+
+            const weights = {
+                identity: 0.30,
+                device: 0.25,
+                behavior: 0.25,
+                network: 0.20
+            };
+
+            const overall = (
+                identity * weights.identity +
+                device * weights.device +
+                behavior * weights.behavior +
+                network * weights.network
+            ).toFixed(1);
+
+            let trustClass = 'trust-low';
+            let trustLevel = 'LOW';
+            if (overall >= 80) {
+                trustClass = 'trust-high';
+                trustLevel = 'HIGH';
+            } else if (overall >= 60) {
+                trustClass = 'trust-medium';
+                trustLevel = 'MEDIUM';
+            }
+
+            const output = document.getElementById('trustOutput');
+            const lang = localStorage.getItem('wia-lang') || 'en';
+            const outputText = lang === 'ko' ?
+                `<h3>계산된 신뢰 점수</h3>
+                <p>전체 신뢰 점수: <span class="trust-score ${trustClass}">${overall} - ${trustLevel}</span></p>
+                <p><strong>점수 구성:</strong></p>
+                <ul>
+                    <li>신원 점수: ${identity} × ${weights.identity} = ${(identity * weights.identity).toFixed(1)}</li>
+                    <li>디바이스 점수: ${device} × ${weights.device} = ${(device * weights.device).toFixed(1)}</li>
+                    <li>행동 점수: ${behavior} × ${weights.behavior} = ${(behavior * weights.behavior).toFixed(1)}</li>
+                    <li>네트워크 점수: ${network} × ${weights.network} = ${(network * weights.network).toFixed(1)}</li>
+                </ul>` :
+                `<h3>Calculated Trust Score</h3>
+                <p>Overall Trust Score: <span class="trust-score ${trustClass}">${overall} - ${trustLevel}</span></p>
+                <p><strong>Score Breakdown:</strong></p>
+                <ul>
+                    <li>Identity Score: ${identity} × ${weights.identity} = ${(identity * weights.identity).toFixed(1)}</li>
+                    <li>Device Score: ${device} × ${weights.device} = ${(device * weights.device).toFixed(1)}</li>
+                    <li>Behavior Score: ${behavior} × ${weights.behavior} = ${(behavior * weights.behavior).toFixed(1)}</li>
+                    <li>Network Score: ${network} × ${weights.network} = ${(network * weights.network).toFixed(1)}</li>
+                </ul>`;
+
+            output.innerHTML = outputText;
+            output.style.display = 'block';
+        }
+
+        // Tab 2: Risk Assessment
+        function assessRisk() {
+            let riskScore = 0;
+            const factors = [];
+
+            if (document.getElementById('anomalousAccess').value === 'true') {
+                riskScore += 30;
+                factors.push('Anomalous access pattern detected');
+            }
+            if (document.getElementById('threatIP').value === 'true') {
+                riskScore += 40;
+                factors.push('Known threat IP address');
+            }
+
+            const sensitivity = parseFloat(document.getElementById('resourceSensitivity').value);
+            riskScore += sensitivity * 0.3;
+            factors.push(`Resource sensitivity: ${sensitivity}`);
+
+            if (document.getElementById('outsideHours').value === 'true') {
+                riskScore += 15;
+                factors.push('Access outside business hours');
+            }
+            if (document.getElementById('unusualLocation').value === 'true') {
+                riskScore += 20;
+                factors.push('Unusual geographic location');
+            }
+
+            let riskLevel = 'LOW';
+            let riskClass = 'trust-high';
+            if (riskScore >= 70) {
+                riskLevel = 'CRITICAL';
+                riskClass = 'trust-low';
+            } else if (riskScore >= 50) {
+                riskLevel = 'HIGH';
+                riskClass = 'trust-low';
+            } else if (riskScore >= 30) {
+                riskLevel = 'MEDIUM';
+                riskClass = 'trust-medium';
+            }
+
+            const output = document.getElementById('riskOutput');
+            const lang = localStorage.getItem('wia-lang') || 'en';
+            const outputText = lang === 'ko' ?
+                `<h3>위험 평가 결과</h3>
+                <p>위험 점수: <span class="trust-score ${riskClass}">${riskScore.toFixed(1)} - ${riskLevel}</span></p>
+                <p><strong>위험 요소:</strong></p>
+                <ul>${factors.map(f => `<li>${f}</li>`).join('')}</ul>` :
+                `<h3>Risk Assessment Result</h3>
+                <p>Risk Score: <span class="trust-score ${riskClass}">${riskScore.toFixed(1)} - ${riskLevel}</span></p>
+                <p><strong>Risk Factors:</strong></p>
+                <ul>${factors.map(f => `<li>${f}</li>`).join('')}</ul>`;
+
+            output.innerHTML = outputText;
+            output.style.display = 'block';
+        }
+
+        // Tab 3: Protocol Simulation
+        function simulateAccessRequest() {
+            const resource = document.getElementById('protocolResource').value;
+            const trustScore = parseFloat(document.getElementById('protocolTrustScore').value);
+            const anomaly = document.getElementById('protocolAnomaly').value === 'true';
+
+            const thresholds = {
+                low: { allow: 50, stepup: 70 },
+                medium: { allow: 60, stepup: 75 },
+                high: { allow: 75, stepup: 85 },
+                critical: { allow: 85, stepup: 92 }
+            };
+
+            const threshold = thresholds[resource];
+            let decision, decisionClass, actions;
+
+            if (anomaly || trustScore < threshold.allow) {
+                decision = 'DENY';
+                decisionClass = 'trust-low';
+                actions = ['Access denied', 'Security alert triggered', 'User notified'];
+            } else if (trustScore < threshold.stepup) {
+                decision = 'STEP_UP_REQUIRED';
+                decisionClass = 'trust-medium';
+                actions = ['Additional MFA required', 'Security question', 'Biometric verification'];
+            } else {
+                decision = 'ALLOW';
+                decisionClass = 'trust-high';
+                actions = ['Access granted', 'Session token issued', 'Continuous monitoring enabled'];
+            }
+
+            const output = document.getElementById('protocolOutput');
+            const lang = localStorage.getItem('wia-lang') || 'en';
+            const outputText = lang === 'ko' ?
+                `<h3>액세스 결정</h3>
+                <p>결정: <span class="trust-score ${decisionClass}">${decision}</span></p>
+                <p><strong>신뢰 점수:</strong> ${trustScore}</p>
+                <p><strong>리소스 민감도:</strong> ${resource.toUpperCase()}</p>
+                <p><strong>필요한 임계값:</strong> ${threshold.allow} (허용), ${threshold.stepup} (단계별 인증 없이)</p>
+                <p><strong>조치:</strong></p>
+                <ul>${actions.map(a => `<li>${a}</li>`).join('')}</ul>` :
+                `<h3>Access Decision</h3>
+                <p>Decision: <span class="trust-score ${decisionClass}">${decision}</span></p>
+                <p><strong>Trust Score:</strong> ${trustScore}</p>
+                <p><strong>Resource Sensitivity:</strong> ${resource.toUpperCase()}</p>
+                <p><strong>Required Threshold:</strong> ${threshold.allow} (allow), ${threshold.stepup} (no step-up)</p>
+                <p><strong>Actions:</strong></p>
+                <ul>${actions.map(a => `<li>${a}</li>`).join('')}</ul>`;
+
+            output.innerHTML = outputText;
+            output.style.display = 'block';
+        }
+
+        // Tab 5: Generate VC and QR Code
+        function generateVC() {
+            const userId = document.getElementById('vcUserId').value;
+            const deviceId = document.getElementById('vcDeviceId').value;
+            const trustScore = parseFloat(document.getElementById('vcTrustScore').value);
+            const duration = parseInt(document.getElementById('vcDuration').value);
+
+            const now = new Date();
+            const expiration = new Date(now.getTime() + duration * 1000);
+
+            const vc = {
+                "@context": [
+                    "https://www.w3.org/2018/credentials/v1",
+                    "https://wia.org/credentials/zero-trust/v1"
+                ],
+                "id": `https://wia.org/credentials/zt/${Math.random().toString(36).substr(2, 9)}`,
+                "type": ["VerifiableCredential", "ZeroTrustCredential"],
+                "issuer": {
+                    "id": "did:wia:issuer:corporate-policy-engine",
+                    "name": "Corporate Zero Trust Policy Engine"
+                },
+                "issuanceDate": now.toISOString(),
+                "expirationDate": expiration.toISOString(),
+                "credentialSubject": {
+                    "id": `did:wia:user:${userId}`,
+                    "trustScore": {
+                        "overall": trustScore,
+                        "identity": 95,
+                        "device": 92,
+                        "behavior": 88,
+                        "network": 88
+                    },
+                    "deviceCompliance": {
+                        "deviceId": deviceId,
+                        "compliant": true,
+                        "osPatched": true,
+                        "antivirusActive": true,
+                        "encryptionEnabled": true
+                    },
+                    "accessGrant": {
+                        "resources": ["app-finance-dashboard"],
+                        "actions": ["read"],
+                        "conditions": {
+                            "maxDuration": duration,
+                            "requireContinuousVerification": true
+                        }
+                    }
+                },
+                "proof": {
+                    "type": "Ed25519Signature2020",
+                    "created": now.toISOString(),
+                    "verificationMethod": "did:wia:issuer:corporate-policy-engine#key-1",
+                    "proofPurpose": "assertionMethod",
+                    "proofValue": "z3FXQsWzG" + btoa(Math.random().toString()).substr(0, 40)
+                }
+            };
+
+            document.getElementById('vcJson').textContent = JSON.stringify(vc, null, 2);
+            document.getElementById('vcOutput').style.display = 'block';
+
+            // Generate QR Code
+            const qrData = JSON.stringify({
+                type: 'zero-trust-credential',
+                credentialId: vc.id,
+                verifyUrl: `https://wia.org/verify/${vc.id}`,
+                trustScore: trustScore
+            });
+
+            const canvas = document.getElementById('qrCanvas');
+            QRCode.toCanvas(canvas, qrData, {
+                width: 300,
+                margin: 2,
+                color: {
+                    dark: '#1e293b',
+                    light: '#ffffff'
+                }
+            });
+        }
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

@@ -1,241 +1,430 @@
-# WIA-education-robot PHASE 2 — API-INTERFACE Specification
+# WIA-education-robot PHASE 2 — API Interface Specification
 
 **Standard:** WIA-education-robot
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-education-robot (Education Robot).
+This document defines the HTTPS API contract that
+an education-robot operator (manufacturer,
+school deployer, after-school academy, inclusive-
+education provider, telepresence-robot operator,
+museum-based deployer, certification body)
+exposes for the records defined in PHASE-1. The
+contract carries the robot-platform registration,
+ontology binding, safety-conformity test upload,
+interaction-event recording, lifecycle event
+recording, and chain-of-custody anchoring
+endpoints.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110, RFC 9111, RFC 9457, RFC 8288,
+  RFC 6901 / 6902, RFC 8259, RFC 4122, RFC
+  9421, RFC 8615
+- W3C Trace Context, W3C WebRTC 1.0
+- ISO/IEC 27001:2022, ISO/IEC 17021-1:2015,
+  ISO/IEC 17065:2012, ISO/IEC 17025:2017
+- ISO 13482:2014, ISO 10218-1:2011 / -2:2011,
+  ISO/TS 15066:2016
+- IEC 62366-1:2015/Amd 1:2020, IEC 61508 series
+- IEEE Std 1872-2015 (CORA), IEEE Std 1872.2-
+  2021 (AuR)
+- IEC 62443-3-3, IEC 62368-1:2018+AMD1:2020
+- ISO/IEC 23894:2023, ISO/IEC 42001:2023
+- EU Machinery Regulation (EU) 2023/1230
+- EU AI Act (Regulation (EU) 2024/1689)
+- KR 어린이제품 안전 특별법
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-education-robot
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published
+by the operator. The OpenAPI 3.1 document at
+`/v1/openapi.json` is canonical. Schema changes
+follow the non-breaking conventions in PHASE-1
+§2. Every endpoint carries a per-request
+signature using HTTP Message Signatures (RFC
+9421) anchored to the operator's accreditation
+reference (the ISO/IEC 17025 testing-laboratory
+accreditation, the ISO/IEC 17065 product-
+certification accreditation, the EU notified-
+body designation under the EU Machinery
+Regulation); the signature key set is published
+at `/.well-known/wia/education-robot/keys.json`.
 
-## §2 Manifest
+## §2 Root Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "education-robot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /v1/
+```
 
-## §3 Conformance Tiers
+```json
+{
+  "standard": "WIA-education-robot",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":          "/v1/programmes",
+    "robots":              "/v1/robots",
+    "ontologyRecords":     "/v1/ontology-records",
+    "safetyRecords":       "/v1/safety-records",
+    "interactionEvents":   "/v1/interaction-events",
+    "lifecycleRecords":    "/v1/lifecycle-records",
+    "custody":             "/v1/custody-events",
+    "openapi":             "/v1/openapi.json",
+    "wellKnown":           "/.well-known/wia/education-robot"
+  }
+}
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Robot Platform Endpoints
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+### §3.1 Register a robot platform
 
-## §4 Discovery
+```
+POST /v1/robots
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/education-robot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Request body carries the §3 record from
+PHASE-1 (robotKind, iso13482Class, payload,
+workspaceClass, intendedAgeBand,
+intendedSupervision). The server validates the
+declared `iso13482Class` against the declared
+`robotKind`: a `programmable-block-robot` or a
+`drone-educational` declared with an
+`iso13482Class` of `physical-assistant` is
+rejected with `422 Unprocessable Entity`
+carrying an RFC 9457 problem document at
+`/problems/iso13482-class-robot-kind-mismatch`,
+since ISO 13482 personal-care-robot
+classification does not apply to those robot
+kinds.
 
-## §5 Time and Identity
+### §3.2 Retrieve a robot platform
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+GET /v1/robots/{robotId}
+Accept: application/json
+```
 
-## §6 Versioning and Deprecation
+### §3.3 Search robots
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+GET /v1/robots?kind={kind}
+&iso13482Class={class}
+&workspaceClass={workspace}
+&intendedAgeBand={age}
+&page={cursor}&size={size}
+```
 
-## §7 Privacy and Security
+## §4 Ontology Endpoints
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+### §4.1 Bind a robot to IEEE Std 1872 ontology
 
-## §8 Open Governance
+```
+POST /v1/ontology-records
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `education-robot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Request body carries the §4 record from
+PHASE-1. The server validates that the
+`coraClassBinding` references the IEEE Std
+1872-2015 CORA classes (Robot, RobotPart,
+Sensor, Effector, Environment, Position,
+Orientation) and that the `aurBehaviour`
+references the IEEE Std 1872.2-2021 AuR
+ontology classes.
+
+### §4.2 Retrieve an ontology record
+
+```
+GET /v1/ontology-records/{ontologyRecordId}
+Accept: application/json
+```
+
+## §5 Safety-Conformity Endpoints
+
+### §5.1 Upload a safety-conformity test
+
+```
+POST /v1/safety-records
+Content-Type: multipart/form-data; boundary=...
+Signature: <RFC 9421 signature from a testing
+            laboratory's ISO/IEC 17025
+            certificate>
+```
+
+The multipart body carries one JSON part with
+the §5 record from PHASE-1 (testStandard,
+testLaboratory, measurementResult, passOrFail)
+and one or more file parts holding the force-
+and-pressure measurement raw data, the
+separation-distance trace, and the supporting
+calibration record. The server stores the raw-
+data files under a content-addressable URI.
+
+The server enforces the test-method-to-
+measurement-result mapping table:
+
+- An `ISO-TS-15066` (collaborative-robot)
+  record MUST carry the per-body-region quasi-
+  static and transient pressure-and-force
+  values measured against the ISO/TS 15066
+  Annex A reference values.
+- An `ISO-13482` record MUST carry the per-
+  scenario hazard-and-risk assessment per the
+  standard's risk-assessment table.
+- An `IEC-61508-SIL-2` or `IEC-61508-SIL-3`
+  record MUST carry the per-channel safety
+  integrity level evidence.
+
+### §5.2 Retrieve a safety-conformity record
+
+```
+GET /v1/safety-records/{safetyRecordId}
+Accept: application/json
+```
+
+## §6 Interaction-Event Endpoints
+
+### §6.1 Record an interaction event
+
+```
+POST /v1/interaction-events
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+Request body carries the §6 record from
+PHASE-1. The server enforces that:
+
+- A learner who is a minor MUST be bound to a
+  consent envelope from the parent or
+  guardian.
+- An inclusive-education session MUST be bound
+  to a supervising-therapist identifier.
+- A telepresence session MUST be bound to a
+  W3C WebRTC signalling-server reference and
+  to the operator's privacy declaration.
+
+### §6.2 Retrieve an interaction event
+
+```
+GET /v1/interaction-events/{eventId}
+Accept: application/json
+Authorization: <bearer token from the
+                 supervising teacher, the
+                 therapist, the parent or
+                 guardian, or an audit
+                 observer>
+```
+
+The response carries the interaction-event
+envelope. The learner's directly-identifying
+record is redacted unless the requesting
+principal has the per-learner authorisation.
+
+## §7 Lifecycle and Recall Endpoints
+
+### §7.1 Record a lifecycle event
+
+```
+POST /v1/lifecycle-records
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+### §7.2 Issue a recall
+
+```
+POST /v1/robots/{robotId}/recall
+Content-Type: application/json
+Signature: <RFC 9421 signature from the
+            robot manufacturer>
+```
+
+The recall envelope carries the recall-
+authority reference, the per-batch identifier
+range, the recall-trigger event description,
+and the operator's remediation plan. The
+server propagates the recall to all subscribed
+deployer endpoints via webhook.
+
+## §8 Custody and Error Reporting
+
+### §8.1 Anchor a custody event
+
+```
+POST /v1/custody-events
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+### §8.2 Error envelope
+
+Errors are returned using RFC 9457 Problem
+Details. Validation errors carry a `pointer`
+(RFC 6901). The server emits a per-request
+`traceparent` header (W3C Trace Context).
+
+## §9 Concurrency and Cache
+
+Every retrieval endpoint emits an `ETag`
+header (RFC 9110 §8.8.3). Conditional
+requests are honoured.
+
+## §10 Bulk Export for Audit Bodies
+
+```
+GET /v1/robots:bulk
+Accept: application/x-ndjson
+Authorization: <bearer token from the
+                 certification body or a
+                 supervisory regulator>
+```
+
+A regulator running a portfolio-level audit
+or a certification body running a surveillance
+audit requests the operator's robot register
+as a newline-delimited JSON stream.
+
+## §11 Webhook Endpoint for Recall Notifications
+
+```
+POST /v1/programmes/{programmeId}/webhooks
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+A school deployer, an after-school academy, an
+inclusive-education provider registers a
+webhook to receive a push notification when a
+recall is issued, an incident is reported, or
+a firmware update is published.
+
+## §12 Schema-Validation and Conformance
+
+The OpenAPI 3.1 document at
+`/v1/openapi.json` carries JSON Schema 2020-12
+schemas for every request and response
+envelope.
+
+```
+GET /v1/conformance/test-vectors
+Accept: application/json
+```
+
+The operator publishes the conformance test
+vectors used to qualify the API implementation
+against this specification.
+
+## §13 Telepresence-Specific Endpoints
+
+```
+POST /v1/robots/{robotId}/telepresence-session
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+A telepresence robot's per-session signalling
+envelope is published per the W3C WebRTC 1.0
+specification. The operator's API surfaces the
+signalling-server reference, the per-session
+ICE-and-TURN configuration, and the operator's
+privacy declaration.
+
+## §14 Multi-Language Surface
+
+```
+GET /v1/robots/{robotId}?lang={lang}
+Accept: application/json
+```
+
+The robot's product-of-record envelope is
+published in each operator-declared language
+(English, Korean, Japanese, German, French,
+Spanish, Arabic) so that a downstream consumer
+in a different jurisdiction can interpret the
+declaration.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## §15 Bulk Operations and Quotas
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+GET /v1/safety-records:bulk
+Accept: application/x-ndjson
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+A national accreditation authority running a
+batch audit requests the operator's safety-
+record register as a newline-delimited JSON
+stream. The endpoint streams the safety
+records in test-date order; a consumer
+resuming the stream provides an
+`If-Resume-After` header carrying the last-
+received test timestamp. Per-token rate
+limits default to 60 record-intake requests
+per minute for testing-laboratory accounts;
+bulk export uses a separate quota tuned to
+the per-deployment audit window.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §16 Inclusive-Education Clinical Endpoint
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+POST /v1/inclusive-sessions
+Content-Type: application/json
+Signature: <RFC 9421 signature from a
+            licensed clinical supervisor>
+```
 
-## Annex F — Adoption Roadmap
+An inclusive-education session is bound to a
+clinical-supervisor identifier, a per-session
+clinical-outcome envelope, and the operator's
+data-sharing agreement. The clinical-outcome
+envelope is encoded per the operator's
+clinical-record vocabulary so that the
+supervisor's clinical-record system can ingest
+the envelope.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §17 Conformance Test Vectors
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+GET /v1/conformance/test-vectors
+Accept: application/json
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The operator publishes the conformance test
+vectors used to qualify the API implementation
+against this specification. Each vector
+carries the request, the expected response,
+the test-report identifier from PHASE-1 §5,
+and the safety-test outcome that the test-of-
+record example reproduces. A laboratory or
+notified body running an interoperability
+check uses the endpoint to confirm that the
+operator's API reproduces the published
+classification logic deterministically across
+the ISO 13482 / ISO 10218 / ISO/TS 15066
+enumeration set.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §18 Authorities and Roles
 
-## Annex G — Test Vectors and Conformance Evidence
+| Role                    | Capabilities |
+|-------------------------|------|
+| `robot-manufacturer`    | Register robot, upload safety-record, issue recall |
+| `school-deployer`       | Register deployment, record interaction event, subscribe webhook |
+| `clinical-supervisor`   | Read per-session interaction event, publish clinical outcome |
+| `parent-or-guardian`    | Issue per-feature consent, revoke consent |
+| `notified-body`         | Issue CE Declaration of Conformity, run conformity assessment |
+| `regulator`             | Read full operator state, audit per-platform safety record |
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The operator's API enforces the per-role
+authorisation policy; an unauthorised request
+is rejected with `403 Forbidden` and an RFC
+9457 problem document.

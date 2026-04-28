@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Deep Learning for Recommendation Systems | WIA-AI-024</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 3rem 2rem; border-bottom: 3px solid #10B981; margin-bottom: 3rem; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 1rem; }
+        .chapter-info { color: #94a3b8; font-size: 1.1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin: 2.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin: 1.5rem 0 0.8rem 0; }
+        p { margin: 1rem 0; color: #cbd5e1; }
+        .code-block { background: #1e293b; border: 1px solid #334155; border-left: 4px solid #10B981; border-radius: 6px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.95rem; line-height: 1.6; }
+        .highlight { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 1.5rem 0; border-radius: 4px; }
+        .example { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; }
+        .example-title { color: #10B981; font-weight: 600; margin-bottom: 1rem; font-size: 1.1rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: #cbd5e1; }
+        li { margin: 0.5rem 0; }
+        .nav { display: flex; justify-content: space-between; margin: 3rem 0; padding: 1.5rem; background: #1e293b; border-radius: 8px; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: 600; }
+        .summary { background: #1e293b; border: 2px solid #10B981; border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review { background: #1e293b; border: 2px solid #3b82f6; border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+        .review h2 { color: #3b82f6; border-bottom: none; margin-top: 0; }
+        .philosophy { text-align: center; padding: 2rem; background: linear-gradient(135deg, #10B981 0%, #059669 100%); border-radius: 8px; margin: 3rem 0; color: white; font-size: 1.2rem; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border: 1px solid #334155; }
+        th { background: #334155; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🧠 Chapter 5: Deep Learning for Recommendation Systems</h1>
+            <div class="chapter-info">WIA-AI-024 Recommendation AI Standard</div>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>🎯 The Neural Revolution</h2>
+        <p>
+            Deep learning has transformed recommendation systems by enabling automatic feature learning, handling multi-modal data, and capturing complex non-linear relationships that traditional methods miss. Neural networks can learn representations directly from raw data—be it text, images, audio, or user behavior sequences.
+        </p>
+        <p>
+            While classical matrix factorization assumes linear interactions between users and items, deep learning models can capture sophisticated patterns like "users who like A and B but not C tend to enjoy D" or learn that certain product combinations predict future purchases.
+        </p>
+
+        <div class="highlight">
+            <strong>Key Advantage:</strong> Deep learning eliminates the need for manual feature engineering and can learn from heterogeneous data sources simultaneously.
+        </div>
+
+        <h2>🔗 Neural Collaborative Filtering (NCF)</h2>
+        <p>
+            NCF replaces the dot product in matrix factorization with a neural network, learning arbitrary user-item interaction functions instead of assuming linearity.
+        </p>
+
+        <div class="code-block">
+<code>// Neural Collaborative Filtering architecture
+interface NCFModel {
+    // Embedding layers
+    userEmbedding: number[][];  // [num_users, embedding_dim]
+    itemEmbedding: number[][];  // [num_items, embedding_dim]
+
+    // MLP layers for learning interaction
+    mlpLayers: {
+        weights: number[][];
+        biases: number[];
+        activation: 'relu' | 'sigmoid' | 'tanh';
+    }[];
+
+    // GMF (Generalized Matrix Factorization) path
+    gmfUserEmbedding: number[][];
+    gmfItemEmbedding: number[][];
+}
+
+class NCF {
+    private userEmbeddings: Map<string, number[]>;
+    private itemEmbeddings: Map<string, number[]>;
+    private mlpWeights: number[][][];
+    private embeddingDim: number;
+
+    constructor(embeddingDim: number = 64, mlpLayers: number[] = [128, 64, 32]) {
+        this.embeddingDim = embeddingDim;
+        this.userEmbeddings = new Map();
+        this.itemEmbeddings = new Map();
+        this.mlpWeights = [];
+
+        // Initialize MLP layers
+        let inputDim = embeddingDim * 2;  // Concatenated user + item embeddings
+        for (const hiddenDim of mlpLayers) {
+            this.mlpWeights.push(
+                this.randomMatrix(inputDim, hiddenDim)
+            );
+            inputDim = hiddenDim;
+        }
+    }
+
+    // Forward pass
+    predict(userId: string, itemId: string): number {
+        const userEmb = this.userEmbeddings.get(userId);
+        const itemEmb = this.itemEmbeddings.get(itemId);
+
+        if (!userEmb || !itemEmb) return 0;
+
+        // Concatenate embeddings
+        let activation = [...userEmb, ...itemEmb];
+
+        // Pass through MLP layers
+        for (const weights of this.mlpWeights) {
+            activation = this.mlpLayer(activation, weights);
+        }
+
+        // Final prediction (sigmoid for binary, linear for rating)
+        return this.sigmoid(activation[0]);
+    }
+
+    private mlpLayer(input: number[], weights: number[][]): number[] {
+        const output: number[] = [];
+
+        for (let i = 0; i < weights[0].length; i++) {
+            let sum = 0;
+            for (let j = 0; j < input.length; j++) {
+                sum += input[j] * weights[j][i];
+            }
+            output.push(this.relu(sum));
+        }
+
+        return output;
+    }
+
+    private relu(x: number): number {
+        return Math.max(0, x);
+    }
+
+    private sigmoid(x: number): number {
+        return 1 / (1 + Math.exp(-x));
+    }
+
+    private randomMatrix(rows: number, cols: number): number[][] {
+        return Array(rows).fill(0).map(() =>
+            Array(cols).fill(0).map(() => (Math.random() - 0.5) * 0.1)
+        );
+    }
+}</code>
+        </div>
+
+        <h2>📚 Embedding Layers</h2>
+        <p>
+            Embeddings are dense vector representations learned during training. They map discrete entities (users, items) to continuous vector spaces where semantic similarity is reflected by vector proximity.
+        </p>
+
+        <h3>Why Embeddings Matter</h3>
+        <ul>
+            <li><strong>Dimensionality reduction:</strong> Map millions of items to compact vectors</li>
+            <li><strong>Similarity capture:</strong> Similar items have similar embeddings</li>
+            <li><strong>Transfer learning:</strong> Pre-trained embeddings improve cold start</li>
+            <li><strong>Multi-modal fusion:</strong> Combine text, images, metadata in unified space</li>
+        </ul>
+
+        <div class="code-block">
+<code>// Embedding layer with training
+class EmbeddingLayer {
+    private embeddings: Map<string, number[]>;
+    private dimension: number;
+
+    constructor(dimension: number) {
+        this.dimension = dimension;
+        this.embeddings = new Map();
+    }
+
+    // Get or initialize embedding
+    getEmbedding(id: string): number[] {
+        if (!this.embeddings.has(id)) {
+            this.embeddings.set(id, this.randomVector());
+        }
+        return this.embeddings.get(id)!;
+    }
+
+    // Update embedding with gradient
+    updateEmbedding(id: string, gradient: number[], learningRate: number): void {
+        const embedding = this.getEmbedding(id);
+        for (let i = 0; i < this.dimension; i++) {
+            embedding[i] -= learningRate * gradient[i];
+        }
+    }
+
+    // Find similar items using embedding similarity
+    findSimilar(id: string, k: number = 10): Array<{id: string, similarity: number}> {
+        const targetEmb = this.getEmbedding(id);
+        const similarities: Array<{id: string, similarity: number}> = [];
+
+        for (const [otherId, otherEmb] of this.embeddings) {
+            if (otherId === id) continue;
+            const sim = this.cosineSimilarity(targetEmb, otherEmb);
+            similarities.push({ id: otherId, similarity: sim });
+        }
+
+        return similarities
+            .sort((a, b) => b.similarity - a.similarity)
+            .slice(0, k);
+    }
+
+    private randomVector(): number[] {
+        return Array.from(
+            { length: this.dimension },
+            () => (Math.random() - 0.5) * 0.1
+        );
+    }
+
+    private cosineSimilarity(a: number[], b: number[]): number {
+        let dot = 0, magA = 0, magB = 0;
+        for (let i = 0; i < a.length; i++) {
+            dot += a[i] * b[i];
+            magA += a[i] * a[i];
+            magB += b[i] * b[i];
+        }
+        return dot / (Math.sqrt(magA) * Math.sqrt(magB) + 1e-8);
+    }
+}</code>
+        </div>
+
+        <h2>🔄 Sequence-Based Models (RNNs & Transformers)</h2>
+        <p>
+            User behavior is inherently sequential. RNNs and Transformers can model temporal dynamics, understanding that what you watch now influences what you'll want next.
+        </p>
+
+        <h3>RNN for Session-Based Recommendations</h3>
+        <p>
+            Process sequences of user actions to predict the next item:
+        </p>
+
+        <div class="code-block">
+<code>// Simplified GRU for session-based recommendations
+class SessionGRU {
+    private itemEmbeddings: EmbeddingLayer;
+    private hiddenDim: number;
+    private updateGate: number[][];
+    private resetGate: number[][];
+    private candidateGate: number[][];
+
+    constructor(embeddingDim: number, hiddenDim: number) {
+        this.itemEmbeddings = new EmbeddingLayer(embeddingDim);
+        this.hiddenDim = hiddenDim;
+
+        // Initialize GRU gates (simplified)
+        const inputDim = embeddingDim;
+        this.updateGate = this.randomMatrix(inputDim + hiddenDim, hiddenDim);
+        this.resetGate = this.randomMatrix(inputDim + hiddenDim, hiddenDim);
+        this.candidateGate = this.randomMatrix(inputDim + hiddenDim, hiddenDim);
+    }
+
+    // Process session sequence and predict next item
+    predictNext(sessionItems: string[], candidateItems: string[]): Array<{itemId: string, score: number}> {
+        // Process sequence to get hidden state
+        let hidden = new Array(this.hiddenDim).fill(0);
+
+        for (const itemId of sessionItems) {
+            const itemEmb = this.itemEmbeddings.getEmbedding(itemId);
+            hidden = this.gruStep(itemEmb, hidden);
+        }
+
+        // Score candidate items
+        const scores: Array<{itemId: string, score: number}> = [];
+        for (const itemId of candidateItems) {
+            const itemEmb = this.itemEmbeddings.getEmbedding(itemId);
+            const score = this.dotProduct(hidden, itemEmb);
+            scores.push({ itemId, score });
+        }
+
+        return scores.sort((a, b) => b.score - a.score);
+    }
+
+    private gruStep(input: number[], prevHidden: number[]): number[] {
+        const combined = [...input, ...prevHidden];
+
+        // Update gate
+        const update = this.applyGate(combined, this.updateGate);
+
+        // Reset gate
+        const reset = this.applyGate(combined, this.resetGate);
+
+        // Candidate hidden state
+        const resetHidden = prevHidden.map((h, i) => h * reset[i]);
+        const candidateInput = [...input, ...resetHidden];
+        const candidate = this.applyGate(candidateInput, this.candidateGate, 'tanh');
+
+        // New hidden state
+        return prevHidden.map((h, i) =>
+            update[i] * h + (1 - update[i]) * candidate[i]
+        );
+    }
+
+    private applyGate(input: number[], weights: number[][], activation: 'sigmoid' | 'tanh' = 'sigmoid'): number[] {
+        const output: number[] = [];
+        for (let i = 0; i < weights[0].length; i++) {
+            let sum = 0;
+            for (let j = 0; j < input.length; j++) {
+                sum += input[j] * weights[j][i];
+            }
+            output.push(activation === 'sigmoid' ? this.sigmoid(sum) : this.tanh(sum));
+        }
+        return output;
+    }
+
+    private sigmoid(x: number): number {
+        return 1 / (1 + Math.exp(-x));
+    }
+
+    private tanh(x: number): number {
+        return Math.tanh(x);
+    }
+
+    private dotProduct(a: number[], b: number[]): number {
+        return a.reduce((sum, val, i) => sum + val * (b[i] || 0), 0);
+    }
+
+    private randomMatrix(rows: number, cols: number): number[][] {
+        return Array(rows).fill(0).map(() =>
+            Array(cols).fill(0).map(() => (Math.random() - 0.5) * 0.1)
+        );
+    }
+}</code>
+        </div>
+
+        <h2>🎭 Attention Mechanisms</h2>
+        <p>
+            Attention allows models to focus on relevant parts of input sequences, dramatically improving performance on long sequences and multi-modal inputs.
+        </p>
+
+        <h3>Self-Attention for Recommendations</h3>
+        <p>
+            The Transformer architecture, powered by self-attention, has become state-of-the-art for many recommendation tasks:
+        </p>
+
+        <ul>
+            <li><strong>Long-range dependencies:</strong> Capture relationships across entire user history</li>
+            <li><strong>Parallel processing:</strong> Unlike RNNs, Transformers are fully parallelizable</li>
+            <li><strong>Interpretability:</strong> Attention weights show which items influenced recommendations</li>
+        </ul>
+
+        <h2>🖼️ Multi-Modal Deep Learning</h2>
+        <p>
+            Modern recommendation systems combine multiple data types:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Modality</th>
+                    <th>Network Type</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Text</strong></td>
+                    <td>BERT, GPT, RoBERTa</td>
+                    <td>Reviews, descriptions, queries</td>
+                </tr>
+                <tr>
+                    <td><strong>Images</strong></td>
+                    <td>ResNet, EfficientNet, ViT</td>
+                    <td>Product photos, thumbnails</td>
+                </tr>
+                <tr>
+                    <td><strong>Audio</strong></td>
+                    <td>WaveNet, Audio Transformers</td>
+                    <td>Music, podcasts, voice queries</td>
+                </tr>
+                <tr>
+                    <td><strong>Video</strong></td>
+                    <td>3D CNNs, Two-Stream Networks</td>
+                    <td>Video recommendations</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>🎯 Deep Learning Architectures</h2>
+
+        <h3>Wide & Deep Learning</h3>
+        <p>
+            Google's Wide & Deep model combines:
+        </p>
+        <ul>
+            <li><strong>Wide component:</strong> Memorization of specific feature combinations</li>
+            <li><strong>Deep component:</strong> Generalization through neural networks</li>
+        </ul>
+
+        <h3>DeepFM</h3>
+        <p>
+            Combines factorization machines with deep neural networks for both low and high-order feature interactions.
+        </p>
+
+        <h3>Neural Autoregressive Distribution Estimator (NADE)</h3>
+        <p>
+            Models user preference distributions, enabling probabilistic recommendations.
+        </p>
+
+        <div class="example">
+            <div class="example-title">🎬 YouTube's Deep Neural Network</div>
+            <p>
+                YouTube's recommendation system uses a two-stage deep learning approach:
+            </p>
+            <ol>
+                <li><strong>Candidate Generation:</strong> Neural network retrieves hundreds of videos from millions</li>
+                <li><strong>Ranking:</strong> Another neural network scores and ranks candidates</li>
+            </ol>
+            <p>
+                The system uses watch history, search history, demographic features, and contextual signals (time, device) as inputs to deep networks with hundreds of millions of parameters.
+            </p>
+        </div>
+
+        <h2>⚡ Training Strategies</h2>
+
+        <h3>Negative Sampling</h3>
+        <p>
+            For implicit feedback, sample negative examples (items user didn't interact with) to train binary classifiers.
+        </p>
+
+        <h3>Batch Normalization</h3>
+        <p>
+            Stabilize training and enable higher learning rates by normalizing layer inputs.
+        </p>
+
+        <h3>Dropout</h3>
+        <p>
+            Prevent overfitting by randomly dropping neurons during training.
+        </p>
+
+        <h3>Learning Rate Scheduling</h3>
+        <p>
+            Adjust learning rates during training for better convergence (warmup, cosine annealing, etc.).
+        </p>
+
+        <h2>📊 Practical Considerations</h2>
+
+        <h3>Computational Cost</h3>
+        <p>
+            Deep models require significant compute for training. Use GPU acceleration, mixed-precision training, and model compression techniques.
+        </p>
+
+        <h3>Inference Latency</h3>
+        <p>
+            Production systems need millisecond-level latency. Strategies include:
+        </p>
+        <ul>
+            <li>Model quantization (FP16, INT8)</li>
+            <li>Knowledge distillation to smaller models</li>
+            <li>Caching popular recommendations</li>
+            <li>Two-tower architectures enabling pre-computation</li>
+        </ul>
+
+        <h3>Explainability Challenges</h3>
+        <p>
+            Deep models are "black boxes." Techniques for interpretability:
+        </p>
+        <ul>
+            <li>Attention visualization</li>
+            <li>Layer-wise relevance propagation</li>
+            <li>Example-based explanations</li>
+            <li>Hybrid systems with interpretable components</li>
+        </ul>
+
+        <h2>🚀 State-of-the-Art Trends</h2>
+
+        <h3>Graph Neural Networks (GNNs)</h3>
+        <p>
+            Model user-item interactions as graphs, propagating information through network structure.
+        </p>
+
+        <h3>Reinforcement Learning</h3>
+        <p>
+            Optimize for long-term user engagement rather than immediate clicks, considering recommendation sequences as a Markov Decision Process.
+        </p>
+
+        <h3>Meta-Learning</h3>
+        <p>
+            Learn to quickly adapt to new users or items with few examples, addressing cold start through rapid learning.
+        </p>
+
+        <h3>Federated Learning</h3>
+        <p>
+            Train models on decentralized data without centralizing sensitive user information, preserving privacy.
+        </p>
+
+        <div class="summary">
+            <h2>📝 Summary</h2>
+            <ul>
+                <li>Deep learning enables automatic feature learning from raw multi-modal data</li>
+                <li>Neural Collaborative Filtering extends matrix factorization with neural networks</li>
+                <li>Embeddings map discrete entities to continuous vector spaces</li>
+                <li>RNNs and Transformers model sequential user behavior patterns</li>
+                <li>Attention mechanisms improve long-range dependency modeling and interpretability</li>
+                <li>Multi-modal learning combines text, images, audio, and metadata</li>
+                <li>Production deployment requires optimization for latency and computational cost</li>
+                <li>Cutting-edge approaches include GNNs, RL, meta-learning, and federated learning</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>🤔 Review Questions</h2>
+            <ol>
+                <li>How does Neural Collaborative Filtering improve upon matrix factorization?</li>
+                <li>What are embeddings and why are they important for recommendations?</li>
+                <li>Explain how RNNs can model sequential user behavior.</li>
+                <li>What advantages do Transformers offer over RNNs for recommendations?</li>
+                <li>How can multi-modal learning improve recommendation quality?</li>
+                <li>What is the Wide & Deep architecture and what problem does it solve?</li>
+                <li>Describe strategies for reducing inference latency in deep models.</li>
+                <li>How can attention mechanisms improve model interpretability?</li>
+                <li>What role does negative sampling play in training recommendation models?</li>
+                <li>Compare Graph Neural Networks to traditional collaborative filtering.</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) · Benefit All Humanity<br>
+            <span style="font-size: 0.9rem; margin-top: 0.5rem; display: block; opacity: 0.9;">
+                Harness AI power responsibly - prioritize transparency, fairness, and human agency
+            </span>
+        </div>
+
+        </div>
+</body>
+</html>

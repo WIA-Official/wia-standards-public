@@ -5,237 +5,310 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-cultural-exchange-data (Cultural Exchange Data).
+This document defines how a memory-institution
+operator integrates with the systems that
+surround international cultural-data exchange:
+the federated-aggregator portal (Europeana, the
+Digital Public Library of America, the
+Internet Archive, the operator's national
+aggregator); the IIIF Consortium publishing the
+IIIF specifications; the international
+authority files (VIAF, LCNAF, ULAN, Wikidata);
+the W3C Working Groups publishing the linked-
+data specifications; the ICOM, IFLA, ICA
+international organisations; the UNESCO
+secretariat operating the 2005 / 1972 / 2003
+Conventions; the supervisory cultural-heritage
+authority overseeing the operator's
+accreditation; the regulator overseeing the
+operator's GDPR Article 89 archival
+processing; and the public-procurement
+authority running a cultural-data interop
+programme.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- UNESCO 2005 / 1972 / 2003 / 1970 Conventions
+  and Operational Guidelines / Directives
+- UNIDROIT 1995 Convention
+- ISO 15836-1/-2, ISO 21127, ISO 23081-1/-2/-3,
+  ISO 25964-1/-2, ISO 23950, ISO 9001
+- IIIF Image API 3.0, IIIF Presentation API 3.0,
+  IIIF Authentication API 2.0, IIIF Search API
+  2.0
+- EAD3, RDA Toolkit, METS, MODS, LIDO, EDM
+- W3C ODRL 2.2, W3C SKOS, W3C LDP 1.0, W3C VC
+  Data Model v2.0
+- OAI-PMH 2.0
+- ISO/IEC 27001:2022, ISO/IEC 17021-1:2015,
+  ISO/IEC 17065:2012
+- IETF RFC 8259, RFC 9457, RFC 8615, RFC 9421,
+  RFC 6962
+- W3C Trace Context, W3C SPARQL 1.1 Protocol
+- EU Directive 2019/790 (Articles 14, 17)
+- EU GDPR Articles 6, 9, 89
+- EU Single Digital Gateway Reg (EU) 2018/1724
+  and EU Interoperable Europe Act Reg (EU)
+  2024/903
+- KR 박물관및미술관진흥법, KR 문화재보호법, KR
+  도서관법, KR 공공기록물 관리에 관한 법률
 
 ---
 
-## §1 Scope
+## §1 Federated-Aggregator Integration
 
-This PHASE document is one of four that together define the WIA-cultural-exchange-data
-standard. It addresses the integration layer of the standard.
+### §1.1 Europeana integration
 
-## §2 Manifest
+A European-jurisdiction operator publishes the
+catalogue under the Europeana Data Model (EDM)
+through Europeana's harvest endpoint. The
+Europeana Aggregation Hub binds the operator's
+collection to the Europeana federated portal so
+that the operator's records are discoverable
+alongside the records of other Member-State
+operators.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "cultural-exchange-data"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+### §1.2 DPLA integration
 
-## §3 Conformance Tiers
+A US-jurisdiction operator binds the catalogue
+to the Digital Public Library of America hub
+under the DPLA Metadata Application Profile.
+The operator publishes the harvest endpoint
+that the DPLA hub ingests on a declared
+cadence.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+### §1.3 National aggregator integration
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+A national aggregator (e.g., the operator's
+national digital library, a national heritage
+portal) ingests the operator's records under
+the national aggregation discipline. The
+operator publishes the per-aggregator harvest
+endpoint and the per-aggregator metadata
+profile.
 
-## §4 Discovery
+## §2 IIIF Consortium Integration
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/cultural-exchange-data`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The IIIF Consortium publishes the IIIF Image
+API and Presentation API specifications. The
+operator subscribes to the IIIF specification-
+update channel and triggers an internal review
+cycle when a specification revision is
+published. A specification version that is
+deprecated by the IIIF Consortium is marked
+deprecated in the operator's enumeration set
+but is not removed for the duration of the
+operator's record-retention period.
 
-## §5 Time and Identity
+## §3 Authority-File Integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### §3.1 VIAF / LCNAF / ULAN integration
 
-## §6 Versioning and Deprecation
+The operator's per-creator authority records
+are bound to a public authority file (VIAF,
+LCNAF, ULAN). The operator's API queries the
+public authority file to verify the per-
+identifier persistence and refuses an
+attribution that references a non-resolvable
+authority identifier.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+### §3.2 Wikidata integration
 
-## §7 Privacy and Security
+The operator may additionally bind the per-
+creator and per-subject records to Wikidata
+items. The operator's API publishes the per-
+record Wikidata QID so that a downstream
+linked-data consumer can pivot to the
+Wikidata graph.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §4 W3C Working Group Integration
 
-## §8 Open Governance
+The W3C Linked Data Platform, SKOS, ODRL, and
+DCAT specifications are reviewed by W3C
+Working Groups on a multi-year cycle. The
+operator subscribes to the W3C specification-
+publishing endpoint and triggers an internal
+review cycle when a new edition is published.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `cultural-exchange-data` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 International Organisation Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+### §5.1 ICOM membership
 
+A museum operator is bound to its ICOM
+(International Council of Museums) membership.
+The ICOM Code of Ethics for Museums applies to
+the operator's collection-management discipline.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+### §5.2 IFLA membership
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+A library operator is bound to its IFLA
+(International Federation of Library
+Associations) membership. The IFLA Statement
+on Indigenous Traditional Knowledge applies
+where the operator's collection includes
+indigenous-knowledge materials.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+### §5.3 ICA membership
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+An archive operator is bound to its ICA
+(International Council on Archives)
+membership. The ICA Code of Ethics applies to
+the operator's archival processing discipline.
 
-## Annex F — Adoption Roadmap
+## §6 UNESCO Secretariat Integration
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+### §6.1 2005 Convention quadrennial reporting
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The UNESCO 2005 Convention quadrennial
+reporting cycle is operated by the UNESCO
+Diversity of Cultural Expressions Section. The
+operator's API publishes the per-cycle
+Member-State report through the
+secretariat's intake endpoint.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+### §6.2 World Heritage Centre integration
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The UNESCO World Heritage Centre operates the
+state-of-conservation reporting cycle for
+World Heritage properties. The operator's API
+publishes the per-property periodic report
+through the Centre's intake endpoint.
 
-## Annex G — Test Vectors and Conformance Evidence
+### §6.3 Intangible Cultural Heritage Section
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+The UNESCO Intangible Cultural Heritage
+Section operates the periodic state-of-the-
+element reporting for inscribed elements. The
+operator's API publishes the per-element
+periodic report.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §7 Restitution-Authority Integration
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+A claimant State requesting restitution under
+the UNESCO 1970 Convention or the UNIDROIT
+1995 Convention queries the operator's API for
+the catalogue record's provenance trail. The
+operator's API publishes the trail and the
+underlying acquisition documentation per the
+operator's documented restitution-handling
+discipline.
 
-## Annex H — Versioning and Deprecation Policy
+## §8 Public Retrieval and Re-Issuance
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+### §8.1 Public catalogue retrieval
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+A public consumer (a researcher, an educator,
+a journalist, a curator) retrieves the
+catalogue record at
+`/v1/catalogue-records/{itemId}` without
+authentication; the response carries the
+public fields and the per-item rights
+statement.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+### §8.2 IIIF cross-institutional viewer
 
-## Annex I — Interoperability Profiles
+A IIIF-compliant viewer (Mirador, Universal
+Viewer) loads the operator's IIIF Presentation
+manifest alongside manifests from other
+institutions for cross-institutional
+comparison. The viewer's sign-in flow uses the
+IIIF Authentication API 2.0 where the operator
+restricts access.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+### §8.3 Verifiable-credentials re-issuance
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+An attestation about an item (the public-
+domain mark, the per-item provenance summary,
+the per-item rights statement) is re-issuable
+as a W3C Verifiable Credential signed by the
+operator's public-key set so that a downstream
+consumer can validate the attestation without
+contacting the operator directly.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §9 GDPR Supervisory Authority Integration
+
+The supervisory data-protection authority
+overseeing the operator's GDPR Article 89
+archival processing audits the operator's
+records of processing activities (Article 30)
+on demand. The operator's API publishes the
+records to the authority's endpoint so that
+the authority's audit trail is preserved.
+
+## §10 KR-Jurisdiction Integration
+
+### §10.1 KR 문화재청 register integration
+
+A KR-jurisdiction operator binds the
+catalogue record to the KR Cultural Heritage
+Administration's heritage register. The
+register is queried on each retrieval after
+the caching TTL.
+
+### §10.2 KR 국립중앙도서관 integration
+
+A KR-jurisdiction library operator binds the
+catalogue record to the KR National Library
+of Korea's union catalogue. The operator
+publishes the harvest endpoint that the
+National Library ingests.
+
+### §10.3 KR 국가기록원 integration
+
+A KR-jurisdiction archive operator binds the
+finding aid to the KR National Archives'
+union finding-aid catalogue.
+
+### §10.4 KR 도서관법 binding
+
+The operator declares the KR 도서관법 (Library
+Act) reference in the programme record's
+`governingFrameworks` set where the operator
+is in scope.
+
+### §10.5 KR 공공기록물 관리에 관한 법률 binding
+
+A KR-jurisdiction archive operator declares
+the KR 공공기록물 관리에 관한 법률 (Public
+Records Management Act) reference in the
+programme record's `governingFrameworks` set.
+
+## §11 Audit and Conformity-Assessment
+       Integration
+
+### §11.1 ISO/IEC 17021-1 management-system audit
+
+The operator's quality-management system
+declared in PHASE-3 §9 is audited under
+ISO/IEC 17021-1 by an accredited certification
+body. The audit result is stored in the
+operator's audit envelope.
+
+### §11.2 ISO/IEC 17065 product certification
+
+Where the operator's collection-care
+certification (a museum collection-management
+certification, a library preservation
+certification) is issued by an external
+conformity-assessment body, the body's
+ISO/IEC 17065:2012 accreditation is bound to
+the certification reference.
+
+## §12 References (consolidated)
+
+The references list across PHASE-1 to PHASE-4
+is the canonical citation set for the WIA-
+cultural-exchange-data standard. Implementations
+cite the standards by their issuing
+organisation (UNESCO, UNIDROIT, ISO, IEC, IETF,
+W3C, IIIF Consortium, Library of Congress,
+SAA, ICOM CIDOC, EU regulatory text, KR
+regulatory text) and the publication year so
+that a downstream consumer can locate the
+authoritative text. Updates to a cited
+standard (for example, an amendment to ISO
+21127) trigger an internal review cycle in the
+operator's quality-management discipline
+declared in PHASE-3 §9 before the new
+revision is bound into the operator's
+enumeration set.

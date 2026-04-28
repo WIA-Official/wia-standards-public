@@ -260,9 +260,6 @@ def estimate_sleep_need(age: int, historical_data: list | None) -> float:
 
 ## 7. References
 
-1. 선행 연구. Life between clocks: daily temporal patterns of human chronotypes. Journal of Biological Rhythms.
-2. 선행 연구. Chronotype and Social Jetlag: A (Self-) Critical Review. Biology.
-3. 선행 연구. The Munich ChronoType Questionnaire (MCTQ). Journal of Biological Rhythms.
 
 ---
 

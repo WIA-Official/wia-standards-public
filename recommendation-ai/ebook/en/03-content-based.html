@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Content-Based Filtering | WIA-AI-024</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 3rem 2rem; border-bottom: 3px solid #10B981; margin-bottom: 3rem; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 1rem; }
+        .chapter-info { color: #94a3b8; font-size: 1.1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin: 2.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin: 1.5rem 0 0.8rem 0; }
+        p { margin: 1rem 0; color: #cbd5e1; }
+        .code-block { background: #1e293b; border: 1px solid #334155; border-left: 4px solid #10B981; border-radius: 6px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.95rem; line-height: 1.6; }
+        .code-block code { color: #e2e8f0; }
+        .highlight { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 1.5rem 0; border-radius: 4px; }
+        .example { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; }
+        .example-title { color: #10B981; font-weight: 600; margin-bottom: 1rem; font-size: 1.1rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: #cbd5e1; }
+        li { margin: 0.5rem 0; }
+        .nav { display: flex; justify-content: space-between; margin: 3rem 0; padding: 1.5rem; background: #1e293b; border-radius: 8px; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: 600; transition: color 0.3s; }
+        .nav a:hover { color: #34d399; }
+        .summary { background: #1e293b; border: 2px solid #10B981; border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review { background: #1e293b; border: 2px solid #3b82f6; border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+        .review h2 { color: #3b82f6; border-bottom: none; margin-top: 0; }
+        .review ol { color: #cbd5e1; }
+        .philosophy { text-align: center; padding: 2rem; background: linear-gradient(135deg, #10B981 0%, #059669 100%); border-radius: 8px; margin: 3rem 0; color: white; font-size: 1.2rem; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border: 1px solid #334155; }
+        th { background: #334155; color: #10B981; font-weight: 600; }
+        td { color: #cbd5e1; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>📊 Chapter 3: Content-Based Filtering</h1>
+            <div class="chapter-info">WIA-AI-024 Recommendation AI Standard</div>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>🎯 Understanding Item Features</h2>
+        <p>
+            Content-based filtering recommends items by analyzing their intrinsic features and matching them to user preferences. Unlike collaborative filtering, which relies on crowd wisdom, content-based systems ask: "What properties make this item appealing to this user?"
+        </p>
+        <p>
+            This approach builds a user profile based on features of items they've liked, then recommends new items with similar features. For movies, features might include genre, director, actors, year, and plot keywords. For products, they might include category, brand, price range, and specifications.
+        </p>
+
+        <div class="highlight">
+            <strong>Key Advantage:</strong> Content-based systems don't suffer from the cold start problem for new items (as long as we have their features) and can provide explanations like "Recommended because you liked similar sci-fi movies."
+        </div>
+
+        <h2>🏗️ Building Item Profiles</h2>
+        <p>
+            The first step is representing items as feature vectors. This process, called feature extraction, transforms items into mathematical representations.
+        </p>
+
+        <h3>Structured Features</h3>
+        <p>
+            For items with clear attributes, create structured feature vectors:
+        </p>
+
+        <div class="code-block">
+<code>// Item profile with structured features
+interface MovieProfile {
+    id: string;
+    title: string;
+    features: {
+        genres: string[];        // ['Sci-Fi', 'Action', 'Thriller']
+        year: number;            // 2010
+        director: string;        // 'Christopher Nolan'
+        actors: string[];        // ['Leonardo DiCaprio', ...]
+        rating: number;          // 8.8
+        duration: number;        // 148 minutes
+        language: string;        // 'English'
+    };
+}
+
+// Convert to feature vector
+class FeatureExtractor {
+    private genreIndex: Map<string, number> = new Map();
+    private directorIndex: Map<string, number> = new Map();
+
+    buildFeatureVector(movie: MovieProfile): number[] {
+        const vector: number[] = [];
+
+        // One-hot encode genres (assuming 20 genres)
+        const genreVector = new Array(20).fill(0);
+        for (const genre of movie.features.genres) {
+            const idx = this.genreIndex.get(genre);
+            if (idx !== undefined) genreVector[idx] = 1;
+        }
+        vector.push(...genreVector);
+
+        // Normalize year to [0, 1]
+        const normalizedYear = (movie.features.year - 1900) / 124;
+        vector.push(normalizedYear);
+
+        // Rating already in [0, 10]
+        vector.push(movie.features.rating / 10);
+
+        // Normalize duration
+        vector.push(movie.features.duration / 300);
+
+        return vector;
+    }
+}</code>
+        </div>
+
+        <h3>Text Features (TF-IDF)</h3>
+        <p>
+            For textual content like descriptions or reviews, use TF-IDF (Term Frequency-Inverse Document Frequency) to extract meaningful features:
+        </p>
+
+        <div class="code-block">
+<code>// TF-IDF implementation for text features
+class TFIDFVectorizer {
+    private vocabulary: Map<string, number> = new Map();
+    private idf: Map<string, number> = new Map();
+    private documentCount: number = 0;
+
+    // Build vocabulary and calculate IDF
+    fit(documents: string[]): void {
+        this.documentCount = documents.length;
+        const docFrequency = new Map<string, number>();
+
+        // Count document frequencies
+        for (const doc of documents) {
+            const terms = new Set(this.tokenize(doc));
+            for (const term of terms) {
+                docFrequency.set(term, (docFrequency.get(term) || 0) + 1);
+            }
+        }
+
+        // Build vocabulary and calculate IDF
+        let idx = 0;
+        for (const [term, df] of docFrequency) {
+            this.vocabulary.set(term, idx++);
+            this.idf.set(term, Math.log(this.documentCount / df));
+        }
+    }
+
+    // Transform document to TF-IDF vector
+    transform(document: string): number[] {
+        const terms = this.tokenize(document);
+        const termFreq = new Map<string, number>();
+
+        // Calculate term frequencies
+        for (const term of terms) {
+            termFreq.set(term, (termFreq.get(term) || 0) + 1);
+        }
+
+        // Normalize by document length
+        const docLength = terms.length;
+        for (const [term, freq] of termFreq) {
+            termFreq.set(term, freq / docLength);
+        }
+
+        // Build TF-IDF vector
+        const vector = new Array(this.vocabulary.size).fill(0);
+        for (const [term, tf] of termFreq) {
+            const idx = this.vocabulary.get(term);
+            const idf = this.idf.get(term);
+            if (idx !== undefined && idf !== undefined) {
+                vector[idx] = tf * idf;
+            }
+        }
+
+        return vector;
+    }
+
+    private tokenize(text: string): string[] {
+        return text.toLowerCase()
+            .replace(/[^\w\s]/g, '')
+            .split(/\s+/)
+            .filter(word => word.length > 2);  // Remove short words
+    }
+}</code>
+        </div>
+
+        <h2>👤 Building User Profiles</h2>
+        <p>
+            Once items are represented as feature vectors, build user profiles by aggregating features of items they've interacted with:
+        </p>
+
+        <div class="code-block">
+<code>// User profile construction
+class UserProfileBuilder {
+    buildProfile(
+        userInteractions: Array<{itemId: string, rating: number}>,
+        itemProfiles: Map<string, number[]>
+    ): number[] {
+        if (userInteractions.length === 0) return [];
+
+        const featureLength = itemProfiles.values().next().value.length;
+        const profile = new Array(featureLength).fill(0);
+        let totalWeight = 0;
+
+        // Weighted average of item features
+        for (const {itemId, rating} of userInteractions) {
+            const itemVector = itemProfiles.get(itemId);
+            if (!itemVector) continue;
+
+            const weight = rating;  // Use rating as weight
+            for (let i = 0; i < featureLength; i++) {
+                profile[i] += itemVector[i] * weight;
+            }
+            totalWeight += weight;
+        }
+
+        // Normalize
+        if (totalWeight > 0) {
+            for (let i = 0; i < featureLength; i++) {
+                profile[i] /= totalWeight;
+            }
+        }
+
+        return profile;
+    }
+
+    // Alternative: Boolean profile (liked/disliked)
+    buildBooleanProfile(
+        likedItems: string[],
+        itemProfiles: Map<string, number[]>
+    ): number[] {
+        if (likedItems.length === 0) return [];
+
+        const featureLength = itemProfiles.values().next().value.length;
+        const profile = new Array(featureLength).fill(0);
+
+        for (const itemId of likedItems) {
+            const itemVector = itemProfiles.get(itemId);
+            if (!itemVector) continue;
+
+            for (let i = 0; i < featureLength; i++) {
+                profile[i] += itemVector[i];
+            }
+        }
+
+        // Average
+        for (let i = 0; i < featureLength; i++) {
+            profile[i] /= likedItems.length;
+        }
+
+        return profile;
+    }
+}</code>
+        </div>
+
+        <h2>📏 Similarity Calculation</h2>
+        <p>
+            With user and item profiles as vectors, calculate similarity to generate recommendations:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Method</th>
+                    <th>Use Case</th>
+                    <th>Pros</th>
+                    <th>Cons</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Cosine Similarity</strong></td>
+                    <td>Sparse, high-dimensional vectors</td>
+                    <td>Scale invariant, fast</td>
+                    <td>Ignores magnitude</td>
+                </tr>
+                <tr>
+                    <td><strong>Euclidean Distance</strong></td>
+                    <td>Dense, low-dimensional data</td>
+                    <td>Intuitive, considers magnitude</td>
+                    <td>Sensitive to scale</td>
+                </tr>
+                <tr>
+                    <td><strong>Pearson Correlation</strong></td>
+                    <td>Rating predictions</td>
+                    <td>Handles different scales</td>
+                    <td>More computationally expensive</td>
+                </tr>
+                <tr>
+                    <td><strong>Jaccard</strong></td>
+                    <td>Set-based features</td>
+                    <td>Simple, works for binary</td>
+                    <td>Loses information</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-block">
+<code>// Content-based recommender
+class ContentBasedRecommender {
+    private itemProfiles: Map<string, number[]>;
+    private userProfiles: Map<string, number[]>;
+
+    constructor() {
+        this.itemProfiles = new Map();
+        this.userProfiles = new Map();
+    }
+
+    addItemProfile(itemId: string, features: number[]): void {
+        this.itemProfiles.set(itemId, features);
+    }
+
+    updateUserProfile(userId: string, profile: number[]): void {
+        this.userProfiles.set(userId, profile);
+    }
+
+    // Generate recommendations
+    recommend(
+        userId: string,
+        k: number = 10,
+        excludeItems: Set<string> = new Set()
+    ): Array<{itemId: string, score: number}> {
+        const userProfile = this.userProfiles.get(userId);
+        if (!userProfile) return [];
+
+        const scores: Array<{itemId: string, score: number}> = [];
+
+        for (const [itemId, itemProfile] of this.itemProfiles) {
+            if (excludeItems.has(itemId)) continue;
+
+            const similarity = this.cosineSimilarity(userProfile, itemProfile);
+            scores.push({ itemId, score: similarity });
+        }
+
+        return scores
+            .sort((a, b) => b.score - a.score)
+            .slice(0, k);
+    }
+
+    private cosineSimilarity(vecA: number[], vecB: number[]): number {
+        let dotProduct = 0;
+        let magA = 0;
+        let magB = 0;
+
+        for (let i = 0; i < vecA.length; i++) {
+            dotProduct += vecA[i] * vecB[i];
+            magA += vecA[i] * vecA[i];
+            magB += vecB[i] * vecB[i];
+        }
+
+        if (magA === 0 || magB === 0) return 0;
+        return dotProduct / (Math.sqrt(magA) * Math.sqrt(magB));
+    }
+
+    // Explain recommendation
+    explainRecommendation(
+        userId: string,
+        itemId: string,
+        featureNames: string[]
+    ): Array<{feature: string, contribution: number}> {
+        const userProfile = this.userProfiles.get(userId);
+        const itemProfile = this.itemProfiles.get(itemId);
+
+        if (!userProfile || !itemProfile) return [];
+
+        const explanations: Array<{feature: string, contribution: number}> = [];
+
+        for (let i = 0; i < featureNames.length; i++) {
+            const contribution = userProfile[i] * itemProfile[i];
+            if (contribution > 0.01) {  // Threshold for relevance
+                explanations.push({
+                    feature: featureNames[i],
+                    contribution
+                });
+            }
+        }
+
+        return explanations.sort((a, b) => b.contribution - a.contribution);
+    }
+}</code>
+        </div>
+
+        <h2>🔍 Advanced Feature Engineering</h2>
+        <p>
+            Sophisticated content-based systems employ advanced feature extraction techniques:
+        </p>
+
+        <h3>1. Word Embeddings</h3>
+        <p>
+            Instead of TF-IDF, use pre-trained embeddings (Word2Vec, GloVe, BERT) to capture semantic meaning.
+        </p>
+
+        <h3>2. Image Features</h3>
+        <p>
+            For visual items, extract features using CNNs (Convolutional Neural Networks) pre-trained on ImageNet.
+        </p>
+
+        <h3>3. Audio Features</h3>
+        <p>
+            For music, extract mel-frequency cepstral coefficients (MFCCs), tempo, key, and other acoustic features.
+        </p>
+
+        <h3>4. Knowledge Graphs</h3>
+        <p>
+            Leverage structured knowledge (DBpedia, Wikidata) to enrich item representations with relationships and entities.
+        </p>
+
+        <div class="example">
+            <div class="example-title">🎵 Example: Music Recommendation</div>
+            <p>
+                A music recommender might combine:
+            </p>
+            <ul>
+                <li><strong>Audio features:</strong> Tempo (120 BPM), key (C major), energy (0.8)</li>
+                <li><strong>Metadata:</strong> Genre (Electronic), artist, year</li>
+                <li><strong>Lyrics:</strong> TF-IDF or BERT embeddings of lyrics</li>
+                <li><strong>Social:</strong> Playlist co-occurrence patterns</li>
+            </ul>
+        </div>
+
+        <h2>⚖️ Addressing Overspecialization</h2>
+        <p>
+            A key limitation of content-based filtering is overspecialization: users only get recommendations similar to what they've already seen, creating filter bubbles.
+        </p>
+
+        <h3>Mitigation Strategies</h3>
+        <ul>
+            <li><strong>Serendipity injection:</strong> Occasionally recommend diverse items</li>
+            <li><strong>Temporal decay:</strong> Give less weight to older preferences</li>
+            <li><strong>Negative feedback:</strong> Learn what users dislike</li>
+            <li><strong>Exploration-exploitation:</strong> Balance familiar and novel recommendations</li>
+        </ul>
+
+        <div class="code-block">
+<code>// Adding diversity to recommendations
+class DiverseContentRecommender extends ContentBasedRecommender {
+    recommendWithDiversity(
+        userId: string,
+        k: number = 10,
+        diversityWeight: number = 0.3
+    ): Array<{itemId: string, score: number}> {
+        // Get initial recommendations
+        const candidates = this.recommend(userId, k * 3);  // Get 3x candidates
+
+        const selected: Array<{itemId: string, score: number}> = [];
+        const selectedProfiles: number[][] = [];
+
+        while (selected.length < k && candidates.length > 0) {
+            let bestIdx = 0;
+            let bestScore = -Infinity;
+
+            for (let i = 0; i < candidates.length; i++) {
+                const candidate = candidates[i];
+                const itemProfile = this.itemProfiles.get(candidate.itemId);
+                if (!itemProfile) continue;
+
+                // Calculate diversity from already selected items
+                let minDiversity = Infinity;
+                for (const selectedProfile of selectedProfiles) {
+                    const similarity = this.cosineSimilarity(itemProfile, selectedProfile);
+                    const diversity = 1 - similarity;
+                    minDiversity = Math.min(minDiversity, diversity);
+                }
+
+                // Combined score: relevance + diversity
+                const relevanceScore = candidate.score;
+                const diversityScore = selectedProfiles.length === 0 ? 1 : minDiversity;
+                const combinedScore =
+                    (1 - diversityWeight) * relevanceScore +
+                    diversityWeight * diversityScore;
+
+                if (combinedScore > bestScore) {
+                    bestScore = combinedScore;
+                    bestIdx = i;
+                }
+            }
+
+            // Add best candidate
+            const best = candidates.splice(bestIdx, 1)[0];
+            selected.push(best);
+            selectedProfiles.push(this.itemProfiles.get(best.itemId)!);
+        }
+
+        return selected;
+    }
+}</code>
+        </div>
+
+        <h2>🎯 Hybrid Content Approaches</h2>
+        <p>
+            Combining multiple content-based techniques often yields better results:
+        </p>
+
+        <h3>Multi-Modal Learning</h3>
+        <p>
+            Combine different types of features (text, images, metadata) into a unified representation.
+        </p>
+
+        <h3>Ensemble Methods</h3>
+        <p>
+            Train multiple models on different feature sets and aggregate their predictions.
+        </p>
+
+        <h3>Deep Learning Integration</h3>
+        <p>
+            Use neural networks to automatically learn relevant features from raw data.
+        </p>
+
+        <h2>📊 Evaluation Metrics</h2>
+        <p>
+            Content-based systems should be evaluated on multiple dimensions:
+        </p>
+
+        <ul>
+            <li><strong>Accuracy:</strong> Precision, recall, F1-score</li>
+            <li><strong>Diversity:</strong> Intra-list similarity, coverage</li>
+            <li><strong>Novelty:</strong> Percentage of unfamiliar items</li>
+            <li><strong>Serendipity:</strong> Unexpected but relevant recommendations</li>
+            <li><strong>Explainability:</strong> Can we explain why items were recommended?</li>
+        </ul>
+
+        <h2>🚀 Real-World Applications</h2>
+        <p>
+            Content-based filtering excels in specific domains:
+        </p>
+
+        <h3>News Recommendation</h3>
+        <p>
+            Recommend articles based on topic, entities, writing style, and user reading history.
+        </p>
+
+        <h3>Job Matching</h3>
+        <p>
+            Match candidates to jobs based on skills, experience, education, and location.
+        </p>
+
+        <h3>Academic Paper Recommendation</h3>
+        <p>
+            Suggest papers based on citations, topics, authors, and abstract similarity.
+        </p>
+
+        <h3>Fashion Recommendation</h3>
+        <p>
+            Recommend clothing based on visual features, style, brand, and user preferences.
+        </p>
+
+        <div class="summary">
+            <h2>📝 Summary</h2>
+            <ul>
+                <li>Content-based filtering recommends items by matching their features to user preferences</li>
+                <li>Feature extraction transforms items into vector representations</li>
+                <li>User profiles aggregate features of items users have liked</li>
+                <li>Similarity metrics (cosine, Euclidean) compare user and item profiles</li>
+                <li>Advanced techniques include embeddings, CNNs for images, and knowledge graphs</li>
+                <li>Main limitation is overspecialization leading to filter bubbles</li>
+                <li>Diversity can be promoted through serendipity injection and exploration strategies</li>
+                <li>Content-based excels when items have rich metadata and cold start is a concern</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>🤔 Review Questions</h2>
+            <ol>
+                <li>How does content-based filtering differ from collaborative filtering?</li>
+                <li>What is TF-IDF and why is it useful for text features?</li>
+                <li>Explain how to build a user profile from item interactions.</li>
+                <li>What is the overspecialization problem and how can it be addressed?</li>
+                <li>Compare different similarity metrics for content-based recommendation.</li>
+                <li>How can you provide explanations for content-based recommendations?</li>
+                <li>What role do word embeddings play in modern content-based systems?</li>
+                <li>Design a feature extraction pipeline for movie recommendations.</li>
+                <li>How would you balance relevance and diversity in recommendations?</li>
+                <li>When is content-based filtering preferable to collaborative filtering?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) · Benefit All Humanity<br>
+            <span style="font-size: 0.9rem; margin-top: 0.5rem; display: block; opacity: 0.9;">
+                Design content systems that expand horizons, not just confirm existing preferences
+            </span>
+        </div>
+
+        </div>
+</body>
+</html>

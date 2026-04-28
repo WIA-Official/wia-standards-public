@@ -5,237 +5,476 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-economic-integration (Economic Integration).
+This document defines the canonical data-format
+layer for WIA-economic-integration. The
+standard covers the persistent record shapes
+that a customs administration, a trade-
+facilitation single-window operator, a national
+statistical office contributing to UN COMTRADE,
+a chamber of commerce issuing certificates of
+origin, an authorised economic operator, a
+freight forwarder, a financial-institution
+operator handling cross-border payments and
+documentary credits, and an inter-state economic-
+union secretariat (the EU Single Market
+secretariat, the ASEAN Economic Community
+secretariat, an USMCA / CPTPP / RCEP working
+group) maintain when registering a trade
+declaration, exchanging an electronic-trade
+message under UN/EDIFACT or ISO 20022,
+publishing a trade-statistics dataset to UN
+COMTRADE, anchoring an Authorised Economic
+Operator certificate, transmitting a
+documentary credit under the ICC UCP 600
+framework, and tracking the per-shipment
+chain-of-custody trail. Records are consumed
+by the destination customs authority, by the
+banker financing the trade, by the freight
+forwarder coordinating the multimodal shipment,
+by the importer / exporter executing the
+contract, and — where the trade involves a
+controlled-goods category — by the supervisory
+export-control authority overseeing the
+licensing decision.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- WTO General Agreement on Tariffs and Trade
+  1994 (GATT 1994), the WTO Agreement on
+  Trade Facilitation (TFA, 2014, in force
+  2017), the WTO Agreement on Government
+  Procurement, the WTO Agreement on Trade-
+  Related Aspects of Intellectual Property
+  Rights (TRIPS), the WTO Agreement on
+  Customs Valuation
+- World Customs Organization (WCO) Framework
+  of Standards to Secure and Facilitate Global
+  Trade (the WCO SAFE Framework, the 2018
+  edition cited as the operative version)
+- WCO Harmonized Commodity Description and
+  Coding System (the Harmonized System or HS)
+  — the 2022 edition cited as the operative
+  version
+- WCO Data Model version 3 — the cross-border
+  customs message reference cited normatively
+  for the per-declaration envelope in §4
+- WCO Authorised Economic Operator (AEO)
+  Programme guidance
+- WCO SAFE Mutual Recognition Arrangement
+  framework
+- UN/EDIFACT (Electronic Data Interchange for
+  Administration, Commerce and Transport) —
+  the message family standardised under ISO
+  9735:2002, with the directories from D.96A
+  through D.21B; cited normatively for the
+  ORDERS, INVOIC, DESADV, IFTMIN, IFTMBC, and
+  CUSDEC messages in §5
+- ISO 9735-1:2002 / -2:2002 / -3:2002 / -4:
+  2002 / -5:2002 / -6:2002 / -7:2002 / -8:
+  2002 / -9:2002 / -10:2014 (UN/EDIFACT —
+  application-level syntax rules)
+- UN/CEFACT (United Nations Centre for Trade
+  Facilitation and Electronic Business)
+  Recommendations — Recommendation 1 (UN
+  Layout Key for Trade Documents),
+  Recommendation 16 (UNLOCODE — Codes for
+  Trade and Transport Locations),
+  Recommendation 33 (Single Window Recommendation),
+  and Recommendation 36 (Single Window
+  Interoperability)
+- UN Comtrade Database (the UN Commodity
+  Trade Statistics Database) and its data-
+  submission specification
+- ISO 20022 (Universal Financial Industry
+  Message Scheme) — the cross-border payments
+  message family cited normatively for §6
+- ISO 4217:2015 (currency codes)
+- ISO 3166-1:2020 (country codes), ISO 3166-2
+  (subdivision codes)
+- ISO 9362:2022 (BIC — Business Identifier
+  Code)
+- ISO 13616:2020 (IBAN — International Bank
+  Account Number)
+- ISO 17442:2020 (LEI — Legal Entity
+  Identifier)
+- ICC Incoterms 2020 (the ICC Incoterms rules
+  for the use of domestic and international
+  trade terms — eleven rules: EXW, FCA, CPT,
+  CIP, DAP, DPU, DDP, FAS, FOB, CFR, CIF)
+- ICC Uniform Customs and Practice for
+  Documentary Credits (UCP 600, in force
+  2007) and ICC International Standard
+  Banking Practice (ISBP 745)
+- ICC Uniform Rules for Demand Guarantees
+  (URDG 758)
+- ICC Uniform Rules for Bank Payment
+  Obligations (URBPO 750)
+- IETF RFC 8259 (JSON), RFC 4122 (UUID), ISO
+  8601 (date-time)
+- ISO/IEC 27001:2022 (information-security
+  management — used for the chain-of-custody
+  record discipline in §8)
+- W3C Verifiable Credentials Data Model v2.0
+  (cited where the operator binds an AEO
+  certificate or a certificate of origin to
+  a verifiable credential)
+- W3C Open Digital Rights Language (ODRL) 2.2
+- KR 관세법 (Customs Act), KR 대외무역법
+  (Foreign Trade Act), KR 외국환거래법
+  (Foreign Exchange Transactions Act)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-economic-integration
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the
+artefacts exchanged when a trader, a freight
+forwarder, a customs administration, and a
+financing institution coordinate a cross-
+border trade transaction. Implementations
+covered include:
 
-## §2 Manifest
+- A national customs administration operating
+  a single-window-of-trade per UN/CEFACT
+  Recommendation 33.
+- A trade-facilitation single-window operator
+  ingesting UN/EDIFACT CUSDEC declarations.
+- A national statistical office contributing
+  to the UN COMTRADE database under the
+  HS-2022 commodity coding.
+- A chamber of commerce issuing electronic
+  certificates of origin under the WTO Rules
+  of Origin and the operator's national
+  preferential-origin agreement.
+- An authorised economic operator (AEO)
+  operating under the WCO SAFE Framework
+  Mutual Recognition Arrangement.
+- A freight forwarder operating multimodal
+  transport under the IFTMIN / IFTMBC /
+  IFTSTA EDIFACT messages.
+- A financial-institution operator
+  transmitting cross-border payments under
+  ISO 20022 pacs.008 / camt.054 / pain.001.
+- An inter-state economic-union secretariat
+  publishing the per-Member-State market-
+  integration dataset.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "economic-integration"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The customs declaration, the multimodal-
+transport message, the cross-border payment
+message, and the certificate of origin
+receive distinct encodings in this PHASE; the
+additional safeguards required by each trade-
+facilitation regime are encoded in PHASE-3 §3.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name of
+                       the operator — customs
+                       administration, single-
+                       window operator, national
+                       statistical office,
+                       chamber of commerce, AEO,
+                       freight forwarder,
+                       financial institution, or
+                       economic-union
+                       secretariat)
+operatorRole         : enum ("customs-admin" |
+                       "single-window-operator"
+                       | "national-statistical-
+                       office" | "chamber-of-
+                       commerce" | "authorised-
+                       economic-operator" |
+                       "freight-forwarder" |
+                       "financial-institution" |
+                       "economic-union-
+                       secretariat" | "user-
+                       defined")
+operatorJurisdiction : array of string (ISO
+                       3166-1 country codes)
+governingFrameworks  : array of enum ("WTO-GATT-
+                       1994" | "WTO-TFA" |
+                       "WTO-GPA" | "WTO-TRIPS" |
+                       "WCO-SAFE-2018" |
+                       "WCO-HS-2022" |
+                       "WCO-DATA-MODEL-V3" |
+                       "WCO-AEO-PROGRAMME" |
+                       "UN-EDIFACT-D-21B" |
+                       "ISO-9735-1" |
+                       "UN-CEFACT-REC-1" |
+                       "UN-CEFACT-REC-16-
+                       UNLOCODE" |
+                       "UN-CEFACT-REC-33-SW" |
+                       "UN-CEFACT-REC-36-SW-
+                       INTEROP" |
+                       "UN-COMTRADE" |
+                       "ISO-20022" | "ISO-4217"
+                       | "ISO-3166-1" | "ISO-
+                       9362-BIC" | "ISO-13616-
+                       IBAN" | "ISO-17442-LEI" |
+                       "ICC-INCOTERMS-2020" |
+                       "ICC-UCP-600" | "ICC-
+                       ISBP-745" | "ICC-URDG-
+                       758" | "ICC-URBPO-750" |
+                       "EU-UCC-952-2013" |
+                       "ASEAN-AEC-BLUEPRINT" |
+                       "USMCA" | "CPTPP" |
+                       "RCEP" |
+                       "KR-관세법" | "KR-대외
+                       무역법" | "KR-외국환거래법"
+                       | "user-defined")
+aeoCertificate       : object (the AEO
+                       certificate reference,
+                       the issuing customs
+                       authority, the AEO type
+                       — Authorised Economic
+                       Operator Customs (AEOC),
+                       Authorised Economic
+                       Operator Security and
+                       Safety (AEOS), or
+                       Authorised Economic
+                       Operator Full (AEOF) —
+                       and the certificate's
+                       expiry date)
+programmeStatus      : enum ("design" |
+                       "operating" | "limited-
+                       rollout" | "wind-down" |
+                       "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Trade Declaration Record (WCO Data Model)
 
-## §4 Discovery
+```
+declarationRecord:
+  declarationId      : string (uuidv7)
+  declarationType    : enum ("import-clearance"
+                       | "export-clearance" |
+                       "transit" | "transhipment"
+                       | "warehousing" |
+                       "temporary-admission" |
+                       "user-defined")
+  consigneeRef       : object (the consignee's
+                       Legal Entity Identifier
+                       per ISO 17442 and the
+                       operator's customs-system
+                       trader registration
+                       number)
+  consignorRef       : object (the consignor's
+                       Legal Entity Identifier
+                       and the operator's
+                       customs-system trader
+                       registration number)
+  goodsDescription   : array of object (per-
+                       commodity envelope —
+                       HS-2022 ten-digit
+                       classification, gross
+                       weight in kg per ISO
+                       80000-4, net weight,
+                       package count, package
+                       type per UN/CEFACT
+                       Recommendation 21)
+  declaredCustomsValue : object (the customs
+                       value per WTO Customs
+                       Valuation Agreement
+                       Article VII methods —
+                       Method 1 transaction
+                       value, Methods 2-6
+                       fallback methods; the
+                       value is declared with
+                       the ISO 4217 currency
+                       code)
+  incoterm           : enum (per ICC Incoterms
+                       2020 — "EXW" | "FCA" |
+                       "CPT" | "CIP" | "DAP" |
+                       "DPU" | "DDP" | "FAS" |
+                       "FOB" | "CFR" | "CIF")
+  transportDetails   : object (per-leg modal
+                       envelope — air, ocean,
+                       road, rail, multimodal
+                       — with the UN/CEFACT
+                       Recommendation 19 modal
+                       code, the carrier's
+                       identifier, the bill of
+                       lading or air waybill
+                       number, and the
+                       UNLOCODE per UN/CEFACT
+                       Recommendation 16)
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/economic-integration`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Electronic-Trade Message Record (UN/EDIFACT)
 
-## §5 Time and Identity
+```
+edifactMessage:
+  messageId          : string (uuidv7)
+  messageType        : enum ("ORDERS" |
+                       "ORDRSP" | "INVOIC" |
+                       "DESADV" | "RECADV" |
+                       "REMADV" | "IFTMIN" |
+                       "IFTMBC" | "IFTMBP" |
+                       "IFTSTA" | "CUSDEC" |
+                       "CUSREP" | "CUSCAR" |
+                       "user-defined")
+  edifactDirectory   : enum (per UN/EDIFACT
+                       directory release — "D-
+                       16A" | "D-17A" | "D-18A"
+                       | "D-19A" | "D-20A" |
+                       "D-21A" | "D-21B" |
+                       "user-defined")
+  syntaxRules        : enum ("ISO-9735-2002")
+  envelopePayload    : string (URI of the
+                       complete EDIFACT
+                       message — the UNB / UNH
+                       / UNT / UNZ envelope
+                       with per-message
+                       segments)
+  partnerExchange    : object (the sender and
+                       receiver UN/EDIFACT
+                       identifier per UNB
+                       segment, the test or
+                       production indicator,
+                       the syntax-version
+                       indicator)
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 Cross-Border Payment Record (ISO 20022)
 
-## §6 Versioning and Deprecation
+```
+paymentRecord:
+  paymentId          : string (uuidv7)
+  iso20022Message    : enum ("pacs.008" |
+                       "pacs.009" | "pacs.002"
+                       | "camt.054" | "camt.029"
+                       | "camt.056" | "pain.001"
+                       | "pain.002" | "user-
+                       defined")
+  initiatingParty    : object (the initiating
+                       party's BIC per ISO 9362
+                       and LEI per ISO 17442)
+  beneficiaryParty   : object (the beneficiary's
+                       BIC and LEI; account
+                       identifier per ISO 13616
+                       IBAN where the
+                       transaction is in scope
+                       of the IBAN registry)
+  instructedAmount   : object (amount in the
+                       declared currency per
+                       ISO 4217)
+  paymentPurpose     : object (the ISO 20022
+                       Purpose Code per the
+                       External Code Set;
+                       trade-purpose codes such
+                       as TRAD or CRED carry
+                       the underlying trade
+                       declaration reference)
+  uniqueEnd-toEndTransactionRef : string (the
+                       UETR per the SWIFT GPI
+                       discipline)
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 Documentary Credit Record (ICC UCP 600)
 
-## §7 Privacy and Security
+```
+documentaryCredit:
+  creditId           : string (uuidv7)
+  creditType         : enum ("irrevocable" |
+                       "transferable" |
+                       "back-to-back" |
+                       "standby" | "user-
+                       defined")
+  issuingBank        : object (BIC per ISO 9362)
+  beneficiaryBank    : object (BIC per ISO 9362)
+  applicantRef       : object (the importer's
+                       LEI per ISO 17442)
+  beneficiaryRef     : object (the exporter's
+                       LEI per ISO 17442)
+  creditAmount       : object (amount in the
+                       declared currency per
+                       ISO 4217 with the
+                       allowed-tolerance per
+                       UCP 600 Article 30)
+  expirePlace        : object (the place of
+                       expiry per UCP 600
+                       Article 6)
+  expiryDate         : string (ISO 8601)
+  documentsRequired  : array of object (the
+                       per-document required
+                       set under UCP 600
+                       Articles 19-28 — bill of
+                       lading, air waybill,
+                       commercial invoice,
+                       insurance document,
+                       packing list,
+                       certificate of origin)
+  isbpProfile        : enum ("ISBP-745" |
+                       "user-defined")
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 Certificate of Origin Record
 
-## §8 Open Governance
+```
+originCertificate:
+  certificateId      : string (uuidv7)
+  issuingChamberRef  : string (the chamber of
+                       commerce or competent
+                       authority issuing the
+                       certificate)
+  beneficiaryRef     : object (the exporter's
+                       LEI)
+  goodsDescription   : array of object (HS-2022
+                       classification + WTO
+                       Rules of Origin
+                       qualification per
+                       Annex II of the
+                       applicable preferential-
+                       trade agreement)
+  agreementRef       : enum ("EU-GSP" |
+                       "USMCA" | "CPTPP" |
+                       "RCEP" | "ASEAN" |
+                       "ICC-NON-PREFERENTIAL"
+                       | "user-defined")
+  validityPeriod     : object (per the per-
+                       agreement validity rules)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `economic-integration` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §8 Chain-of-Custody Record
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+custodyRecord:
+  custodyId          : string (uuidv7)
+  artefactRef        : string (the declaration,
+                       EDIFACT message, payment,
+                       documentary credit, or
+                       origin certificate
+                       identifier)
+  custodyEvent       : enum ("declaration-
+                       lodged" | "declaration-
+                       cleared" | "edifact-
+                       transmitted" |
+                       "iso20022-instructed" |
+                       "documentary-credit-
+                       issued" | "documents-
+                       presented" | "documents-
+                       paid" | "origin-
+                       certified" | "withdrawn"
+                       | "user-defined")
+  eventTimestamp     : string (ISO 8601)
+  performingParty    : string (legal entity)
+  hashOfArtefacts    : string (SHA-256 hex
+                       digest)
+```
 
+## §9 Manifest
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations publish a signed manifest
+carrying `standardSlug` (constant value
+"economic-integration"), `version`,
+`implementation`, the operator's `aeoCertificate`
+envelope, and the `profile` declaration that
+selects which of the optional records
+(EDIFACT, ISO 20022, UCP 600, origin) the
+implementation supports. The manifest is
+signed using a key whose public part is
+published on the operator's `.well-known/wia/
+economic-integration/` discovery endpoint
+declared in PHASE-2.

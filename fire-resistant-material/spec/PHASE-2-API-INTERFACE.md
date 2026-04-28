@@ -5,237 +5,398 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-fire-resistant-material (Fire Resistant Material).
+This document defines the HTTPS API contract that
+a fire-resistant-material operator (material
+producer, fire-testing laboratory, notified body,
+certification body, Authority Having Jurisdiction,
+or public-procurement authority) exposes for the
+records defined in PHASE-1. The contract carries
+the material-registration, reaction-to-fire test
+upload, resistance-to-fire test upload,
+Declaration of Performance publication, AHJ
+audit ingestion, and chain-of-custody anchoring
+endpoints.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110, RFC 9111, RFC 9457, RFC 8288,
+  RFC 6901 / 6902, RFC 8259, RFC 4122, RFC
+  9421, RFC 8615
+- W3C Trace Context
+- ISO/IEC 27001:2022, ISO/IEC 17021-1:2015,
+  ISO/IEC 17065:2012, ISO/IEC 17025:2017
+- EN 13501-1:2018+A1:2019, EN 13501-2:2023,
+  EN 13823:2020+A1:2022, EN ISO 11925-2:2020
+- ISO 1182:2020, ISO 1716:2018, ISO 5660-1:2015,
+  ISO 5660-2:2002, ISO 9239-1:2010, ISO 13943:
+  2017
+- ASTM E84-23, UL 723:2018, ASTM E119-23a,
+  ASTM E136-22, ASTM E2257-22
+- NFPA 251 / 252 / 257 / 259 / 268
+- EN 1363-1:2020, EN 1364 series, EN 1365 series,
+  EN 1366 series, EN 1634-1
+- KS F 2271:2016, KS F 2257-1:2019
+- EU Construction Products Regulation (EU)
+  305/2011, EU Decision 2000/147/EC, EU Decision
+  2000/367/EC
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-fire-resistant-material
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by
+the operator. The OpenAPI 3.1 document at
+`/v1/openapi.json` is canonical. Schema changes
+follow the non-breaking conventions in PHASE-1
+§2. Every endpoint carries a per-request
+signature using HTTP Message Signatures (RFC
+9421) anchored to the operator's ISO/IEC 17025
+laboratory accreditation, the operator's ISO/IEC
+17065 product-certification body accreditation,
+or the operator's notified-body designation
+under EU CPR Article 39; the signature key set
+is published at
+`/.well-known/wia/fire-resistant-material/keys.
+json`.
 
-## §2 Manifest
+## §2 Root Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "fire-resistant-material"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /v1/
+```
 
-## §3 Conformance Tiers
+```json
+{
+  "standard": "WIA-fire-resistant-material",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":         "/v1/programmes",
+    "materials":          "/v1/materials",
+    "rtfTestRecords":     "/v1/rtf-test-records",
+    "rfTestRecords":      "/v1/rf-test-records",
+    "dopRecords":         "/v1/dop-records",
+    "ahjAuditRecords":    "/v1/ahj-audits",
+    "custody":            "/v1/custody-events",
+    "openapi":            "/v1/openapi.json",
+    "wellKnown":          "/.well-known/wia/fire-resistant-material"
+  }
+}
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Material Registration Endpoints
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+### §3.1 Register a material
 
-## §4 Discovery
+```
+POST /v1/materials
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/fire-resistant-material`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Request body carries the §3 record from PHASE-1.
+The server validates the `materialFamily` against
+the `intendedUse`: a `flame-retardant-polymer`
+declared with `intendedUse: structural-beam-
+column` is rejected with `422 Unprocessable
+Entity` at `/problems/cpr-intended-use-family-
+mismatch` and the offending field expressed as a
+JSON Pointer (RFC 6901).
 
-## §5 Time and Identity
+### §3.2 Retrieve a material
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+GET /v1/materials/{materialId}
+Accept: application/json
+```
 
-## §6 Versioning and Deprecation
+### §3.3 Search materials
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+GET /v1/materials?family={family}
+&intendedUse={use}&euroclass={class}
+&fireResistanceClass={REI}
+&dopExpiringBefore={iso8601}
+&page={cursor}&size={size}
+```
 
-## §7 Privacy and Security
+## §4 Reaction-to-Fire Test Endpoints
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+### §4.1 Upload a reaction-to-fire test
 
-## §8 Open Governance
+```
+POST /v1/rtf-test-records
+Content-Type: multipart/form-data; boundary=...
+Signature: <RFC 9421 signature from a fire-
+            testing laboratory's accreditation
+            certificate>
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `fire-resistant-material` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The multipart body carries one JSON part with the
+§4 record from PHASE-1 (testStandard,
+testLaboratory, measurementResult,
+classification) and one or more file parts
+holding the test report, the calibration record,
+the photographic evidence (per EN 13823 §7), and
+the raw sensor data file. The server stores the
+report files under content-addressable URIs (the
+SHA-256 hex digest is the path segment).
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+The server enforces the test-method-to-
+classification mapping table:
 
+- A `classification.primaryClass` of `A1`
+  REQUIRES test reports under both ISO 1182 and
+  ISO 1716 in the underlying record set.
+- A `classification.primaryClass` of `A2`
+  REQUIRES the ISO 1716 test result and the EN
+  13823 SBI test result, with the additional
+  ISO 1182 result where the producer claims the
+  homogeneous-product route per EN 13501-1
+  Annex B.
+- A `classification.primaryClass` of `B`, `C`,
+  or `D` REQUIRES the EN 13823 SBI test and
+  the EN ISO 11925-2 small-flame test.
+- A `classification.primaryClass` of `E`
+  REQUIRES the EN ISO 11925-2 small-flame test.
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+A mismatch returns `422 Unprocessable Entity`
+at `/problems/en13501-1-test-set-incomplete`.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+### §4.2 Retrieve a reaction-to-fire test
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+GET /v1/rtf-test-records/{rtfTestId}
+Accept: application/json
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §5 Resistance-to-Fire Test Endpoints
 
-## Annex F — Adoption Roadmap
+### §5.1 Upload a resistance-to-fire test
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+POST /v1/rf-test-records
+Content-Type: multipart/form-data; boundary=...
+Signature: <RFC 9421 signature>
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The multipart body carries the §5 record from
+PHASE-1 (testStandard, testLaboratory,
+measurementResult, classification) and the
+supporting evidence (the EN 1363-1 furnace
+calibration, the test specimen design, the
+heating-curve record).
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The server validates the EN 1363-1 failure
+criteria envelope: a record claiming `REI 60`
+classification MUST carry passing time-to-
+failure values for all three R, E, and I
+criteria at or above 60 minutes. A record
+claiming `EI` only (no load-bearing) MUST omit
+the R criterion.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+### §5.2 Retrieve a resistance-to-fire test
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+GET /v1/rf-test-records/{rfTestId}
+Accept: application/json
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §6 Declaration-of-Performance Endpoints
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+### §6.1 Publish a Declaration of Performance
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+```
+POST /v1/dop-records
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
-## Annex H — Versioning and Deprecation Policy
+Request body carries the §6 record from PHASE-1.
+The server validates the `harmonisedSpec`
+reference (the harmonised standard or European
+Assessment Document) against the EU CPR
+hENs / EAD register, and the `notifiedBodyRef`
+against the EU NANDO database for notified
+bodies. A withdrawn or expired notified-body
+reference returns `410 Gone`.
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+The server enforces the conformity-assessment-
+system mapping under EU CPR Annex V: a fire-
+performance product family in scope of system
+1+ requires the notified body to issue a
+certificate of constancy of performance and to
+conduct continuing surveillance per EU CPR
+Article 39.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+### §6.2 Retrieve a Declaration of Performance
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+```
+GET /v1/dop-records/{dopId}
+Accept: application/json
+```
 
-## Annex I — Interoperability Profiles
+## §7 AHJ Audit Endpoints
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+### §7.1 Submit an AHJ audit outcome
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+POST /v1/ahj-audits
+Content-Type: application/json
+Signature: <RFC 9421 signature from the AHJ's
+            authorised inspector>
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Request body carries the §7 record from PHASE-1.
+The server links the audit to the building
+project and to the material record so that the
+audit trail is preserved across building life-
+cycle events.
+
+### §7.2 Retrieve an AHJ audit
+
+```
+GET /v1/ahj-audits/{auditId}
+Accept: application/json
+```
+
+## §8 Custody and Error Reporting
+
+### §8.1 Anchor a custody event
+
+```
+POST /v1/custody-events
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+### §8.2 Error envelope
+
+Errors are returned using RFC 9457 Problem
+Details. Validation errors carry a `pointer`
+field (RFC 6901). The server emits a per-request
+`traceparent` header (W3C Trace Context).
+
+## §9 Concurrency and Cache
+
+Every retrieval endpoint emits an `ETag` header
+(RFC 9110 §8.8.3). Conditional requests
+(`If-Match`, `If-None-Match`) are honoured on
+update endpoints. The server returns `412
+Precondition Failed` where the conditional
+request does not match.
+
+## §10 Bulk Export for Building-Code Audits
+
+```
+GET /v1/dop-records:bulk
+Accept: application/x-ndjson
+```
+
+A building-code authority running a bulk audit
+of installed materials in a portfolio of
+buildings requests the operator's DoP register
+as a newline-delimited JSON stream. The endpoint
+streams the DoP records in publication-date
+order; a consumer resuming the stream provides
+an `If-Resume-After` header.
+
+## §11 Notified-Body Surveillance Endpoint
+
+```
+GET /v1/programmes/{programmeId}/surveillance
+Accept: application/json
+Signature: <RFC 9421 signature from a notified
+            body>
+```
+
+A notified body conducting continuing
+surveillance under EU CPR Article 39 requests
+the operator's manufacturing-process records,
+the per-batch test result set, and the per-
+batch DoP reference. The endpoint authenticates
+the requester's notified-body designation
+identifier against the EU NANDO database.
+
+## §12 Building-Information-Modelling Integration
+
+```
+GET /v1/materials/{materialId}/bim-summary
+Accept: application/json
+```
+
+The operator publishes a machine-readable
+summary suitable for ingestion into a Building
+Information Modelling tool. The summary carries
+the material's geometry-and-composition
+declaration, the reaction-to-fire and
+resistance-to-fire classifications, and the per-
+classification time-to-failure value so that the
+BIM tool can parameterise the building-level
+fire-protection design.
+
+## §13 Schema-Validation Note
+
+The OpenAPI 3.1 document at `/v1/openapi.json`
+carries JSON Schema 2020-12 schemas for every
+request and response envelope. Schemas are
+published with `additionalProperties: false` on
+top-level objects so that an unknown field
+returned by a malformed implementation is
+detected at the consumer side. The Schema URIs
+are stable across non-breaking schema additions.
+
+## §14 Webhook Endpoint for Notified-Body
+       Notifications
+
+```
+POST /v1/programmes/{programmeId}/webhooks
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+A notified body registers a webhook to receive
+a push notification when a manufacturer publishes
+a new DoP, a corrective-action announcement, or
+a withdrawal under EU CPR Article 56. The webhook
+envelope carries the operator's signing-key
+reference, the event type, and the resource
+identifier; the notified body's webhook receiver
+verifies the signature before queuing the work
+item.
+
+## §15 Conformance Test-Vector Endpoint
+
+```
+GET /v1/conformance/test-vectors
+Accept: application/json
+```
+
+The operator publishes the conformance test
+vectors used to qualify the API implementation
+against this specification. Each vector carries
+the request, the expected response, the test-
+report identifier from PHASE-1 §4 / §5, and the
+classification outcome that the test-of-record
+example reproduces. A laboratory or notified
+body running an interoperability check uses the
+endpoint to confirm that the operator's API
+reproduces the published classification logic
+deterministically across the EN 13501-1 / EN
+13501-2 / ASTM E84 / ASTM E119 enumeration set.
+
+## §16 Bilingual Public Retrieval
+
+```
+GET /v1/dop-records/{dopId}?lang={lang}
+Accept: application/json
+```
+
+The operator's public retrieval endpoint accepts
+a `lang` query parameter (`en`, `ko`, `de`,
+`fr`, `es`, `ja`, `zh`) and returns the public
+fields with the harmonised-standard reference
+in the requested language. The classification
+codes (Euroclass, REI, EI) are language-
+neutral and carried in the canonical form
+across all retrievals.

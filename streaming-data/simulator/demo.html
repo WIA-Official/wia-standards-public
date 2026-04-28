@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streaming Data - Live Demo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 30px;
+        }
+
+        h1 {
+            color: #10B981;
+            font-size: 2.5em;
+            border-bottom: 3px solid #10B981;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+
+        .demo-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .panel {
+            background: rgba(30, 41, 59, 0.6);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+
+        .panel h2 {
+            color: #10B981;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #10B981;
+            color: #0f172a;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+
+        button:disabled {
+            background: #334155;
+            color: #64748b;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .event-stream {
+            background: #0f172a;
+            border: 1px solid #10B981;
+            border-radius: 6px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .event {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 3px solid #10B981;
+            background: rgba(16, 185, 129, 0.1);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .timestamp {
+            color: #64748b;
+            font-size: 0.85em;
+        }
+
+        .event-type {
+            color: #10B981;
+            font-weight: bold;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: rgba(16, 185, 129, 0.1);
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #10B981;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            color: #10B981;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .visualization {
+            background: #0f172a;
+            border: 1px solid #10B981;
+            border-radius: 6px;
+            padding: 20px;
+            height: 200px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bar {
+            position: absolute;
+            bottom: 0;
+            width: 20px;
+            background: linear-gradient(to top, #10B981, #34d399);
+            border-radius: 4px 4px 0 0;
+            transition: height 0.3s ease;
+        }
+
+        .config-panel {
+            background: rgba(30, 41, 59, 0.4);
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+
+        .config-item {
+            margin: 10px 0;
+        }
+
+        .config-item label {
+            color: #94a3b8;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: #10B981;
+        }
+
+        select {
+            width: 100%;
+            padding: 8px;
+            background: #1e293b;
+            color: #e2e8f0;
+            border: 1px solid #334155;
+            border-radius: 4px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 Live Streaming Demo</h1>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-value" id="eventCount">0</div>
+            <div class="stat-label">Events Processed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="throughput">0</div>
+            <div class="stat-label">Events/sec</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="avgLatency">0</div>
+            <div class="stat-label">Avg Latency (ms)</div>
+        </div>
+    </div>
+
+    <div class="demo-container">
+        <div class="panel">
+            <h2>🎛️ Stream Producer</h2>
+            <div class="config-panel">
+                <div class="config-item">
+                    <label>Event Rate: <span id="rateValue">10</span> events/sec</label>
+                    <input type="range" id="eventRate" min="1" max="100" value="10">
+                </div>
+                <div class="config-item">
+                    <label>Event Type:</label>
+                    <select id="eventType">
+                        <option value="user-action">User Action</option>
+                        <option value="sensor-data">Sensor Data</option>
+                        <option value="transaction">Transaction</option>
+                        <option value="log-entry">Log Entry</option>
+                        <option value="metric">System Metric</option>
+                    </select>
+                </div>
+            </div>
+            <div class="controls">
+                <button id="startBtn" onclick="startStream()">▶️ Start Stream</button>
+                <button id="stopBtn" onclick="stopStream()" disabled>⏸️ Stop Stream</button>
+                <button onclick="clearEvents()">🗑️ Clear</button>
+            </div>
+            <h3 style="color: #10B981; margin-top: 20px;">Throughput Visualization</h3>
+            <div class="visualization" id="throughputViz"></div>
+        </div>
+
+        <div class="panel">
+            <h2>📊 Stream Consumer</h2>
+            <div style="margin-bottom: 10px; color: #94a3b8;">
+                Latest Events (Real-time)
+            </div>
+            <div class="event-stream" id="eventStream">
+                <div style="color: #64748b; text-align: center; padding: 20px;">
+                    No events yet. Click "Start Stream" to begin.
+                </div>
+            </div>
+        </div>
+
+        <div class="panel full-width">
+            <h2>🔍 Stream Processing Pipeline</h2>
+            <div class="config-panel">
+                <h3 style="color: #10B981; margin-top: 0;">Active Transformations</h3>
+                <ul style="color: #cbd5e1; line-height: 2;">
+                    <li>✅ <strong>Filter:</strong> Remove null values and malformed events</li>
+                    <li>✅ <strong>Map:</strong> Enrich events with timestamp and metadata</li>
+                    <li>✅ <strong>Window:</strong> Tumbling window of 5 seconds for aggregation</li>
+                    <li>✅ <strong>Aggregate:</strong> Count events by type, calculate avg latency</li>
+                    <li>✅ <strong>Sink:</strong> Write to event stream display and update metrics</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let streamInterval = null;
+        let eventCount = 0;
+        let eventsPerSecond = 0;
+        let lastSecondCount = 0;
+        let totalLatency = 0;
+        let throughputData = [];
+        let maxBars = 30;
+
+        // Update rate value display
+        document.getElementById('eventRate').addEventListener('input', (e) => {
+            document.getElementById('rateValue').textContent = e.target.value;
+        });
+
+        function startStream() {
+            const rate = parseInt(document.getElementById('eventRate').value);
+            const interval = 1000 / rate;
+
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+
+            streamInterval = setInterval(produceEvent, interval);
+
+            // Update throughput visualization every second
+            setInterval(updateThroughputViz, 1000);
+            setInterval(updateMetrics, 1000);
+        }
+
+        function stopStream() {
+            clearInterval(streamInterval);
+            streamInterval = null;
+
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+        }
+
+        function produceEvent() {
+            const eventType = document.getElementById('eventType').value;
+            const timestamp = new Date().toISOString();
+            const latency = Math.floor(Math.random() * 50) + 10;
+
+            const event = {
+                id: `evt_${eventCount}`,
+                type: eventType,
+                timestamp: timestamp,
+                latency: latency,
+                data: generateEventData(eventType)
+            };
+
+            displayEvent(event);
+
+            eventCount++;
+            eventsPerSecond++;
+            totalLatency += latency;
+        }
+
+        function generateEventData(type) {
+            const templates = {
+                'user-action': { action: 'click', target: 'button', userId: Math.floor(Math.random() * 1000) },
+                'sensor-data': { temperature: (20 + Math.random() * 10).toFixed(1), humidity: Math.floor(Math.random() * 100) },
+                'transaction': { amount: (Math.random() * 1000).toFixed(2), currency: 'USD' },
+                'log-entry': { level: ['INFO', 'WARN', 'ERROR'][Math.floor(Math.random() * 3)], message: 'Sample log' },
+                'metric': { cpu: (Math.random() * 100).toFixed(1), memory: (Math.random() * 100).toFixed(1) }
+            };
+            return templates[type] || {};
+        }
+
+        function displayEvent(event) {
+            const stream = document.getElementById('eventStream');
+
+            // Clear placeholder
+            if (stream.children.length === 1 && stream.children[0].style.color === 'rgb(100, 116, 139)') {
+                stream.innerHTML = '';
+            }
+
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'event';
+            eventDiv.innerHTML = `
+                <div><span class="event-type">${event.type}</span> · <span class="timestamp">${event.timestamp}</span></div>
+                <div style="color: #cbd5e1; font-size: 0.85em; margin-top: 4px;">
+                    ${JSON.stringify(event.data)} · Latency: ${event.latency}ms
+                </div>
+            `;
+
+            stream.insertBefore(eventDiv, stream.firstChild);
+
+            // Keep only last 20 events
+            while (stream.children.length > 20) {
+                stream.removeChild(stream.lastChild);
+            }
+        }
+
+        function updateMetrics() {
+            document.getElementById('eventCount').textContent = eventCount;
+            document.getElementById('throughput').textContent = eventsPerSecond;
+            document.getElementById('avgLatency').textContent = eventCount > 0
+                ? (totalLatency / eventCount).toFixed(1)
+                : 0;
+
+            lastSecondCount = eventsPerSecond;
+            eventsPerSecond = 0;
+        }
+
+        function updateThroughputViz() {
+            throughputData.push(lastSecondCount);
+            if (throughputData.length > maxBars) {
+                throughputData.shift();
+            }
+
+            const viz = document.getElementById('throughputViz');
+            viz.innerHTML = '';
+
+            const maxValue = Math.max(...throughputData, 1);
+            const barWidth = viz.offsetWidth / maxBars;
+
+            throughputData.forEach((value, index) => {
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                bar.style.left = `${index * barWidth}px`;
+                bar.style.height = `${(value / maxValue) * 160}px`;
+                bar.style.width = `${barWidth - 2}px`;
+                viz.appendChild(bar);
+            });
+        }
+
+        function clearEvents() {
+            document.getElementById('eventStream').innerHTML = `
+                <div style="color: #64748b; text-align: center; padding: 20px;">
+                    Events cleared. Stream is ${streamInterval ? 'running' : 'stopped'}.
+                </div>
+            `;
+            eventCount = 0;
+            eventsPerSecond = 0;
+            totalLatency = 0;
+            throughputData = [];
+            updateMetrics();
+        }
+    </script>
+</body>
+</html>

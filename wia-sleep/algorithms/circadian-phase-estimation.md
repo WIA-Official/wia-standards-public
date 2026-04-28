@@ -421,7 +421,6 @@ def calculate_phase_confidence(
 
 ## 10. References
 
-1. 선행 연구. Comparisons of the variability of three markers of the human circadian pacemaker. Journal of Biological Rhythms.
 2. Borbély, A.A. (1982). A two process model of sleep regulation. Human Neurobiology.
 3. Czeisler, C.A., et al. (1989). Bright light induction of strong (type 0) resetting of the human circadian pacemaker. Science.
 

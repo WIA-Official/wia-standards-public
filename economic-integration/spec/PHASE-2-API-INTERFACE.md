@@ -5,237 +5,402 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-economic-integration (Economic Integration).
+This document defines the HTTPS API contract
+that an economic-integration operator (customs
+administration, single-window operator,
+national statistical office, chamber of
+commerce, authorised economic operator,
+freight forwarder, financial institution, or
+economic-union secretariat) exposes for the
+records defined in PHASE-1. The contract
+carries the trade-declaration ingestion, UN/
+EDIFACT message exchange, ISO 20022 payment
+publication, UCP 600 documentary-credit
+publication, certificate-of-origin issuance,
+UN COMTRADE statistics submission, and
+chain-of-custody anchoring endpoints. The API
+is the canonical interoperability layer
+between the operator, the cross-border partner
+agency, the financial institution, the freight
+forwarder, and the trade-statistics
+secretariat.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110, RFC 9111, RFC 9457, RFC 8288,
+  RFC 6901 / 6902, RFC 8259, RFC 4122, RFC
+  9421, RFC 8615
+- W3C Trace Context, W3C ODRL 2.2, W3C VC
+  v2.0
+- ISO/IEC 27001:2022, ISO/IEC 17021-1:2015
+- WCO SAFE Framework, WCO Data Model v3, WCO
+  HS-2022, WCO AEO Programme
+- UN/EDIFACT (ISO 9735-1 to -10), UN/CEFACT
+  Recommendations 1, 16, 21, 33, 36
+- UN COMTRADE submission specification
+- ISO 20022 message family
+- ISO 4217, ISO 3166-1, ISO 9362 (BIC), ISO
+  13616 (IBAN), ISO 17442 (LEI)
+- ICC Incoterms 2020, ICC UCP 600, ICC ISBP
+  745, ICC URDG 758, ICC URBPO 750
+- WTO TFA, WTO GATT 1994, WTO GPA, WTO TRIPS
+- KR 관세법, KR 대외무역법, KR 외국환거래법
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-economic-integration
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published
+by the operator. The OpenAPI 3.1 document at
+`/v1/openapi.json` is canonical. Schema
+changes follow the non-breaking conventions
+in PHASE-1 §2. Every endpoint carries a per-
+request signature using HTTP Message
+Signatures (RFC 9421) anchored to the
+operator's institutional identifier (the
+operator's customs-system trader registration,
+the AEO certificate identifier, or the
+operator's national-authority registration);
+the signature key set is published at
+`/.well-known/wia/economic-integration/keys.
+json`.
 
-## §2 Manifest
+## §2 Root Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "economic-integration"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /v1/
+```
 
-## §3 Conformance Tiers
+```json
+{
+  "standard": "WIA-economic-integration",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":         "/v1/programmes",
+    "declarations":       "/v1/declarations",
+    "edifactMessages":    "/v1/edifact-messages",
+    "paymentRecords":     "/v1/payment-records",
+    "documentaryCredits": "/v1/documentary-credits",
+    "originCertificates": "/v1/origin-certificates",
+    "comtradeFeeds":      "/v1/comtrade-feeds",
+    "custody":            "/v1/custody-events",
+    "openapi":            "/v1/openapi.json",
+    "wellKnown":          "/.well-known/wia/economic-integration"
+  }
+}
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Trade Declaration Endpoints
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+### §3.1 Lodge a declaration
 
-## §4 Discovery
+```
+POST /v1/declarations
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/economic-integration`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Request body carries the §3 record from PHASE-1
+(declarationType, consigneeRef, consignorRef,
+goodsDescription, declaredCustomsValue,
+incoterm, transportDetails). The server
+validates the `goodsDescription[].hsCode`
+against the WCO HS-2022 commodity register;
+an unknown ten-digit code returns `422
+Unprocessable Entity` at `/problems/wco-hs-
+2022-unknown-code` and the offending field's
+JSON Pointer (RFC 6901).
 
-## §5 Time and Identity
+The server validates the `incoterm` against
+the WTO Customs Valuation methods declared in
+`declaredCustomsValue.method`: a `DDP`
+incoterm with a Method 1 transaction value
+that does not include the duty and tax in the
+declared value is rejected as inconsistent
+with the incoterm's risk-and-cost allocation.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### §3.2 Retrieve a declaration
 
-## §6 Versioning and Deprecation
+```
+GET /v1/declarations/{declarationId}
+Accept: application/json
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+### §3.3 Search declarations
 
-## §7 Privacy and Security
+```
+GET /v1/declarations?type={type}
+&hsChapter={chapter}&consigneeLei={lei}
+&lodgedBetween={iso8601}/{iso8601}
+&page={cursor}&size={size}
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+### §3.4 AEO mutual-recognition lookup
 
-## §8 Open Governance
+```
+GET /v1/declarations/{declarationId}/aeo-
+   mutual-recognition
+Accept: application/json
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `economic-integration` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The endpoint returns the consignee's and
+consignor's AEO status against the operator's
+declared mutual-recognition partner list per
+the WCO SAFE Framework MRA register.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §4 UN/EDIFACT Endpoints
 
+### §4.1 Transmit an EDIFACT message
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST /v1/edifact-messages
+Content-Type: application/edifact
+Signature: <RFC 9421 signature>
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+Request body is the complete EDIFACT message
+with the UNB / UNH / UNT / UNZ envelope per
+ISO 9735-1. The server validates the message
+against the declared `edifactDirectory` (D-
+21B) and the declared `messageType` schema
+(the IFTMIN segment table, the CUSDEC segment
+table, the INVOIC segment table).
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+### §4.2 Retrieve an EDIFACT message
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+GET /v1/edifact-messages/{messageId}
+Accept: application/edifact
+```
 
-## Annex F — Adoption Roadmap
+### §4.3 Translate EDIFACT to UN/CEFACT XML
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+GET /v1/edifact-messages/{messageId}/cefact-xml
+Accept: application/xml
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The server returns the UN/CEFACT XML
+representation per the per-message XML
+schema published by UN/CEFACT.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §5 ISO 20022 Payment Endpoints
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+### §5.1 Instruct a payment
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+POST /v1/payment-records
+Content-Type: application/json
+Signature: <RFC 9421 signature from the
+            initiating financial institution's
+            BIC>
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Request body carries the §5 record from PHASE-1
+(iso20022Message, initiatingParty,
+beneficiaryParty, instructedAmount,
+paymentPurpose, uniqueEnd-toEndTransactionRef).
+The server validates the `iso20022Message`
+against the operator's declared message
+family and the per-message ISO 20022 schema.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The `uniqueEnd-toEndTransactionRef` (UETR)
+follows the SWIFT GPI discipline so that the
+per-payment leg can be tracked across the
+correspondent-banking chain.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+### §5.2 Retrieve a payment record
 
-## Annex H — Versioning and Deprecation Policy
+```
+GET /v1/payment-records/{paymentId}
+Accept: application/json
+```
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+The response carries the per-leg status
+(initiated, in-transit-via-correspondent,
+beneficiary-credited, returned, rejected) so
+that the consumer can track the cross-border
+payment.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §6 Documentary Credit Endpoints
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+### §6.1 Issue a documentary credit
 
-## Annex I — Interoperability Profiles
+```
+POST /v1/documentary-credits
+Content-Type: application/json
+Signature: <RFC 9421 signature from the
+            issuing bank's BIC>
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Request body carries the §6 record from PHASE-1
+(creditType, issuingBank, beneficiaryBank,
+applicantRef, beneficiaryRef, creditAmount,
+expirePlace, expiryDate, documentsRequired,
+isbpProfile).
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+### §6.2 Present documents under a credit
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+```
+POST /v1/documentary-credits/{creditId}/
+   documents
+Content-Type: multipart/form-data; boundary=...
+Signature: <RFC 9421 signature from the
+            beneficiary or its bank>
+```
+
+The multipart body carries the per-document
+attachments listed in `documentsRequired`. The
+server records the presentation timestamp and
+the per-document compliance state per UCP
+600 Articles 14-16.
+
+### §6.3 Retrieve a documentary credit
+
+```
+GET /v1/documentary-credits/{creditId}
+Accept: application/json
+```
+
+## §7 Certificate-of-Origin Endpoints
+
+### §7.1 Issue an origin certificate
+
+```
+POST /v1/origin-certificates
+Content-Type: application/json
+Signature: <RFC 9421 signature from the
+            issuing chamber of commerce or
+            competent authority>
+```
+
+Request body carries the §7 record from PHASE-1
+(issuingChamberRef, beneficiaryRef,
+goodsDescription, agreementRef,
+validityPeriod). The server validates the
+`agreementRef` against the operator's
+declared preferential-trade agreement set.
+
+### §7.2 Retrieve an origin certificate
+
+```
+GET /v1/origin-certificates/{certificateId}
+Accept: application/json
+```
+
+## §8 UN COMTRADE Submission Endpoints
+
+### §8.1 Submit a per-period dataset
+
+```
+POST /v1/comtrade-feeds
+Content-Type: application/json
+Signature: <RFC 9421 signature from the
+            national statistical office>
+```
+
+Request body carries the per-period dataset
+(month, quarter, year). The server validates
+the per-row commodity code against the WCO
+HS-2022 commodity register and the partner-
+country code against ISO 3166-1.
+
+### §8.2 Retrieve a UN COMTRADE feed
+
+```
+GET /v1/comtrade-feeds/{feedId}
+Accept: application/json | text/csv
+```
+
+## §9 Custody and Error Reporting
+
+### §9.1 Anchor a custody event
+
+```
+POST /v1/custody-events
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+### §9.2 Error envelope
+
+Errors are returned using RFC 9457 Problem
+Details. Validation errors carry a `pointer`
+field (RFC 6901). The server emits a per-
+request `traceparent` header (W3C Trace
+Context).
+
+## §10 Concurrency and Cache Discipline
+
+Every retrieval endpoint emits an `ETag`
+header (RFC 9110 §8.8.3). Conditional
+requests are honoured.
+
+## §11 Bulk Export for Trade-Statistics
+       Aggregators
+
+```
+GET /v1/declarations:bulk
+Accept: application/x-ndjson
+Authorization: <bearer token from a national
+                 statistical office or an
+                 international trade
+                 organisation>
+```
+
+A national statistical office or an inter-
+national trade organisation runs a bulk
+ingest of the operator's declaration register.
+
+## §12 Single-Window Federation
+
+```
+POST /v1/declarations/{declarationId}/single-
+   window-route
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+A trade-facilitation single-window operator
+participating in a regional single-window
+network (the ASEAN Single Window, the EU
+Customs Single Window) routes the declaration
+to the relevant peer authority's intake
+endpoint per UN/CEFACT Recommendation 36.
+
+## §13 Schema-Validation and Conformance
+
+The OpenAPI 3.1 document at `/v1/openapi.json`
+carries JSON Schema 2020-12 schemas. The
+EDIFACT endpoint follows the ISO 9735-1
+syntax rules and the per-directory message
+schemas. The ISO 20022 endpoints follow the
+per-message ISO 20022 schemas published by
+the SWIFT MyStandards reference set.
+
+```
+GET /v1/conformance/test-vectors
+Accept: application/json
+```
+
+The operator publishes the conformance test
+vectors used to qualify the API implementation.
+Each vector references the relevant WCO Data
+Model, UN/EDIFACT directory, ISO 20022
+message, ICC UCP 600, or WTO TFA clause.
+
+## §14 Webhook Endpoint for Customs-Decision Notifications
+
+```
+POST /v1/programmes/{programmeId}/webhooks
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+A trader, a freight forwarder, or a financial
+institution registers a webhook to receive a
+push notification when a customs decision
+(release, hold, query, seizure) is recorded
+on a declaration that the registrant is bound
+to.

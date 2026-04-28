@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 8: Production Systems | WIA-AI-024</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 3rem 2rem; border-bottom: 3px solid #10B981; margin-bottom: 3rem; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 1rem; }
+        .chapter-info { color: #94a3b8; font-size: 1.1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin: 2.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin: 1.5rem 0 0.8rem 0; }
+        p { margin: 1rem 0; color: #cbd5e1; }
+        .code-block { background: #1e293b; border: 1px solid #334155; border-left: 4px solid #10B981; border-radius: 6px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.95rem; line-height: 1.6; }
+        .highlight { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 1.5rem 0; border-radius: 4px; }
+        .example { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; }
+        .example-title { color: #10B981; font-weight: 600; margin-bottom: 1rem; font-size: 1.1rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: #cbd5e1; }
+        li { margin: 0.5rem 0; }
+        .nav { display: flex; justify-content: space-between; margin: 3rem 0; padding: 1.5rem; background: #1e293b; border-radius: 8px; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: 600; }
+        .summary { background: #1e293b; border: 2px solid #10B981; border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review { background: #1e293b; border: 2px solid #3b82f6; border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+        .review h2 { color: #3b82f6; border-bottom: none; margin-top: 0; }
+        .philosophy { text-align: center; padding: 2rem; background: linear-gradient(135deg, #10B981 0%, #059669 100%); border-radius: 8px; margin: 3rem 0; color: white; font-size: 1.2rem; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border: 1px solid #334155; }
+        th { background: #334155; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🚀 Chapter 8: Production Recommendation Systems</h1>
+            <div class="chapter-info">WIA-AI-024 Recommendation AI Standard</div>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>🎯 From Research to Reality</h2>
+        <p>
+            Building recommendation systems in production is fundamentally different from research prototypes. You must handle millions of users, serve recommendations in milliseconds, adapt to changing preferences in real-time, monitor for failures, and ensure fairness and privacy—all while maintaining 99.9% uptime.
+        </p>
+        <p>
+            This chapter covers the architecture, infrastructure, deployment strategies, monitoring, and operational considerations for production recommendation systems at scale.
+        </p>
+
+        <div class="highlight">
+            <strong>Core Principle:</strong> Production systems prioritize reliability, latency, and maintainability over model complexity. A simple model that serves consistently beats a sophisticated model that fails.
+        </div>
+
+        <h2>🏗️ System Architecture</h2>
+        <p>
+            Modern recommendation systems follow a multi-stage architecture:
+        </p>
+
+        <h3>Stage 1: Candidate Generation</h3>
+        <p>
+            Quickly retrieve hundreds to thousands of candidates from millions of items. Uses fast retrieval methods like nearest neighbor search, collaborative filtering, or simple rules.
+        </p>
+
+        <h3>Stage 2: Ranking</h3>
+        <p>
+            Apply more sophisticated models to score and rank candidates. Can use deep learning, ensemble methods, or complex features.
+        </p>
+
+        <h3>Stage 3: Filtering & Business Logic</h3>
+        <p>
+            Apply business rules, diversity constraints, legal requirements, and user preferences.
+        </p>
+
+        <h3>Stage 4: Serving</h3>
+        <p>
+            Return formatted results with explanations, metadata, and tracking information.
+        </p>
+
+        <div class="code-block">
+<code>// Production recommendation pipeline
+interface RecommendationRequest {
+    userId: string;
+    context: {
+        device: string;
+        location?: string;
+        timeOfDay: string;
+        sessionId: string;
+    };
+    count: number;
+    filters?: {
+        categories?: string[];
+        priceRange?: [number, number];
+        excludeItems?: string[];
+    };
+}
+
+interface RecommendationResponse {
+    items: Array<{
+        itemId: string;
+        score: number;
+        reason: string;
+        metadata: any;
+    }>;
+    requestId: string;
+    latencyMs: number;
+}
+
+class ProductionRecommendationPipeline {
+    private candidateGenerator: CandidateGenerator;
+    private ranker: Ranker;
+    private filterEngine: FilterEngine;
+    private logger: Logger;
+    private cache: Cache;
+
+    async recommend(request: RecommendationRequest): Promise<RecommendationResponse> {
+        const startTime = Date.now();
+        const requestId = this.generateRequestId();
+
+        try {
+            // Try cache first
+            const cached = await this.cache.get(this.getCacheKey(request));
+            if (cached) {
+                this.logger.info('Cache hit', { requestId, userId: request.userId });
+                return cached;
+            }
+
+            // Stage 1: Candidate Generation (100-1000 items)
+            const candidates = await this.candidateGenerator.generate(
+                request.userId,
+                request.context,
+                1000
+            );
+
+            // Stage 2: Ranking (score all candidates)
+            const ranked = await this.ranker.rank(
+                request.userId,
+                candidates,
+                request.context
+            );
+
+            // Stage 3: Filtering (apply business rules)
+            const filtered = this.filterEngine.apply(ranked, request.filters);
+
+            // Stage 4: Prepare response
+            const topItems = filtered.slice(0, request.count);
+
+            const response: RecommendationResponse = {
+                items: topItems.map(item => ({
+                    itemId: item.id,
+                    score: item.score,
+                    reason: item.explanation,
+                    metadata: item.metadata
+                })),
+                requestId,
+                latencyMs: Date.now() - startTime
+            };
+
+            // Cache result
+            await this.cache.set(this.getCacheKey(request), response, 300); // 5 min TTL
+
+            // Log metrics
+            this.logger.info('Recommendation served', {
+                requestId,
+                userId: request.userId,
+                latencyMs: response.latencyMs,
+                itemCount: response.items.length
+            });
+
+            return response;
+
+        } catch (error) {
+            this.logger.error('Recommendation failed', {
+                requestId,
+                userId: request.userId,
+                error
+            });
+
+            // Fallback to popular items
+            return this.getFallbackRecommendations(request, requestId);
+        }
+    }
+
+    private generateRequestId(): string {
+        return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    private getCacheKey(request: RecommendationRequest): string {
+        return `rec:${request.userId}:${request.count}:${JSON.stringify(request.filters || {})}`;
+    }
+
+    private getFallbackRecommendations(
+        request: RecommendationRequest,
+        requestId: string
+    ): RecommendationResponse {
+        // Return popular items as fallback
+        return {
+            items: [],
+            requestId,
+            latencyMs: 0
+        };
+    }
+}
+
+// Placeholder classes
+class CandidateGenerator {
+    async generate(userId: string, context: any, count: number): Promise<any[]> {
+        return [];
+    }
+}
+
+class Ranker {
+    async rank(userId: string, candidates: any[], context: any): Promise<any[]> {
+        return [];
+    }
+}
+
+class FilterEngine {
+    apply(items: any[], filters: any): any[] {
+        return items;
+    }
+}
+
+class Logger {
+    info(message: string, meta: any) {}
+    error(message: string, meta: any) {}
+}
+
+class Cache {
+    async get(key: string): Promise<any> { return null; }
+    async set(key: string, value: any, ttl: number) {}
+}</code>
+        </div>
+
+        <h2>⚡ Latency Optimization</h2>
+        <p>
+            Users expect recommendations in 50-200ms. Achieving this requires multiple strategies:
+        </p>
+
+        <h3>1. Caching Strategies</h3>
+        <ul>
+            <li><strong>User-level cache:</strong> Cache recommendations per user (short TTL)</li>
+            <li><strong>Item-level cache:</strong> Cache item features and similarities</li>
+            <li><strong>Model cache:</strong> Cache model predictions for common inputs</li>
+            <li><strong>Partial computation:</strong> Precompute item embeddings, similarities</li>
+        </ul>
+
+        <h3>2. Approximate Methods</h3>
+        <ul>
+            <li><strong>ANN (Approximate Nearest Neighbors):</strong> FAISS, Annoy, HNSW</li>
+            <li><strong>Quantization:</strong> Reduce precision for faster computation</li>
+            <li><strong>Model compression:</strong> Distillation, pruning, quantization</li>
+        </ul>
+
+        <h3>3. Asynchronous Processing</h3>
+        <ul>
+            <li><strong>Pre-computation:</strong> Generate recommendations offline for known users</li>
+            <li><strong>Background updates:</strong> Update models without blocking requests</li>
+            <li><strong>Event-driven:</strong> Trigger recomputation on user actions</li>
+        </ul>
+
+        <div class="code-block">
+<code>// Fast nearest neighbor search using approximation
+class FastSimilaritySearch {
+    private index: Map<string, number[]>;
+    private buckets: Map<string, Set<string>>;
+    private numBuckets: number = 100;
+
+    constructor() {
+        this.index = new Map();
+        this.buckets = new Map();
+    }
+
+    // Locality-Sensitive Hashing for fast approximate search
+    addItem(itemId: string, vector: number[]): void {
+        this.index.set(itemId, vector);
+
+        // Hash to buckets
+        const hash = this.lshHash(vector);
+        if (!this.buckets.has(hash)) {
+            this.buckets.set(hash, new Set());
+        }
+        this.buckets.get(hash)!.add(itemId);
+    }
+
+    // Fast approximate k-NN search
+    findSimilar(queryVector: number[], k: number = 10): Array<{itemId: string, similarity: number}> {
+        const hash = this.lshHash(queryVector);
+        const candidates = this.buckets.get(hash) || new Set();
+
+        // If bucket is empty or too small, check neighboring buckets
+        if (candidates.size < k * 2) {
+            // Expand search to all items (fallback)
+            candidates.clear();
+            for (const itemId of this.index.keys()) {
+                candidates.add(itemId);
+            }
+        }
+
+        // Compute exact similarities for candidates
+        const similarities: Array<{itemId: string, similarity: number}> = [];
+        for (const itemId of candidates) {
+            const itemVector = this.index.get(itemId)!;
+            const sim = this.cosineSimilarity(queryVector, itemVector);
+            similarities.push({ itemId, similarity: sim });
+        }
+
+        return similarities
+            .sort((a, b) => b.similarity - a.similarity)
+            .slice(0, k);
+    }
+
+    private lshHash(vector: number[]): string {
+        // Simple LSH: project onto random hyperplanes
+        let hash = '';
+        for (let i = 0; i < 10; i++) {
+            const projection = vector.reduce((sum, val, idx) => {
+                // Use deterministic pseudo-random projection
+                const weight = Math.sin(idx * i);
+                return sum + val * weight;
+            }, 0);
+            hash += projection > 0 ? '1' : '0';
+        }
+        return hash;
+    }
+
+    private cosineSimilarity(a: number[], b: number[]): number {
+        let dot = 0, magA = 0, magB = 0;
+        for (let i = 0; i < a.length; i++) {
+            dot += a[i] * b[i];
+            magA += a[i] * a[i];
+            magB += b[i] * b[i];
+        }
+        return dot / (Math.sqrt(magA) * Math.sqrt(magB) + 1e-8);
+    }
+}</code>
+        </div>
+
+        <h2>🔄 Real-Time Updates</h2>
+        <p>
+            User preferences change constantly. Production systems must adapt:
+        </p>
+
+        <h3>Online Learning</h3>
+        <p>
+            Update models incrementally as new data arrives without full retraining:
+        </p>
+
+        <div class="code-block">
+<code>// Online learning for recommendations
+class OnlineRecommender {
+    private userFactors: Map<string, number[]>;
+    private itemFactors: Map<string, number[]>;
+    private learningRate: number = 0.01;
+
+    // Update model with new interaction
+    updateOnInteraction(
+        userId: string,
+        itemId: string,
+        feedback: number  // 1 for positive, 0 for negative
+    ): void {
+        let userVec = this.userFactors.get(userId);
+        let itemVec = this.itemFactors.get(itemId);
+
+        // Initialize if new
+        if (!userVec) {
+            userVec = this.randomVector(50);
+            this.userFactors.set(userId, userVec);
+        }
+
+        if (!itemVec) {
+            itemVec = this.randomVector(50);
+            this.itemFactors.set(itemId, itemVec);
+        }
+
+        // Predict and compute error
+        const prediction = this.dotProduct(userVec, itemVec);
+        const error = feedback - this.sigmoid(prediction);
+
+        // Gradient update
+        for (let i = 0; i < userVec.length; i++) {
+            const userGrad = error * itemVec[i];
+            const itemGrad = error * userVec[i];
+
+            userVec[i] += this.learningRate * userGrad;
+            itemVec[i] += this.learningRate * itemGrad;
+        }
+    }
+
+    private randomVector(dim: number): number[] {
+        return Array.from({ length: dim }, () => (Math.random() - 0.5) * 0.1);
+    }
+
+    private dotProduct(a: number[], b: number[]): number {
+        return a.reduce((sum, val, i) => sum + val * b[i], 0);
+    }
+
+    private sigmoid(x: number): number {
+        return 1 / (1 + Math.exp(-x));
+    }
+}</code>
+        </div>
+
+        <h2>📊 Monitoring & Observability</h2>
+        <p>
+            Production systems require comprehensive monitoring:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric Type</th>
+                    <th>Examples</th>
+                    <th>Alert Threshold</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Latency</strong></td>
+                    <td>P50, P95, P99 response time</td>
+                    <td>P95 > 200ms</td>
+                </tr>
+                <tr>
+                    <td><strong>Availability</strong></td>
+                    <td>Success rate, error rate</td>
+                    <td>Error rate > 1%</td>
+                </tr>
+                <tr>
+                    <td><strong>Quality</strong></td>
+                    <td>CTR, conversion, diversity</td>
+                    <td>CTR drops > 10%</td>
+                </tr>
+                <tr>
+                    <td><strong>Freshness</strong></td>
+                    <td>Model age, data lag</td>
+                    <td>Model > 24h old</td>
+                </tr>
+                <tr>
+                    <td><strong>Coverage</strong></td>
+                    <td>% users/items recommended</td>
+                    <td>Coverage < 80%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>🛡️ Reliability & Fault Tolerance</h2>
+
+        <h3>Fallback Strategies</h3>
+        <ul>
+            <li><strong>Popular items:</strong> When personalization fails</li>
+            <li><strong>Cached recommendations:</strong> Serve stale data if fresh fails</li>
+            <li><strong>Rule-based:</strong> Simple rules as last resort</li>
+            <li><strong>Multi-model:</strong> Switch to backup model on failure</li>
+        </ul>
+
+        <h3>Circuit Breakers</h3>
+        <p>
+            Prevent cascading failures by breaking calls to failing services:
+        </p>
+
+        <div class="code-block">
+<code>// Circuit breaker pattern for recommendations
+class CircuitBreaker {
+    private failures: number = 0;
+    private lastFailure: number = 0;
+    private state: 'closed' | 'open' | 'half-open' = 'closed';
+    private threshold: number = 5;
+    private timeout: number = 60000; // 1 minute
+
+    async call<T>(fn: () => Promise<T>, fallback: () => T): Promise<T> {
+        if (this.state === 'open') {
+            // Check if timeout has passed
+            if (Date.now() - this.lastFailure > this.timeout) {
+                this.state = 'half-open';
+            } else {
+                console.log('Circuit breaker open, using fallback');
+                return fallback();
+            }
+        }
+
+        try {
+            const result = await fn();
+
+            // Success - reset if half-open
+            if (this.state === 'half-open') {
+                this.state = 'closed';
+                this.failures = 0;
+            }
+
+            return result;
+
+        } catch (error) {
+            this.failures++;
+            this.lastFailure = Date.now();
+
+            if (this.failures >= this.threshold) {
+                this.state = 'open';
+                console.log('Circuit breaker opened due to failures');
+            }
+
+            return fallback();
+        }
+    }
+}</code>
+        </div>
+
+        <h2>📈 A/B Testing Infrastructure</h2>
+        <p>
+            Continuous experimentation is essential for improvement:
+        </p>
+
+        <div class="code-block">
+<code>// A/B testing framework
+class ABTestingFramework {
+    private experiments: Map<string, Experiment> = new Map();
+
+    registerExperiment(experiment: Experiment): void {
+        this.experiments.set(experiment.id, experiment);
+    }
+
+    // Assign user to variant
+    getVariant(experimentId: string, userId: string): string {
+        const experiment = this.experiments.get(experimentId);
+        if (!experiment || !experiment.active) {
+            return 'control';
+        }
+
+        // Consistent hashing for stable assignment
+        const hash = this.hashCode(userId + experimentId);
+        const bucket = hash % 100;
+
+        let cumulative = 0;
+        for (const [variant, percentage] of Object.entries(experiment.variants)) {
+            cumulative += percentage;
+            if (bucket < cumulative) {
+                return variant;
+            }
+        }
+
+        return 'control';
+    }
+
+    // Log experiment exposure
+    logExposure(experimentId: string, userId: string, variant: string): void {
+        // Send to analytics
+        console.log('Experiment exposure:', { experimentId, userId, variant });
+    }
+
+    // Log experiment outcome
+    logOutcome(experimentId: string, userId: string, metric: string, value: number): void {
+        // Send to analytics
+        console.log('Experiment outcome:', { experimentId, userId, metric, value });
+    }
+
+    private hashCode(str: string): number {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash |= 0; // Convert to 32-bit integer
+        }
+        return Math.abs(hash);
+    }
+}
+
+interface Experiment {
+    id: string;
+    name: string;
+    active: boolean;
+    variants: {
+        control: number;    // percentage (0-100)
+        treatment: number;  // percentage (0-100)
+    };
+}</code>
+        </div>
+
+        <h2>🔒 Privacy & Ethics</h2>
+        <p>
+            Production systems must respect user privacy and avoid harmful biases:
+        </p>
+
+        <h3>Privacy Considerations</h3>
+        <ul>
+            <li><strong>Data minimization:</strong> Collect only necessary data</li>
+            <li><strong>Anonymization:</strong> Remove or hash PII where possible</li>
+            <li><strong>User control:</strong> Allow opt-out and data deletion</li>
+            <li><strong>Encryption:</strong> Encrypt data in transit and at rest</li>
+            <li><strong>Federated learning:</strong> Train without centralizing data</li>
+        </ul>
+
+        <h3>Fairness & Bias</h3>
+        <ul>
+            <li><strong>Diverse training data:</strong> Ensure representation</li>
+            <li><strong>Bias detection:</strong> Monitor for discriminatory patterns</li>
+            <li><strong>Fair ranking:</strong> Apply fairness constraints</li>
+            <li><strong>Transparency:</strong> Explain recommendations</li>
+        </ul>
+
+        <h2>🚀 Deployment Strategies</h2>
+
+        <h3>Blue-Green Deployment</h3>
+        <p>
+            Maintain two identical production environments, switch traffic instantly:
+        </p>
+
+        <h3>Canary Releases</h3>
+        <p>
+            Gradually roll out to increasing percentages of users:
+        </p>
+
+        <h3>Shadow Mode</h3>
+        <p>
+            Run new model alongside production, compare offline before switching:
+        </p>
+
+        <div class="example">
+            <div class="example-title">🎬 Netflix's Production Stack</div>
+            <ul>
+                <li><strong>Offline training:</strong> Spark for batch model training</li>
+                <li><strong>Online serving:</strong> Microservices on AWS</li>
+                <li><strong>Caching:</strong> EVCache (Memcached) for low latency</li>
+                <li><strong>A/B testing:</strong> Custom experimentation platform</li>
+                <li><strong>Monitoring:</strong> Custom metrics and alerting</li>
+                <li><strong>Data pipeline:</strong> Kafka for real-time events</li>
+            </ul>
+        </div>
+
+        <h2>📚 Technology Stack</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Technologies</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Training</strong></td>
+                    <td>TensorFlow, PyTorch, Spark MLlib</td>
+                </tr>
+                <tr>
+                    <td><strong>Serving</strong></td>
+                    <td>TensorFlow Serving, TorchServe, ONNX</td>
+                </tr>
+                <tr>
+                    <td><strong>Feature Store</strong></td>
+                    <td>Feast, Tecton, Hopsworks</td>
+                </tr>
+                <tr>
+                    <td><strong>Vector Search</strong></td>
+                    <td>FAISS, Milvus, Pinecone</td>
+                </tr>
+                <tr>
+                    <td><strong>Caching</strong></td>
+                    <td>Redis, Memcached</td>
+                </tr>
+                <tr>
+                    <td><strong>Orchestration</strong></td>
+                    <td>Kubernetes, Airflow</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="summary">
+            <h2>📝 Summary</h2>
+            <ul>
+                <li>Production systems require multi-stage architecture: candidate generation, ranking, filtering</li>
+                <li>Latency optimization uses caching, approximation, and pre-computation</li>
+                <li>Real-time adaptation through online learning and incremental updates</li>
+                <li>Comprehensive monitoring of latency, quality, and availability</li>
+                <li>Reliability through fallbacks, circuit breakers, and graceful degradation</li>
+                <li>Continuous experimentation via A/B testing infrastructure</li>
+                <li>Privacy and fairness must be built in from the start</li>
+                <li>Deployment requires careful rollout strategies and monitoring</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>🤔 Review Questions</h2>
+            <ol>
+                <li>Why use a multi-stage architecture for recommendations?</li>
+                <li>What are the main strategies for achieving sub-200ms latency?</li>
+                <li>How does online learning differ from batch training?</li>
+                <li>What metrics should you monitor in a production recommendation system?</li>
+                <li>Explain the circuit breaker pattern and when to use it.</li>
+                <li>How do you implement consistent A/B test assignment?</li>
+                <li>What privacy considerations matter for recommendation systems?</li>
+                <li>Compare blue-green deployment and canary releases.</li>
+                <li>Design a monitoring dashboard for a recommendation system.</li>
+                <li>How would you handle a production outage in your recommendation service?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) · Benefit All Humanity<br>
+            <span style="font-size: 0.9rem; margin-top: 0.5rem; display: block; opacity: 0.9;">
+                Build systems that are reliable, fair, and respectful of user trust
+            </span>
+        </div>
+
+        </div>
+</body>
+</html>

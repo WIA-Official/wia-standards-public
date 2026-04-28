@@ -1,241 +1,368 @@
-# WIA-data-integration PHASE 3 — PROTOCOL Specification
+# WIA-data-integration PHASE 3 — Protocol Specification
 
 **Standard:** WIA-data-integration
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-data-integration (Data Integration).
+This document defines the protocols that govern
+a data-integration operator across the source-
+to-schema-to-mapping-to-master-to-quality value
+chain: the ISO/IEC 11179 metadata-registry
+discipline that anchors every per-source schema
+descriptor, the W3C R2RML mapping discipline
+that publishes the relational-to-RDF mapping,
+the ISO 8000-110 master-data exchange
+discipline that gates the cross-organisation
+master-data publication, the ISO/IEC 25012
+data-quality discipline that scores every per-
+flow measurement, the ISO/IEC 19763 metamodel-
+framework discipline that anchors the
+operator's metadata interoperability, the W3C
+PROV-O lineage discipline that prevents silent
+mutation of the per-flow transformation, the
+chain-of-custody anchoring discipline, the
+per-jurisdiction privacy discipline, and the
+DAMA DMBoK governance discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO/IEC 11179 series (Parts 1, 3, 5, 6),
+  ISO 8000-1:2022, ISO 8000-2:2024, ISO
+  8000-100:2016, ISO 8000-110:2021, ISO
+  8000-115:2018
+- ISO/IEC 25012:2008, ISO/IEC 25024:2015,
+  ISO/IEC 19763, ISO/IEC 27001:2022
+- W3C R2RML, W3C SPARQL 1.1, W3C RDF 1.1,
+  W3C OWL 2, W3C JSON-LD 1.1, W3C SHACL,
+  W3C SKOS, W3C DCAT v3, W3C PROV-O
+- DAMA DMBoK 2nd edition
+- HL7 FHIR R5 (where applicable)
+- IETF RFC 9110, RFC 9421, RFC 9457, RFC
+  6234, RFC 8615, RFC 6962
+- W3C Trace Context
+- EU GDPR (Regulation (EU) 2016/679), KR
+  개인정보 보호법, KR 데이터기반행정 활성화에
+  관한 법률, KR 공공데이터의 제공 및 이용 활
+  성화에 관한 법률
 
 ---
 
-## §1 Scope
+## §1 ISO/IEC 11179 Metadata-Registry Discipline
 
-This PHASE document is one of four that together define the WIA-data-integration
-standard. It addresses the protocol layer of the standard.
+### §1.1 Per-element naming discipline
 
-## §2 Manifest
+Every per-source data element carries a name
+conforming to the ISO/IEC 11179-5:2015 naming
+conventions — the operator declares the
+naming convention (the "object class word"
+discipline, the "property word" discipline,
+the "representation term" discipline) at the
+programme level, and the operator's API
+enforces the convention on each per-element
+publication.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "data-integration"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+### §1.2 Per-element registration authority
 
-## §3 Conformance Tiers
+Every per-element record is bound to a
+registration authority per ISO/IEC 11179-6:
+2023. The registration authority's
+designation is published with the per-element
+record so that a downstream consumer can
+verify the per-element provenance.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+### §1.3 Conceptual-and-value-domain separation
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Every per-element record separates the
+conceptual domain (the per-element semantic
+meaning) from the value domain (the per-
+element representation). The separation is
+canonical per ISO/IEC 11179-3 and is
+enforced by the operator's API.
 
-## §4 Discovery
+## §2 W3C R2RML Mapping Discipline
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/data-integration`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+### §2.1 Per-mapping evidence
 
-## §5 Time and Identity
+Every per-source-and-per-ontology mapping
+publishes the per-mapping R2RML document as
+a Turtle, RDF/XML, or JSON-LD encoding. The
+per-mapping document is parsed and validated
+against the W3C R2RML grammar; an invalid
+mapping is rejected.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### §2.2 Per-virtual-graph endpoint
 
-## §6 Versioning and Deprecation
+The operator's API publishes the per-mapping
+W3C SPARQL 1.1 endpoint that exposes the
+mapping's virtual graph. The endpoint enforces
+the per-query timeout and the per-query
+result-size limit declared in the operator's
+resource-governance policy.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+### §2.3 Per-mapping ontology versioning
 
-## §7 Privacy and Security
+A per-mapping ontology revision (a new W3C
+OWL 2 ontology release, a new SKOS concept-
+scheme release) triggers an internal review
+cycle in the operator's quality-management
+discipline before the new revision is bound
+into the mapping.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §3 ISO 8000-110 Master-Data Exchange Discipline
 
-## §8 Open Governance
+### §3.1 Per-exchange conformance level
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `data-integration` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The operator declares the per-exchange
+conformance level — level-1-syntactic, level-
+2-semantic, or level-3-quality — per ISO
+8000-110. The conformance level gates the
+downstream consumer's trust envelope; a
+level-1 exchange is not trusted for direct
+analytics consumption without an additional
+operator-declared quality envelope.
+
+### §3.2 Per-exchange data-specification reference
+
+Every level-2 or level-3 exchange references
+a per-exchange data-specification document.
+The data-specification document carries the
+per-element semantic encoding and the per-
+element value-domain reference. The operator's
+API publishes the data-specification document
+under a content-addressable URI.
+
+### §3.3 Per-exchange quality-identifier binding
+
+A level-3 exchange binds the per-exchange
+quality-identifier per ISO 8000-115. The
+quality identifier carries the per-exchange
+quality measurement reference and the per-
+exchange quality-attestation envelope.
+
+## §4 ISO/IEC 25012 Data-Quality Discipline
+
+### §4.1 Per-characteristic measurement
+
+Every per-flow data-quality measurement is
+bound to one of the ISO/IEC 25012:2008
+quality characteristics. The measurement
+function is per ISO/IEC 25024:2015; the
+operator's API records the per-measurement
+function declaration.
+
+### §4.2 Per-baseline threshold
+
+The operator declares the per-quality-
+characteristic baseline at the programme
+level; a per-flow measurement falling below
+the baseline triggers a per-flow remediation
+envelope.
+
+### §4.3 Per-flow trend tracking
+
+The operator's API publishes the per-flow
+quality-trend envelope so that a per-flow
+deterioration is detectable across periods.
+
+## §5 ISO/IEC 19763 Metamodel-Framework Discipline
+
+The operator declares the per-programme
+metadata-interoperability metamodel per
+ISO/IEC 19763 so that a downstream consumer
+can deterministically interpret the per-
+source schema and the per-mapping ontology.
+
+## §6 W3C PROV-O Lineage Discipline
+
+### §6.1 Per-flow lineage graph
+
+Every per-flow transformation publishes the
+per-flow PROV-O lineage graph. The graph
+records the per-flow upstream-source
+dependency, the per-flow transformation
+envelope (the per-step transformation rule,
+the per-step parameter envelope), and the
+per-flow downstream-consumer dependency.
+
+### §6.2 Per-flow signing
+
+The lineage graph is signed by the operator's
+signing-key set so that a downstream
+consumer can verify the lineage envelope
+without contacting the operator directly.
+
+## §7 Chain-of-Custody Anchoring Discipline
+
+### §7.1 Per-event transparency log
+
+Every chain-of-custody event carried by
+PHASE-1 §8 is appended to a per-operator
+transparency log modelled on the IETF RFC 6962
+Certificate Transparency append-only-log
+structure.
+
+### §7.2 Mutation prevention
+
+A custody event cannot be retroactively
+edited; an amendment is recorded as a new
+event with `previousEventRef` pointing at the
+event being amended.
+
+## §8 Privacy Discipline
+
+### §8.1 GDPR / KR 개인정보 보호법 binding
+
+A per-flow envelope processing personal data
+is bound to the relevant per-jurisdiction
+privacy framework. A per-flow processing
+under EU jurisdiction is bound to GDPR
+Articles 6 (lawful basis), 9 (special-
+category data where applicable), 12-22 (data
+subject rights), 24-30 (controller
+obligations), 32-34 (security and breach
+notification). A per-flow processing under
+KR jurisdiction is bound to KR 개인정보 보호법
+§15, §17, §18, §28-2, and §35.
+
+### §8.2 Per-flow purpose limitation
+
+Every per-flow envelope carries the per-flow
+purpose declaration. A per-flow processing
+beyond the declared purpose is rejected with
+`403 Forbidden` at `/problems/per-flow-
+purpose-mismatch`.
+
+### §8.3 Per-flow pseudonymisation
+
+A per-flow envelope carrying personal data
+applies the per-flow pseudonymisation
+declared in the operator's privacy
+discipline. The per-flow re-identification
+table is held in the operator's identity
+vault and is access-gated.
+
+## §9 DAMA DMBoK Governance Discipline
+
+The operator declares the per-programme
+governance-and-management envelope per the
+DAMA DMBoK 2nd edition functional-framework
+domains (Data Governance, Data Architecture,
+Data Modeling and Design, Data Storage and
+Operations, Data Security, Data Integration
+and Interoperability, Documents and Content,
+Reference and Master Data, Data Warehousing
+and Business Intelligence, Metadata, Data
+Quality).
+
+## §10 KR-Jurisdiction Discipline
+
+### §10.1 KR 데이터기반행정 binding
+
+A KR-jurisdiction public-sector operator is
+bound to the KR 데이터기반행정 활성화에 관한
+법률 (Act on Promotion of Data-Based
+Administration). The operator's API publishes
+the per-period administrative-data envelope
+to the KR Ministry of the Interior and
+Safety's data-based-administration platform.
+
+### §10.2 KR 공공데이터법 binding
+
+A KR-jurisdiction public-sector operator
+publishing open-data is bound to the KR
+공공데이터의 제공 및 이용 활성화에 관한 법률
+(Act on Promotion of the Provision and Use
+of Public Data). The operator's API publishes
+the per-dataset envelope to the KR Open Data
+Portal operated by the Ministry of the
+Interior and Safety.
+
+### §10.3 KR-MyData binding
+
+A KR financial-services operator publishing
+the per-customer MyData envelope is bound to
+the KR 신용정보의 이용 및 보호에 관한 법률
+(Credit Information Use and Protection Act)
+and the KR Financial Services Commission's
+MyData supervision regulation.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## §11 Schema-Evolution Discipline
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+A per-source schema revision (a per-element
+addition, a per-element deprecation, a per-
+element semantic redefinition) is bound to
+the operator's schema-evolution discipline.
+A non-breaking change (an additive per-element
+addition, an optional per-element addition)
+is published with a minor-version bump; a
+breaking change (a per-element removal, a
+per-element semantic redefinition, a per-
+element value-domain restriction) is published
+with a major-version bump and a per-revision
+deprecation envelope declaring the per-
+revision sunset window.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## §12 Per-Schema Backwards-Compatibility Discipline
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The operator's API publishes the per-schema
+backwards-compatibility envelope per the
+operator's schema-evolution discipline. A per-
+flow consumer subscribed to the per-schema
+webhook receives the per-revision sunset
+notice and runs the per-flow migration before
+the sunset window closes.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §13 Per-Programme Federation Discipline
 
-## Annex F — Adoption Roadmap
+A federated data-integration programme (a
+multi-domain data-mesh, a multi-tenant data-
+fabric, a multi-jurisdiction master-data
+exchange) publishes the per-member programme
+envelope to the federation's central register
+per the federation's information-sharing
+agreement.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §14 Per-Flow Failure-Recovery Discipline
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+A per-flow failure (an upstream-source
+unavailability, a per-flow transformation
+exception, a downstream-target schema
+mismatch) triggers the per-flow failure-
+recovery envelope. The envelope carries the
+per-flow retry-count, the per-flow back-off
+schedule, the per-flow dead-letter destination,
+and the per-flow operator-notification path.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §15 ISO/IEC 38505 Data-Governance Discipline
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The operator's per-programme governance is
+bound to ISO/IEC 38505-1:2017 (Governance of
+IT — Governance of Data). The operator's
+per-period governance review carries the per-
+period evaluate-direct-monitor (EDM) cycle,
+the per-period assurance envelope, and the
+per-period stakeholder-engagement record.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §16 ISO/IEC 27040 Storage-Security Discipline
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+A per-source-or-per-mapping at-rest envelope
+is bound to ISO/IEC 27040:2024 (information
+technology — security techniques — storage
+security) where applicable. The operator's
+API publishes the per-storage envelope's
+encryption-at-rest declaration, the per-
+storage backup envelope, and the per-storage
+disposal envelope.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §17 Per-Mapping Reference-Data Discipline
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+A per-mapping envelope referencing a per-
+domain reference-data set (ISO 4217 currency,
+ISO 3166 country, ISO 8601 date-time, ISO
+639-3 language, FAO commodity code, GS1
+identifier) is bound to the reference-data
+publisher's licensing envelope and the
+reference-data publisher's update cadence.

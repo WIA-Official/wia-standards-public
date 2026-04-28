@@ -1,241 +1,389 @@
-# WIA-data-visualization PHASE 2 — API-INTERFACE Specification
+# WIA-data-visualization PHASE 2 — API Interface Specification
 
 **Standard:** WIA-data-visualization
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-data-visualization (Data Visualization).
+This document defines the HTTPS API contract that
+a data-visualization operator (BI platform
+vendor, open-data dashboard publisher, news-
+media operator, scientific-visualization
+operator, inclusive-visualization provider,
+industrial-presentation operator, SVG-rendering
+library publisher, certification body) exposes
+for the records defined in PHASE-1. The
+contract carries the visualization-specification
+registration, accessibility-profile attestation,
+colour-space binding, display-calibration
+recording, provenance recording, and chain-of-
+custody anchoring endpoints.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110, RFC 9111, RFC 9457, RFC 8288,
+  RFC 6901 / 6902, RFC 8259, RFC 4122, RFC
+  9421, RFC 8615
+- W3C Trace Context, W3C SVG 2, W3C SVG 1.1
+  Second Edition, W3C WAI-ARIA 1.2, W3C WCAG
+  2.2, W3C HTML Living Standard, W3C CSS
+  Color Module Level 4, W3C JSON-LD 1.1, W3C
+  SHACL, W3C Verifiable Credentials Data
+  Model v2.0
+- ISO 9241-303:2011, ISO 9241-307:2008, ISO
+  9241-306:2018, ISO 9241-110:2020, ISO 9241-
+  210:2019, ISO 14915 series, IEC 61506:1997
+- ICC.1:2010, ICC.2:2019, CIE 15:2018
+- ISO/IEC 27001:2022, ISO/IEC 17021-1:2015,
+  ISO/IEC 17065:2012
+- EN 301 549 v3.2.1, US Section 508, KR 한국
+  형 웹 콘텐츠 접근성 지침
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-data-visualization
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published
+by the operator. The OpenAPI 3.1 document at
+`/v1/openapi.json` is canonical. Schema changes
+follow the non-breaking conventions in PHASE-1
+§2. Every endpoint carries a per-request
+signature using HTTP Message Signatures (RFC
+9421) anchored to the operator's accreditation
+reference (the ISO/IEC 27001 certification, the
+per-jurisdiction accessibility-conformance
+reference); the signature key set is published
+at
+`/.well-known/wia/data-visualization/keys.json`.
 
-## §2 Manifest
+## §2 Root Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "data-visualization"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /v1/
+```
 
-## §3 Conformance Tiers
+```json
+{
+  "standard": "WIA-data-visualization",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":          "/v1/programmes",
+    "vizSpecs":            "/v1/viz-specs",
+    "accessibilityProfiles": "/v1/accessibility-profiles",
+    "colourSpaces":        "/v1/colour-spaces",
+    "displayCalibrations": "/v1/display-calibrations",
+    "provenanceRecords":   "/v1/provenance-records",
+    "custody":             "/v1/custody-events",
+    "openapi":             "/v1/openapi.json",
+    "wellKnown":           "/.well-known/wia/data-visualization"
+  }
+}
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Visualization-Specification Endpoints
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+### §3.1 Register a visualization specification
 
-## §4 Discovery
+```
+POST /v1/viz-specs
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/data-visualization`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Request body carries the §3 record from
+PHASE-1 (vizKind, vegaLiteSpecRef, svgRef,
+encodingChannels, dataSourceRef). The server
+validates the per-channel encoding declarations
+against the declared `vizKind`: a `bar-chart`
+declared with a `position-x` and `position-y`
+encoding is accepted; a `bar-chart` declared
+without `position-x` or `position-y` is
+rejected with `422 Unprocessable Entity` at
+`/problems/encoding-channel-vizkind-mismatch`.
 
-## §5 Time and Identity
+### §3.2 Retrieve a visualization specification
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+GET /v1/viz-specs/{vizSpecId}
+Accept: application/json
+```
 
-## §6 Versioning and Deprecation
+### §3.3 Render a visualization specification
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+GET /v1/viz-specs/{vizSpecId}/render
+Accept: image/svg+xml | image/png | application/pdf
+```
 
-## §7 Privacy and Security
+The endpoint renders the per-spec visualization
+in the requested format. SVG is the canonical
+format (per W3C SVG 2); PNG and PDF are
+secondary rasterisation formats with the
+operator-declared resolution envelope.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §4 Accessibility-Profile Endpoints
 
-## §8 Open Governance
+### §4.1 Attest the accessibility profile
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `data-visualization` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST /v1/accessibility-profiles
+Content-Type: application/json
+Signature: <RFC 9421 signature from the
+            inclusive-content team>
+```
+
+Request body carries the §4 record from
+PHASE-1. The server validates that the per-
+chart `wcagConformance` declaration is
+consistent with the per-chart attestation
+evidence: a `WCAG-2.2-AA` declaration MUST
+be backed by per-chart `altText`,
+`longDescription`, and `dataTableFallback`,
+and the per-chart `contrastRatio` MUST meet
+or exceed the WCAG 2.2 SC 1.4.3 thresholds.
+
+### §4.2 Retrieve an accessibility profile
+
+```
+GET /v1/accessibility-profiles/{accessibilityProfileId}
+Accept: application/json
+```
+
+## §5 Colour-Space Endpoints
+
+### §5.1 Bind a colour space
+
+```
+POST /v1/colour-spaces
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+Request body carries the §5 record from
+PHASE-1 (iccProfileRef, workingSpace,
+colorimetricIntent, cieLABReference). The
+server validates the `colorimetricIntent`
+against the ICC.1:2010 enumeration.
+
+### §5.2 Retrieve a colour-space record
+
+```
+GET /v1/colour-spaces/{colourSpaceId}
+Accept: application/json
+```
+
+## §6 Display-Calibration Endpoints
+
+### §6.1 Record a display calibration
+
+```
+POST /v1/display-calibrations
+Content-Type: application/json
+Signature: <RFC 9421 signature from a per-
+            jurisdiction calibration
+            laboratory>
+```
+
+Request body carries the §6 record from
+PHASE-1. The server validates the
+`measurementMethod` against the ISO 9241-307
+enumeration.
+
+### §6.2 Retrieve a display-calibration record
+
+```
+GET /v1/display-calibrations/{displayCalibrationId}
+Accept: application/json
+```
+
+## §7 Provenance Endpoints
+
+### §7.1 Record provenance
+
+```
+POST /v1/provenance-records
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+Request body carries the §7 record from
+PHASE-1. The server validates that the per-
+chart `dataProvenance` references at least
+one upstream data source per the operator's
+data-provenance discipline.
+
+### §7.2 Retrieve provenance
+
+```
+GET /v1/provenance-records/{provenanceId}
+Accept: application/json
+```
+
+## §8 Custody and Error Reporting
+
+### §8.1 Anchor a custody event
+
+```
+POST /v1/custody-events
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+### §8.2 Error envelope
+
+Errors are returned using RFC 9457 Problem
+Details. Validation errors carry a `pointer`
+(RFC 6901). The server emits a per-request
+`traceparent` header (W3C Trace Context).
+
+## §9 Concurrency and Cache
+
+Every retrieval endpoint emits an `ETag`
+header (RFC 9110 §8.8.3). Conditional
+requests are honoured.
+
+## §10 Bulk Export for Catalogue Consumers
+
+```
+GET /v1/viz-specs:bulk
+Accept: application/x-ndjson
+```
+
+A catalogue consumer (a corporate-data-
+catalogue platform, an open-data portal)
+ingests the operator's visualization-spec
+register as a newline-delimited JSON stream.
+
+## §11 Per-Chart Embed Endpoint
+
+```
+GET /v1/viz-specs/{vizSpecId}/embed
+Accept: text/html
+```
+
+The endpoint returns the per-chart embeddable
+HTML envelope per W3C HTML Living Standard.
+The envelope carries the per-chart accessibility-
+profile binding so that the embedded chart
+remains accessible in the host page.
+
+## §12 Per-Chart Static Snapshot Endpoint
+
+```
+GET /v1/viz-specs/{vizSpecId}/snapshot
+?at={iso8601}
+Accept: image/svg+xml | image/png
+```
+
+A consumer requesting a per-chart static
+snapshot at a declared timestamp receives the
+per-chart frozen rendering with the per-source
+data as it was at the declared timestamp. The
+snapshot is signed by the operator's signing-
+key set so that a downstream archival system
+can verify the snapshot envelope.
+
+## §13 Webhook Endpoint for Spec-Change Notifications
+
+```
+POST /v1/programmes/{programmeId}/webhooks
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+A downstream consumer (a host page embedding
+the per-chart, an archival system retaining
+the per-chart, an audit observer) registers
+a webhook to receive a push notification when
+a per-chart specification is republished, when
+a per-chart accessibility profile is re-
+attested, or when a per-chart provenance
+record is updated.
+
+## §14 Authorities and Roles
+
+| Role                      | Capabilities |
+|---------------------------|------|
+| `viz-author`              | Register visualization specification, render |
+| `inclusive-content-team`  | Attest accessibility profile |
+| `colour-management-engineer` | Bind colour space |
+| `display-calibration-laboratory` | Record display calibration |
+| `editorial-quality-team`  | Record provenance, attest authorship |
+| `audit-observer`          | Read full operator state under engagement |
+| `regulator`               | Read full operator state under accessibility mandate |
+
+The operator's API enforces the per-role
+authorisation policy.
+
+## §15 Schema-Validation and Conformance
+
+The OpenAPI 3.1 document at
+`/v1/openapi.json` carries JSON Schema 2020-12
+schemas for every request and response
+envelope.
+
+```
+GET /v1/conformance/test-vectors
+Accept: application/json
+```
+
+The operator publishes the conformance test
+vectors used to qualify the API implementation
+against this specification.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## §16 Per-Chart Idempotency-Key Discipline
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST /v1/viz-specs
+Idempotency-Key: <UUID>
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+Every per-chart registration carries an
+`Idempotency-Key` header so that a per-chart
+re-registration arising from a network retry
+does not produce a duplicate per-chart record.
+The operator's API records the per-key envelope
+for 24 hours; a re-registration with the same
+key returns the original per-chart record.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §17 Multi-Language Per-Chart Surface
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+GET /v1/viz-specs/{vizSpecId}?lang={lang}
+Accept: application/json
+```
 
-## Annex F — Adoption Roadmap
+The per-chart text envelope is published in
+each operator-declared language (English,
+Korean, Japanese, German, French, Spanish,
+Arabic, Chinese) with the per-chart axis
+labels, the per-chart legend entries, the per-
+chart annotations, the per-chart `altText`,
+and the per-chart `longDescription` translated.
+The per-chart encoding declarations and the
+per-chart numeric values are language-neutral.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §18 Per-Chart Conformance-Test Endpoint
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+POST /v1/viz-specs/{vizSpecId}/conformance-test
+Content-Type: application/json
+Signature: <RFC 9421 signature from a per-
+            jurisdiction conformance-test
+            authority>
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+A per-jurisdiction conformance-test authority
+runs the per-chart accessibility-conformance
+test against the operator's API. The test
+envelope carries the per-chart axe-core /
+WAVE / Pa11y test-tool reference, the per-
+chart ARC Toolkit reference, the per-chart
+KR-WAH (Korean Web Accessibility Hub)
+evaluation reference, or an equivalent per-
+jurisdiction-recognised test-tool reference.
+The test outcome is recorded against the per-
+chart accessibility-profile envelope.

@@ -5,237 +5,382 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-electronic-skin (Electronic Skin).
+This document defines the canonical data-format
+layer for WIA-electronic-skin. The standard
+covers the persistent record shapes that an
+electronic-skin device manufacturer (a wearable
+health-monitoring patch, a continuous biosignal
+recorder, a sweat-chemistry sensor, a wound-
+healing telemetry patch, an electromyography or
+electrocardiography body-conformal patch), a
+contract manufacturer running the medical-device
+quality system, a notified body issuing the EU
+MDR conformity assessment, an institutional review
+board approving a clinical investigation, a
+healthcare provider operating the patch under a
+treating-clinician's order, and a healthcare
+analytics service ingesting the device telemetry
+maintain. Records are consumed by the treating
+clinician at the point of care, by the patient
+through the patient-portal export, by the
+notified body during the EU MDR Annex IX surveillance
+audit, by the institutional review board reviewing
+the clinical investigation, by the device's
+software-update service, and — where the device
+is sold across borders — by the supervisory data-
+protection authority overseeing the cross-border
+transfer of body-borne sensor data.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IEC 60601-1:2005+AMD1:2012+AMD2:2020 (general
+  requirements for basic safety and essential
+  performance of medical electrical equipment)
+- IEC 60601-1-2:2014+AMD1:2020 (electromagnetic
+  disturbances — requirements and tests)
+- IEC 60601-1-6:2010+AMD1:2013+AMD2:2020 (general
+  requirements for usability)
+- IEC 60601-1-9:2007+AMD1:2013+AMD2:2020
+  (environmentally conscious design)
+- IEC 80601-2-49:2018 (basic safety and essential
+  performance of multifunction patient
+  monitoring equipment)
+- IEC 60601-2-25:2011 (electrocardiographs),
+  IEC 60601-2-27:2011 (electrocardiographic
+  monitoring equipment), IEC 60601-2-47:2012
+  (ambulatory electrocardiographic systems),
+  IEC 60601-2-26:2012 (electroencephalographs),
+  IEC 60601-2-40:2016 (electromyographs and
+  evoked-response equipment)
+- IEEE 11073-10101:2019 (nomenclature for
+  personal-health-device communication —
+  cited normatively for the term codes carried
+  by every observation in §4)
+- IEEE 11073-10103:2014 (point-of-care medical-
+  device nomenclature for implantable cardiac
+  devices), IEEE 11073-10406:2011 (basic ECG),
+  IEEE 11073-10407:2010 (blood pressure),
+  IEEE 11073-10408:2010 (thermometer),
+  IEEE 11073-10417:2017 (glucose meter),
+  IEEE 11073-10418:2014 (INR), IEEE 11073-
+  10421:2010 (peak expiratory flow),
+  IEEE 11073-10472:2010 (medication monitor) —
+  the per-device specialisation profiles cited
+  where the e-skin patch implements the
+  specialisation
+- IEEE 802.15.6:2012 (wireless body area
+  networks, the BAN baseline)
+- ISO 14971:2019 (application of risk management
+  to medical devices)
+- ISO 13485:2016+A11:2021 (quality management
+  systems for medical-device manufacturers)
+- IEC 62366-1:2015+AMD1:2020 (application of
+  usability engineering to medical devices)
+- IEC 62304:2006+AMD1:2015 (medical-device
+  software life-cycle processes)
+- ISO 10993-1:2018 (biological evaluation of
+  medical devices — evaluation and testing
+  within a risk-management process), ISO 10993-5:
+  2009 (in-vitro cytotoxicity), ISO 10993-10:2010
+  (irritation and skin sensitisation), ISO 10993-
+  23:2021 (irritation, replacing parts of -10)
+- HL7 FHIR Release 5 (the international standard
+  for representing and exchanging healthcare
+  information electronically — cited normatively
+  for the FHIR resources carrying the e-skin
+  observation envelope in §5)
+- IETF RFC 8259 (JSON), RFC 4122 (UUID), ISO
+  8601 (date-time)
+- ISO/IEC 27001:2022 (information-security
+  management — used for the chain-of-custody
+  record discipline in §8)
+- EU Medical Device Regulation (EU) 2017/745
+  (general safety and performance requirements,
+  Annex I, II, IX clinical-evaluation and
+  surveillance discipline)
+- US 21 CFR Part 820 (Quality System Regulation
+  for medical devices)
+- KR 의료기기법 (Medical Devices Act) and KR
+  PIPA Articles 17, 23, 28-2 (sensitive personal
+  information clauses for body-borne sensor data)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-electronic-skin
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the
+artefacts exchanged when an electronic-skin
+device is registered, characterised under its
+applicable IEC 60601 / IEC 80601 collateral and
+particular standard, qualified through ISO 10993
+biocompatibility testing, deployed under a
+treating clinician's order, generating clinical
+observations under the IEEE 11073-10101
+nomenclature, and tracked through its software-
+update and chain-of-custody history.
+Implementations covered include:
 
-## §2 Manifest
+- A continuous-cardiac-rhythm patch issuing ECG
+  rhythm strips under IEC 60601-2-25/-27/-47.
+- A continuous-glucose monitor with a body-
+  conformal sensor, communicating per IEEE 11073-
+  10417.
+- A respiratory-rate / oxygen-saturation patch
+  combining pulse-oximetry and accelerometry.
+- A wound-healing telemetry patch reporting
+  exudate volume and pH.
+- An electromyography patch for rehabilitation.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "electronic-skin"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The device-side IEC 60601 record, the IEEE 11073
+observation record, and the FHIR R5 clinical-
+observation record receive distinct encodings
+in this PHASE; the additional safeguards required
+by each regulator's review are encoded in
+PHASE-3 §4.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name of the
+                       device manufacturer or
+                       service operator)
+operatorRole         : enum ("device-manufacturer" |
+                       "contract-manufacturer" |
+                       "notified-body" |
+                       "clinical-investigation-
+                       sponsor" | "treating-
+                       healthcare-provider" |
+                       "analytics-service" |
+                       "user-defined")
+governingFrameworks  : array of enum ("IEC-60601-
+                       1" | "IEC-60601-1-2" |
+                       "IEC-60601-1-6" |
+                       "IEC-60601-1-9" |
+                       "IEC-80601-2-49" |
+                       "IEC-60601-2-25" |
+                       "IEC-60601-2-27" |
+                       "IEC-60601-2-47" |
+                       "IEC-60601-2-26" |
+                       "IEC-60601-2-40" |
+                       "IEEE-11073-10101" |
+                       "IEEE-11073-10406" |
+                       "IEEE-11073-10417" |
+                       "IEEE-802.15.6" |
+                       "ISO-14971" |
+                       "ISO-13485" |
+                       "IEC-62366-1" |
+                       "IEC-62304" |
+                       "ISO-10993-1" |
+                       "ISO-10993-5" |
+                       "ISO-10993-10" |
+                       "ISO-10993-23" |
+                       "HL7-FHIR-R5" |
+                       "EU-MDR-2017-745" |
+                       "US-21-CFR-820" |
+                       "KR-Medical-Devices-Act" |
+                       "user-defined")
+qmsCertification     : object (the ISO 13485
+                       certification reference,
+                       the issuing certification
+                       body, and the certificate's
+                       expiry)
+programmeStatus      : enum ("design" | "operating"
+                       | "limited-rollout" |
+                       "wind-down" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Device Record
 
-## §4 Discovery
+```
+deviceRecord:
+  deviceId           : string (uuidv7)
+  identifierBindings : array of object (per-
+                       jurisdiction device
+                       identifiers — for example
+                       the EU MDR Unique Device
+                       Identifier (UDI-DI / UDI-
+                       PI), the US FDA UDI, the
+                       KR 의료기기 품목허가번호
+                       — each carrying the issuing
+                       authority and the scope of
+                       use)
+  deviceClass        : enum ("EU-MDR-class-IIa" |
+                       "EU-MDR-class-IIb" |
+                       "EU-MDR-class-III" |
+                       "US-FDA-class-I" |
+                       "US-FDA-class-II" |
+                       "US-FDA-class-III" |
+                       "user-defined")
+  applicableParticular : array of enum ("IEC-
+                       60601-2-25" | "IEC-60601-
+                       2-27" | "IEC-60601-2-47" |
+                       "IEC-60601-2-26" | "IEC-
+                       60601-2-40" | "IEC-80601-
+                       2-49" | "user-defined")
+  signalChannels     : array of object (per-
+                       channel modality with the
+                       IEEE 11073-10101 term
+                       code, sampling rate,
+                       resolution, dynamic range,
+                       and electrode count where
+                       applicable)
+  energySource       : enum ("battery-rechargeable"
+                       | "battery-primary" |
+                       "wireless-power-transfer"
+                       | "energy-harvesting-
+                       triboelectric" | "energy-
+                       harvesting-photovoltaic" |
+                       "energy-harvesting-
+                       thermal" | "user-defined")
+  patchSubstrate     : enum ("polyimide" |
+                       "polydimethylsiloxane" |
+                       "thermoplastic-
+                       polyurethane" | "silicon-
+                       elastomer" | "user-defined")
+  biocompatibilityRecord : array of object (the
+                       ISO 10993 test references
+                       and the per-test result
+                       summary)
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/electronic-skin`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Observation Record
 
-## §5 Time and Identity
+The observation record carries per-channel
+samples under the IEEE 11073-10101 nomenclature:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+observationRecord:
+  observationId      : string (uuidv7)
+  deviceRef          : string (PHASE-1 §3 record
+                       reference)
+  patientRef         : string (PHASE-1 §6 record
+                       reference; the operator's
+                       master-patient identifier
+                       resolves to the FHIR
+                       Patient resource)
+  channelRef         : string (PHASE-1 §3
+                       `signalChannels` index)
+  sampleStartTime    : string (ISO 8601 date-time
+                       at sample number 0)
+  sampleRateHz       : number (per the channel's
+                       IEEE 11073-10101 unit code)
+  sampleResolution   : number (per the channel's
+                       IEEE 11073-10101 unit code)
+  samples            : object (the encoded sample
+                       block with the encoding
+                       declaration — base64 binary
+                       carrying signed 16-bit big-
+                       endian samples for ECG /
+                       EMG, signed 24-bit for
+                       EEG, IEEE 754 single-
+                       precision floats for
+                       temperature)
+  qualityFlags       : array of object (per-
+                       segment artefact flags
+                       under the IEC 60601-2-47
+                       cardiac-rhythm cardiac-
+                       event nomenclature)
+```
 
-## §6 Versioning and Deprecation
+## §5 FHIR Observation Mapping
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The operator publishes a FHIR R5 `Observation`
+resource for every clinically reportable event
+derived from the §4 channel samples:
 
-## §7 Privacy and Security
+```
+fhirObservation:
+  identifier         : array (one is the operator's
+                       internal observation
+                       reference)
+  status             : enum ("final" | "amended" |
+                       "corrected" | "cancelled")
+  category           : object (LOINC vital-signs)
+  code               : object (LOINC + IEEE
+                       11073-10101 cross-reference)
+  subject            : object (FHIR Patient
+                       reference)
+  device             : object (FHIR Device
+                       reference)
+  effectiveDateTime  : string (ISO 8601)
+  valueQuantity      : object (UCUM unit symbol)
+  component          : array of object (per-
+                       sub-channel value)
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Patient and Consent Record
 
-## §8 Open Governance
+```
+patientBinding:
+  patientId          : string (uuidv7)
+  pseudonymousId     : string (the operator's
+                       master-patient identifier)
+  consentDirective   : object (the FHIR R5 Consent
+                       resource carrying the
+                       patient's permission to
+                       process body-borne sensor
+                       data, the GDPR Article 9(2)
+                       (a) explicit consent or
+                       Article 9(2)(h) treatment
+                       basis, the HIPAA 45 CFR
+                       164.508 authorisation, the
+                       KR PIPA Article 18 sensitive-
+                       information consent)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `electronic-skin` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §7 Software-Update Record
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+softwareUpdate:
+  updateId           : string (uuidv7)
+  deviceRef          : string (PHASE-1 §3)
+  releaseLevel       : enum ("major" | "minor" |
+                       "patch" | "security-only" |
+                       "user-defined")
+  iec62304Class      : enum ("A" | "B" | "C")
+  signedManifest     : string (URI of the IEC
+                       62304 §5 software-of-known-
+                       provenance manifest)
+  releaseDate        : string (ISO 8601)
+  postmarketSurveillanceRef : string (the EU MDR
+                       Annex III post-market
+                       surveillance plan reference
+                       under which the update is
+                       evaluated)
+```
 
+## §8 Chain-of-Custody Record
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+```
+custodyRecord:
+  custodyId          : string (uuidv7)
+  artefactRef        : string (the device,
+                       observation, software-
+                       update, or biocompatibility
+                       record identifier)
+  custodyEvent       : enum ("manufacture-
+                       complete" | "lot-release" |
+                       "shipment" | "patient-
+                       application" | "patient-
+                       removal" | "data-
+                       transmission" |
+                       "decommission" | "recall" |
+                       "user-defined")
+  eventTimestamp     : string (ISO 8601 date-time)
+  performingParty    : string (legal entity)
+  hashOfArtefacts    : string (SHA-256 hex digest)
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## §9 Manifest
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations publish a signed manifest carrying
+`standardSlug` (constant value "electronic-skin"),
+`version`, `implementation`, the QMS certification
+reference, and the `profile` declaration that
+selects which of the optional records (FHIR
+mapping, software update, biocompatibility) the
+implementation supports. The manifest is signed
+using a key whose public part is published on the
+operator's `.well-known/wia/electronic-skin/`
+discovery endpoint declared in PHASE-2.

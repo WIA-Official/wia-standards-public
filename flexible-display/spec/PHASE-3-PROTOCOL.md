@@ -5,237 +5,350 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-flexible-display (Flexible Display).
+This document defines the protocols that govern
+a flexible-display operator across the
+manufacturer-to-laboratory-to-notified-body-to-
+buyer value chain: the IEC 62977 / SID IDMS
+optical-measurement discipline that anchors the
+optical-performance declaration, the IEC 62715
+mechanical-flexibility discipline that gates
+the foldability and rollability declarations,
+the IEC 62341 OLED-specific discipline that
+binds the emissive-pixel parameters to the
+optical record, the ISO 9241-307 ergonomic
+compliance discipline that ties the device to
+its intended-use viewing distance, the IEC
+60068 environmental-reliability discipline that
+qualifies the device against the operating-
+environment envelope, the IEC 61000 EMC
+discipline and the IEC 62368-1 safety discipline
+that gate CE marking, the laboratory-
+accreditation discipline that anchors every
+measurement to an ISO/IEC 17025 accredited test
+report, the chain-of-custody anchoring discipline
+that prevents silent mutation of the test
+result, and the recall-and-corrective-action
+discipline that handles a discovered non-
+conformance.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IEC 62977 series (multimedia display
+  measurement methods)
+- IEC 62715 series (flexible display devices)
+- IEC 62341 series (OLED display)
+- IEC 61747 series (LCD module)
+- IEC TS 62687:2014
+- ISO 9241 series (-302, -303, -306, -307)
+- SID IDMS 1.03
+- JEITA RC-9131
+- KS C IEC 62715-1-1, KS C IEC 62977-1
+- IEC 60068 series (environmental tests)
+- IEC 61000 series (EMC test methods)
+- IEC 62368-1:2018+AMD1:2020 (audio-video
+  safety)
+- ISO 9001:2015
+- ISO/IEC 17000:2020, ISO/IEC 17021-1:2015,
+  ISO/IEC 17025:2017, ISO/IEC 17065:2012
+- IETF RFC 9110, RFC 9421, RFC 9457, RFC 8615,
+  RFC 6962
+- W3C Trace Context
+- EU Low Voltage Directive 2014/35/EU, EU EMC
+  Directive 2014/30/EU, EU RoHS 2011/65/EU, EU
+  REACH (EC) 1907/2006
 
 ---
 
-## §1 Scope
+## §1 IEC 62977 / SID IDMS Optical-Measurement Discipline
 
-This PHASE document is one of four that together define the WIA-flexible-display
-standard. It addresses the protocol layer of the standard.
+### §1.1 Measurement-geometry binding
 
-## §2 Manifest
+Every optical-performance record carries the
+measurement geometry declared in PHASE-1 §4
+(`flat-state`, `bent-at-declared-radius`,
+`rolled-fully`, `rolled-partially`, `folded-
+fully`, `folded-partially`). The operator's API
+enforces that a `flexibilityClass: foldable`
+device's optical record set covers at least the
+flat-state and the folded-fully geometries; a
+record set missing one of the two is rejected
+with `422 Unprocessable Entity` at
+`/problems/iec62977-geometry-set-incomplete`.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "flexible-display"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+### §1.2 SID IDMS procedure traceability
 
-## §3 Conformance Tiers
+Every optical-record measurement procedure
+declared in `testStandard` is bound to the SID
+IDMS 1.03 procedure reference. The operator's
+API publishes the per-measurement traceability
+link so that a downstream metrology laboratory
+can verify the procedure-of-record without
+contacting the operator.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+### §1.3 Calibration-record linkage
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+The optical record carries a calibration-record
+reference for the spectroradiometer or
+luminance meter used in the measurement. The
+calibration record's accreditation reference
+(ISO/IEC 17025) and its expiry date are bound
+to the optical record so that a downstream
+auditor can detect the use of an out-of-
+calibration instrument.
 
-## §4 Discovery
+## §2 IEC 62715 Mechanical-Flexibility Discipline
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/flexible-display`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+### §2.1 Bend-radius enforcement
 
-## §5 Time and Identity
+Every mechanical-reliability record declares the
+bend radius applied during the test. The
+operator's API rejects a record whose declared
+bend radius is below the device's
+`declaredBendRadiusMm` (the device's qualified
+minimum bend radius) — a test conducted below
+the qualified envelope cannot be used as
+evidence for the qualification claim.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### §2.2 Fold-cycle endurance binding
 
-## §6 Versioning and Deprecation
+A foldable device's `declaredFoldCycles` value
+declared in PHASE-1 §3 binds the device to the
+IEC 62715-6-1 test record that demonstrates the
+declared cycle count. The operator's API
+verifies the binding on each declaration and
+rejects a publication where the device's
+`declaredFoldCycles` exceeds the test-record
+fold-cycle endurance.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+### §2.3 Crease-formation criterion
 
-## §7 Privacy and Security
+The IEC 62715-6-1 test result declares the cycle
+count at first crease formation. The operator's
+API records the criterion under which crease
+formation was identified (visual inspection
+under controlled lighting, optical-degradation
+threshold, or strain-gauge reading) so that
+the criterion is part of the test-of-record.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §3 IEC 62341 OLED-Specific Discipline
 
-## §8 Open Governance
+### §3.1 Emissive-pixel binding
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `flexible-display` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+An OLED-class flexible display (`displayFamily:
+oled-foldable`, `oled-rollable`, `oled-bendable`)
+is qualified against the IEC 62341-5-2 image-
+quality measurement and the IEC 62341-6-2
+mechanical-characteristics test method. The
+operator's API rejects an OLED-class device
+whose record set omits at least one of the
+two test methods.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+### §3.2 Burn-in and lifetime binding
 
+The IEC 62341-2-2 lifetime test (the L70
+half-life criterion — the time at which the
+panel's luminance decays to 70 % of its
+initial value) is recorded against the
+display record. The operator's API publishes
+the L70 hours value as part of the device's
+performance envelope so that a buyer can
+parameterise the device's expected lifetime.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §4 ISO 9241-307 Ergonomic-Compliance Discipline
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+A device intended for general consumer use
+satisfies the ISO 9241-307 ergonomic compliance
+test methods and is classified at the
+ergonomic-class declared in the device record.
+The operator's API publishes the per-device
+ergonomic class and the underlying ISO 9241-307
+test-of-record reference; a device classified
+above its substantiation evidence is rejected
+with `422 Unprocessable Entity`.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §5 IEC 60068 Environmental-Reliability Discipline
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+### §5.1 Test-method-to-application binding
 
-## Annex F — Adoption Roadmap
+The environmental-reliability record's
+`testStandard` is bound to the device's
+intended-use environment declaration: an
+automotive curved-cluster display is expected
+to satisfy IEC 60068-2-14 thermal cycling at
+the automotive-grade temperature envelope, while
+a consumer foldable phone is expected to satisfy
+IEC 60068-2-30 damp heat at the consumer-grade
+envelope.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+### §5.2 Thermal-cycling endpoint
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The IEC 60068-2-14 thermal-cycling endpoint is
+declared as the post-cycle pixel-defect count,
+the post-cycle dark-defect area, and the post-
+cycle brightness-and-colour drift. The
+operator's API enforces that the endpoint
+metrics fall within the manufacturer's declared
+envelope.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §6 EMC and Safety Discipline
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+### §6.1 IEC 61000 EMC binding
 
-## Annex G — Test Vectors and Conformance Evidence
+Every device record carries the IEC 61000 test-
+report reference for line harmonics (IEC
+61000-3-2), line-voltage variations (IEC
+61000-3-3), ESD immunity (IEC 61000-4-2), and
+radiated-RF immunity (IEC 61000-4-3) so that
+the EU EMC Directive 2014/30/EU declaration is
+substantiated.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+### §6.2 IEC 62368-1 hazard-based safety
+       engineering
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Every device record carries the IEC 62368-1
+HBSE classification (the energy-source class
+table — ES1 / ES2 / ES3, MS1 / MS2 / MS3, TS1
+/ TS2 / TS3, etc.) and the per-class
+substantiation evidence so that the EU LVD
+declaration is substantiated.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §7 Laboratory-Accreditation Discipline
 
-## Annex H — Versioning and Deprecation Policy
+Every test record is uploaded under an HTTP
+Message Signature (RFC 9421) issued under the
+testing laboratory's ISO/IEC 17025:2017
+accreditation. The operator's API verifies the
+signature, the certificate's currency, and the
+scope of the accreditation against the declared
+test method. A scope mismatch returns `403
+Forbidden`.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §8 Chain-of-Custody Anchoring Discipline
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+### §8.1 Per-event transparency log
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Every chain-of-custody event carried by PHASE-1
+§8 is appended to a per-operator transparency
+log modelled on the IETF RFC 6962 Certificate
+Transparency append-only-log structure.
 
-## Annex I — Interoperability Profiles
+### §8.2 Mutation prevention
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+A custody event cannot be retroactively edited;
+an amendment is recorded as a new event with
+`previousEventRef` pointing at the event being
+amended.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §9 Quality-Management Discipline
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The operator runs an ISO 9001:2015 quality
+management system covering the device design,
+the line-acceptance test, the per-batch
+release, the warranty-claim handling, and the
+recall workflow. Internal audits run on a
+frequency declared in the quality manual; the
+nonconformity register is reviewed in the ISO
+9001 §9.3 management-review cycle.
+
+## §10 Recall and Corrective-Action Discipline
+
+### §10.1 EU LVD Article 8 recall
+
+A device found to expose users to an
+unacceptable safety risk under EU LVD 2014/35/EU
+triggers a recall declaration. The operator's
+API publishes the recall notice on the public
+retrieval endpoint and notifies registered
+distributors via the webhook endpoint declared
+in PHASE-2 §14.
+
+### §10.2 Corrective-action record
+
+Every recall is bound to a corrective-action
+record under the operator's ISO 9001 §10.2
+discipline. The record carries the root-cause
+analysis, the containment actions, the
+production-line corrective actions, and the
+verification-of-effectiveness evidence.
+
+## §11 KR-Jurisdiction Discipline
+
+### §11.1 KR 전파법 적합성평가 binding
+
+A device sold in the KR market is bound to the
+KR 전파법 방송통신기자재등의 적합성평가 인증
+번호 declared in the device record. The KR
+Ministry of Science and ICT operates the
+register; the operator's API queries the
+register on each retrieval after the caching
+TTL.
+
+### §11.2 KR 전기용품안전관리법 binding
+
+Where the device is in scope of the KR
+전기용품 및 생활용품 안전관리법 KC marking,
+the operator declares the KC certificate
+reference. The KR National Institute of
+Technology and Standards operates the register;
+the operator's API queries the register on
+each retrieval after the caching TTL.
+
+## §12 Warranty-Claim Discipline
+
+### §12.1 Warranty-period binding
+
+The device's warranty period is bound to the
+device record. Where a warranty claim
+references a device whose `declaredFoldCycles`
+or `declaredBendRadiusMm` was exceeded, the
+operator's warranty-claim service may decline
+the claim per the warranty terms; the decline
+is recorded as a chain-of-custody event so
+that the consumer-protection authority can
+audit the claim outcome.
+
+### §12.2 Field-failure feedback loop
+
+Field-failure data flowing from warranty
+claims feeds the operator's reliability-
+engineering team. The team reviews the failure
+modes against the IEC 62715 test-of-record and
+adjusts the test-method-of-record where the
+field failures expose a gap in the qualification
+envelope.
+
+## §13 RoHS and REACH Substance Discipline
+
+### §13.1 EU RoHS Directive 2011/65/EU compliance
+
+A device sold in the EU market is bound to the
+EU RoHS Directive 2011/65/EU restricted-
+substance limits. The operator's API publishes
+the per-device material declaration declaring
+the lead, mercury, cadmium, hexavalent chromium,
+PBB, PBDE, DEHP, BBP, DBP, and DIBP content
+ranges so that a downstream auditor can
+substantiate the compliance claim.
+
+### §13.2 EU REACH SVHC supply-chain communication
+
+A device whose component-of-record contains a
+substance of very high concern (SVHC) above the
+0.1 % weight-by-weight threshold publishes the
+EU REACH Article 33 supply-chain communication
+envelope so that the downstream system
+integrator and the consumer can be informed of
+the substance presence.
+
+## §14 Bistable-Display Discipline
+
+An electronic-paper bistable display
+(`displayFamily: electronic-paper-flexible`) is
+characterised against the SID IDMS bistable-
+display measurement section (the bistable
+state-retention time, the per-state contrast
+ratio, the per-state response time, the
+per-state luminance). The operator's API records
+the per-state measurements separately so that a
+downstream consumer can parameterise the
+expected behaviour of the bistable display.

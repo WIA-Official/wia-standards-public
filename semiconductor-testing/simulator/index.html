@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-SEMI-002 Simulator - Semiconductor Testing</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 15px;
+            margin-bottom: 30px;
+            border: 2px solid #10B981;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            color: #10B981;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 1.2em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            background: #1e293b;
+            color: #94a3b8;
+            border: 2px solid #334155;
+            padding: 15px 30px;
+            cursor: pointer;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            border-color: #10B981;
+            color: #10B981;
+        }
+
+        .tab.active {
+            background: #10B981;
+            color: white;
+            border-color: #10B981;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        }
+
+        .tab-content {
+            display: none;
+            background: rgba(30, 41, 59, 0.5);
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid #334155;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #10B981;
+            font-weight: bold;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #10B981;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+        }
+
+        button {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .result-box {
+            background: #0f172a;
+            border: 2px solid #10B981;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            min-height: 100px;
+        }
+
+        .wafer-map {
+            display: grid;
+            grid-template-columns: repeat(20, 1fr);
+            gap: 2px;
+            margin: 20px 0;
+            max-width: 600px;
+        }
+
+        .die {
+            aspect-ratio: 1;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .die:hover {
+            transform: scale(1.2);
+            z-index: 10;
+        }
+
+        .die.bin0 { background: #ef4444; }
+        .die.bin1 { background: #10B981; }
+        .die.bin2 { background: #f59e0b; }
+        .die.bin3 { background: #8b5cf6; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: #0f172a;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #334155;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            color: #10B981;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            margin-top: 5px;
+        }
+
+        .log-entry {
+            background: #0f172a;
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid #10B981;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .timestamp {
+            color: #10B981;
+            margin-right: 10px;
+        }
+
+        .chart {
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            height: 300px;
+            display: flex;
+            align-items: flex-end;
+            gap: 5px;
+        }
+
+        .bar {
+            flex: 1;
+            background: linear-gradient(to top, #10B981, #059669);
+            border-radius: 5px 5px 0 0;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .bar:hover {
+            opacity: 0.8;
+        }
+
+        .bar-label {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #94a3b8;
+            font-size: 12px;
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+
+        nav.top-nav {
+            background: #0f172a;
+            padding: 14px 24px;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            gap: 18px;
+            flex-wrap: wrap;
+        }
+        nav.top-nav a {
+            color: #93c5fd;
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+        nav.top-nav a.muted {
+            color: #94a3b8;
+        }
+        nav.top-nav a:hover {
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+<nav class="top-nav">
+  <a href="https://wiastandards.com">← WIA Standards</a>
+  <a href="../">↑ simulator</a>
+  <a href="../README.md" class="muted">README</a>
+  <a href="../spec/" class="muted">Spec</a>
+  <a href="../api/" class="muted">API</a>
+  <a href="../cli/" class="muted">CLI</a>
+  <a href="../ebook/en/" class="muted">eBook EN</a>
+  <a href="../ebook/ko/" class="muted">eBook KO</a>
+  <a href="../simulator/" class="muted">Simulator</a>
+  <a href="../press/" class="muted">Press</a>
+</nav>
+
+    <div class="container">
+        <header>
+            <h1>🔬 WIA-SEMI-002 Simulator</h1>
+            <p class="subtitle">Interactive Semiconductor Testing Environment</p>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('wafer')">🔬 Wafer Test</div>
+            <div class="tab" onclick="switchTab('package')">📦 Package Test</div>
+            <div class="tab" onclick="switchTab('ate')">⚙️ ATE Control</div>
+            <div class="tab" onclick="switchTab('quality')">📊 Quality Metrics</div>
+            <div class="tab" onclick="switchTab('logs')">📝 Test Logs</div>
+        </div>
+
+        <!-- Wafer Test Tab -->
+        <div id="wafer" class="tab-content active">
+            <h2 style="color: #10B981; margin-bottom: 20px;">Wafer Probe Testing</h2>
+
+            <div class="form-group">
+                <label>Wafer ID</label>
+                <input type="text" id="waferId" value="W-2025-001-0001" placeholder="Enter wafer ID">
+            </div>
+
+            <div class="form-group">
+                <label>Lot ID</label>
+                <input type="text" id="lotId" value="LOT-2025-001" placeholder="Enter lot ID">
+            </div>
+
+            <div class="form-group">
+                <label>Device Type</label>
+                <select id="deviceType">
+                    <option value="SOC-7NM">SOC 7nm</option>
+                    <option value="SOC-5NM">SOC 5nm</option>
+                    <option value="DRAM-DDR5">DRAM DDR5</option>
+                    <option value="NAND-3D">NAND 3D</option>
+                    <option value="ANALOG">Analog/Mixed-Signal</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Test Program</label>
+                <select id="testProgram">
+                    <option value="PARAMETRIC">Parametric Test</option>
+                    <option value="FUNCTIONAL">Functional Test</option>
+                    <option value="FULL">Full Test Suite</option>
+                </select>
+            </div>
+
+            <button onclick="runWaferTest()">▶️ Run Wafer Test</button>
+
+            <div class="result-box" id="waferResult">
+                <h3 style="color: #10B981;">Wafer Map</h3>
+                <div class="wafer-map" id="waferMap"></div>
+                <div class="stats-grid" id="waferStats"></div>
+            </div>
+        </div>
+
+        <!-- Package Test Tab -->
+        <div id="package" class="tab-content">
+            <h2 style="color: #10B981; margin-bottom: 20px;">Final Package Testing</h2>
+
+            <div class="form-group">
+                <label>Package Type</label>
+                <select id="packageType">
+                    <option value="QFN">QFN (Quad Flat No-leads)</option>
+                    <option value="BGA">BGA (Ball Grid Array)</option>
+                    <option value="FCBGA">FCBGA (Flip Chip BGA)</option>
+                    <option value="WLCSP">WLCSP (Wafer Level CSP)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Test Temperature (°C)</label>
+                <input type="number" id="testTemp" value="25" min="-40" max="125">
+            </div>
+
+            <div class="form-group">
+                <label>Test Voltage (V)</label>
+                <input type="number" id="testVoltage" value="1.8" min="0.5" max="5.0" step="0.1">
+            </div>
+
+            <div class="form-group">
+                <label>Burn-In Duration (hours)</label>
+                <input type="number" id="burnInHours" value="48" min="0" max="168">
+            </div>
+
+            <button onclick="runPackageTest()">▶️ Run Package Test</button>
+
+            <div class="result-box" id="packageResult">
+                <p style="color: #94a3b8;">Test results will appear here...</p>
+            </div>
+        </div>
+
+        <!-- ATE Control Tab -->
+        <div id="ate" class="tab-content">
+            <h2 style="color: #10B981; margin-bottom: 20px;">ATE Equipment Control</h2>
+
+            <div class="form-group">
+                <label>Equipment Model</label>
+                <select id="ateModel">
+                    <option value="ADVANTEST-T2000">Advantest T2000</option>
+                    <option value="ADVANTEST-V93000">Advantest V93000</option>
+                    <option value="TERADYNE-ULTRAFLEX">Teradyne UltraFLEX</option>
+                    <option value="TERADYNE-J750">Teradyne J750</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Test Sites</label>
+                <input type="number" id="testSites" value="8" min="1" max="128">
+            </div>
+
+            <div class="form-group">
+                <label>Probe Card ID</label>
+                <input type="text" id="probeCardId" value="PC-001" placeholder="Enter probe card ID">
+            </div>
+
+            <button onclick="connectATE()">🔌 Connect to ATE</button>
+            <button onclick="calibrateATE()" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">⚙️ Run Calibration</button>
+
+            <div class="result-box" id="ateResult">
+                <h3 style="color: #10B981;">Equipment Status</h3>
+                <div id="ateStatus"></div>
+            </div>
+        </div>
+
+        <!-- Quality Metrics Tab -->
+        <div id="quality" class="tab-content">
+            <h2 style="color: #10B981; margin-bottom: 20px;">Quality Metrics & Analytics</h2>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="yieldValue">--</div>
+                    <div class="stat-label">Wafer Yield (%)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="dpmValue">--</div>
+                    <div class="stat-label">Defects Per Million</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="uptimeValue">--</div>
+                    <div class="stat-label">Equipment Uptime (%)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="throughputValue">--</div>
+                    <div class="stat-label">Throughput (wafers/day)</div>
+                </div>
+            </div>
+
+            <h3 style="color: #10B981; margin: 30px 0 15px 0;">Yield Trend (Last 30 Days)</h3>
+            <div class="chart" id="yieldChart"></div>
+
+            <button onclick="generateMetrics()">📊 Generate Quality Report</button>
+
+            <div class="result-box" id="qualityResult" style="margin-top: 20px;">
+                <p style="color: #94a3b8;">Click "Generate Quality Report" to view detailed analytics...</p>
+            </div>
+        </div>
+
+        <!-- Logs Tab -->
+        <div id="logs" class="tab-content">
+            <h2 style="color: #10B981; margin-bottom: 20px;">Test Execution Logs</h2>
+
+            <button onclick="clearLogs()" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">🗑️ Clear Logs</button>
+            <button onclick="exportLogs()">💾 Export Logs</button>
+
+            <div class="result-box" id="logContainer" style="max-height: 500px; overflow-y: auto; margin-top: 20px;">
+                <div class="log-entry">
+                    <span class="timestamp">[2025-01-15 10:00:00]</span>
+                    <span>System initialized. WIA-SEMI-002 v1.0.0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let testLogs = [];
+
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span><span>${message}</span>`;
+            document.getElementById('logContainer').appendChild(logEntry);
+            testLogs.push({ timestamp, message, type });
+        }
+
+        function runWaferTest() {
+            const waferId = document.getElementById('waferId').value;
+            const lotId = document.getElementById('lotId').value;
+            const deviceType = document.getElementById('deviceType').value;
+            const testProgram = document.getElementById('testProgram').value;
+
+            addLog(`Starting wafer test: ${waferId} (${deviceType})`);
+            addLog(`Test program: ${testProgram}`);
+
+            // Generate wafer map
+            const waferMap = document.getElementById('waferMap');
+            waferMap.innerHTML = '';
+
+            let bin1Count = 0, bin2Count = 0, bin0Count = 0, totalDies = 400;
+
+            for (let i = 0; i < totalDies; i++) {
+                const die = document.createElement('div');
+                die.className = 'die';
+
+                // Simulate yield pattern (higher yield in center)
+                const row = Math.floor(i / 20);
+                const col = i % 20;
+                const centerDist = Math.sqrt(Math.pow(row - 10, 2) + Math.pow(col - 10, 2));
+                const yieldProb = Math.max(0.3, 1 - (centerDist / 15));
+
+                const rand = Math.random();
+                if (rand < yieldProb * 0.85) {
+                    die.classList.add('bin1');
+                    bin1Count++;
+                } else if (rand < yieldProb) {
+                    die.classList.add('bin2');
+                    bin2Count++;
+                } else {
+                    die.classList.add('bin0');
+                    bin0Count++;
+                }
+
+                die.title = `Die ${i + 1}`;
+                waferMap.appendChild(die);
+            }
+
+            const yield = ((bin1Count / totalDies) * 100).toFixed(2);
+
+            // Display statistics
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="stat-value">${yield}%</div>
+                    <div class="stat-label">Yield</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${bin1Count}</div>
+                    <div class="stat-label">Bin 1 (Pass)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${bin2Count}</div>
+                    <div class="stat-label">Bin 2 (Partial)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${bin0Count}</div>
+                    <div class="stat-label">Bin 0 (Fail)</div>
+                </div>
+            `;
+            document.getElementById('waferStats').innerHTML = statsHtml;
+
+            addLog(`Wafer test completed: Yield = ${yield}%, Good dies = ${bin1Count}/${totalDies}`);
+            addLog(`Test duration: ${(Math.random() * 30 + 15).toFixed(1)} minutes`);
+        }
+
+        function runPackageTest() {
+            const packageType = document.getElementById('packageType').value;
+            const temp = document.getElementById('testTemp').value;
+            const voltage = document.getElementById('testVoltage').value;
+            const burnIn = document.getElementById('burnInHours').value;
+
+            addLog(`Starting package test: ${packageType}`);
+            addLog(`Test conditions: ${temp}°C, ${voltage}V`);
+
+            if (parseInt(burnIn) > 0) {
+                addLog(`Burn-in test: ${burnIn} hours @ 125°C`);
+            }
+
+            // Simulate test results
+            const passRate = (Math.random() * 5 + 95).toFixed(2);
+            const failCount = Math.floor(Math.random() * 50);
+            const totalDevices = 1000;
+
+            const resultHtml = `
+                <h3 style="color: #10B981;">Test Results</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">${passRate}%</div>
+                        <div class="stat-label">Pass Rate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${totalDevices - failCount}</div>
+                        <div class="stat-label">Devices Passed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${failCount}</div>
+                        <div class="stat-label">Devices Failed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${(Math.random() * 10 + 50).toFixed(1)} min</div>
+                        <div class="stat-label">Test Duration</div>
+                    </div>
+                </div>
+                <p style="color: #94a3b8; margin-top: 20px;">
+                    <strong>Failure Analysis:</strong><br>
+                    • Continuity failures: ${Math.floor(failCount * 0.3)}<br>
+                    • Functional failures: ${Math.floor(failCount * 0.5)}<br>
+                    • Parametric failures: ${Math.floor(failCount * 0.2)}<br>
+                </p>
+            `;
+            document.getElementById('packageResult').innerHTML = resultHtml;
+
+            addLog(`Package test completed: ${passRate}% pass rate`);
+        }
+
+        function connectATE() {
+            const model = document.getElementById('ateModel').value;
+            const sites = document.getElementById('testSites').value;
+
+            addLog(`Connecting to ${model}...`);
+
+            setTimeout(() => {
+                const statusHtml = `
+                    <p style="color: #10B981; font-weight: bold;">✓ Connected to ${model}</p>
+                    <p style="color: #94a3b8; margin-top: 10px;">
+                        <strong>Configuration:</strong><br>
+                        • Test sites: ${sites}<br>
+                        • Status: Online<br>
+                        • Last calibration: ${new Date().toLocaleDateString()}<br>
+                        • Temperature: ${(Math.random() * 5 + 23).toFixed(1)}°C<br>
+                        • Uptime: ${(Math.random() * 10 + 90).toFixed(1)}%<br>
+                    </p>
+                `;
+                document.getElementById('ateStatus').innerHTML = statusHtml;
+                addLog(`Successfully connected to ${model}`);
+                addLog(`Test sites configured: ${sites}`);
+            }, 1000);
+        }
+
+        function calibrateATE() {
+            addLog('Starting ATE calibration...');
+
+            setTimeout(() => {
+                addLog('Calibration completed successfully');
+                alert('ATE calibration completed! All systems nominal.');
+            }, 2000);
+        }
+
+        function generateMetrics() {
+            // Generate random but realistic metrics
+            const yieldValue = (Math.random() * 10 + 85).toFixed(2);
+            const dpmValue = Math.floor(Math.random() * 150 + 50);
+            const uptimeValue = (Math.random() * 5 + 95).toFixed(1);
+            const throughputValue = Math.floor(Math.random() * 50 + 150);
+
+            document.getElementById('yieldValue').textContent = yieldValue;
+            document.getElementById('dpmValue').textContent = dpmValue;
+            document.getElementById('uptimeValue').textContent = uptimeValue;
+            document.getElementById('throughputValue').textContent = throughputValue;
+
+            // Generate yield trend chart
+            const chart = document.getElementById('yieldChart');
+            chart.innerHTML = '';
+
+            for (let i = 0; i < 30; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                const height = Math.random() * 40 + 60;
+                bar.style.height = height + '%';
+
+                const label = document.createElement('div');
+                label.className = 'bar-label';
+                label.textContent = `D${i + 1}`;
+                bar.appendChild(label);
+
+                chart.appendChild(bar);
+            }
+
+            const reportHtml = `
+                <h3 style="color: #10B981;">Quality Analysis Report</h3>
+                <p style="color: #94a3b8; margin-top: 15px;">
+                    <strong>Summary:</strong><br>
+                    • Average yield: ${yieldValue}%<br>
+                    • Defect density: ${dpmValue} DPM<br>
+                    • Equipment uptime: ${uptimeValue}%<br>
+                    • Daily throughput: ${throughputValue} wafers<br>
+                    • Trend: ${Math.random() > 0.5 ? '↑ Improving' : '→ Stable'}<br>
+                    • Quality level: ${parseFloat(yieldValue) > 90 ? 'Excellent' : parseFloat(yieldValue) > 80 ? 'Good' : 'Needs Improvement'}<br>
+                </p>
+            `;
+            document.getElementById('qualityResult').innerHTML = reportHtml;
+
+            addLog('Quality metrics report generated');
+        }
+
+        function clearLogs() {
+            document.getElementById('logContainer').innerHTML = '';
+            testLogs = [];
+            addLog('Logs cleared');
+        }
+
+        function exportLogs() {
+            const logText = testLogs.map(log => `[${log.timestamp}] ${log.message}`).join('\n');
+            const blob = new Blob([logText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `wia-semi-002-logs-${Date.now()}.txt`;
+            a.click();
+            addLog('Logs exported successfully');
+        }
+
+        // Initialize with a sample wafer map
+        window.onload = function() {
+            addLog('WIA-SEMI-002 Simulator ready');
+            runWaferTest();
+        };
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

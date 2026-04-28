@@ -1,241 +1,436 @@
-# WIA-education-integration PHASE 2 — API-INTERFACE Specification
+# WIA-education-integration PHASE 2 — API Interface Specification
 
 **Standard:** WIA-education-integration
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-education-integration (Education Integration).
+This document defines the HTTPS API contract that
+an education-integration operator (national
+education ministry, multilateral programme
+secretariat, international school, education-
+development agency, recognition authority,
+education-data warehouse) exposes for the records
+defined in PHASE-1. The contract carries the
+programme registration, ISCED 2011 classification
+upload, curriculum publication, learner
+registration, recognition-decision issuance,
+mobility-flow recording, and chain-of-custody
+anchoring endpoints.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics), RFC 9111
+  (HTTP Caching), RFC 9457 (Problem Details),
+  RFC 8288 (Web Linking), RFC 6901 / 6902
+  (JSON Pointer / Patch), RFC 8259 (JSON), RFC
+  4122 (UUID), RFC 9421 (HTTP Message
+  Signatures), RFC 8615 (well-known URIs)
+- W3C Trace Context
+- ISO/IEC 27001:2022, ISO/IEC 17021-1:2015,
+  ISO/IEC 17065:2012
+- ISO 21001:2018 (educational organisations
+  management system requirements)
+- ISO/IEC 19796-1:2005 (e-learning quality
+  management)
+- IMS Global LTI 1.3 / Advantage, OneRoster
+  1.2, Caliper Analytics 1.2, QTI 3.0
+- IMS Open Badges 3.0, W3C Verifiable
+  Credentials Data Model v2.0
+- UNESCO ISCED 2011, ISCED-F 2013
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-education-integration
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published
+by the operator. The OpenAPI 3.1 document at
+`/v1/openapi.json` is canonical for the WIA
+endpoints declared in this PHASE. Schema
+changes follow the non-breaking conventions in
+PHASE-1 §2. Every endpoint carries a per-
+request signature using HTTP Message Signatures
+(RFC 9421) anchored to the operator's
+accreditation reference (the ISO 21001
+certification, the Lisbon / Tokyo / Global
+Convention competent-authority designation,
+the multilateral programme's secretariat
+designation); the signature key set is
+published at
+`/.well-known/wia/education-integration/keys.json`.
 
-## §2 Manifest
+## §2 Root Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "education-integration"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /v1/
+```
 
-## §3 Conformance Tiers
+```json
+{
+  "standard": "WIA-education-integration",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":          "/v1/programmes",
+    "iscedRecords":        "/v1/isced-records",
+    "curricula":           "/v1/curricula",
+    "learners":            "/v1/learners",
+    "recognitionDecisions": "/v1/recognition-decisions",
+    "mobilityRecords":     "/v1/mobility-records",
+    "custody":             "/v1/custody-events",
+    "openapi":             "/v1/openapi.json",
+    "wellKnown":           "/.well-known/wia/education-integration"
+  }
+}
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 ISCED Programme Endpoints
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+### §3.1 Register an ISCED programme
 
-## §4 Discovery
+```
+POST /v1/isced-records
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/education-integration`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Request body carries the §3 record from
+PHASE-1 (iscedLevel, iscedField, duration,
+awardName, nationalFrameworkRef). The server
+returns `201 Created` with the canonical
+resource URL at
+`/v1/isced-records/{iscedRecordId}` and
+validates the declared `iscedLevel` against
+the ISCED 2011 level table: a programme
+awarding a "Bachelor of Science" with
+`iscedLevel: 5` (short-cycle tertiary) is
+rejected with `422 Unprocessable Entity`
+carrying an RFC 9457 problem document at
+`/problems/isced-level-award-mismatch` and the
+position of the offending field expressed as a
+JSON Pointer (RFC 6901), since a Bachelor
+degree is ISCED Level 6.
 
-## §5 Time and Identity
+### §3.2 Retrieve an ISCED record
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+GET /v1/isced-records/{iscedRecordId}
+Accept: application/json
+```
 
-## §6 Versioning and Deprecation
+The response carries the registered ISCED
+record, the link set covering its curricula,
+its enrolled learners, and its issued
+recognition decisions. A `Link` header (RFC
+8288) carries pagination cursors when the
+linked-resource collection exceeds the per-
+collection page size declared at the
+`/v1/openapi.json` document.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+### §3.3 Search ISCED records
 
-## §7 Privacy and Security
+```
+GET /v1/isced-records?level={level}
+&field={field}&country={iso3166-alpha3}
+&page={cursor}&size={size}
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The response is an RFC 8288 `Link`-paginated
+collection of ISCED records matching the
+filter. The `level` filter accepts the ISCED
+2011 levels 0 through 8; the `field` filter
+accepts the ISCED-F 2013 narrow-field codes.
 
-## §8 Open Governance
+## §4 Curriculum Endpoints
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `education-integration` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+### §4.1 Publish a curriculum
+
+```
+POST /v1/curricula
+Content-Type: application/json
+Signature: <RFC 9421 signature from the
+            operator's quality-assurance
+            authority>
+```
+
+Request body carries the §4 record from
+PHASE-1. The server validates that the sum of
+the per-module `creditValue` is consistent
+with the declared `totalCredits` value within
+the operator's tolerance threshold (a 0.5-
+credit tolerance is the default per the
+operator's declared discipline).
+
+### §4.2 Retrieve a curriculum
+
+```
+GET /v1/curricula/{curriculumId}
+Accept: application/json
+```
+
+### §4.3 LTI integration
+
+```
+GET /v1/curricula/{curriculumId}/lti-launch
+```
+
+Where the operator integrates with an LMS via
+IMS LTI 1.3, the endpoint returns the LTI
+launch payload bound to the requesting LMS
+context.
+
+## §5 Learner Endpoints
+
+### §5.1 Register a learner
+
+```
+POST /v1/learners
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+Request body carries the §5 record from
+PHASE-1. The server uses a pseudonymous
+learner identifier; the linkage between the
+pseudonym and the directly-identifying record
+is held in the operator's identity vault
+(PHASE-3 §8).
+
+### §5.2 Retrieve a learner record
+
+```
+GET /v1/learners/{learnerId}
+Accept: application/json
+```
+
+### §5.3 Per-learner transcript
+
+```
+GET /v1/learners/{learnerId}/transcript
+Accept: application/json
+```
+
+The transcript carries the learner's per-
+programme enrolment, the per-programme credit
+accumulation, the per-mobility credit
+recognition, and the per-decision recognition
+record. The transcript is signed by the
+operator using the operator's signing-key set.
+
+## §6 Recognition-Decision Endpoints
+
+### §6.1 Publish a recognition decision
+
+```
+POST /v1/recognition-decisions
+Content-Type: application/json
+Signature: <RFC 9421 signature from the
+            recognition authority>
+```
+
+Request body carries the §6 record from
+PHASE-1. The server enforces the convention-
+to-authority binding: a `Lisbon-Recognition-
+Convention-1997` decision MUST be issued by
+an authority designated under that convention.
+A mismatch returns `403 Forbidden` at
+`/problems/recognition-authority-not-
+designated`.
+
+### §6.2 Retrieve a recognition decision
+
+```
+GET /v1/recognition-decisions/{recognitionId}
+Accept: application/json
+```
+
+### §6.3 Appeal a recognition decision
+
+```
+POST /v1/recognition-decisions/{recognitionId}/appeals
+Content-Type: application/json
+Signature: <RFC 9421 signature from the
+            applicant>
+```
+
+Per Lisbon Article III.5, the applicant
+lodges an appeal against the recognition
+decision. The appeal carries the substantive
+grounds under the convention's substantive
+criteria (absence of substantial difference,
+fair procedure, transparency).
+
+## §7 Mobility Endpoints
+
+### §7.1 Record a mobility flow
+
+```
+POST /v1/mobility-records
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+Request body carries the §7 record from
+PHASE-1. The server enforces that the
+`fromCountry` and `toCountry` are different
+(except where the operator declares an intra-
+country exchange) and that the
+`learningAgreementRef` URL carries a
+countersigned learning agreement signed by
+the sending and receiving institutions.
+
+### §7.2 Retrieve a mobility record
+
+```
+GET /v1/mobility-records/{mobilityId}
+Accept: application/json
+```
+
+## §8 Custody and Error Reporting
+
+### §8.1 Anchor a custody event
+
+```
+POST /v1/custody-events
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+### §8.2 Error envelope
+
+Errors are returned using RFC 9457 Problem
+Details. Validation errors carry a `pointer`
+(RFC 6901). The server emits a per-request
+`traceparent` header (W3C Trace Context).
+
+## §9 Concurrency and Cache
+
+Every retrieval endpoint emits an `ETag`
+header (RFC 9110 §8.8.3). Conditional
+requests (`If-Match`, `If-None-Match`) are
+honoured.
+
+## §10 Bulk Export for Education-Statistics
+
+```
+GET /v1/programmes:bulk
+Accept: application/x-ndjson
+```
+
+A multilateral education-statistics body
+(UNESCO Institute for Statistics, OECD
+Education Directorate) requests the operator's
+programme register as a newline-delimited JSON
+stream. The endpoint streams the programme
+records in registration-date order; a consumer
+resuming the stream provides an
+`If-Resume-After` header carrying the last-
+received registration timestamp.
+
+## §11 Caliper Analytics Endpoint
+
+```
+POST /v1/caliper-events
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+Where the operator integrates with an LMS via
+IMS Caliper 1.2, the endpoint receives Caliper
+events from the LMS for the operator's
+analytics-and-reporting programme.
+
+## §12 Verifiable-Credentials Re-Issuance
+
+```
+GET /v1/learners/{learnerId}/credentials
+Accept: application/json
+```
+
+A learner's diploma or transcript is re-
+issuable as a W3C Verifiable Credential signed
+by the operator's signing-key set so that a
+downstream recognition authority can verify
+the credential without contacting the issuing
+operator directly.
+
+## §13 Schema-Validation and Conformance
+
+The OpenAPI 3.1 document at
+`/v1/openapi.json` carries JSON Schema 2020-12
+schemas for every request and response
+envelope. Schemas are published with
+`additionalProperties: false` on top-level
+objects.
+
+```
+GET /v1/conformance/test-vectors
+Accept: application/json
+```
+
+The operator publishes the conformance test
+vectors used to qualify the API implementation
+against this specification.
+
+## §14 Webhook Endpoint for Recognition Notifications
+
+```
+POST /v1/programmes/{programmeId}/webhooks
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+A learner, a sending institution, or a
+receiving institution registers a webhook to
+receive a push notification when a recognition
+decision is issued, a mobility record is
+recorded, or a transcript is re-issued.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## §15 Subscriptions for the Education Statistics
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+GET /v1/programmes/{programmeId}/statistics
+?period={iso8601}/{iso8601}
+Accept: application/json
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+A multilateral education-statistics body
+(UNESCO Institute for Statistics, OECD
+Education Directorate) subscribes to the
+operator's per-period statistics envelope
+covering the per-ISCED-level enrolment count,
+the per-ISCED-field graduate count, and the
+per-jurisdictional intake-and-outflow mobility
+flow. The response is signed by the operator's
+public-key set so that the downstream
+multilateral consumer can validate the
+envelope offline.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §16 Pseudonymisation Discipline
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The operator's API does not surface the
+learner's directly-identifying record. The
+learner-identity vault is an operator-internal
+service accessed only through a separate
+authenticated endpoint subject to the
+operator's role-based access-control policy
+declared in PHASE-3 §9.
 
-## Annex F — Adoption Roadmap
+## §17 Multi-Language Programme Surface
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+GET /v1/programmes/{programmeId}?lang={lang}
+Accept: application/json
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The operator's programme record is published
+in each operator-declared language with the
+programme's title, the qualification's award
+name, the curriculum's per-module title, and
+the recognition decision's substantive
+reasoning translated. The classification codes
+(ISCED level, ISCED field, EQF level) are
+language-neutral and carried in the canonical
+form across all retrievals.

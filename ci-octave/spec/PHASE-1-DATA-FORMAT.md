@@ -1,274 +1,414 @@
-# WIA-ci-octave PHASE 1 — DATA-FORMAT Specification
+# WIA-ci-octave PHASE 1 — Data Format Specification
 
 **Standard:** WIA-ci-octave
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-ci-octave (Ci Octave).
+This document defines the canonical data-format
+layer for WIA-ci-octave. The standard covers
+the persistent record shapes that an
+information-security risk-management operator
+(an enterprise CISO office, a public-sector
+agency information-security team, a critical-
+infrastructure operator, a healthcare-IT risk
+manager, a financial-services risk officer, a
+managed-security-services provider, a third-
+party-risk-management programme operator)
+maintains when running the OCTAVE (Operationally
+Critical Threat, Asset, and Vulnerability
+Evaluation) Allegro / FORTE methodology
+developed by the CMU Software Engineering
+Institute, anchored to ISO/IEC 27005 information-
+security risk management, NIST SP 800-30 risk-
+assessment guidance, and ISO 31000 enterprise
+risk management. Records are consumed by the
+risk owner accepting or treating the residual
+risk, by the audit committee approving the
+risk-treatment plan, by the certification body
+auditing the operator's ISO/IEC 27001 ISMS, by
+the internal-audit function running the second-
+line review, and by the supervisory regulator
+enforcing the operator's sectoral information-
+security obligations.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- CMU Software Engineering Institute (SEI)
+  CERT Division — OCTAVE Allegro
+  (Carnegie Mellon University SEI Technical
+  Report CMU/SEI-2007-TR-012) and OCTAVE FORTE
+  (CMU/SEI-2020-TR-002), the operationally-
+  critical-threat-asset-and-vulnerability-
+  evaluation methodologies authoritatively
+  published by the SEI
+- CMU SEI CERT Resilience Management Model
+  (CERT-RMM) v1.2
+- CMU SEI Insider Threat Programme reference
+- ISO/IEC 27001:2022 (information security
+  management systems — requirements)
+- ISO/IEC 27002:2022 (information security
+  controls)
+- ISO/IEC 27005:2022 (information security
+  risk management)
+- ISO 31000:2018 (risk management —
+  guidelines), ISO/IEC 31010:2019 (risk
+  assessment techniques)
+- ISO/IEC 27017:2015 (cloud-services
+  information-security controls), ISO/IEC
+  27018:2019 (cloud-services personal-data
+  protection)
+- ISO/IEC 27036 series (information security
+  for supplier relationships) — ISO/IEC
+  27036-1:2021, ISO/IEC 27036-2:2022, ISO/IEC
+  27036-3:2023, ISO/IEC 27036-4:2016
+- NIST SP 800-30 Rev. 1 (Guide for Conducting
+  Risk Assessments), NIST SP 800-37 Rev. 2
+  (Risk Management Framework — RMF), NIST SP
+  800-53 Rev. 5 (Security and Privacy Controls
+  for Information Systems and Organizations)
+- NIST Cybersecurity Framework v2.0 (CSF 2.0)
+- US FIPS PUB 199 (Standards for Security
+  Categorization of Federal Information and
+  Information Systems), FIPS PUB 200 (Minimum
+  Security Requirements for Federal Information
+  and Information Systems)
+- US FedRAMP authorisation
+- EU NIS2 Directive (Directive (EU) 2022/2555),
+  EU DORA Regulation (EU) 2022/2554, EU CRA
+  Regulation (EU) 2024/2847
+- ENISA Threat Landscape, ENISA Risk Assessment
+  Methodology
+- Open FAIR (Factor Analysis of Information
+  Risk) — published by The Open Group
+- IEC 62443-3-2:2020 (security risk assessment
+  for system design — for the OT-system
+  binding)
+- KR 정보통신망 이용촉진 및 정보보호 등에 관한
+  법률, KR 개인정보 보호법, KR 전자금융거래법, KR
+  중요정보통신기반시설 보호법 (Critical Information
+  Infrastructure Protection Act)
+- KR-ISMS-P (Information Security Management
+  System and Personal Information Management
+  System) certification scheme operated by KISA
+- IETF RFC 8259 (JSON), RFC 4122 (UUID), ISO
+  8601 (date-time)
+- W3C Verifiable Credentials Data Model v2.0
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-ci-octave
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the
+artefacts exchanged when an organisation runs
+an OCTAVE Allegro / FORTE risk-evaluation
+cycle, anchors the cycle to the ISO/IEC 27005
+risk-management process, applies the NIST SP
+800-30 likelihood-and-impact discipline, and
+publishes the resulting risk-treatment plan to
+the audit committee and the regulator.
+Implementations covered include:
 
-## §2 Manifest
+- An enterprise CISO office running the
+  annual OCTAVE Allegro cycle covering the
+  organisation's critical-asset inventory,
+  threat-and-vulnerability evaluation, and
+  risk-treatment plan.
+- A public-sector agency running the OCTAVE
+  FORTE cycle as the agency's risk-management
+  operating model under the agency's
+  information-security policy and the NIST RMF
+  authorisation envelope.
+- A critical-infrastructure operator (an
+  electric-utility operator, a water-utility
+  operator, a transportation-system operator)
+  running the OCTAVE FORTE cycle anchored to
+  the EU NIS2 Directive's risk-management
+  obligations or the equivalent national
+  legislation.
+- A healthcare-IT risk manager running the
+  OCTAVE Allegro cycle anchored to the
+  HIPAA Security Rule's risk-analysis
+  requirement (45 CFR § 164.308(a)(1)) where
+  applicable, or to the equivalent national
+  health-information-security framework.
+- A financial-services risk officer running
+  the OCTAVE FORTE cycle anchored to the
+  EU DORA Regulation's ICT-risk-management
+  framework or the equivalent national
+  financial-regulator framework (the US
+  Federal Financial Institutions Examination
+  Council FFIEC IT Examination Handbook).
+- A managed-security-services provider
+  delivering the OCTAVE Allegro evaluation as
+  a contracted service to a customer
+  organisation, with the per-engagement
+  contract envelope and the per-engagement
+  evidence-handling discipline.
+- A third-party-risk-management programme
+  operator running the OCTAVE Allegro
+  evaluation on a supplier engagement under
+  the ISO/IEC 27036 supplier-relationship
+  discipline.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "ci-octave"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The OCTAVE Allegro per-asset evaluation
+envelope, the OCTAVE FORTE programme-level
+governance envelope, the ISO/IEC 27005
+process-mapping envelope, and the NIST SP
+800-30 likelihood-and-impact envelope receive
+distinct encodings in this PHASE; the
+additional safeguards required by each
+sectoral framework are encoded in PHASE-3 §3.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name of the
+                       operator — enterprise,
+                       public-sector agency,
+                       critical-infrastructure
+                       operator, healthcare-IT
+                       provider, financial-
+                       services firm, MSSP,
+                       third-party-risk-
+                       management programme)
+operatorRole         : enum ("ciso-office" |
+                       "agency-information-
+                       security" | "critical-
+                       infrastructure-operator"
+                       | "healthcare-it-risk" |
+                       "financial-services-
+                       risk" | "mssp" |
+                       "third-party-risk" |
+                       "user-defined")
+governingFrameworks  : array of enum ("OCTAVE-
+                       ALLEGRO" | "OCTAVE-FORTE"
+                       | "CERT-RMM-1.2" |
+                       "ISO-IEC-27001-2022" |
+                       "ISO-IEC-27002-2022" |
+                       "ISO-IEC-27005-2022" |
+                       "ISO-31000-2018" |
+                       "ISO-IEC-31010-2019" |
+                       "ISO-IEC-27017" |
+                       "ISO-IEC-27018" |
+                       "ISO-IEC-27036-1" |
+                       "ISO-IEC-27036-2" |
+                       "NIST-SP-800-30" |
+                       "NIST-SP-800-37" |
+                       "NIST-SP-800-53" |
+                       "NIST-CSF-2.0" |
+                       "FIPS-PUB-199" |
+                       "FIPS-PUB-200" |
+                       "EU-NIS2-2022-2555" |
+                       "EU-DORA-2022-2554" |
+                       "EU-CRA-2024-2847" |
+                       "Open-FAIR" |
+                       "IEC-62443-3-2-2020" |
+                       "KR-ISMS-P" |
+                       "user-defined")
+accreditationStatus  : object (the ISO/IEC
+                       27001 certification
+                       reference, the FedRAMP
+                       authorisation reference,
+                       the KR-ISMS-P certification
+                       reference, the SEI CERT
+                       OCTAVE-trained-evaluator
+                       designation)
+programmeStatus      : enum ("design" | "operating"
+                       | "limited-rollout" |
+                       "wind-down" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Critical-Asset Record (OCTAVE Allegro Step 2)
 
-## §4 Discovery
+```
+assetRecord:
+  assetId            : string (uuidv7)
+  programmeRef       : string (PHASE-1 §2 record
+                       reference)
+  assetName          : string (the operator's
+                       canonical name for the
+                       asset — for example
+                       "patient-record database"
+                       or "core-banking ledger")
+  assetType          : enum ("information-asset" |
+                       "system-asset" | "software-
+                       asset" | "hardware-asset" |
+                       "people-asset" | "facility-
+                       asset" | "service-asset" |
+                       "user-defined")
+  fipsCategorisation : object (the FIPS PUB 199
+                       categorisation per
+                       confidentiality, integrity,
+                       and availability — each
+                       at "low", "moderate", or
+                       "high")
+  rationale          : string (the operator's
+                       documented rationale for
+                       the asset's selection as
+                       a critical asset per the
+                       OCTAVE Allegro Step 2
+                       prioritisation)
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/ci-octave`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Risk-Area-of-Concern Record (OCTAVE Allegro Step 4)
 
-## §5 Time and Identity
+```
+areaOfConcern:
+  concernId          : string (uuidv7)
+  assetRef           : string (PHASE-1 §3 record
+                       reference)
+  threatScenario     : string (the identified
+                       threat scenario per the
+                       OCTAVE Allegro Step 4
+                       template)
+  threatActor        : enum ("insider-malicious"
+                       | "insider-accidental" |
+                       "outsider-criminal" |
+                       "outsider-state" |
+                       "outsider-hacktivist" |
+                       "natural-disaster" |
+                       "supply-chain" | "user-
+                       defined")
+  threatVector       : string (the threat-vector
+                       declaration — phishing,
+                       credential-stuffing,
+                       supply-chain compromise,
+                       physical-intrusion,
+                       insider-exfiltration,
+                       ransomware, denial-of-
+                       service, mis-configuration,
+                       prompt-injection)
+  consequenceArea    : enum ("reputation-and-
+                       trust" | "financial" |
+                       "productivity" |
+                       "safety-and-health" |
+                       "fines-and-legal-penalties"
+                       | "regulatory-compliance"
+                       | "user-defined")
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 Risk-Score Record (NIST SP 800-30 Likelihood × Impact)
 
-## §6 Versioning and Deprecation
+```
+riskScore:
+  riskScoreId        : string (uuidv7)
+  concernRef         : string (PHASE-1 §4 record
+                       reference)
+  likelihoodLevel    : enum ("very-low" | "low"
+                       | "moderate" | "high" |
+                       "very-high")
+  impactLevel        : enum ("very-low" | "low"
+                       | "moderate" | "high" |
+                       "very-high")
+  overallRisk        : enum (per NIST SP 800-30
+                       Appendix I Table I-2 —
+                       "very-low" | "low" |
+                       "moderate" | "high" |
+                       "very-high")
+  openFairBinding    : object (where the
+                       operator additionally
+                       declares an Open FAIR
+                       quantitative envelope —
+                       Loss Event Frequency, Loss
+                       Magnitude, with the
+                       operator's documented
+                       distribution parameters)
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 Risk-Treatment Record (OCTAVE Allegro Step 7)
 
-## §7 Privacy and Security
+```
+treatmentRecord:
+  treatmentId        : string (uuidv7)
+  riskScoreRef       : string (PHASE-1 §5 record
+                       reference)
+  treatmentDecision  : enum ("accept" | "mitigate"
+                       | "transfer" | "avoid")
+  acceptanceRationale : string (where decision
+                       is "accept", the
+                       documented residual-risk-
+                       acceptance rationale)
+  mitigationControls : array of object (per-
+                       control — the ISO/IEC
+                       27002 control reference,
+                       the NIST SP 800-53
+                       control reference, the
+                       per-control implementation
+                       owner, the per-control
+                       implementation deadline)
+  transferBinding    : object (where decision is
+                       "transfer", the cyber-
+                       insurance policy reference
+                       or the contractual-transfer
+                       reference)
+  riskOwnerRef       : string (the per-treatment
+                       risk-owner identifier —
+                       the named senior accountable
+                       person)
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 Per-Cycle Audit Record
 
-## §8 Open Governance
+```
+auditRecord:
+  auditRecordId      : string (uuidv7)
+  programmeRef       : string (PHASE-1 §2 record
+                       reference)
+  cyclePeriod        : object (the per-cycle
+                       coverage period — start
+                       and end ISO 8601 dates)
+  auditorRef         : string (the per-cycle
+                       lead-auditor identifier
+                       — internal-audit function,
+                       external auditor, or SEI
+                       CERT-trained OCTAVE
+                       evaluator)
+  findingsCount      : object (per-severity
+                       finding count — "critical",
+                       "high", "moderate", "low",
+                       "informational")
+  managementResponse : string (the per-cycle
+                       management response per
+                       ISO/IEC 27001 §9.3
+                       management review)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `ci-octave` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §8 Chain-of-Custody Record
+
+```
+custodyRecord:
+  custodyId          : string (uuidv7)
+  artefactRef        : string (the asset, area-
+                       of-concern, risk-score,
+                       treatment, or audit
+                       identifier)
+  custodyEvent       : enum ("asset-registered"
+                       | "concern-identified" |
+                       "risk-scored" |
+                       "treatment-decided" |
+                       "treatment-implemented" |
+                       "cycle-completed" |
+                       "audit-finding-issued" |
+                       "user-defined")
+  eventTimestamp     : string (ISO 8601 date-time)
+  performingParty    : string (legal entity)
+  hashOfArtefacts    : string (SHA-256 hex digest)
+```
+
+## §9 Manifest
+
+Implementations publish a signed manifest carrying
+`standardSlug` (constant value "ci-octave"),
+`version`, `implementation`, the operator's
+`accreditationStatus`, and the `profile`
+declaration that selects which of the optional
+records (asset, area-of-concern, risk-score,
+treatment, audit) the implementation supports.
+The manifest is signed using a key whose public
+part is published on the operator's
+`.well-known/wia/ci-octave/` discovery endpoint
+declared in PHASE-2.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
-
-
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
-
-## Annex J — Reference Implementation Topology
-
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
-
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-1-DATA-FORMAT validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
-
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.

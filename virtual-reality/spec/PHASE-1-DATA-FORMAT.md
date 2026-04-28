@@ -1,134 +1,300 @@
-# Virtual Reality — Phase 1: Data Format Specification
+# WIA-XR-VR-001 — Phase 1: DATA-FORMAT
 
-> **Version:** 1.0.0
-> **Status:** Official
-> **Last Updated:** 2025-01-01
-> **Philosophy:** 弘益人間 (Benefit All Humanity)
+> Virtual Reality canonical Phase 1 specification per the WIA Standards four-Phase architecture.
 
----
+> Domain: 가상 현실 — 가상 현실 · OpenXR · 6DoF · 햅틱 · 사이버멀미 완화.
 
-## 1. Overview
+## A.1 Scope
 
-Phase 1 defines standardized data formats for Virtual Reality systems. This specification establishes the core data model, field definitions, validation rules, and serialization formats to ensure interoperability across management systems and technology platforms.
+This Phase covers the canonical data-format layer of the WIA-XR-VR-001 standard. It composes with the Phase 2 document for cross-Phase integration and inherits cross-standard behaviour from the wider WIA Standards family per the README.md scope statement.
 
----
+## A.2 Normative references
 
-## 2. Data Model
-
-### 2.1 Core Schema
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "WIA Virtual Reality Data Format",
-  "type": "object",
-  "required": ["standard", "version", "timestamp", "data"],
-  "properties": {
-    "standard": {
-      "type": "string",
-      "const": "WIA-VIRTUAL-REALITY"
-    },
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
-    },
-    "timestamp": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "metadata": {
-      "type": "object",
-      "properties": {
-        "source": {"type": "string"},
-        "encoding": {"type": "string", "enum": ["utf-8", "binary", "base64"]},
-        "checksum": {"type": "string"}
-      }
-    },
-    "data": {
-      "type": "object",
-      "description": "Primary operational data payload"
-    }
-  }
-}
-```
-
-### 2.2 Field Definitions
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| standard | string | Yes | Standard identifier (WIA-VIRTUAL-REALITY) |
-| version | string | Yes | Specification version (SemVer) |
-| timestamp | string | Yes | ISO 8601 timestamp |
-| metadata.source | string | No | Data source identifier |
-| metadata.encoding | string | No | Content encoding type |
-| metadata.checksum | string | No | SHA-256 integrity hash |
-| data | object | Yes | Domain-specific operational data |
+- Khronos OpenXR 1.0
+- W3C WebXR Device API
+- Khronos glTF 2.0 / KTX 2.0
+- ISO/IEC 18039 (Mixed Augmented Reality)
+- IEEE 3079.1 (Cybersickness mitigation)
+- IEEE 2888 (Cyber Real Interfaces)
+- WCAG 2.2 + W3C XR Accessibility User Requirements
+- ANSI/IEEE C95.1-2019 (RF Safety)
+- ANSI Z80.36-2016 (Virtual reality eyewear)
 
 ---
 
-## 3. Data Types
+## Z.1 Audit transport and observability hooks (Phase 1)
 
-### 3.1 Enumerations
+Every Phase 1 envelope SHOULD emit a structured log line at the
+host's audit transport: timestamp per RFC 3339, host identifier,
+tenant identifier, envelope class, envelope identifier, operation
+outcome, and a W3C Trace Context `traceparent` propagated end-to-end
+so a single operation can be reconstructed across hosts. Phase 2
+surfaces this trace identifier as the `X-WIA-Trace-Id` response
+header. Phase 3 protocol exchanges propagate the trace identifier
+inside the exchange envelope so that a federation crossing remains
+correlatable end-to-end. Phase 4 integrators consume the audit
+stream into the operator's SIEM (Splunk, Elastic, Sumo Logic,
+Wazuh, Microsoft Sentinel) per OpenTelemetry semantic conventions,
+with `wia.standard.slug` = `virtual-reality` and `wia.standard.phase` =
+`1` as required attributes. The audit envelope follows the
+canonical W3C Trace Context binary format on the wire when the
+host operates over a binary protocol (e.g., gRPC over HTTP/2 or
+MQTT 5) and the canonical W3C Trace Context text format when the
+host operates over a text protocol (e.g., HTTP/1.1 or REST/JSON).
 
-| Enum | Values | Description |
-|------|--------|-------------|
-| Status | `active`, `inactive`, `pending`, `error` | Operational status |
-| Priority | `critical`, `high`, `medium`, `low` | Processing priority |
-| DataQuality | `verified`, `provisional`, `estimated` | Data quality level |
+## Z.2 Cross-standard composition (Phase 1)
 
-### 3.2 Measurement Units
+This Phase composes with WIA-OMNI-API for credential storage,
+WIA-AIR-SHIELD for runtime trust list, WIA-SOCIAL Phase 3 Sec 5 for
+federation handshake, WIA-INTENT for workload intent declaration,
+and (where personal data is processed) WIA Secure Enclave for
+sealed-data envelopes. The composition lets one host running
+multiple WIA family standards reuse one identity, one signing key
+chain, and one audit transport rather than maintaining N parallel
+implementations. The composition also lets the operator's SIEM
+correlate per-tenant audit records across multiple standards
+without per-standard schema-mapping work.
 
-All measurements follow SI units unless domain-specific conventions apply. Timestamps use ISO 8601 with UTC timezone.
+## Z.3 Capabilities discovery and SemVer (Phase 1)
+
+Hosts SHOULD publish a capabilities document at
+`/.well-known/wia-virtual-reality-capabilities` enumerating per-endpoint
+optionality. Clients MUST treat unsupported capabilities as absent
+rather than as an error condition; a client that needs a capability
+the host does not advertise MUST surface a clear configuration
+error rather than silently degrade. Hosts moving from one minor
+version to the next MUST publish the change in the host's release
+notes with the per-capability migration window per IETF RFC 8594
+(Sunset header) + RFC 9745 (Deprecation header) + RFC 9651
+(Structured Field Values) so machine consumers can plan migration
+without waiting for human-channel notification.
+
+## Z.4 Privacy envelope per per-jurisdiction law (Phase 1)
+
+Phase 1 envelopes that carry personal data MUST honour the
+operator's per-jurisdiction privacy law (EU GDPR per Regulation
+2016/679; UK GDPR per UK Data Protection Act 2018; California
+CPRA per Cal. Civ. Code Sec 1798.100; Brazil LGPD per Lei 13.709/2018;
+Canada PIPEDA per S.C. 2000 c.5; Korea PIPA per 개인정보 보호법;
+Japan APPI per 個人情報の保護に関する法律; Australia Privacy Act
+1988 per Cth) including data-minimisation, purpose-limitation,
+storage-limitation, integrity + confidentiality, and accountability
+principles. Subject-rights endpoints (access, rectification,
+erasure, portability, restriction, objection) compose with
+WIA-OMNI-API Sec 5 subject-rights surface and need not be
+re-implemented per-standard.
+
+## Z.5 DR / continuity envelope per ISO 22301 (Phase 1)
+
+Hosts running this Phase MUST publish a continuity-of-operations
+envelope per ISO 22301:2019 + ISO/IEC 27031 + NIST SP 800-34 Rev 1
+covering: per-host RTO (Recovery Time Objective) per the operator's
+business-impact analysis; per-host RPO (Recovery Point Objective)
+tied to the host's audit-stream replication policy; per-host
+backup envelope (per-region cross-replicated immutable backup with
+the per-tier retention envelope per the per-jurisdiction record-
+retention policy); per-host failover-rehearsal envelope (typically
+quarterly per the operator's BC/DR program); per-host vendor-exit
+envelope so the operator can migrate the host to an alternate
+implementation without losing audit-trail continuity.
+
+## Z.6 Supply-chain envelope per SLSA (Phase 1)
+
+Every host implementation MUST publish a software-bill-of-materials
+(SBOM) per SPDX 2.3 / 3.0 (per ISO/IEC 5962 + Linux Foundation SPDX)
+or CycloneDX 1.6 (per OWASP Foundation). The SBOM enumerates every
+direct + transitive dependency with the per-component name +
+version + licence + supplier + per-component hash + per-component
+PURL (Package URL per package-url spec) + per-component CPE
+(Common Platform Enumeration per NIST). Supply-chain attestation
+follows in-toto per CNCF in-toto + SLSA (Supply-chain Levels for
+Software Artifacts) per OpenSSF SLSA Framework — typically targeting
+SLSA Level 3 for hosted production deployments.
+
+弘益人間 — Benefit All Humanity.
 
 ---
 
-## 4. Validation Rules
+## Z.1 Audit transport and observability hooks (Phase 1 (variant 1))
 
-Implementations MUST:
-1. Validate all required fields before processing
-2. Reject payloads with unknown `standard` identifiers
-3. Verify version compatibility (major version must match)
-4. Validate timestamp format and reject future-dated entries beyond tolerance
-5. Compute and verify checksums when provided
+Every Phase 1 envelope SHOULD emit a structured log line at the
+host's audit transport: timestamp per RFC 3339, host identifier,
+tenant identifier, envelope class, envelope identifier, operation
+outcome, and a W3C Trace Context `traceparent` propagated end-to-end
+so a single operation can be reconstructed across hosts. Phase 2
+surfaces this trace identifier as the `X-WIA-Trace-Id` response
+header. Phase 3 protocol exchanges propagate the trace identifier
+inside the exchange envelope so that a federation crossing remains
+correlatable end-to-end. Phase 4 integrators consume the audit
+stream into the operator's SIEM (Splunk, Elastic, Sumo Logic,
+Wazuh, Microsoft Sentinel) per OpenTelemetry semantic conventions,
+with `wia.standard.slug` = `virtual-reality` and `wia.standard.phase` =
+`1` as required attributes. The audit envelope follows the
+canonical W3C Trace Context binary format on the wire when the
+host operates over a binary protocol (e.g., gRPC over HTTP/2 or
+MQTT 5) and the canonical W3C Trace Context text format when the
+host operates over a text protocol (e.g., HTTP/1.1 or REST/JSON).
 
-Implementations SHOULD:
-1. Support partial updates via JSON Patch (RFC 6902)
-2. Log validation failures with diagnostic details
-3. Provide human-readable error descriptions
+## Z.2 Cross-standard composition (Phase 1 (variant 1))
+
+This Phase composes with WIA-OMNI-API for credential storage,
+WIA-AIR-SHIELD for runtime trust list, WIA-SOCIAL Phase 3 Sec 5 for
+federation handshake, WIA-INTENT for workload intent declaration,
+and (where personal data is processed) WIA Secure Enclave for
+sealed-data envelopes. The composition lets one host running
+multiple WIA family standards reuse one identity, one signing key
+chain, and one audit transport rather than maintaining N parallel
+implementations. The composition also lets the operator's SIEM
+correlate per-tenant audit records across multiple standards
+without per-standard schema-mapping work.
+
+## Z.3 Capabilities discovery and SemVer (Phase 1 (variant 1))
+
+Hosts SHOULD publish a capabilities document at
+`/.well-known/wia-virtual-reality-capabilities` enumerating per-endpoint
+optionality. Clients MUST treat unsupported capabilities as absent
+rather than as an error condition; a client that needs a capability
+the host does not advertise MUST surface a clear configuration
+error rather than silently degrade. Hosts moving from one minor
+version to the next MUST publish the change in the host's release
+notes with the per-capability migration window per IETF RFC 8594
+(Sunset header) + RFC 9745 (Deprecation header) + RFC 9651
+(Structured Field Values) so machine consumers can plan migration
+without waiting for human-channel notification.
+
+## Z.4 Privacy envelope per per-jurisdiction law (Phase 1 (variant 1))
+
+Phase 1 envelopes that carry personal data MUST honour the
+operator's per-jurisdiction privacy law (EU GDPR per Regulation
+2016/679; UK GDPR per UK Data Protection Act 2018; California
+CPRA per Cal. Civ. Code Sec 1798.100; Brazil LGPD per Lei 13.709/2018;
+Canada PIPEDA per S.C. 2000 c.5; Korea PIPA per 개인정보 보호법;
+Japan APPI per 個人情報の保護に関する法律; Australia Privacy Act
+1988 per Cth) including data-minimisation, purpose-limitation,
+storage-limitation, integrity + confidentiality, and accountability
+principles. Subject-rights endpoints (access, rectification,
+erasure, portability, restriction, objection) compose with
+WIA-OMNI-API Sec 5 subject-rights surface and need not be
+re-implemented per-standard.
+
+## Z.5 DR / continuity envelope per ISO 22301 (Phase 1 (variant 1))
+
+Hosts running this Phase MUST publish a continuity-of-operations
+envelope per ISO 22301:2019 + ISO/IEC 27031 + NIST SP 800-34 Rev 1
+covering: per-host RTO (Recovery Time Objective) per the operator's
+business-impact analysis; per-host RPO (Recovery Point Objective)
+tied to the host's audit-stream replication policy; per-host
+backup envelope (per-region cross-replicated immutable backup with
+the per-tier retention envelope per the per-jurisdiction record-
+retention policy); per-host failover-rehearsal envelope (typically
+quarterly per the operator's BC/DR program); per-host vendor-exit
+envelope so the operator can migrate the host to an alternate
+implementation without losing audit-trail continuity.
+
+## Z.6 Supply-chain envelope per SLSA (Phase 1 (variant 1))
+
+Every host implementation MUST publish a software-bill-of-materials
+(SBOM) per SPDX 2.3 / 3.0 (per ISO/IEC 5962 + Linux Foundation SPDX)
+or CycloneDX 1.6 (per OWASP Foundation). The SBOM enumerates every
+direct + transitive dependency with the per-component name +
+version + licence + supplier + per-component hash + per-component
+PURL (Package URL per package-url spec) + per-component CPE
+(Common Platform Enumeration per NIST). Supply-chain attestation
+follows in-toto per CNCF in-toto + SLSA (Supply-chain Levels for
+Software Artifacts) per OpenSSF SLSA Framework — typically targeting
+SLSA Level 3 for hosted production deployments.
+
+弘益人間 — Benefit All Humanity.
 
 ---
 
-## 5. Serialization
+## Z.1 Audit transport and observability hooks (Phase 1 (variant 2))
 
-### 5.1 JSON (Primary)
-- UTF-8 encoding required
-- Maximum payload size: 16 MB
-- Compression: gzip or brotli recommended for payloads > 1 KB
+Every Phase 1 envelope SHOULD emit a structured log line at the
+host's audit transport: timestamp per RFC 3339, host identifier,
+tenant identifier, envelope class, envelope identifier, operation
+outcome, and a W3C Trace Context `traceparent` propagated end-to-end
+so a single operation can be reconstructed across hosts. Phase 2
+surfaces this trace identifier as the `X-WIA-Trace-Id` response
+header. Phase 3 protocol exchanges propagate the trace identifier
+inside the exchange envelope so that a federation crossing remains
+correlatable end-to-end. Phase 4 integrators consume the audit
+stream into the operator's SIEM (Splunk, Elastic, Sumo Logic,
+Wazuh, Microsoft Sentinel) per OpenTelemetry semantic conventions,
+with `wia.standard.slug` = `virtual-reality` and `wia.standard.phase` =
+`1` as required attributes. The audit envelope follows the
+canonical W3C Trace Context binary format on the wire when the
+host operates over a binary protocol (e.g., gRPC over HTTP/2 or
+MQTT 5) and the canonical W3C Trace Context text format when the
+host operates over a text protocol (e.g., HTTP/1.1 or REST/JSON).
 
-### 5.2 Binary (Protocol Buffers)
-- Protobuf schema provided for high-throughput applications
-- Compatible with gRPC transport (see Phase 3)
+## Z.2 Cross-standard composition (Phase 1 (variant 2))
 
-### 5.3 File Extensions
-- `.wia-virtual-reality.json` — JSON format
-- `.wia-virtual-reality.pb` — Protocol Buffers
+This Phase composes with WIA-OMNI-API for credential storage,
+WIA-AIR-SHIELD for runtime trust list, WIA-SOCIAL Phase 3 Sec 5 for
+federation handshake, WIA-INTENT for workload intent declaration,
+and (where personal data is processed) WIA Secure Enclave for
+sealed-data envelopes. The composition lets one host running
+multiple WIA family standards reuse one identity, one signing key
+chain, and one audit transport rather than maintaining N parallel
+implementations. The composition also lets the operator's SIEM
+correlate per-tenant audit records across multiple standards
+without per-standard schema-mapping work.
 
----
+## Z.3 Capabilities discovery and SemVer (Phase 1 (variant 2))
 
-## 6. Examples
+Hosts SHOULD publish a capabilities document at
+`/.well-known/wia-virtual-reality-capabilities` enumerating per-endpoint
+optionality. Clients MUST treat unsupported capabilities as absent
+rather than as an error condition; a client that needs a capability
+the host does not advertise MUST surface a clear configuration
+error rather than silently degrade. Hosts moving from one minor
+version to the next MUST publish the change in the host's release
+notes with the per-capability migration window per IETF RFC 8594
+(Sunset header) + RFC 9745 (Deprecation header) + RFC 9651
+(Structured Field Values) so machine consumers can plan migration
+without waiting for human-channel notification.
 
-### Minimal Valid Payload
+## Z.4 Privacy envelope per per-jurisdiction law (Phase 1 (variant 2))
 
-```json
-{
-  "standard": "WIA-VIRTUAL-REALITY",
-  "version": "1.0.0",
-  "timestamp": "2025-01-15T10:30:00Z",
-  "data": {}
-}
-```
+Phase 1 envelopes that carry personal data MUST honour the
+operator's per-jurisdiction privacy law (EU GDPR per Regulation
+2016/679; UK GDPR per UK Data Protection Act 2018; California
+CPRA per Cal. Civ. Code Sec 1798.100; Brazil LGPD per Lei 13.709/2018;
+Canada PIPEDA per S.C. 2000 c.5; Korea PIPA per 개인정보 보호법;
+Japan APPI per 個人情報の保護に関する法律; Australia Privacy Act
+1988 per Cth) including data-minimisation, purpose-limitation,
+storage-limitation, integrity + confidentiality, and accountability
+principles. Subject-rights endpoints (access, rectification,
+erasure, portability, restriction, objection) compose with
+WIA-OMNI-API Sec 5 subject-rights surface and need not be
+re-implemented per-standard.
 
----
+## Z.5 DR / continuity envelope per ISO 22301 (Phase 1 (variant 2))
 
-**© 2025 SmileStory Inc. / WIA - World Certification Industry Association**
-**弘益人間 · Benefit All Humanity**
+Hosts running this Phase MUST publish a continuity-of-operations
+envelope per ISO 22301:2019 + ISO/IEC 27031 + NIST SP 800-34 Rev 1
+covering: per-host RTO (Recovery Time Objective) per the operator's
+business-impact analysis; per-host RPO (Recovery Point Objective)
+tied to the host's audit-stream replication policy; per-host
+backup envelope (per-region cross-replicated immutable backup with
+the per-tier retention envelope per the per-jurisdiction record-
+retention policy); per-host failover-rehearsal envelope (typically
+quarterly per the operator's BC/DR program); per-host vendor-exit
+envelope so the operator can migrate the host to an alternate
+implementation without losing audit-trail continuity.
+
+## Z.6 Supply-chain envelope per SLSA (Phase 1 (variant 2))
+
+Every host implementation MUST publish a software-bill-of-materials
+(SBOM) per SPDX 2.3 / 3.0 (per ISO/IEC 5962 + Linux Foundation SPDX)
+or CycloneDX 1.6 (per OWASP Foundation). The SBOM enumerates every
+direct + transitive dependency with the per-component name +
+version + licence + supplier + per-component hash + per-component
+PURL (Package URL per package-url spec) + per-component CPE
+(Common Platform Enumeration per NIST). Supply-chain attestation
+follows in-toto per CNCF in-toto + SLSA (Supply-chain Levels for
+Software Artifacts) per OpenSSF SLSA Framework — typically targeting
+SLSA Level 3 for hosted production deployments.
+
+弘益人間 — Benefit All Humanity.

@@ -1,241 +1,353 @@
-# WIA-data-visualization PHASE 3 — PROTOCOL Specification
+# WIA-data-visualization PHASE 3 — Protocol Specification
 
 **Standard:** WIA-data-visualization
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-data-visualization (Data Visualization).
+This document defines the protocols that govern
+a data-visualization operator across the
+specification-to-rendering-to-accessibility-to-
+archival value chain: the W3C SVG 2 rendering
+discipline that anchors every per-chart
+canonical artefact, the W3C WAI-ARIA 1.2
+accessibility discipline that gates every per-
+chart accessibility profile, the WCAG 2.2
+conformance discipline that scores every per-
+chart accessibility outcome, the ISO 9241-303
+electronic-visual-display discipline that
+anchors the per-deployment display envelope,
+the ICC.1:2010 colour-management discipline,
+the CIE 15:2018 colorimetric discipline, the
+graphical-encoding-faithfulness discipline that
+prevents distortion, the per-chart provenance
+discipline, the chain-of-custody anchoring
+discipline, and the per-jurisdiction
+accessibility-framework discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- W3C SVG 2, W3C SVG 1.1 Second Edition, W3C
+  WAI-ARIA 1.2, W3C WCAG 2.2, W3C HTML Living
+  Standard, W3C CSS Color Module Level 4, W3C
+  JSON-LD 1.1, W3C SHACL
+- ISO 9241-303:2011, ISO 9241-307:2008, ISO
+  9241-306:2018, ISO 9241-110:2020, ISO 9241-
+  210:2019, ISO 14915 series, IEC 61506:1997
+- ICC.1:2010, ICC.2:2019, CIE 15:2018
+- ISO/IEC 27001:2022, ISO/IEC 17021-1:2015,
+  ISO/IEC 17065:2012
+- IETF RFC 9110, RFC 9421, RFC 9457, RFC
+  6234, RFC 8615, RFC 6962
+- W3C Trace Context
+- EN 301 549 v3.2.1, US Section 508, KR 한국
+  형 웹 콘텐츠 접근성 지침, KR 정보접근성 보장에
+  관한 법률, KR 장애인차별금지 및 권리구제 등에
+  관한 법률
 
 ---
 
-## §1 Scope
+## §1 W3C SVG 2 Rendering Discipline
 
-This PHASE document is one of four that together define the WIA-data-visualization
-standard. It addresses the protocol layer of the standard.
+### §1.1 Per-chart canonical artefact
 
-## §2 Manifest
+Every per-chart canonical artefact is published
+as a W3C SVG 2 document. The operator's API
+validates the per-chart SVG document against
+the W3C SVG 2 grammar; an invalid document is
+rejected.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "data-visualization"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+### §1.2 Per-chart presentation-attribute discipline
 
-## §3 Conformance Tiers
+The operator's API enforces the per-chart
+presentation-attribute discipline — the per-
+element `aria-label`, `aria-labelledby`, and
+`role` attributes per W3C WAI-ARIA 1.2; the
+per-element CSS-encoded styling per W3C CSS
+Color Module Level 4.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+### §1.3 Per-chart text-element discipline
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+A per-chart axis label, a per-chart legend
+entry, and a per-chart annotation MUST be
+encoded as a `<text>` element so that an
+assistive-technology consumer can read the
+text envelope.
 
-## §4 Discovery
+## §2 W3C WAI-ARIA Accessibility Discipline
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/data-visualization`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+### §2.1 Per-chart ARIA pattern
 
-## §5 Time and Identity
+Every per-chart ARIA pattern is bound to one
+of the W3C WAI-ARIA Graphics Module patterns
+— `graphics-document`, `graphics-symbol`,
+`graphics-object`, `img`. The operator's API
+records the per-chart ARIA pattern.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### §2.2 Per-chart alternative-text discipline
 
-## §6 Versioning and Deprecation
+The per-chart `altText` envelope is non-empty
+and carries the per-chart descriptive
+alternative text. The per-chart
+`longDescription` envelope carries the per-
+chart extended description used by assistive-
+technology consumers requiring more context
+than the alternative text.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+### §2.3 Per-chart data-table-fallback discipline
 
-## §7 Privacy and Security
+The per-chart `dataTableFallback` envelope
+is published as an HTML `<table>` per WCAG
+2.2 SC 1.3.1 Info and Relationships so that
+the per-chart underlying data is accessible
+through tabular reading.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §3 WCAG 2.2 Conformance Discipline
 
-## §8 Open Governance
+### §3.1 Per-chart contrast threshold
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `data-visualization` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The per-chart text-and-background contrast
+ratio meets or exceeds the WCAG 2.2 SC 1.4.3
+threshold (4.5:1 for normal-size text, 3:1
+for large-size text per the standard's
+definitions). A per-chart `WCAG-2.2-AAA`
+declaration meets the SC 1.4.6 threshold
+(7:1 / 4.5:1).
+
+### §3.2 Per-chart non-text-contrast threshold
+
+The per-chart non-text-contrast (per WCAG
+2.2 SC 1.4.11) meets or exceeds the 3:1
+threshold for graphical objects necessary to
+understand the chart.
+
+### §3.3 Per-chart focus-visible discipline
+
+A per-chart interactive element (a per-chart
+tooltip trigger, a per-chart selection
+control) carries a per-element focus-visible
+indicator per WCAG 2.2 SC 2.4.7 and SC
+2.4.13.
+
+## §4 ISO 9241-303 Electronic-Visual-Display Discipline
+
+### §4.1 Per-deployment display envelope
+
+The operator's API records the per-deployment
+display envelope per ISO 9241-303:2011 — the
+per-display luminance, chromaticity, contrast,
+gamma, resolution, and viewing-angle envelope.
+
+### §4.2 Per-deployment field-assessment
+
+The operator's per-deployment field assessment
+is published per ISO 9241-306:2018 to verify
+the per-display envelope under the per-
+deployment ambient-light conditions.
+
+## §5 ICC.1:2010 Colour-Management Discipline
+
+### §5.1 Per-chart colour profile
+
+Every per-chart colour profile is bound to an
+ICC.1:2010 profile (an sRGB profile, a Display-
+P3 profile, a Rec.2020 profile, a per-deployment
+custom profile). The operator's API records
+the per-chart profile reference.
+
+### §5.2 Per-chart colorimetric intent
+
+The per-chart colorimetric intent is one of
+the ICC.1:2010 enumerated intents —
+perceptual, relative-colorimetric, saturation,
+absolute-colorimetric. The operator's API
+records the per-chart intent declaration.
+
+## §6 CIE 15:2018 Colorimetric Discipline
+
+A per-chart palette declares the per-stop
+CIE-LAB coordinates per CIE 15:2018. The
+operator's API computes the per-stop CIE-LAB
+distance to verify the per-palette
+discriminability for colour-blind consumers
+(per the operator's protanopia, deuteranopia,
+and tritanopia simulation discipline).
+
+## §7 Graphical-Encoding-Faithfulness Discipline
+
+### §7.1 Per-channel scale faithfulness
+
+Every per-channel encoding's scale declaration
+is faithful to the underlying data — a per-
+channel `position` encoding uses a linear
+scale unless the per-channel data declaration
+explicitly justifies a non-linear scale; a
+per-channel `area` encoding is bound to a
+square-root scale so that the visual area is
+proportional to the underlying value.
+
+### §7.2 Per-chart axis-truncation discipline
+
+A per-chart axis-truncation is permitted only
+where the per-chart documented editorial-
+discipline justifies the truncation. The
+operator's API records the per-chart
+truncation envelope so that a downstream
+audit can review the per-chart truncation
+decision.
+
+### §7.3 Per-chart legend-and-annotation discipline
+
+The per-chart legend declares the per-channel
+encoding mapping; the per-chart annotation
+declares the per-data-point context. Both are
+encoded as text elements so that the per-chart
+narrative is accessible.
+
+## §8 Per-Chart Provenance Discipline
+
+Every per-chart provenance record carries the
+per-source data-provenance envelope, the per-
+chart authorship envelope, and the per-chart
+measurement-uncertainty envelope. The
+operator's API publishes the per-chart
+provenance record alongside the per-chart
+canonical artefact.
+
+## §9 Chain-of-Custody Anchoring Discipline
+
+### §9.1 Per-event transparency log
+
+Every chain-of-custody event carried by
+PHASE-1 §8 is appended to a per-operator
+transparency log modelled on the IETF RFC 6962
+Certificate Transparency append-only-log
+structure.
+
+### §9.2 Mutation prevention
+
+A custody event cannot be retroactively
+edited; an amendment is recorded as a new
+event with `previousEventRef` pointing at the
+event being amended.
+
+## §10 Per-Jurisdiction Accessibility Framework Discipline
+
+### §10.1 EU EN 301 549 binding
+
+A EU-procurement-context operator binds the
+per-chart accessibility profile to the EN
+301 549 v3.2.1 envelope per the EU Web
+Accessibility Directive (Directive (EU)
+2016/2102) and the EU European Accessibility
+Act (Directive (EU) 2019/882).
+
+### §10.2 US Section 508 binding
+
+A US-federal-agency operator binds the per-
+chart accessibility profile to the US
+Section 508 envelope per the US Access Board's
+ICT Final Rule.
+
+### §10.3 KR accessibility binding
+
+A KR-jurisdiction operator binds the per-
+chart accessibility profile to the KR 한국형
+웹 콘텐츠 접근성 지침 (Korean Web Content
+Accessibility Guidelines) and the KR 정보
+접근성 보장에 관한 법률 (Information
+Accessibility Guarantee Act).
+
+## §11 Per-Chart Internationalisation Discipline
+
+The per-chart text envelope is declared with
+the per-locale language tag per BCP 47. The
+operator's API publishes the per-chart per-
+locale rendering so that a downstream consumer
+in a different locale receives the per-locale
+narrative.
+
+## §12 Per-Chart Lifecycle Discipline
+
+### §12.1 Per-chart deprecation
+
+A per-chart deprecation is signalled by a per-
+chart deprecation envelope with a per-chart
+sunset window. The per-chart consumer is
+expected to migrate to the successor per-chart
+within the sunset window.
+
+### §12.2 Per-chart archival
+
+A per-chart archived state preserves the per-
+chart canonical artefact, the per-chart
+provenance record, and the per-chart
+accessibility profile so that a downstream
+archival system can retrieve the per-chart
+envelope after the per-chart deprecation.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## §13 Per-Chart Animation Discipline
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+A per-chart animated sequence (a per-chart
+transition, a per-chart timeline scrubber, a
+per-chart auto-playing animation) is bound to
+WCAG 2.2 SC 2.2.2 (Pause, Stop, Hide) and SC
+2.3.1 (Three Flashes or Below Threshold). The
+operator's API enforces a per-animation
+controls envelope so that a consumer can
+pause, stop, or hide the animation; a per-
+animation flash-frequency exceeding the SC
+2.3.1 threshold is rejected.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## §14 Per-Chart Interactive-Element Discipline
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+A per-chart interactive element (a per-chart
+tooltip trigger, a per-chart selection
+control, a per-chart drill-down link) is
+bound to WCAG 2.2 SC 2.1.1 (Keyboard) so that
+the element is operable via keyboard alone. A
+per-chart pointer-only interaction is rejected.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §15 Per-Chart Reduced-Motion Discipline
 
-## Annex F — Adoption Roadmap
+A per-chart deployment honours the consumer's
+`prefers-reduced-motion` CSS media query per
+W3C Media Queries Level 5; a consumer with
+the preference set receives a per-chart
+static rendering rather than an animated
+rendering.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §16 Per-Chart Internationalised Number-and-Date Formatting
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+A per-chart numeric or date-time encoding is
+formatted per the per-locale CLDR (Unicode
+Common Locale Data Repository) rules. The
+operator's API records the per-chart per-
+locale formatting envelope so that a downstream
+consumer in a different locale receives the
+per-locale-correct formatting.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §17 Per-Chart Right-to-Left Layout Discipline
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+A per-chart layout for a right-to-left locale
+(Arabic, Hebrew, Persian, Urdu) honours the
+per-locale layout discipline — the per-chart
+axis order, the per-chart legend order, the
+per-chart annotation alignment — per W3C HTML
+Living Standard `dir="rtl"` and W3C CSS
+Logical Properties.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §18 Per-Chart High-Contrast Mode Discipline
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+A per-chart deployment honours the consumer's
+operating-system high-contrast mode (the
+Windows High Contrast theme, the macOS
+Increase Contrast preference, the Linux high-
+contrast theme) per W3C CSS Media Queries
+Level 5 `forced-colors` query. A consumer
+with the preference set receives a per-chart
+rendering using the operating-system colour
+palette rather than the per-chart custom
+palette.

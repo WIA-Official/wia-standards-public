@@ -5,237 +5,382 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-cultural-exchange-data (Cultural Exchange Data).
+This document defines the HTTPS API contract
+that a memory-institution operator (museum,
+library, archive, heritage-site custodian,
+audiovisual archive, digital-humanities centre,
+or intergovernmental cultural-exchange
+programme operator) exposes for the records
+defined in PHASE-1. The contract carries the
+catalogue publication, IIIF manifest
+publication, EAD3 finding-aid publication,
+linked-data graph publication, OAI-PMH harvest,
+intergovernmental programme report ingestion,
+and chain-of-custody anchoring endpoints. The
+API is the canonical interoperability layer
+between the operator's catalogue, the
+international IIIF aggregator, the linked-data
+discovery client, the OAI-PMH harvester, and
+the OAI / Europeana federated portal.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics), RFC 9111 (HTTP
+  Caching), RFC 9457 (Problem Details), RFC
+  8288 (Web Linking), RFC 6901 / 6902 (JSON
+  Pointer / Patch), RFC 8259 (JSON), RFC 4122
+  (UUID), RFC 9421 (HTTP Message Signatures),
+  RFC 8615 (well-known URIs)
+- W3C Trace Context, W3C Linked Data Platform
+  v1.0, W3C SKOS, W3C ODRL 2.2
+- IIIF Image API 3.0, IIIF Presentation API 3.0,
+  IIIF Authentication API 2.0, IIIF Search API
+  2.0
+- EAD3 schema and Tag Library
+- ISO 15836-1:2017 / 15836-2:2019 (Dublin Core)
+- ISO 21127:2014 (CIDOC CRM)
+- ISO 23950:1998 (Z39.50 — cited where the
+  operator runs a Z39.50 gateway alongside the
+  HTTP API)
+- OAI-PMH 2.0 specification
+- METS / MODS / LIDO / EDM / RDA Toolkit
+- ISO/IEC 27001:2022, ISO/IEC 17021-1:2015
+- UNESCO 2005 Convention Operational Guidelines
+  (the reporting envelope for the programme
+  endpoints in §7)
+- KR 박물관 및 미술관 진흥법 / KR 문화재보호법
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-cultural-exchange-data
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published
+by the operator. The OpenAPI 3.1 document at
+`/v1/openapi.json` is canonical for the WIA
+endpoints; the IIIF Image API 3.0 and IIIF
+Presentation API 3.0 endpoints are canonical
+for the IIIF surface; the OAI-PMH 2.0 base URL
+is canonical for the OAI surface. Schema
+changes follow the non-breaking conventions in
+PHASE-1 §2. Every endpoint carries a per-
+request signature using HTTP Message Signatures
+(RFC 9421) anchored to the operator's
+institutional identifier (the ICOM / IFLA /
+ICA membership reference); the signature key
+set is published at
+`/.well-known/wia/cultural-exchange-data/keys.
+json`.
 
-## §2 Manifest
+## §2 Root Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "cultural-exchange-data"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /v1/
+```
 
-## §3 Conformance Tiers
+```json
+{
+  "standard": "WIA-cultural-exchange-data",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":         "/v1/programmes",
+    "catalogueRecords":   "/v1/catalogue-records",
+    "iiifManifests":      "/v1/iiif-manifests",
+    "findingAids":        "/v1/finding-aids",
+    "graphRecords":       "/v1/graph-records",
+    "cepRecords":         "/v1/cep-records",
+    "oaiPmh":             "/oai/",
+    "iiifBase":           "/iiif/",
+    "custody":            "/v1/custody-events",
+    "openapi":            "/v1/openapi.json",
+    "wellKnown":          "/.well-known/wia/cultural-exchange-data"
+  }
+}
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Catalogue Record Endpoints
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+### §3.1 Publish a catalogue record
 
-## §4 Discovery
+```
+POST /v1/catalogue-records
+Content-Type: application/json
+Signature: <RFC 9421 signature from the
+            operator's signing key>
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/cultural-exchange-data`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Request body carries the §4 record from PHASE-1
+(itemId, identifierBindings, cataloguingScheme,
+itemType, title, creator, date,
+subjectClassification, rightsExpression). The
+server validates the `cataloguingScheme`
+against the `itemType`: a `LIDO` record applied
+to an `archival-collection` item is rejected
+with `422 Unprocessable Entity` at
+`/problems/cataloguing-scheme-item-type-
+mismatch` (LIDO is for object records; archival
+collections use EAD3 finding aids).
 
-## §5 Time and Identity
+### §3.2 Retrieve a catalogue record
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+GET /v1/catalogue-records/{itemId}
+Accept: application/json
+```
 
-## §6 Versioning and Deprecation
+Where the consumer prefers a per-scheme
+serialisation, the operator supports content-
+negotiation under the `Accept` header — for
+example, `application/lido+xml` returns the
+LIDO XML serialisation, `application/mods+xml`
+returns the MODS XML serialisation, and
+`application/ead+xml` returns the EAD3 finding
+aid.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+### §3.3 Search catalogue records
 
-## §7 Privacy and Security
+```
+GET /v1/catalogue-records?type={itemType}
+&schema={cataloguingScheme}
+&subjectScheme={scheme}
+&subjectIdentifier={id}
+&creatorAuthority={authority}
+&creatorIdentifier={id}
+&page={cursor}&size={size}
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The response is an RFC 8288 `Link`-paginated
+collection.
 
-## §8 Open Governance
+## §4 IIIF Manifest Endpoints
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `cultural-exchange-data` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+### §4.1 Publish a IIIF manifest
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+POST /v1/iiif-manifests
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
+Request body carries the §5 record from PHASE-1.
+The server validates the manifest's IIIF API
+version against the operator's IIIF profile
+(declared in the discovery endpoint) and
+refuses a publication where the manifest's
+declared version is below the operator's
+minimum version.
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+### §4.2 Serve a IIIF Presentation manifest
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+```
+GET /iiif/{itemId}/manifest
+Accept: application/ld+json;profile="http://iiif.io/api/presentation/3/context.json"
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The endpoint returns a IIIF Presentation API
+3.0 manifest. The manifest carries the
+canonical Image API 3.0 service URLs for each
+image, the per-image rights statement, the
+attribution metadata, and the per-canvas
+range-and-structure declaration.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+### §4.3 Serve a IIIF Image API request
 
-## Annex F — Adoption Roadmap
+```
+GET /iiif/{itemId}/{imageId}/{region}/{size}/{rotation}/{quality}.{format}
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+The IIIF Image API 3.0 endpoint follows the
+canonical URL pattern. The endpoint enforces
+the operator's `imageServices.maxWidth` and
+`maxHeight` parameters and rejects a request
+exceeding the declared maximum with `413
+Content Too Large`.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §5 EAD3 Finding-Aid Endpoints
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+### §5.1 Publish an EAD3 finding aid
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```
+POST /v1/finding-aids
+Content-Type: application/xml; charset=utf-8
+Signature: <RFC 9421 signature>
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+Request body is the EAD3 XML document. The
+server validates the document against the EAD3
+schema and refuses a publication where the
+schema validation fails.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+### §5.2 Retrieve an EAD3 finding aid
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+```
+GET /v1/finding-aids/{faId}
+Accept: application/xml
+```
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §6 Linked-Data Graph Endpoints
 
-## Annex H — Versioning and Deprecation Policy
+### §6.1 Publish a graph
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+```
+POST /v1/graph-records
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Request body carries the §7 record from PHASE-1
+(graphSerialisation, ontologySet, triplesUri).
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+### §6.2 Retrieve a graph
 
-## Annex I — Interoperability Profiles
+```
+GET /v1/graph-records/{graphId}
+Accept: text/turtle | application/rdf+xml
+       | application/ld+json
+       | application/n-triples
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+### §6.3 SPARQL endpoint
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+POST /v1/sparql
+Content-Type: application/sparql-query
+Accept: application/sparql-results+json
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Where the operator hosts a SPARQL endpoint, the
+endpoint follows the W3C SPARQL 1.1 Protocol
+specification.
+
+## §7 Intergovernmental Programme Endpoints
+
+### §7.1 Publish a programme report
+
+```
+POST /v1/cep-records
+Content-Type: application/json
+Signature: <RFC 9421 signature from the UNESCO
+            Member-State focal point or the
+            programme operator>
+```
+
+Request body carries the §3 record from PHASE-1
+(cepId, programmeType, reportingPeriod,
+subject, rightsExpression). The server
+validates the `programmeType` and the
+`reportingPeriod` against the UNESCO 2005
+Convention quadrennial reporting cadence, the
+World Heritage state-of-conservation reporting
+cadence, or the Intangible Cultural Heritage
+periodic-reporting cadence.
+
+### §7.2 Retrieve a programme report
+
+```
+GET /v1/cep-records/{cepId}
+Accept: application/json
+```
+
+## §8 OAI-PMH Harvest Endpoint
+
+```
+GET /oai/?verb={verb}&metadataPrefix={prefix}
+   &from={iso8601}&until={iso8601}
+   &set={setSpec}
+   &resumptionToken={token}
+```
+
+The operator runs an OAI-PMH 2.0 harvest
+endpoint. The endpoint supports the
+`Identify`, `ListMetadataFormats`, `ListSets`,
+`ListIdentifiers`, `ListRecords`, and
+`GetRecord` verbs. The supported metadata
+prefixes are `oai_dc` (Dublin Core), `mods`,
+`mets`, `lido`, `edm`, and the operator's
+declared user-defined prefixes.
+
+## §9 Custody and Error Reporting
+
+### §9.1 Anchor a custody event
+
+```
+POST /v1/custody-events
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+### §9.2 Error envelope
+
+Errors are returned using RFC 9457 Problem
+Details. Validation errors carry a `pointer`
+field (RFC 6901). The server emits a per-
+request `traceparent` header (W3C Trace
+Context).
+
+## §10 Concurrency and Cache Discipline
+
+Every retrieval endpoint emits an `ETag` header
+(RFC 9110 §8.8.3) and supports `If-Match` /
+`If-None-Match` conditional requests. IIIF
+manifests are cacheable per the IIIF Caching
+Discipline (the manifest is served with a long
+`Cache-Control` max-age and is invalidated by
+republishing under a new identifier).
+
+## §11 Bulk Export for Aggregators
+
+```
+GET /v1/catalogue-records:bulk
+Accept: application/x-ndjson
+```
+
+A federated aggregator (Europeana, the
+Digital Public Library of America, a national
+aggregator) ingests the operator's catalogue as
+a newline-delimited JSON stream. A consumer
+resuming the stream provides an `If-Resume-
+After` header carrying the last-received
+modification timestamp.
+
+## §12 Z39.50 Gateway (legacy, optional)
+
+Where the operator runs a Z39.50 gateway under
+ISO 23950:1998, the gateway is published at the
+operator's `Z39.50` host and port declared in
+the discovery endpoint. The gateway translates
+between the Z39.50 query envelope and the
+operator's HTTP search endpoint.
+
+## §13 Schema-Validation and Conformance
+
+The OpenAPI 3.1 document at `/v1/openapi.json`
+carries JSON Schema 2020-12 schemas for every
+WIA endpoint. The IIIF endpoints follow the
+IIIF specifications' schemas. The OAI-PMH
+endpoint follows the OAI-PMH 2.0 schema.
+
+```
+GET /v1/conformance/test-vectors
+Accept: application/json
+```
+
+The operator publishes the conformance test
+vectors used to qualify the API implementation.
+Each vector references the relevant Dublin
+Core / CIDOC CRM / IIIF / OAI-PMH clause.
+
+## §14 Webhook Endpoint for Catalogue Update Notifications
+
+```
+POST /v1/programmes/{programmeId}/webhooks
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+A federated aggregator registers a webhook to
+receive a push notification when a catalogue
+record is published, updated, or withdrawn. The
+webhook envelope carries the operator's
+signing-key reference, the event type, and the
+resource identifier.

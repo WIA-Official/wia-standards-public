@@ -5,237 +5,333 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-fire-resistant-material (Fire Resistant Material).
+This document defines how a fire-resistant-
+material operator integrates with the systems
+that surround a fire-rated construction product:
+the EU notified body designated under EU CPR
+Article 39; the ISO/IEC 17025 fire-testing
+laboratory's accreditation body; the ISO/IEC
+17065 product-certification body; the building-
+information-modelling tool ingesting the per-
+material reaction-to-fire and resistance-to-fire
+classification; the building-code authority
+auditing the construction-permit submission;
+the fire marshal's pre-occupancy inspection
+service; the insurance underwriter pricing the
+building's risk profile; the public-procurement
+authority running a building-safety programme;
+and the customs authority enforcing the import
+classification on the commercial invoice.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- EN 13501-1, EN 13501-2, EN 13823, EN ISO
+  11925-2 and the per-element-test EN 1363 / EN
+  1364 / EN 1365 / EN 1366 / EN 1634 series
+- ISO 1182, ISO 1716, ISO 5660-1, ISO 5660-2,
+  ISO 9239-1, ISO 13943
+- ASTM E84, UL 723, ASTM E119, ASTM E136, ASTM
+  E2257
+- NFPA 251 / 252 / 257 / 259 / 268
+- KS F 2271, KS F 2257-1
+- ISO 9001:2015, ISO/IEC 17000, ISO/IEC 17021-1,
+  ISO/IEC 17025, ISO/IEC 17065
+- IETF RFC 8259, RFC 9457, RFC 8615, RFC 9421,
+  RFC 6962
+- W3C Verifiable Credentials Data Model 2.0
+- EU Construction Products Regulation (EU)
+  305/2011 (especially Articles 4, 6, 7, 11–14,
+  39, 56)
+- EU NANDO database (the EU notified-body
+  register)
+- EU Decision 2000/147/EC and EU Decision
+  2000/367/EC
 
 ---
 
-## §1 Scope
+## §1 Notified-Body Integration
 
-This PHASE document is one of four that together define the WIA-fire-resistant-material
-standard. It addresses the integration layer of the standard.
+### §1.1 EU NANDO database query
 
-## §2 Manifest
+The operator's API binds every DoP record to a
+notified-body designation reference. The NANDO
+database is queried on each publication request
+and on each retrieval after the caching TTL.
+A withdrawn or restricted designation returns
+`410 Gone` for the publication endpoint and
+annotates the public retrieval endpoint with the
+designation status.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "fire-resistant-material"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+### §1.2 Annex IX surveillance audit
 
-## §3 Conformance Tiers
+The notified body conducts continuing
+surveillance audits on the operator's QMS and
+factory-production-control system per EU CPR
+Article 39 and Annex V. The operator's audit
+envelope records the audit dates, findings,
+corrective actions, and closure dates so that
+the notified body's audit trail is preserved.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §2 Fire-Testing Laboratory Integration
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+### §2.1 Laboratory accreditation register
 
-## §4 Discovery
+Every test record's signature is verified against
+the issuing accreditation body's ISO/IEC 17025
+register. The accreditation scope MUST cover
+the declared test method; a scope mismatch
+returns `403 Forbidden`. Accreditation registers
+operated by the ILAC-recognised members are
+trusted under the ILAC Mutual Recognition
+Arrangement.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/fire-resistant-material`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+### §2.2 Laboratory proficiency-testing register
 
-## §5 Time and Identity
+A laboratory participating in proficiency
+testing publishes the round's outcome (the
+laboratory's z-score, the round's identifier,
+and the date of the round's publication). The
+operator's API carries the laboratory's PT
+profile as a non-blocking annotation on the
+test record so that a downstream consumer can
+take the proficiency-testing record into
+account.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §3 Product-Certification Body Integration
 
-## §6 Versioning and Deprecation
+### §3.1 ISO/IEC 17065 register
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+A certification body issuing a product
+certification (UL Listed, FM Approved, BS Mark)
+is bound to its issuing accreditation body's
+ISO/IEC 17065:2012 register. The operator's API
+queries the register on each retrieval after the
+caching TTL and refuses to publish a product
+certification reference whose certification
+body's accreditation is suspended.
 
-## §7 Privacy and Security
+### §3.2 Marking-and-scope discipline
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The certification body's marking, scope of
+certification, and the certified product's
+identifier are published in the certificate
+envelope so that a downstream consumer can
+verify the certification scope before relying on
+the marking.
 
-## §8 Open Governance
+## §4 Building-Information-Modelling Integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `fire-resistant-material` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+A BIM tool consuming the operator's machine-
+readable summary (PHASE-2 §12) parameterises
+the building-level fire-protection design. The
+summary carries:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- The reaction-to-fire Euroclass and the smoke /
+  droplet sub-class.
+- The resistance-to-fire class (REI, EI, R) and
+  the time-to-failure value rounded to the
+  declaration interval.
+- The product's intended-use scope (interior
+  wall, exterior wall, ceiling, floor, roof,
+  structural beam-column, compartment
+  separation).
 
+A signature over the summary is verified by the
+BIM tool against the operator's public-key set
+so that the binding is preserved across BIM
+authoring and downstream consumer review.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §5 Building-Code Authority Integration
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+### §5.1 Construction-permit linkage
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+A building-code authority reviewing a
+construction-permit submission queries the
+operator's API for the materials referenced in
+the submission. The query envelope carries the
+permit reference, the per-material identifier,
+and the required performance class; the response
+returns the per-material DoP reference and the
+underlying test record summary.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+### §5.2 Pre-occupancy inspection linkage
 
-## Annex F — Adoption Roadmap
+The fire marshal's pre-occupancy inspection
+queries the operator's API for the as-built
+material list and the per-material DoP. The
+inspection outcome is recorded as an AHJ-audit
+record (PHASE-1 §7) so that the inspection
+trail is preserved.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §6 Insurance Underwriter Integration
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+An insurance underwriter pricing a building's
+risk profile queries the operator's API for the
+per-material DoP and the per-material AHJ-audit
+outcome. The query envelope carries the building
+reference, the underwriter's identifier, and the
+underwriting purpose; the response returns the
+material list, the per-material classification,
+and the underlying notified-body certificate
+identifier.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §7 Public-Procurement Integration
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+A public-procurement authority running a
+building-safety programme integrates with the
+operator's API by querying the materials
+satisfying the programme's safety criteria. The
+query envelope carries the programme's
+performance threshold (for example, EN 13501-1
+A2 minimum for high-rise residential buildings)
+and the response is an RFC 8288 `Link`-paginated
+collection of materials satisfying the
+threshold.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §8 Customs Authority Integration
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+A customs authority enforcing the import
+classification queries the operator's API for
+the commercial-invoice material's DoP reference.
+The customs authority's query carries the
+declared HS code and the declared performance
+class; the operator's API returns the per-
+material DoP and the per-material classification
+so that the customs authority can verify the
+declaration on the commercial invoice.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §9 KR-Jurisdiction Integration
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+### §9.1 KR 건축자재 품질인정 register
 
-## Annex H — Versioning and Deprecation Policy
+A KR-jurisdiction operator declares the KR
+건축자재 품질인정 (Quality Recognition System
+for Building Materials) reference in the
+material record. The KR Ministry of Land,
+Infrastructure and Transport (국토교통부)
+operates the recognition register; the
+operator's API queries the register on each
+retrieval after the caching TTL.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+### §9.2 KR 건축물의 피난·방화구조 binding
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+A material installed in a KR-jurisdiction
+building is bound to the KR 건축물의 피난·방화
+구조 등의 기준에 관한 규칙 article reference
+that authorises the use. The KR 시·도 건축위원회
+publishes the audit trail; the operator's API
+references the audit envelope so that a
+downstream consumer can verify the regulatory
+basis for the installation.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+### §9.3 KR 한국방재시험연구원 (KFRI) integration
 
-## Annex I — Interoperability Profiles
+A KS F 2271 or KS F 2257-1 test conducted at
+the Korea Fire Institute (한국방재시험연구원) is
+bound to the KFRI test-report reference. The
+operator's API publishes the link to the KFRI
+test-report endpoint so that a KR AHJ can
+verify the test report directly.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §10 Public Retrieval and Re-Issuance
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+### §10.1 Public DoP retrieval
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+A public consumer (a building designer
+integrating the DoP into a fire-protection
+design, an AHJ auditing the construction permit,
+an insurance underwriter pricing risk) retrieves
+the DoP record at `/v1/dop-records/{dopId}`
+without authentication; the response carries the
+public fields and the underlying test summary.
+
+### §10.2 Verifiable-credentials re-issuance
+
+A material's notified-body certificate of
+constancy of performance is re-issuable as a
+W3C Verifiable Credential. The credential
+carries the notified body's issuer identifier,
+the certificate reference, the scope of the
+certification, the certificate's expiry, and
+the issuing date; the credential is signed
+using the notified body's public-key set so
+that a downstream consumer can validate the
+credential without contacting the notified body
+directly.
+
+## §11 Audit and Conformity-Assessment Integration
+
+### §11.1 ISO/IEC 17021-1 management-system audit
+
+The operator's quality-management system declared
+in PHASE-3 §8 is audited under ISO/IEC 17021-1
+by an accredited certification body. The audit
+result is stored in the operator's audit
+envelope and is referenced from the programme
+record's `accreditationStatus`.
+
+### §11.2 ISO/IEC 17065 product certification
+
+A material whose route to market includes a
+product-certification mark (UL Listed, FM
+Approved, BS Mark, the KR 건축자재 품질인정
+mark) is bound to the certification body's
+ISO/IEC 17065:2012 accreditation. The
+certification body's marking, scope of
+certification, and the certified product's
+identifier are published so that a downstream
+consumer can verify the certification before
+relying on it.
+
+## §12 References (consolidated)
+
+The references list across PHASE-1 to PHASE-4
+is the canonical citation set for the WIA-
+fire-resistant-material standard. Implementations
+cite the standards by their issuing organisation
+(EN, ISO, IEC, ASTM International, UL, NFPA,
+KS, EU regulatory text) and the publication year
+so that a downstream consumer can locate the
+authoritative text. Updates to a cited standard
+(for example, an amendment to EN 13501-1)
+trigger an internal review cycle in the
+operator's quality-management discipline declared
+in PHASE-3 §8 before the new revision is bound
+into the operator's enumeration set.
+
+## §13 Cross-Border Fire-Class Mapping
+
+A material classified under one regional
+classification system (EU Euroclass under EN
+13501-1, US Class A/B/C under ASTM E84, UK BS
+476 Part 7 surface-spread-of-flame, KR 난연 1급
+/ 2급 / 3급) may be marketed in another region
+under that region's classification. The operator's
+API publishes the mapping table that ties each
+classification to the applicable evidence set
+under the destination's regulator. The mapping
+is annotated with an "approximate equivalence"
+flag where the destination's regulator does not
+formally recognise the source classification —
+the destination's regulator's audit trail is
+preserved through the AHJ-audit record set.
+
+## §14 Insurance-Industry Risk-Score Integration
+
+An insurance underwriter integrates the
+operator's per-material classification with the
+underwriter's risk-scoring model. The
+underwriter's query envelope carries the
+building's geometry, the per-zone material
+list, and the per-zone occupancy class; the
+response carries the per-zone fire-load
+declaration, the per-zone fire-resistance
+rating, and the per-material smoke / toxicity
+sub-class so that the underwriter's risk model
+can produce a per-zone underwriting score.
+
+The operator's API does not publish the
+underwriter's risk model (the model is the
+underwriter's intellectual property); the API
+publishes only the inputs the model consumes,
+under the underwriter's data-use agreement.

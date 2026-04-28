@@ -5,237 +5,283 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-family-reunion-data (Family Reunion Data).
+This document defines how a humanitarian
+operator integrates with the systems that
+surround restoring family links: the ICRC
+Central Tracing Agency operating the global
+RFL network; the UNHCR Operational Data
+Portal aggregating refugee statistics; the IOM
+DTM regional dashboard; the OCHA Centre for
+Humanitarian Data hosting the Humanitarian
+Data Exchange (HDX); the IASC cluster
+coordination endpoints; the destination-state
+reception authority receiving a transferred
+case; the Hague-1980 / Hague-1993 Central
+Authority of the destination state; the
+Interpol Yellow Notice register; the
+supervisory data-protection authority
+overseeing GDPR Article 9 processing; and the
+public-procurement authority running a
+humanitarian-data interoperability programme.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- 1949 Geneva Conventions and 1977 Additional
+  Protocols
+- 1951 Refugee Convention and 1967 Protocol
+- 1989 CRC, 1993 Hague ICA, 1980 Hague ICCA,
+  1963 VCCR Article 36, 1961 Statelessness
+  Convention
+- ICRC RFL Strategy and Code of Conduct
+- ICRC Professional Standards for Protection
+  Work
+- UNHCR ProGres v4 schema, UNHCR Personal
+  Data Policy, UNHCR Operational Data Portal
+- IOM DTM Methodological Framework, IOM Data
+  Protection Manual
+- HXL Standard, OCHA HDX
+- Sphere Handbook, IASC Operational Guidelines
+- ISO 19115, ISO 6709, ISO 3166-1/-2, ISO
+  5218, ISO 639, ISO 4217
+- ISO 9001:2015, ISO/IEC 27001:2022, ISO/IEC
+  27018:2019
+- ISO/IEC 17021-1:2015, ISO/IEC 17065:2012
+- IETF RFC 8259, RFC 9457, RFC 8615, RFC
+  9421, RFC 6234, RFC 8032, RFC 6962
+- W3C Trace Context, W3C ODRL 2.2, W3C VC
+  v2.0
+- Interpol Notices Manual (Yellow Notices for
+  missing persons)
+- IATI Standard (International Aid
+  Transparency Initiative)
+- EU GDPR Articles 6, 9, 12-22, 25, 32, 33-34,
+  46-49, 89
+- EU Council Directive 2003/86/EC
+- KR 출입국관리법, KR 난민법, KR 아동복지법, KR
+  개인정보보호법
 
 ---
 
-## §1 Scope
+## §1 ICRC Central Tracing Agency Integration
 
-This PHASE document is one of four that together define the WIA-family-reunion-data
-standard. It addresses the integration layer of the standard.
+### §1.1 Global RFL network
 
-## §2 Manifest
+A national Red Cross or Red Crescent society
+participating in the ICRC RFL global network
+binds the per-case file to the ICRC's central
+case register through the operator's
+`icrcCoordinationRef`. The ICRC's central
+register coordinates cross-border tracing and
+maintains the per-conflict tracing dataset.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "family-reunion-data"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+### §1.2 ICRC online tracing service
 
-## §3 Conformance Tiers
+A registered person seeking to be found by a
+relative may opt-in to the ICRC online tracing
+service. The opt-in is recorded as part of the
+person's consent directive; the operator
+publishes the opt-in entry to the ICRC tracing
+service through the ICRC's federation
+endpoint.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §2 UNHCR Operational Data Portal Integration
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+A UNHCR-coordinated registration is published
+to the UNHCR Operational Data Portal through
+the per-operation aggregation pipeline. The
+portal aggregates per-operation statistics
+(per-country-of-origin numbers, per-vulnerability
+breakdowns) without disclosing per-individual
+identifiers.
 
-## §4 Discovery
+## §3 IOM DTM Regional Dashboard Integration
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/family-reunion-data`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+An IOM DTM operation publishes the per-site
+assessment data to the IOM regional dashboard.
+The dashboard aggregates the data per the IOM
+DTM Methodological Framework and presents
+the per-region displacement statistics.
 
-## §5 Time and Identity
+## §4 OCHA HDX Integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The operator's HXL feed published under PHASE-1
+§7 is ingested by the OCHA Humanitarian Data
+Exchange. The HDX entry carries the per-feed
+HXL Tag set so that a downstream consumer can
+filter by tag.
 
-## §6 Versioning and Deprecation
+## §5 IASC Cluster Coordination Integration
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+A cluster-coordinated operation binds the per-
+case file to the cluster's coordination
+endpoint:
 
-## §7 Privacy and Security
+- The Protection cluster ingests the per-case
+  protection-monitoring summary.
+- The Camp Coordination and Camp Management
+  cluster ingests the per-site population-
+  management summary.
+- The Child Protection sub-cluster ingests the
+  per-case unaccompanied-or-separated-minor
+  summary.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The cluster's information-management officer
+publishes the aggregated dataset on the
+cluster's portal.
 
-## §8 Open Governance
+## §6 Destination-State Reception Authority Integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `family-reunion-data` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+A transferred case bound for a destination
+state is published to the destination-state's
+reception-authority endpoint. The reception
+authority's response carries the per-case
+acceptance status, the reception location
+reference, and the receiving guardian
+reference where the case is a minor.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Hague Central Authority Integration
 
+### §7.1 Hague-1993 inter-country adoption
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+An ICA case under the 1993 Hague Convention
+binds the case to both the originating and
+the receiving Central Authorities. The
+operator's API publishes the per-case file to
+the Central Authority's intake endpoint with
+the consent of both the originating and the
+receiving authorities.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+### §7.2 Hague-1980 child-abduction return
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+A Hague-1980 abduction case binds the case to
+the destination-state's Central Authority. The
+operator's API publishes the return application
+through the Central Authority's intake endpoint.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 Interpol Yellow-Notice Integration
 
-## Annex F — Adoption Roadmap
+A missing-persons case may be coordinated
+through an Interpol Yellow Notice. The
+operator's API binds the per-case file to the
+Interpol Yellow Notice identifier where the
+operator is empowered to request the issuance
+through the operator's national central
+bureau.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Supervisory Data-Protection Authority Integration
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The supervisory data-protection authority
+overseeing the operator's GDPR Article 9
+processing audits the operator's records of
+processing activities (Article 30) on demand.
+The operator's API publishes the records to
+the authority's endpoint so that the
+authority's audit trail is preserved.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Public Retrieval and Re-Issuance
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+### §10.1 Public summary retrieval
 
-## Annex G — Test Vectors and Conformance Evidence
+A public consumer (a researcher running an
+academic study, a journalist running a public-
+interest investigation) retrieves the per-
+operation aggregated summary at
+`/v1/programmes/{programmeId}/public-summary`
+without per-individual identifiers. The summary
+is consistent with the operator's documented
+public-disclosure policy under the operator's
+data-protection regime.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+### §10.2 Verifiable-credentials re-issuance
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+A positive-identification attestation may be
+re-issued to the registered person and the
+named relative as a W3C Verifiable Credential
+signed by the operator's public-key set. The
+credential carries the per-case identification
+reference, the date of identification, and
+the issuing authority's reference. The
+credential allows the receiving person to
+demonstrate the identification to a downstream
+authority (a destination-state reception
+authority, an inter-country adoption Central
+Authority) without disclosing the underlying
+case file.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §11 KR-Jurisdiction Integration
 
-## Annex H — Versioning and Deprecation Policy
+### §11.1 KR Ministry of the Interior and Safety
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+A KR-jurisdiction operator binds the
+registration to the KR Ministry of the
+Interior and Safety's missing-persons register
+where the operator is empowered to publish
+to the register.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+### §11.2 KR National Police Agency missing-
+       persons register
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+A KR-jurisdiction operator coordinates with
+the KR National Police Agency's missing-
+persons register where the case includes a KR
+domestic missing-persons declaration.
 
-## Annex I — Interoperability Profiles
+### §11.3 KR 적십자사 / KR Korean Red Cross
+       integration
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+A KR-jurisdiction operator participating in
+the ICRC RFL network through the Korean Red
+Cross binds the per-case file to the Korean
+Red Cross's RFL coordination endpoint.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §12 IATI Transparency Integration
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Where the operator publishes its operational
+funding under the IATI Standard, the per-
+operation funding envelope is bound to the
+IATI publisher identifier and the per-activity
+identifier. The IATI publication does not
+disclose per-individual case data; it
+discloses operational-level funding and
+beneficiary-aggregate counts.
+
+## §13 Audit and Conformity-Assessment Integration
+
+### §13.1 ISO/IEC 17021-1 management-system audit
+
+The operator's quality-management system
+declared in PHASE-3 §9 is audited under
+ISO/IEC 17021-1 by an accredited certification
+body. The audit result is stored in the
+operator's audit envelope.
+
+### §13.2 ISO/IEC 17065 product certification
+
+Where the operator's per-case attestation (the
+per-case identification anchor signed
+attestation) is issued under a product-
+certification scheme, the certification body's
+ISO/IEC 17065:2012 accreditation is bound to
+the certification reference.
+
+## §14 References (consolidated)
+
+The references list across PHASE-1 to PHASE-4
+is the canonical citation set for the WIA-
+family-reunion-data standard. Implementations
+cite the international conventions and
+treaties by their formal name (the 1949 Geneva
+Conventions, the 1989 CRC, the 1993 Hague ICA,
+the 1980 Hague ICCA, the 1963 VCCR, the 1961
+Statelessness Convention, the 1951 Refugee
+Convention) and the ICRC, UNHCR, IOM, and
+OCHA frameworks by their published name so
+that a downstream consumer can locate the
+authoritative text. Updates to a cited
+framework (for example, a new edition of the
+ICRC RFL Strategy or a new release of UNHCR
+ProGres) trigger an internal review cycle in
+the operator's quality-management discipline
+declared in PHASE-3 §9 before the new
+revision is bound into the operator's
+enumeration set.

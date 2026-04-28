@@ -1,241 +1,332 @@
-# WIA-data-visualization PHASE 4 — INTEGRATION Specification
+# WIA-data-visualization PHASE 4 — Integration Specification
 
 **Standard:** WIA-data-visualization
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-data-visualization (Data Visualization).
+This document defines how a data-visualization
+operator integrates with the systems that
+surround the specification-to-rendering value
+chain: the W3C SVG / WAI-ARIA / WCAG ecosystem
+operating the canonical web-rendering layer;
+the ISO 9241 ergonomics committee maintaining
+the electronic-visual-display reference; the
+ICC and CIE colour-management ecosystem; the
+EU Web Accessibility Directive supervisory
+authority; the US Access Board enforcing
+Section 508; the KR 한국정보화진흥원 (NIA)
+operating the per-jurisdiction accessibility
+audit; the upstream WIA-data-integration
+operator providing the per-chart data; the
+upstream WIA-content-ai operator providing
+the per-chart AI-assisted authoring envelope;
+the downstream WIA-lms operator embedding
+the per-chart in learning content; and the
+inclusive-design certification body.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- W3C SVG 2, W3C SVG 1.1 Second Edition, W3C
+  WAI-ARIA 1.2, W3C WCAG 2.2, W3C HTML Living
+  Standard, W3C CSS Color Module Level 4, W3C
+  JSON-LD 1.1, W3C SHACL, W3C Verifiable
+  Credentials Data Model v2.0
+- ISO 9241-303:2011, ISO 9241-307:2008, ISO
+  9241-306:2018, ISO 9241-110:2020, ISO 9241-
+  210:2019, ISO 14915 series, IEC 61506:1997
+- ICC.1:2010, ICC.2:2019, CIE 15:2018
+- ISO/IEC 27001:2022, ISO/IEC 17021-1:2015,
+  ISO/IEC 17065:2012
+- EN 301 549 v3.2.1, US Section 508
+- EU Web Accessibility Directive (Directive
+  (EU) 2016/2102), EU European Accessibility
+  Act (Directive (EU) 2019/882)
+- KR 한국형 웹 콘텐츠 접근성 지침, KR 정보
+  접근성 보장에 관한 법률, KR 장애인차별금지
+  및 권리구제 등에 관한 법률
+- IETF RFC 8259, RFC 9457, RFC 8615, RFC 9421
+- W3C Trace Context
 
 ---
 
-## §1 Scope
+## §1 W3C SVG / WAI-ARIA / WCAG Ecosystem Integration
 
-This PHASE document is one of four that together define the WIA-data-visualization
-standard. It addresses the integration layer of the standard.
+The operator subscribes to the W3C SVG 2
+publishing endpoint, the W3C WAI-ARIA 1.2
+publishing endpoint, and the W3C WCAG 2.2
+publishing endpoint. A new W3C publication
+triggers an internal review cycle in the
+operator's quality-management discipline before
+the new revision is bound into the operator's
+per-chart canonical envelope.
 
-## §2 Manifest
+## §2 ISO 9241 Ergonomics Committee Integration
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "data-visualization"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The operator subscribes to the ISO 9241 series
+publishing endpoint. A new ISO 9241 amendment
+(a per-display ergonomics revision, a per-
+interaction principle revision) triggers an
+internal review cycle in the operator's
+display-deployment discipline.
 
-## §3 Conformance Tiers
+## §3 ICC / CIE Colour-Management Ecosystem Integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+The operator queries the ICC.1:2010 profile
+register for per-display profiles; the per-
+display profile is signed by the per-display
+manufacturer's signing-key set so that a
+downstream consumer can verify the per-display
+envelope. The operator queries the CIE 15:2018
+colorimetric envelope for the per-palette
+discriminability analysis.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 EU Web Accessibility Directive Integration
 
-## §4 Discovery
+A EU-public-sector operator publishes the per-
+period accessibility-monitoring report per the
+EU Web Accessibility Directive (Directive (EU)
+2016/2102) Article 8. The report carries the
+per-period accessibility-statement envelope,
+the per-period feedback-mechanism envelope,
+and the per-period non-accessible-content
+declaration.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/data-visualization`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §5 US Section 508 Access Board Integration
 
-## §5 Time and Identity
+A US-federal-agency operator publishes the
+per-period Section 508 conformance report to
+the US Access Board. The report carries the
+per-period accessibility-conformance summary,
+the per-period exception-and-undue-burden
+declaration, and the per-period plan for
+remediation.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §6 KR NIA Accessibility-Audit Integration
 
-## §6 Versioning and Deprecation
+A KR-jurisdiction operator binds the per-chart
+accessibility profile to the KR 한국정보화진흥원
+(NIA) operated KR 정보접근성 인증 (Web
+Accessibility Mark) audit. The operator's API
+publishes the per-chart accessibility-conformance
+evidence to NIA's accessibility-audit endpoint.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §7 WIA-data-integration Operator Integration
 
-## §7 Privacy and Security
+The operator's per-chart data source is
+referenced via the upstream WIA-data-integration
+operator's per-source endpoint. The per-source
+schema descriptor (per ISO/IEC 11179) is bound
+to the per-chart's encoding-channel binding so
+that the per-chart's encoding remains aligned
+with the per-source schema.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §8 WIA-content-ai Operator Integration
 
-## §8 Open Governance
+Where the operator uses an AI-assisted authoring
+envelope to generate the per-chart specification,
+the operator binds the per-chart to the
+upstream WIA-content-ai operator's per-output
+attestation envelope. The per-chart authorship
+envelope records the per-chart AI-assisted
+declaration.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `data-visualization` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §9 WIA-lms Operator Integration
+
+A learning-management-system operator embedding
+the per-chart in a per-course content envelope
+binds the per-chart's accessibility profile to
+the LMS's per-course accessibility-conformance
+envelope. The operator's API publishes the per-
+chart embeddable HTML envelope (per PHASE-2
+§11) for the LMS to ingest.
+
+## §10 Inclusive-Design Certification-Body Integration
+
+An inclusive-design certification body
+(operating under ISO/IEC 17065:2012
+accreditation) issues the per-chart inclusive-
+design certificate. The certification body
+queries the operator's API for the per-chart
+accessibility profile, the per-chart
+provenance record, and the per-chart audit
+envelope.
+
+## §11 Audit and Conformity-Assessment Integration
+
+### §11.1 ISO/IEC 17021-1 management-system audit
+
+The operator's quality-management system is
+audited under ISO/IEC 17021-1 by an accredited
+certification body. The audit result is stored
+in the operator's audit envelope.
+
+### §11.2 ISO/IEC 17065 product certification
+
+A per-chart whose route to market includes a
+product-certification mark (the EU Accessibility
+mark, the KR 정보접근성 인증 mark, the US
+Trusted Tester certification) is bound to the
+certification body's ISO/IEC 17065:2012
+accreditation.
+
+## §12 Public Retrieval and Re-Issuance
+
+### §12.1 Public chart-summary publication
+
+The operator publishes per-period
+visualization-statistics on the public-portal
+endpoint without per-record identifiers — total
+charts published, per-chart-kind distribution,
+per-accessibility-conformance distribution.
+
+### §12.2 Verifiable-credentials re-issuance
+
+A per-chart accessibility-conformance
+attestation is re-issuable as a W3C Verifiable
+Credential signed by the certification body's
+signing-key set so that a downstream consumer
+can verify the attestation without contacting
+the certification body directly.
+
+## §13 KR-Jurisdiction Integration
+
+### §13.1 KR Open Data Portal binding
+
+A KR-jurisdiction public-sector dashboard
+publisher binds the per-dashboard envelope
+to the KR Open Data Portal's accessibility
+declaration.
+
+### §13.2 KR 장애인차별금지법 binding
+
+A KR-jurisdiction operator binds the per-
+chart accessibility profile to the KR 장애인
+차별금지 및 권리구제 등에 관한 법률 (Anti-
+Discrimination Act for Persons with
+Disabilities) §21 information-accessibility
+obligation.
+
+### §13.3 KR 정보접근성 보장에 관한 법률 binding
+
+A KR-jurisdiction operator binds the per-
+chart accessibility profile to the KR 정보
+접근성 보장에 관한 법률 (Information
+Accessibility Guarantee Act).
+
+## §14 Per-Chart Embed Ecosystem Integration
+
+A host-page consumer (a content-management
+system, a news-media platform, a public-
+sector portal) embeds the per-chart per the
+operator's per-chart embed endpoint (PHASE-2
+§11). The host page's accessibility envelope
+is consistent with the per-chart accessibility
+profile so that the host page's per-page
+WCAG 2.2 AA conformance is preserved.
+
+## §15 Per-Chart Print-and-Export Integration
+
+A print-and-export consumer (a per-period
+publication, a per-event report, a per-
+research per-experiment artefact) renders the
+per-chart per the operator's per-chart static-
+snapshot endpoint (PHASE-2 §12). The print-
+and-export envelope preserves the per-chart
+colour space (per ISO 12647:2019 print-
+production reference, where applicable) and
+the per-chart accessibility envelope.
+
+## §16 Continuous Improvement Programme
+
+Each operator publishes an annual improvement
+plan addressing per-chart accessibility-
+conformance trend, per-chart graphical-
+encoding-faithfulness audit findings, per-
+deployment display-calibration drift, and per-
+period inclusive-design certification renewal.
+The programme is open and the annual report
+is published on the operator's public-portal
+endpoint per PHASE-2 §10.
+
+## §17 References (consolidated)
+
+The references list across PHASE-1 to PHASE-4
+is the canonical citation set for the WIA-
+data-visualization standard. Implementations
+cite the W3C / ISO / IEC / ICC / CIE / IETF
+/ EU / US / KR references by their issuing
+organisation and the publication year so that
+a downstream consumer can locate the
+authoritative text. Updates to a cited
+standard (for example, a new W3C SVG 2
+amendment, a new W3C WCAG release, a new ICC
+profile-format release) trigger an internal
+review cycle in the operator's quality-
+management discipline declared in PHASE-3 §10
+before the new revision is bound into the
+operator's enumeration set.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## §18 Per-Chart Open-Source Tool Integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+The operator's per-chart authoring may use
+open-source tooling — D3.js for SVG-based
+visualization authoring, Vega-Lite for
+declarative chart specification, the
+Observable Plot library for grammar-of-
+graphics visualization, the Apache ECharts
+library for cross-platform rendering. The
+operator publishes the per-chart tool-version
+envelope so that a downstream auditor can
+reproduce the per-chart authoring evidence.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## §19 Per-Chart Print-Production Integration
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+A print-production consumer rendering the
+per-chart at a per-publication resolution (a
+news-media print supplement, a per-research
+publication artefact, a per-corporate per-
+period printed report) integrates with the
+operator's per-chart static-snapshot endpoint
+(per PHASE-2 §12) and applies the ISO
+12647:2019 print-production reference so that
+the per-chart colour rendering is preserved
+across the digital-to-print transition.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §20 Per-Chart Accessibility Audit Tooling Integration
 
-## Annex F — Adoption Roadmap
+The operator's per-chart accessibility audit
+runs against multiple per-tool envelopes — the
+W3C-recommended axe-core open-source rule
+engine, the Pa11y open-source automated audit
+tool, the WAVE accessibility evaluator
+operated by WebAIM. The operator publishes
+the per-chart per-tool audit outcome so that
+the per-chart accessibility audit evidence is
+multi-source.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §21 Per-Chart Performance Budget Integration
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+A per-chart deployment under a performance-
+budget envelope (a per-page Web Vitals
+envelope, a per-page Lighthouse audit
+envelope) is bound to the per-page performance
+budget. The operator's API publishes the per-
+chart resource envelope (the per-chart
+rendered SVG byte-count, the per-chart per-
+load network round-trip count, the per-chart
+per-load CPU time) so that the host page can
+budget the per-chart resource consumption.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §22 Per-Chart Search-Indexing Integration
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+A per-chart embedded in a host page is
+indexed by a search engine through the per-
+chart `<title>` element, the per-chart `<desc>`
+element, and the per-chart Schema.org JSON-LD
+metadata. The operator's API publishes the
+per-chart Schema.org `Dataset` envelope so
+that a search engine can deterministically
+interpret the per-chart subject matter.

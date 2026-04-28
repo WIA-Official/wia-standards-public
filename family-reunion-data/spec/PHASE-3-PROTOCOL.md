@@ -5,237 +5,365 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-family-reunion-data (Family Reunion Data).
+This document defines the protocols that govern
+a humanitarian operator across the registered-
+person-to-tracing-request-to-identification-
+anchor value chain: the humanitarian-principle
+discipline that anchors every operator action
+to neutrality, impartiality, independence, and
+humanity, the consent-and-data-protection
+discipline under GDPR Article 9 / UNHCR
+Personal Data Policy / IOM Data Protection
+Manual, the special-protection discipline for
+unaccompanied or separated minors under the
+1989 CRC, the inter-state-transfer discipline
+under GDPR Article 46-49 / VCCR Article 36 /
+Hague-1980 / Hague-1993, the biometric-data
+discipline that gates the use of fingerprints,
+iris scans, and face data under the operator's
+biometric policy, the chain-of-custody
+anchoring discipline that prevents silent
+mutation of the case file, the inter-agency
+coordination discipline that aligns the
+operator's case file with the IASC cluster,
+the security-and-confidentiality discipline
+that protects the registered person against
+adverse re-identification, and the post-case-
+closure retention discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- 1949 Geneva Conventions and 1977 Additional
+  Protocols I and II
+- 1951 Refugee Convention and 1967 Protocol
+- 1989 CRC (especially Articles 7, 8, 9, 10,
+  11, 20, 22, 35)
+- 1993 Hague Convention on Inter-Country
+  Adoption
+- 1980 Hague Convention on the Civil Aspects
+  of International Child Abduction
+- 1963 Vienna Convention on Consular Relations
+  Article 36
+- 1961 Convention on the Reduction of
+  Statelessness
+- ICRC Restoring Family Links Strategy and
+  ICRC Code of Conduct
+- ICRC Professional Standards for Protection
+  Work
+- UNHCR ProGres v4 schema and UNHCR Policy on
+  the Protection of Personal Data of Persons
+  of Concern
+- IOM Displacement Tracking Matrix
+  Methodological Framework and IOM Data
+  Protection Manual
+- HXL Standard (the OCHA-maintained
+  humanitarian-data tagging standard)
+- Sphere Handbook
+- ISO 19115-1/-2, ISO 6709, ISO 3166-1/-2,
+  ISO 5218, ISO 639, ISO 4217
+- ISO 9001:2015, ISO/IEC 27001:2022, ISO/IEC
+  27018:2019
+- ISO/IEC 17021-1:2015
+- IETF RFC 9110, RFC 9421, RFC 9457, RFC 6234,
+  RFC 8032, RFC 6962
+- W3C Trace Context, W3C ODRL 2.2, W3C VC
+  v2.0
+- EU GDPR Articles 6, 9, 12-22, 25, 32, 33-34,
+  46-49, 89
+- EU Council Directive 2003/86/EC
+- KR 출입국관리법, KR 난민법, KR 아동복지법
+  (Child Welfare Act), KR 개인정보보호법
 
 ---
 
-## §1 Scope
+## §1 Humanitarian-Principle Discipline
 
-This PHASE document is one of four that together define the WIA-family-reunion-data
-standard. It addresses the protocol layer of the standard.
+Every operator action carried by the API is
+anchored to the four humanitarian principles
+declared in the ICRC RFL Strategy: humanity,
+impartiality, neutrality, and independence.
+The operator's API rejects an operator action
+that is conditioned on a discriminatory
+attribute (nationality, ethnicity, religious
+belief) where the discrimination is unrelated
+to the case's protection requirement; the
+rejection is recorded as a nonconformity event
+under PHASE-3 §10.
 
-## §2 Manifest
+## §2 Consent-and-Data-Protection Discipline
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "family-reunion-data"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+### §2.1 GDPR Article 9 special-category basis
 
-## §3 Conformance Tiers
+Every person record contains GDPR Article 9
+special-category data (health-related
+vulnerability flags, biometric identifiers
+where collected, ethnicity-related fields).
+The operator's API records the per-record
+Article 9(2) processing basis — typically
+Article 9(2)(b) (employment / social
+security), Article 9(2)(c) (vital interests),
+Article 9(2)(d) (legitimate activity of a
+foundation, association, or non-profit body),
+or Article 9(2)(g) (substantial public
+interest under EU or Member-State law).
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+### §2.2 UNHCR Personal Data Policy purpose
+       binding
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+A UNHCR-coordinated operation binds the per-
+record processing to the per-purpose
+declaration under the UNHCR Personal Data
+Policy. The operator's API enforces purpose-
+binding through the bearer-token's declared
+purpose claim and refuses a retrieval request
+whose declared purpose is outside the per-
+record purpose declaration.
 
-## §4 Discovery
+### §2.3 IOM Data Protection Manual binding
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/family-reunion-data`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+An IOM-coordinated operation binds the per-
+record processing to the per-purpose
+declaration under the IOM Data Protection
+Manual.
 
-## §5 Time and Identity
+### §2.4 Privacy-by-design discipline
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The operator runs a privacy-impact assessment
+on each new processing activity per GDPR
+Article 35 and IOM Data Protection Manual
+§3. The assessment outcome is recorded in the
+operator's audit envelope.
 
-## §6 Versioning and Deprecation
+## §3 Special-Protection Discipline for Minors
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+### §3.1 CRC Article 22 refugee-children
+       protection
 
-## §7 Privacy and Security
+A `separated-minor-unaccompanied` registration
+is bound to the operator's child-protection
+authority's case file per CRC Article 22 and
+the operator's national child-protection law.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+### §3.2 Best-interests-of-the-child assessment
 
-## §8 Open Governance
+Every action affecting a minor is taken
+following a best-interests-of-the-child
+assessment per CRC Article 3. The assessment
+is recorded in the per-action audit envelope.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `family-reunion-data` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+### §3.3 Appointed guardian binding
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+The operator's API records the
+`appointedGuardianRef` field for every
+unaccompanied minor; the field references the
+appointed guardian under the operator's
+national child-protection law and is signed
+by the appointing authority.
 
+### §3.4 Hague-1993 inter-country adoption
+       discipline
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Where the case is in scope of the 1993 Hague
+Convention, the operator's API records the
+both-central-authority consent under the
+Convention's Article 17 framework before any
+inter-state placement is initiated.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+### §3.5 Hague-1980 child-abduction discipline
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Where the case involves a cross-border
+abduction in scope of the 1980 Hague
+Convention, the operator's API binds the
+case to the Hague-1980 Central Authority of
+the destination state and records the per-
+case return-application reference.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §4 Inter-State-Transfer Discipline
 
-## Annex F — Adoption Roadmap
+### §4.1 GDPR Article 46-49 appropriate safeguard
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+A transfer of personal data to a non-adequate
+third country is bound to a GDPR Article 46
+appropriate safeguard (Standard Contractual
+Clauses, Binding Corporate Rules, an approved
+Code of Conduct, or an approved Certification
+Mechanism), or to an Article 49 derogation
+where applicable. The operator's API records
+the per-transfer safeguard reference.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+### §4.2 VCCR Article 36 consular notification
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Where the registered person is a foreign
+national entitled to consular notification per
+VCCR Article 36, the operator's API records
+the per-case notification status (notified,
+notification-declined-by-the-registrant,
+notification-pending).
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+### §4.3 Refugee non-refoulement discipline
 
-## Annex G — Test Vectors and Conformance Evidence
+A transfer of a refugee or asylum-seeker is
+gated on the non-refoulement principle of the
+1951 Refugee Convention Article 33. The
+operator's API rejects a transfer to a state
+where the registered person would face a
+threat to life or freedom on account of race,
+religion, nationality, membership of a
+particular social group, or political opinion.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §5 Biometric-Data Discipline
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+### §5.1 Operator biometric policy binding
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+Biometric data (fingerprints, iris scans, face
+images) is collected only under the operator's
+documented biometric policy. The policy
+declares the per-purpose collection basis, the
+retention period, and the per-purpose
+disclosure scope.
 
-## Annex H — Versioning and Deprecation Policy
+### §5.2 Biometric match-evidence handling
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+A biometric match used as evidence in an
+identification anchor (PHASE-1 §5) is reviewed
+by the supervising protection officer; the
+biometric match score, the threshold, and the
+match-method identifier are recorded in the
+attestation envelope.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+### §5.3 Biometric-deletion-on-closure rule
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Biometric templates are deleted on case
+closure per the operator's documented retention
+schedule, except where an Article 89 archival
+basis or a statutory retention obligation
+applies. The deletion is recorded as a chain-
+of-custody event.
 
-## Annex I — Interoperability Profiles
+## §6 Chain-of-Custody Anchoring Discipline
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+### §6.1 Per-event transparency log
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Every chain-of-custody event carried by PHASE-1
+§8 is appended to a per-operator transparency
+log modelled on the IETF RFC 6962 Certificate
+Transparency append-only-log structure. The
+log is operated within the operator's secure
+processing environment and is not exposed to
+external consumers without the protection
+officer's authorisation.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+### §6.2 Mutation prevention
+
+A custody event cannot be retroactively edited;
+an amendment is recorded as a new event with
+`previousEventRef` pointing at the event being
+amended.
+
+## §7 Inter-Agency Coordination Discipline
+
+### §7.1 IASC cluster binding
+
+Where the operation is in scope of an IASC
+cluster (Protection cluster, Camp Coordination
+and Camp Management cluster), the operator's
+HXL feed is bound to the cluster's coordination
+endpoint so that the cluster's information-
+management officer can aggregate the
+operator's data into the cluster-level dataset.
+
+### §7.2 OCHA 3W coordination
+
+Where the operation contributes to the OCHA
+3W (Who-What-Where) operational picture, the
+operator's HXL feed is published with the
+OCHA-defined HXL tags (`#org`, `#sector`,
+`#adm1`, `#adm2`, `#status`).
+
+## §8 Security-and-Confidentiality Discipline
+
+### §8.1 ISO/IEC 27001 + 27018 binding
+
+The operator's information-security management
+system is certified under ISO/IEC 27001:2022
+and ISO/IEC 27018:2019 (PII protection in
+public clouds). The operator's API publishes
+the per-deployment certification envelope.
+
+### §8.2 Adverse-re-identification risk
+
+Where a coordination dataset carries fields
+that could allow adverse re-identification of
+a registered person (the combination of an
+ethnic descriptor, a geographic area, and a
+date of arrival), the operator's API applies
+the operator's documented k-anonymity or
+suppression rules before publication.
+
+## §9 Quality-Management Discipline
+
+The operator runs an ISO 9001:2015 quality
+management system covering the registration,
+tracing, identification, transfer, HXL
+coordination, and case-closure processes.
+Internal audits run on a frequency declared
+in the quality manual.
+
+## §10 Post-Case-Closure Retention Discipline
+
+### §10.1 Per-purpose retention schedule
+
+The operator publishes a per-purpose retention
+schedule that declares how long each category
+of data is retained after case closure (a
+positive-identification case may retain the
+case file for the longer of the operator's
+declared retention period or any statutory
+obligation, while a closed-no-result tracing
+request retains the file for a shorter
+declared period).
+
+### §10.2 Right-of-erasure interaction
+
+A registered person exercising the GDPR Article
+17 right of erasure on a non-essential field
+triggers the operator's erasure workflow. The
+erasure is honoured except where Article
+17(3)(b) (compliance with a legal obligation
+under EU or Member-State law) or Article
+17(3)(d) (archival processing in the public
+interest) applies.
+
+### §10.3 Per-jurisdiction archival basis
+
+Where a case file is retained under an Article
+89 archival basis, the file is migrated to the
+operator's archival tier and the migration is
+recorded as a chain-of-custody event.
+
+## §11 KR-Jurisdiction Discipline
+
+### §11.1 KR 출입국관리법 + KR 난민법 binding
+
+A KR-jurisdiction operator binds the
+registration to the relevant article of KR
+출입국관리법 (Immigration Control Act) and
+KR 난민법 (Refugee Act).
+
+### §11.2 KR 아동복지법 binding
+
+A KR-jurisdiction operator handling an
+unaccompanied or separated minor binds the
+case file to KR 아동복지법 (Child Welfare
+Act) and the appointed guardian's
+authorisation envelope under KR 미성년자
+보호 법령.
+
+### §11.3 KR 개인정보보호법 sensitive-information
+       binding
+
+A KR-jurisdiction operator binds the per-
+record processing to KR Personal Information
+Protection Act Article 23 sensitive-
+information processing basis where the record
+includes special-category data.

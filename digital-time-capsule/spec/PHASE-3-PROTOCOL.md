@@ -5,237 +5,362 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-digital-time-capsule (Digital Time Capsule).
+This document defines the protocols that govern
+a digital-preservation operator across the
+depositor-to-repository-to-future-consumer
+value chain: the OAIS Information Package
+discipline that anchors every artefact to the
+ISO 14721 reference model, the PREMIS metadata
+discipline that records every preservation
+event, the format-identification-and-validation
+discipline that classifies every file against
+the published format register, the BagIt
+transfer discipline that gates inter-repository
+package transfer, the WARC discipline that
+governs web-archive ingestion, the trustworthy-
+digital-repository discipline that anchors the
+operator's accreditation to ISO 16363 / ISO
+16919, the seal-and-release discipline that
+governs the per-capsule opening condition, the
+fixity-and-integrity discipline that detects
+silent bit-rot across decades, the legal
+admissibility discipline that aligns with EU
+eIDAS-2 / KR 전자문서법, the chain-of-custody
+anchoring discipline, and the post-audit
+remediation discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 14721:2012 (OAIS) and its terminology
+  vocabulary in §1
+- ISO 16363:2012 (audit and certification of
+  trustworthy digital repositories)
+- ISO 16919:2020 (audit certification body
+  requirements)
+- ISO 14641:2018 (electronic archiving
+  specifications)
+- PREMIS Data Dictionary v3.0 (and PREMIS
+  ontology)
+- ISO 28500:2017 (WARC), ISO 19005-1/-2/-3/-4
+  (PDF/A), ISO 32000-2:2020 (PDF 2.0)
+- ISO 15836-1:2017 / 15836-2:2019
+- METS / MODS / DDI 4 (research-data DDI
+  Lifecycle)
+- IIPC WARC and CDX format guidelines
+- ISO 9001:2015 (QMS) and ISO/IEC 27001:2022
+  (ISMS)
+- ISO/IEC 17021-1:2015 / ISO/IEC 17065:2012
+- IETF RFC 9110, RFC 6234 (SHA-256), RFC 8032
+  (Ed25519), RFC 8493 (BagIt), RFC 9421 (HTTP
+  Message Signatures), RFC 9457 (Problem
+  Details), RFC 8615 (well-known URIs), RFC
+  6962 (Certificate Transparency, the per-event
+  log template)
+- W3C Trace Context, W3C ODRL 2.2, W3C VC Data
+  Model v2.0
+- EU Regulation (EU) 910/2014 (eIDAS) and EU
+  Regulation (EU) 2024/1183 (eIDAS-2)
+- EU Regulation (EU) 2016/679 (GDPR) Articles
+  6, 9, 89
+- KR 공공기록물 관리에 관한 법률, KR 전자문서
+  및 전자거래 기본법, KR 정보공개법
 
 ---
 
-## §1 Scope
+## §1 OAIS Information Package Discipline
 
-This PHASE document is one of four that together define the WIA-digital-time-capsule
-standard. It addresses the protocol layer of the standard.
+### §1.1 Mandatory Properties
 
-## §2 Manifest
+Every package carried by the operator's API
+declares the OAIS Mandatory Properties per
+ISO 14721 §4.2.1.3 — Reference Information,
+Provenance Information, Context Information,
+Fixity Information, and Access Rights
+Information. The operator's API rejects a
+package omitting any Mandatory Property at
+ingestion time and returns the field's JSON
+Pointer in the RFC 9457 problem document.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "digital-time-capsule"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+### §1.2 SIP-to-AIP transformation
 
-## §3 Conformance Tiers
+The SIP-to-AIP transformation per ISO 14721
+§4.1.1.4 is performed inside the operator's
+AIP-generation workflow. The transformation
+runs the per-event PREMIS Event records (a
+ValidationOK event, a FixityCheckOK event, a
+FormatIdentificationOK event, a VirusCheckOK
+event) and binds the events to the AIP's
+Provenance Information.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+### §1.3 AIP-to-DIP packaging
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+The AIP-to-DIP packaging per ISO 14721 §4.1.1.5
+adapts the AIP to the consumer's request
+envelope. The DIP carries the same Content
+Information as the AIP but with the
+Representation Information adapted to the
+consumer's requested rendering format
+(HTML, PDF/A, plain-text-UTF-8, image
+thumbnail, video preview).
 
-## §4 Discovery
+## §2 PREMIS Metadata Discipline
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/digital-time-capsule`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+### §2.1 Per-event recording
 
-## §5 Time and Identity
+Every preservation event is recorded as a PREMIS
+Event entity with `eventType` from the PREMIS
+Event Type Vocabulary (the Library of Congress-
+maintained vocabulary). The operator's API
+rejects an event with an unknown `eventType` at
+publication time.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### §2.2 Per-object characteristics
 
-## §6 Versioning and Deprecation
+The PREMIS Object's `objectCharacteristics`
+carries the `size`, the `fixity` (SHA-256 hex
+digest per RFC 6234), and the `format`
+identifier from the format register declared in
+PHASE-1 §5.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+### §2.3 Per-rights envelope
 
-## §7 Privacy and Security
+The PREMIS Rights envelope binds the rights
+basis (statutory, license, donor agreement)
+to the package. The operator's API enforces
+that the rights-basis declaration is consistent
+with the operator's declared statutory or
+licensed processing basis.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §3 Format-Identification-and-Validation Discipline
 
-## §8 Open Governance
+### §3.1 Format register binding
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `digital-time-capsule` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Every file's format identifier is bound to the
+Library of Congress Sustainability of Digital
+Formats register identifier or the PRONOM PUID.
+A file whose format identifier is not in either
+register is annotated as `format-unidentified`
+and triggers a manual review by the
+preservation engineer.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+### §3.2 Validation outcome enforcement
 
+Every file's validation outcome (well-formed-
+and-valid, well-formed-not-valid, not-well-
+formed) is recorded against the per-format
+validator's report — the JHOVE module outcome,
+the veraPDF outcome for PDF/A, the FFV1
+framemd5 outcome for AV files. A `not-well-
+formed` outcome triggers the operator's
+remediation workflow (re-ingestion from the
+depositor, file repair, per-format migration).
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+### §3.3 Preservation-format migration
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+The operator periodically migrates files into a
+preservation format (PDF/A, FLAC, FFV1-MKV,
+WARC) per the operator's documented migration
+plan. Each migration is recorded as a PREMIS
+Event with `eventType: migration`.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §4 BagIt Transfer Discipline
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+### §4.1 Manifest digest verification
 
-## Annex F — Adoption Roadmap
+Every BagIt package's manifest is verified
+against the recomputed digest (SHA-256 or
+SHA-512 per RFC 6234) at ingestion time. A
+mismatch returns `422 Unprocessable Entity` at
+`/problems/bagit-manifest-digest-mismatch`.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+### §4.2 Tagmanifest discipline
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Where the BagIt package carries a
+`tagmanifest-{algorithm}.txt`, the operator
+verifies the tagmanifest digest against the
+`bag-info.txt`, the `bagit.txt`, and the
+manifest file. A tagmanifest mismatch is
+recorded as a chain-of-custody event.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+### §4.3 BagIt signature
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Where the package crosses an EU jurisdiction,
+the BagIt package carries a qualified-
+electronic-signature per EU eIDAS-2 over the
+manifest digest. The operator's API verifies
+the qualified signature against the issuing
+qualified trust service provider's certificate.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §5 WARC Discipline
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+### §5.1 Per-record validation
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Every WARC record is validated against the
+ISO 28500:2017 WARC schema. The operator's API
+refuses a record with a missing `WARC-Type`,
+`WARC-Record-ID`, `WARC-Date`, or
+`Content-Length` header.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+### §5.2 CDX index generation
 
-## Annex H — Versioning and Deprecation Policy
+The operator generates the per-WARC CDX index
+per the IIPC CDX format guideline so that a
+downstream consumer can locate WARC records
+by URL, MIME type, status code, or date.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §6 Trustworthy-Digital-Repository Discipline
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+### §6.1 ISO 16363 audit binding
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+The operator's API binds every audit record to
+the ISO 16363:2012 criteria. A `certified`
+outcome carries the per-criterion findings; a
+`conditional` outcome lists the conditions
+that the operator must satisfy before the next
+audit cycle.
 
-## Annex I — Interoperability Profiles
+### §6.2 ISO 16919 audit body accreditation
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+The audit body's ISO 16919:2020 accreditation
+is verified at audit-record ingestion time. A
+withdrawn or expired accreditation refuses the
+audit-record publication.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §7 Capsule-Seal-and-Release Discipline
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+### §7.1 Seal envelope
+
+The operator's API records the seal envelope
+declared in the seal request — the depositor
+identity, the named beneficiary (which may be
+"the public at the declared date", an
+individual identified by W3C Verifiable
+Credential, or a group identified by an
+operator-defined attribute), the declared
+opening date, the release-condition envelope,
+and the rights-expression for post-opening
+re-use.
+
+### §7.2 Time-trigger discipline
+
+A `time-trigger` capsule is opened on or after
+the declared opening date. The operator's API
+runs a daily cron job that scans the seal
+register and triggers the opening event for
+capsules whose opening date has been reached.
+
+### §7.3 Beneficiary-trigger discipline
+
+A `beneficiary-trigger` capsule is opened on
+the named beneficiary's authenticated request.
+The beneficiary's identity is verified against
+the W3C Verifiable Credential declared in the
+seal envelope.
+
+### §7.4 Event-trigger discipline
+
+An `event-trigger` capsule is opened on the
+declared trigger event (for example, the
+depositor's death verified by a national-
+register death certificate, the closure of a
+named institution verified by the institution's
+public dissolution notice).
+
+## §8 Fixity-and-Integrity Discipline
+
+### §8.1 Per-cycle fixity check
+
+The operator runs a periodic fixity check on
+every package per the operator's declared
+cycle (typically annual for AIPs at storage
+tier 1, monthly for storage tier 2 with
+cheaper media). The check recomputes the
+SHA-256 digest of every file and compares it
+with the recorded digest in the PREMIS Object.
+
+### §8.2 Bit-rot detection and remediation
+
+A fixity mismatch triggers the operator's bit-
+rot remediation workflow. The package is
+restored from a replicated copy held in a
+separate storage tier, the affected file is
+re-ingested from the depositor where the
+depositor copy is preserved, or the file is
+recreated from a documented re-derivation
+recipe.
+
+### §8.3 Replication discipline
+
+The operator maintains a documented number of
+replicated copies (typically three copies
+across two geographic regions and two
+storage technologies — disk + tape, or disk +
+cloud-cold-storage) per the LOCKSS principle
+that the operator declares in the programme
+record.
+
+## §9 Legal-Admissibility Discipline
+
+### §9.1 EU eIDAS-2 qualified seal
+
+Where the operator targets legal-admissibility
+in an EU jurisdiction, the operator applies a
+qualified-electronic-signature seal per EU
+Regulation (EU) 2024/1183 to every AIP's
+manifest. The qualified seal is verifiable
+under the EU Trusted Lists scheme.
+
+### §9.2 KR 전자문서법 binding
+
+A KR-jurisdiction operator binds the AIP's
+manifest to the KR 전자문서 및 전자거래 기본법
+(Framework Act on Electronic Documents and
+Electronic Transactions) §5 evidentiary value
+discipline so that the AIP is admissible in
+KR civil and administrative proceedings.
+
+## §10 Chain-of-Custody Anchoring Discipline
+
+### §10.1 Per-event transparency log
+
+Every chain-of-custody event carried by PHASE-1
+§8 is appended to a per-operator transparency
+log modelled on the IETF RFC 6962 Certificate
+Transparency append-only-log structure.
+
+### §10.2 Mutation prevention
+
+A custody event cannot be retroactively edited;
+an amendment is recorded as a new event with
+`previousEventRef` pointing at the event being
+amended.
+
+## §11 Quality-Management Discipline
+
+The operator runs an ISO 9001:2015 quality
+management system covering the ingestion,
+validation, format-identification, fixity-
+check, replication, audit, seal, and release
+processes. The operator's information-security
+management system declared under ISO/IEC
+27001:2022 covers the protection of the
+preserved data and the operator's signing keys.
+
+## §12 Post-Audit Remediation Discipline
+
+### §12.1 Conditional-audit closure
+
+An audit outcome of `conditional` triggers
+the operator's remediation workflow against
+each declared condition. The closure is
+gated on a re-audit by the same audit body or
+an equivalent body.
+
+### §12.2 Non-certified withdrawal
+
+An audit outcome of `non-certified` triggers
+a public withdrawal of the operator's
+trustworthy-digital-repository attestation.
+The operator's API publishes the withdrawal
+notice on the public retrieval endpoint and
+the chain-of-custody record.

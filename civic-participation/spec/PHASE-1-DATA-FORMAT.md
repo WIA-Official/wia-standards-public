@@ -5,237 +5,414 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-civic-participation (Civic Participation).
+This document defines the canonical data-format
+layer for WIA-civic-participation. The standard
+covers the persistent record shapes that a
+public-administration body operating a citizen-
+engagement platform (a national government's
+e-petition system, a municipal participatory-
+budgeting platform, a regional public-
+consultation portal, a parliamentary written-
+contribution intake, a local council citizen-
+assembly secretariat), a third-party civic-tech
+service operator, an academic or civil-society
+observer running a transparency-of-engagement
+audit, and a public-procurement authority running
+an inclusive-engagement programme maintain when
+publishing a consultation, recording a citizen
+submission, anchoring the consultation outcome to
+a deliberative record, tracking the per-citizen
+participation trail under privacy-by-design
+principles, and integrating the engagement record
+into a smart-sustainable-city KPI dashboard.
+Records are consumed by the citizen submitter,
+by the elected representative receiving the
+consultation outcome, by the civil-society
+auditor publishing the post-consultation
+analysis, by the e-government interoperability
+service, and — where the platform handles
+sensitive-category data — by the supervisory
+data-protection authority overseeing the
+processing.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ITU-T Recommendation Y.4900/L.1600 (Overview
+  of key performance indicators in smart
+  sustainable cities) and ITU-T Y.4901 / Y.4902
+  / Y.4903 (the per-domain KPI series cited
+  normatively for the engagement-related KPIs
+  in §4 and §7)
+- ISO 37120:2018 (sustainable cities and
+  communities — indicators for city services
+  and quality of life) and ISO 37122:2019
+  (indicators for smart cities) and ISO 37123:
+  2019 (indicators for resilient cities)
+- ISO 37100:2016 (sustainable cities and
+  communities — vocabulary) and ISO 37101:2016
+  (sustainable development in communities —
+  management system for sustainable development)
+- ISO 18091:2019 (quality management systems —
+  guidelines for the application of ISO 9001 in
+  local government) — the local-government
+  QMS that anchors the operator's process
+  governance
+- W3C Open Digital Rights Language (ODRL) 2.2
+  Information Model and W3C ODRL Vocabulary &
+  Expression 2.2 (cited normatively for the
+  rights-and-policy expression carried by the
+  consultation envelope in §3 and §4)
+- W3C Data Catalog Vocabulary (DCAT) v3 (cited
+  for the per-consultation dataset description
+  in §4)
+- W3C Decentralised Identifiers (DIDs) v1.0 and
+  W3C Verifiable Credentials Data Model v2.0
+  (cited where the operator binds a citizen
+  identity to a verifiable-credential issued by
+  a national identity provider)
+- UN Department of Economic and Social Affairs
+  E-Government Survey (the biennial e-
+  government and e-participation index reference)
+- OECD Recommendation of the Council on Open
+  Government (OECD/LEGAL/0438) and OECD Citizen
+  Engagement: A Guide to Public Engagement
+  (the framework reference for the
+  engagement-classification taxonomy in §3)
+- World Bank GovTech Maturity Index (the cross-
+  jurisdictional benchmark cited where the
+  operator publishes a maturity-comparator)
+- IETF RFC 8259 (JSON), RFC 4122 (UUID), ISO
+  8601 (date and time)
+- ISO/IEC 27001:2022 (information-security
+  management — used for the chain-of-custody
+  record discipline in §8)
+- EU Regulation (EU) 2018/1724 (Single Digital
+  Gateway) and EU Regulation (EU) 2024/903
+  (Interoperable Europe Act) — the EU-level
+  framework cited where the operator
+  participates in the Single Digital Gateway
+- EU GDPR (Regulation (EU) 2016/679) Articles
+  6, 9, 12 to 22 (cited for the processing
+  basis of citizen-submission data)
+- KR 행정기본법 (Framework Act on Administrative
+  Affairs) and KR 정보공개법 (Official
+  Information Disclosure Act)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-civic-participation
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the
+artefacts exchanged when a public-administration
+body opens a consultation, ingests citizen
+submissions, deliberates against a documented
+decision-record, and publishes the outcome.
+Implementations covered include:
 
-## §2 Manifest
+- A national e-petition platform processing
+  citizen petitions against a defined
+  threshold-and-response discipline.
+- A municipal participatory-budgeting platform
+  publishing the per-cycle citizen-proposed
+  project list and the per-project deliberation
+  record.
+- A regional public-consultation portal under
+  the EU Single Digital Gateway aggregating
+  cross-border citizen submissions.
+- A parliamentary written-contribution intake
+  binding the citizen submission to a per-
+  legislator analysis dossier.
+- A local council citizen-assembly secretariat
+  operating a randomly-selected citizen-panel
+  deliberation under a sortition discipline.
+- A smart-city dashboard publishing engagement
+  KPIs under ITU-T Y.4900 / ISO 37120/37122.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "civic-participation"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The petition record, the participatory-budget
+proposal, the public-consultation submission,
+and the citizen-assembly deliberation record
+receive distinct encodings in this PHASE; the
+additional safeguards required by each engagement
+regime are encoded in PHASE-3 §4.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name of the
+                       operator — national
+                       government body, municipal
+                       authority, regional
+                       authority, parliament,
+                       council secretariat, or
+                       civic-tech service operator)
+operatorRole         : enum ("national-government"
+                       | "municipal-authority" |
+                       "regional-authority" |
+                       "parliament-secretariat" |
+                       "council-secretariat" |
+                       "civic-tech-service" |
+                       "transparency-observer" |
+                       "user-defined")
+operatorJurisdiction : array of string (ISO 3166-1
+                       country codes; municipal
+                       authorities additionally
+                       carry the ISO 3166-2
+                       subdivision code)
+governingFrameworks  : array of enum ("ITU-T-Y-
+                       4900" | "ISO-37120" |
+                       "ISO-37122" | "ISO-37123" |
+                       "ISO-37100" | "ISO-37101" |
+                       "ISO-18091" | "W3C-ODRL" |
+                       "W3C-DCAT-3" |
+                       "W3C-DID-1" |
+                       "W3C-VC-2" |
+                       "OECD-OPEN-GOV-0438" |
+                       "OECD-CITIZEN-ENGAGEMENT" |
+                       "UN-DESA-EGOV-SURVEY" |
+                       "WB-GOVTECH-MATURITY" |
+                       "EU-SDG-2018-1724" |
+                       "EU-INTEROP-2024-903" |
+                       "EU-GDPR" |
+                       "KR-행정기본법" |
+                       "KR-정보공개법" |
+                       "user-defined")
+engagementMaturity   : object (the World Bank
+                       GovTech Maturity Index
+                       score, the OECD OURdata
+                       Index score, and the UN
+                       DESA E-Participation Index
+                       score where applicable)
+programmeStatus      : enum ("design" | "operating"
+                       | "limited-rollout" |
+                       "wind-down" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Consultation Record
 
-## §4 Discovery
+```
+consultationRecord:
+  consultationId     : string (uuidv7)
+  publisher          : string (the operator's
+                       legal-entity reference)
+  consultationType   : enum ("e-petition" |
+                       "participatory-budgeting"
+                       | "public-consultation" |
+                       "written-contribution" |
+                       "citizen-assembly" |
+                       "binding-referendum" |
+                       "advisory-poll" |
+                       "user-defined")
+  engagementLadder   : enum ("inform" | "consult"
+                       | "involve" | "collaborate"
+                       | "empower")
+  subject            : object (the policy
+                       question, the legislative
+                       proposal reference, the
+                       budget allocation
+                       proposal, or the planning
+                       application reference
+                       under deliberation)
+  rightsExpression   : object (the W3C ODRL 2.2
+                       policy expression carrying
+                       the consultation's permission
+                       to redistribute, to use for
+                       research, to anonymise, or
+                       to retain after closure)
+  openingDate        : string (ISO 8601 date-time)
+  closingDate        : string (ISO 8601 date-time)
+  responseSchedule   : object (the operator's
+                       commitment to publish the
+                       per-submission acknowledgment
+                       and the consultation
+                       outcome at a declared
+                       timeline)
+  jurisdictionalScope : enum ("national" |
+                       "regional" | "municipal" |
+                       "ward" | "supranational"
+                       | "user-defined")
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/civic-participation`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Submission Record
 
-## §5 Time and Identity
+```
+submissionRecord:
+  submissionId       : string (uuidv7)
+  consultationRef    : string (PHASE-1 §3 record
+                       reference)
+  submitter          : object (the submitter's
+                       declared identity envelope
+                       — anonymous, pseudonymous,
+                       verified-citizen via a
+                       national identity provider
+                       carrying a W3C Verifiable
+                       Credential, or institutional
+                       — each carrying the
+                       declared scope of identity
+                       disclosure)
+  submissionType     : enum ("free-text" |
+                       "structured-form" |
+                       "vote" | "ranked-choice" |
+                       "budget-allocation" |
+                       "amendment-text" |
+                       "supporting-evidence" |
+                       "user-defined")
+  body               : object (the submission
+                       payload under the schema
+                       declared by the
+                       consultation envelope —
+                       free text encoded per RFC
+                       8259, structured-form
+                       fields, vote tally,
+                       ranked-choice ordering,
+                       per-line-item budget
+                       allocation)
+  attachments        : array of object (per-
+                       attachment file reference
+                       under content-addressable
+                       URI; each attachment
+                       carries its declared mime
+                       type and the SHA-256 hex
+                       digest)
+  consentDirective   : object (the GDPR Article
+                       6/9 processing basis
+                       declared by the submitter,
+                       and the per-purpose consent
+                       for downstream re-use such
+                       as research-use or open-
+                       data publication)
+  submissionTimestamp : string (ISO 8601)
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 Deliberation Record
 
-## §6 Versioning and Deprecation
+```
+deliberationRecord:
+  deliberationId     : string (uuidv7)
+  consultationRef    : string (PHASE-1 §3 record
+                       reference)
+  deliberativeForum  : enum ("legislator-analysis"
+                       | "council-committee" |
+                       "citizen-panel-sortition"
+                       | "expert-panel" |
+                       "public-hearing" |
+                       "user-defined")
+  participantSet     : array of object (per-
+                       participant role —
+                       elected representative,
+                       sortition-selected citizen,
+                       expert advisor, civil-
+                       society observer — each
+                       carrying the participant's
+                       declared role and the
+                       conflict-of-interest
+                       declaration where
+                       applicable)
+  agenda             : object (the per-session
+                       agenda binding the
+                       deliberation to the
+                       submissions referenced)
+  decisionRecord     : object (the documented
+                       conclusion of the
+                       deliberation — accept,
+                       accept-with-modification,
+                       defer, reject; carrying
+                       the cited submission set
+                       that informed the
+                       decision and the per-
+                       decision rationale)
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 Outcome Publication Record
 
-## §7 Privacy and Security
+```
+outcomeRecord:
+  outcomeId          : string (uuidv7)
+  consultationRef    : string (PHASE-1 §3 record
+                       reference)
+  publicationType    : enum ("response-to-each-
+                       submission" | "aggregated-
+                       summary" | "decision-with-
+                       rationale" | "follow-up-
+                       action" | "user-defined")
+  publicationDate    : string (ISO 8601)
+  publicationChannel : enum ("operator-portal" |
+                       "official-gazette" |
+                       "single-digital-gateway"
+                       | "broadcast" | "user-
+                       defined")
+  followUpActions    : array of object (the
+                       commitments declared in
+                       the outcome — legislative
+                       amendment to be tabled,
+                       regulatory amendment to be
+                       proposed, budget
+                       allocation to be
+                       requested, programme to be
+                       launched)
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 Engagement KPI Record
 
-## §8 Open Governance
+```
+kpiRecord:
+  kpiId              : string (uuidv7)
+  programmeRef       : string (the programme
+                       identifier)
+  reportingPeriod    : object (start and end
+                       dates per ISO 8601)
+  kpiBundle          : object (per-indicator
+                       value — the ITU-T Y.4900
+                       smart-city engagement
+                       KPI, the ISO 37120 §15
+                       (Recreation) / §22
+                       (Telecommunication and
+                       Innovation) per-indicator
+                       value, the ISO 37122
+                       smart-city participation-
+                       intensity indicator, the
+                       UN DESA E-Participation
+                       Index sub-component, and
+                       the OECD OURdata Index
+                       sub-component as
+                       applicable)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `civic-participation` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §8 Chain-of-Custody Record
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+custodyRecord:
+  custodyId          : string (uuidv7)
+  artefactRef        : string (the consultation,
+                       submission, deliberation,
+                       outcome, or KPI record
+                       identifier)
+  custodyEvent       : enum ("consultation-
+                       opened" | "submission-
+                       received" | "submission-
+                       acknowledged" |
+                       "deliberation-conducted"
+                       | "decision-recorded" |
+                       "outcome-published" |
+                       "kpi-published" |
+                       "redaction-applied" |
+                       "withdrawal" | "user-
+                       defined")
+  eventTimestamp     : string (ISO 8601 date-time)
+  performingParty    : string (legal entity)
+  hashOfArtefacts    : string (SHA-256 hex digest)
+```
 
+## §9 Manifest
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations publish a signed manifest carrying
+`standardSlug` (constant value "civic-
+participation"), `version`, `implementation`,
+the operator's `engagementMaturity` envelope,
+and the `profile` declaration that selects which
+of the optional records (deliberation, outcome,
+KPI) the implementation supports. The manifest
+is signed using a key whose public part is
+published on the operator's
+`.well-known/wia/civic-participation/` discovery
+endpoint declared in PHASE-2.

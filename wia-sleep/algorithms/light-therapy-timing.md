@@ -495,9 +495,7 @@ def assess_treatment_response(
 
 ## 8. References
 
-1. St 선행 연구. Human phase response curve to a 1 h pulse of bright white light. Journal of Physiology.
-2. 선행 연구. A phase response curve to single bright light pulses in human subjects. Journal of Physiology.
-3. 선행 연구. Human responses to bright light of different durations. Journal of Physiology.
+1. St 관련 분야 자료. Human phase response curve to a 1 h pulse of bright white light. Journal of Physiology.
 
 ---
 

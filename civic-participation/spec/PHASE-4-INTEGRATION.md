@@ -5,237 +5,300 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-civic-participation (Civic Participation).
+This document defines how a public-administration
+body operating a citizen-engagement platform
+integrates with the systems that surround
+deliberative democracy: the EU Single Digital
+Gateway operating the cross-border citizen
+service one-stop shop; the Interoperable Europe
+Portal under EU Regulation 2024/903; the smart-
+city KPI dashboard ingesting ITU-T Y.4900 and
+ISO 37120/37122 indicators; the national
+identity provider issuing the citizen's W3C
+Verifiable Credential; the open-data portal
+under W3C DCAT v3; the parliament secretariat's
+written-contribution intake; the OECD Open
+Government Partnership clearinghouse; the UN
+DESA biennial e-government survey; the
+transparency observer running the audit-of-
+record; the supervisory data-protection
+authority overseeing GDPR Article 9 processing;
+and the public-procurement authority running an
+inclusive-engagement programme.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ITU-T Y.4900/L.1600
+- ISO 37120:2018, ISO 37122:2019, ISO 37123:2019,
+  ISO 37100:2016, ISO 37101:2016
+- ISO 18091:2019, ISO 9001:2015, ISO 37001:2016
+- W3C ODRL 2.2, W3C DCAT v3, W3C DID v1.0, W3C
+  VC Data Model v2.0
+- OECD Recommendation of the Council on Open
+  Government (OECD/LEGAL/0438), OECD Citizen
+  Engagement Guide
+- UN DESA E-Government Survey
+- World Bank GovTech Maturity Index
+- ISO/IEC 27001:2022, ISO/IEC 17021-1:2015,
+  ISO/IEC 17065:2012
+- IETF RFC 8259, RFC 9457, RFC 8615, RFC 9421,
+  RFC 6962
+- W3C Verifiable Credentials Data Model v2.0
+- EU Single Digital Gateway Regulation (EU)
+  2018/1724
+- EU Interoperable Europe Act Regulation (EU)
+  2024/903
+- EU Regulation (EU) 2018/1724 Implementing
+  Regulation (EU) 2022/1463 (technical
+  specifications)
+- EU GDPR Articles 6, 9, 12-22, 24-30, 32-34
+- KR 행정기본법, KR 정보공개법, KR 전자정부법
+  (e-Government Act)
 
 ---
 
-## §1 Scope
+## §1 EU Single Digital Gateway Integration
 
-This PHASE document is one of four that together define the WIA-civic-participation
-standard. It addresses the integration layer of the standard.
+### §1.1 SDG operator registry binding
 
-## §2 Manifest
+A consultation in scope of the EU SDG
+Regulation (EU) 2018/1724 binds the operator's
+SDG identifier to the consultation record. The
+SDG implementing-regulation (EU) 2022/1463
+technical specifications govern the cross-
+border-citizen-service interaction.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "civic-participation"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+### §1.2 Multi-language summary publication
 
-## §3 Conformance Tiers
+The operator publishes a per-consultation
+summary in each EU official language declared
+in the operator's SDG profile. The summary's
+multi-language envelope is signed by the
+operator's public-key set so that the SDG-side
+aggregator can validate the summary independent
+of the operator.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §2 EU Interoperable Europe Portal Integration
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+EU Regulation 2024/903 (Interoperable Europe
+Act) establishes the Interoperable Europe
+Portal as the catalogue of cross-border
+interoperable services. The operator's API
+publishes its per-service interoperability
+descriptor (the data shapes carried, the
+authentication mechanism, the rights expression)
+through the portal's intake endpoint so that a
+downstream consumer can discover the operator's
+service alongside other Member-State services.
 
-## §4 Discovery
+## §3 National Identity Provider Integration
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/civic-participation`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+### §3.1 Verified-citizen submission
 
-## §5 Time and Identity
+A submission carrying a verified-citizen
+identity references a W3C Verifiable Credential
+issued by the national identity provider (the
+EU eIDAS-2 European Digital Identity Wallet
+under EU Regulation (EU) 2024/1183, the KR 본인
+확인기관 issuing 본인확인서비스, the US state-
+level digital-driver-license trust framework).
+The credential's issuer signature is verified
+against the issuer's public-key set published
+on the issuer's discovery endpoint.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### §3.2 Credential revocation check
 
-## §6 Versioning and Deprecation
+The operator's API queries the issuer's
+revocation list on each verified-citizen
+submission and refuses a submission whose
+underlying credential has been revoked. The
+revocation status is cached for the TTL
+declared in the issuer's response headers.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Smart-City Dashboard Integration
 
-## §7 Privacy and Security
+A smart-city dashboard consuming the operator's
+ITU-T Y.4900 / ISO 37120 / ISO 37122 KPI bundle
+binds the per-period indicator value to the
+city-level dashboard. The KPI envelope is
+streamed to the dashboard via the webhook
+endpoint declared in PHASE-2 §12; the
+dashboard's signature verifier validates the
+operator's signing key against the public-key
+set.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Open-Data Portal Integration
 
-## §8 Open Governance
+The operator publishes the consultation envelope
+and the post-consultation aggregated submission
+corpus as a W3C DCAT v3 dataset on the
+operator's open-data portal (or the national
+open-data portal where the operator
+participates in a federated catalogue). The
+DCAT envelope carries the dataset's title in
+multiple languages, the rights expression
+(W3C ODRL), the publication-date, and the
+contact-point.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `civic-participation` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Parliament-Secretariat Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+A consultation related to a parliamentary
+proposal binds the consultation envelope to the
+parliament secretariat's written-contribution
+intake. The secretariat's API publishes the per-
+proposal contribution summary that the operator
+ingests and binds to the consultation's
+deliberation record.
 
+## §7 OECD Open Government Partnership
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+The OECD Open Government Partnership maintains
+a clearinghouse of open-government commitments
+and reviews. An operator participating in the
+OGP National Action Plan binds the per-
+consultation outcome to the relevant OGP
+commitment so that the OGP review-of-record
+can audit the operator's progress against the
+commitment.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## §8 UN DESA Biennial Survey Integration
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The UN DESA E-Government Survey is conducted
+biennially and publishes the per-Member-State
+E-Government Development Index and the E-
+Participation Index. The operator's API
+publishes the per-period KPI bundle in the
+form expected by the UN DESA secretariat so
+that the operator's contribution to the
+survey is preserved.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §9 Transparency-Observer Integration
 
-## Annex F — Adoption Roadmap
+A transparency observer (a civil-society
+watchdog, an academic researcher running a
+democratic-audit, a journalist running a public-
+interest investigation) integrates with the
+operator's API through the audit-scope
+authorisation declared in the operator's open-
+data publication policy. The observer's audit
+findings are published on the observer's
+endpoint and may be referenced by the
+operator's nonconformity register under PHASE-3
+§11.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §10 Supervisory Data-Protection Authority Integration
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+A supervisory data-protection authority
+overseeing the operator's processing under
+GDPR Article 9 audits the operator's processing
+records (Article 30) on demand. The operator's
+API publishes the GDPR Article 30 records of
+processing activities to the authority's
+endpoint so that the authority's audit trail
+is preserved.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §11 KR-Jurisdiction Integration
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+### §11.1 KR 전자정부법 binding
 
-## Annex G — Test Vectors and Conformance Evidence
+A KR-jurisdiction operator declares the KR
+전자정부법 (e-Government Act) and the KR
+국가정보화 기본법 (Framework Act on National
+Informatization) reference in the programme
+record's `governingFrameworks`. The KR Ministry
+of the Interior and Safety operates the e-
+government service register; the operator's
+API queries the register on each retrieval
+after the caching TTL.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+### §11.2 KR 국민신문고 / 국민제안 integration
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The KR 국민신문고 / 국민제안 platform operated
+by the Anti-Corruption and Civil Rights
+Commission ingests cross-jurisdictional citizen
+petitions. A KR municipal operator publishing
+a local petition binds the local petition to
+the 국민신문고 cross-jurisdictional petition
+where the petitioner requests the cross-
+jurisdictional escalation.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+### §11.3 KR 정보공개법 disclosure register
 
-## Annex H — Versioning and Deprecation Policy
+A KR-jurisdiction operator handling an
+information-disclosure request publishes the
+per-request decision in the KR 정보공개포털
+operated by the Ministry of the Interior and
+Safety so that the request's decision is
+discoverable.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Public Retrieval and Re-Issuance
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+### §12.1 Public consultation retrieval
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+A public consumer (a citizen reading the
+consultation, a journalist reporting on the
+consultation, a researcher referencing the
+consultation in a publication) retrieves the
+consultation record at
+`/v1/consultations/{consultationId}` without
+authentication; the response carries the
+public fields and the underlying outcome
+summary.
 
-## Annex I — Interoperability Profiles
+### §12.2 Verifiable-credentials re-issuance
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+A consultation outcome (the per-citizen
+acknowledgement, the per-citizen response with
+rationale, the per-deliberation decision-
+record) is re-issuable as a W3C Verifiable
+Credential signed by the operator's public-
+key set so that a downstream consumer (a
+follow-up consultation, an external register,
+an academic researcher) can validate the
+outcome without contacting the operator
+directly.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §13 Audit and Conformity-Assessment Integration
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+### §13.1 ISO/IEC 17021-1 management-system audit
+
+The operator's quality-management system
+declared in PHASE-3 §10 is audited under
+ISO/IEC 17021-1 by an accredited certification
+body. The audit result is stored in the
+operator's audit envelope and is referenced
+from the programme record's
+`engagementMaturity`. The certification body's
+public-key set is published at the certification
+body's endpoint; the operator's API verifies
+the audit certificate's signature against the
+certification body's public key on retrieval.
+
+### §13.2 ISO/IEC 17065 conformity body
+       discipline
+
+Where the operator's certification (for
+example the OECD OURdata Index sub-component
+attestation, the World Bank GovTech Maturity
+Index attestation) is issued by an external
+conformity-assessment body, the body's
+ISO/IEC 17065:2012 accreditation is bound to
+the certification reference declared in the
+programme record.
+
+## §14 References (consolidated)
+
+The references list across PHASE-1 to PHASE-4
+is the canonical citation set for the WIA-
+civic-participation standard. Implementations
+cite the standards by their issuing
+organisation (ITU-T, ISO, IEC, IETF, W3C, OECD,
+UN, World Bank, EU regulatory text, KR
+regulatory text) and the publication year so
+that a downstream consumer can locate the
+authoritative text. Updates to a cited standard
+(for example, a new edition of ISO 37122)
+trigger an internal review cycle in the
+operator's quality-management discipline
+declared in PHASE-3 §10 before the new revision
+is bound into the operator's enumeration set.

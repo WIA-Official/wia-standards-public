@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 4-02: Closures - Rust NRT Academy</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e94560;
+            overflow: hidden;
+        }
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            display: none;
+            flex-direction: column;
+        }
+        .slide.active { display: flex; }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+        .logo { font-size: 28px; font-weight: bold; color: #e94560; }
+        .episode-tag {
+            background: linear-gradient(90deg, #e94560, #ff6b6b);
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-size: 18px;
+            color: white;
+        }
+        .lang-toggle { display: flex; gap: 10px; }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 2px solid #e94560;
+            background: transparent;
+            color: #e94560;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .lang-btn.active { background: #e94560; color: white; }
+
+        h1 {
+            font-size: 72px;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #e94560, #ff6b6b, #ffc371);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+        h2 { font-size: 48px; color: #ff6b6b; margin-bottom: 30px; }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .code-block {
+            background: #0a0a12;
+            border-radius: 20px;
+            padding: 40px;
+            margin: 20px 0;
+            border: 2px solid #e94560;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 26px;
+            line-height: 1.6;
+            position: relative;
+        }
+        .code-block::before {
+            content: 'RUST';
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            color: #e94560;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateX(-30px);
+            animation: slideIn 0.5s forwards;
+        }
+        @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+
+        .keyword { color: #ff6b6b; }
+        .type { color: #ffc371; }
+        .string { color: #a8e6cf; }
+        .comment { color: #6b7280; font-style: italic; }
+        .function { color: #74b9ff; }
+        .number { color: #fab1a0; }
+        .macro { color: #a29bfe; }
+        .closure { color: #fd79a8; }
+
+        .concept-box {
+            background: linear-gradient(135deg, rgba(233, 69, 96, 0.2), rgba(255, 107, 107, 0.1));
+            border: 2px solid #e94560;
+            border-radius: 20px;
+            padding: 40px;
+            margin: 20px 0;
+        }
+
+        .flex-container { display: flex; gap: 40px; align-items: flex-start; }
+        .flex-item { flex: 1; }
+
+        .highlight { color: #ffc371; font-weight: bold; }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 30px 0;
+            font-size: 24px;
+        }
+        .comparison-table th, .comparison-table td {
+            padding: 20px;
+            text-align: left;
+            border: 2px solid #e94560;
+        }
+        .comparison-table th { background: rgba(233, 69, 96, 0.3); color: #ffc371; }
+
+        .closure-box {
+            background: rgba(253, 121, 168, 0.1);
+            border: 2px solid #fd79a8;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 15px 0;
+        }
+
+        .bullet-list {
+            list-style: none;
+            font-size: 28px;
+            line-height: 2;
+        }
+        .bullet-list li::before { content: '🦀 '; }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #e94560, #ffc371);
+            transition: width 0.3s;
+        }
+        .slide-number {
+            position: fixed;
+            bottom: 20px;
+            right: 40px;
+            font-size: 24px;
+            color: #e94560;
+        }
+        .nav-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 40px;
+            font-size: 18px;
+            color: #6b7280;
+        }
+
+        .ko { display: block; }
+        .en { display: none; }
+        body.lang-en .ko { display: none; }
+        body.lang-en .en { display: block; }
+
+        .center { text-align: center; }
+        .subtitle { font-size: 32px; color: #a8e6cf; text-align: center; margin-bottom: 40px; }
+
+        .lambda-symbol {
+            font-size: 200px;
+            text-align: center;
+            color: #fd79a8;
+            text-shadow: 0 0 50px rgba(253, 121, 168, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">EP 4-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="content center">
+            <h1>Closures</h1>
+            <p class="subtitle ko">클로저: 환경을 캡처하는 익명 함수</p>
+            <p class="subtitle en">Closures: Anonymous Functions That Capture Their Environment</p>
+            <div class="lambda-symbol">λ</div>
+            <p style="font-size: 28px; color: #6b7280; margin-top: 20px;">
+                <span class="ko">함수형 프로그래밍의 핵심 - 유연하고 강력한 추상화</span>
+                <span class="en">The core of functional programming - flexible and powerful abstraction</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Slide 2: Closure Syntax -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">클로저 문법</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">클로저 기본 문법</h2>
+        <h2 class="en">Basic Closure Syntax</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// 일반 함수</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="keyword">fn</span> <span class="function">add_one</span>(x: <span class="type">i32</span>) -> <span class="type">i32</span> { x + <span class="number">1</span> }</div>
+                <div class="code-line" style="animation-delay: 0.4s"></div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="comment">// 클로저 (동일한 기능)</span></div>
+                <div class="code-line" style="animation-delay: 0.6s"><span class="keyword">let</span> add_one = <span class="closure">|x: i32|</span> -> <span class="type">i32</span> { x + <span class="number">1</span> };</div>
+                <div class="code-line" style="animation-delay: 0.8s"></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="comment">// 타입 추론 활용 (더 간결하게)</span></div>
+                <div class="code-line" style="animation-delay: 1.0s"><span class="keyword">let</span> add_one = <span class="closure">|x|</span> x + <span class="number">1</span>;</div>
+                <div class="code-line" style="animation-delay: 1.2s"></div>
+                <div class="code-line" style="animation-delay: 1.3s"><span class="comment">// 호출</span></div>
+                <div class="code-line" style="animation-delay: 1.4s"><span class="keyword">let</span> result = <span class="function">add_one</span>(<span class="number">5</span>);  <span class="comment">// 6</span></div>
+            </div>
+            <div class="concept-box">
+                <p style="font-size: 24px;">
+                    <span class="ko">💡 클로저는 <span class="highlight">|매개변수|</span> 문법을 사용합니다. 타입 추론 덕분에 간결하게 작성 가능!</span>
+                    <span class="en">💡 Closures use <span class="highlight">|parameters|</span> syntax. Type inference makes them concise!</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 3: Capturing Environment -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">환경 캡처</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">환경 캡처 - 클로저의 핵심!</h2>
+        <h2 class="en">Capturing Environment - The Core of Closures!</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                <div class="code-line" style="animation-delay: 0.2s">    <span class="keyword">let</span> x = <span class="number">4</span>;</div>
+                <div class="code-line" style="animation-delay: 0.3s">    <span class="keyword">let</span> y = <span class="number">10</span>;</div>
+                <div class="code-line" style="animation-delay: 0.5s"></div>
+                <div class="code-line" style="animation-delay: 0.6s">    <span class="comment">// 클로저가 x와 y를 "캡처"!</span></div>
+                <div class="code-line" style="animation-delay: 0.7s">    <span class="keyword">let</span> add_to_x = <span class="closure">|n|</span> n + x;</div>
+                <div class="code-line" style="animation-delay: 0.8s">    <span class="keyword">let</span> multiply_by_y = <span class="closure">|n|</span> n * y;</div>
+                <div class="code-line" style="animation-delay: 1.0s"></div>
+                <div class="code-line" style="animation-delay: 1.1s">    <span class="macro">println!</span>(<span class="string">"{}"</span>, <span class="function">add_to_x</span>(<span class="number">5</span>));       <span class="comment">// 9</span></div>
+                <div class="code-line" style="animation-delay: 1.2s">    <span class="macro">println!</span>(<span class="string">"{}"</span>, <span class="function">multiply_by_y</span>(<span class="number">3</span>));  <span class="comment">// 30</span></div>
+                <div class="code-line" style="animation-delay: 1.3s">}</div>
+                <div class="code-line" style="animation-delay: 1.5s"></div>
+                <div class="code-line" style="animation-delay: 1.6s"><span class="comment">// 일반 함수는 이렇게 못함!</span></div>
+                <div class="code-line" style="animation-delay: 1.7s"><span class="comment">// fn add_to_x(n: i32) -> i32 { n + x }  // ❌ 에러</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: Capture Modes -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">캡처 방식</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">세 가지 캡처 방식</h2>
+        <h2 class="en">Three Capture Modes</h2>
+        <div class="content">
+            <table class="comparison-table">
+                <tr>
+                    <th>Trait</th>
+                    <th class="ko">캡처 방식</th>
+                    <th class="en">Capture Mode</th>
+                    <th class="ko">설명</th>
+                    <th class="en">Description</th>
+                </tr>
+                <tr>
+                    <td><span class="type">Fn</span></td>
+                    <td class="ko">&amp;T (불변 참조)</td>
+                    <td class="en">&amp;T (immutable ref)</td>
+                    <td class="ko">값을 읽기만 함</td>
+                    <td class="en">Only reads the value</td>
+                </tr>
+                <tr>
+                    <td><span class="type">FnMut</span></td>
+                    <td class="ko">&amp;mut T (가변 참조)</td>
+                    <td class="en">&amp;mut T (mutable ref)</td>
+                    <td class="ko">값을 수정함</td>
+                    <td class="en">Modifies the value</td>
+                </tr>
+                <tr>
+                    <td><span class="type">FnOnce</span></td>
+                    <td class="ko">T (소유권 이동)</td>
+                    <td class="en">T (ownership move)</td>
+                    <td class="ko">값의 소유권을 가져감</td>
+                    <td class="en">Takes ownership of value</td>
+                </tr>
+            </table>
+            <div class="code-block" style="font-size: 22px;">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">let</span> s = <span class="type">String</span>::<span class="function">from</span>(<span class="string">"hello"</span>);</div>
+                <div class="code-line" style="animation-delay: 0.3s"></div>
+                <div class="code-line" style="animation-delay: 0.4s"><span class="comment">// move 키워드로 강제 소유권 이동</span></div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="keyword">let</span> consume = <span class="keyword">move</span> <span class="closure">||</span> <span class="macro">println!</span>(<span class="string">"{}"</span>, s);</div>
+                <div class="code-line" style="animation-delay: 0.7s"></div>
+                <div class="code-line" style="animation-delay: 0.8s"><span class="comment">// println!("{}", s);  // ❌ s는 이미 move됨!</span></div>
+                <div class="code-line" style="animation-delay: 0.9s"><span class="function">consume</span>();  <span class="comment">// ✅ "hello"</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 5: Closures with Iterators -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Iterator와 함께</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">Iterator와 클로저 - 환상의 조합!</h2>
+        <h2 class="en">Iterators & Closures - Perfect Combination!</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">let</span> numbers = <span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>];</div>
+                <div class="code-line" style="animation-delay: 0.3s"></div>
+                <div class="code-line" style="animation-delay: 0.4s"><span class="comment">// map: 각 요소 변환</span></div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="keyword">let</span> doubled: <span class="type">Vec</span>&lt;<span class="type">i32</span>&gt; = numbers.<span class="function">iter</span>()</div>
+                <div class="code-line" style="animation-delay: 0.6s">    .<span class="function">map</span>(<span class="closure">|x|</span> x * <span class="number">2</span>)</div>
+                <div class="code-line" style="animation-delay: 0.7s">    .<span class="function">collect</span>();  <span class="comment">// [2, 4, 6, 8, 10]</span></div>
+                <div class="code-line" style="animation-delay: 0.9s"></div>
+                <div class="code-line" style="animation-delay: 1.0s"><span class="comment">// filter: 조건에 맞는 요소만</span></div>
+                <div class="code-line" style="animation-delay: 1.1s"><span class="keyword">let</span> evens: <span class="type">Vec</span>&lt;&amp;<span class="type">i32</span>&gt; = numbers.<span class="function">iter</span>()</div>
+                <div class="code-line" style="animation-delay: 1.2s">    .<span class="function">filter</span>(<span class="closure">|x|</span> *x % <span class="number">2</span> == <span class="number">0</span>)</div>
+                <div class="code-line" style="animation-delay: 1.3s">    .<span class="function">collect</span>();  <span class="comment">// [2, 4]</span></div>
+                <div class="code-line" style="animation-delay: 1.5s"></div>
+                <div class="code-line" style="animation-delay: 1.6s"><span class="comment">// 체이닝!</span></div>
+                <div class="code-line" style="animation-delay: 1.7s"><span class="keyword">let</span> sum: <span class="type">i32</span> = numbers.<span class="function">iter</span>()</div>
+                <div class="code-line" style="animation-delay: 1.8s">    .<span class="function">filter</span>(<span class="closure">|x|</span> *x > <span class="number">2</span>).<span class="function">map</span>(<span class="closure">|x|</span> x * <span class="number">2</span>).<span class="function">sum</span>();  <span class="comment">// 24</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 6: Closure as Parameters -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">함수 매개변수</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">클로저를 함수 인자로 받기</h2>
+        <h2 class="en">Accepting Closures as Function Parameters</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// 제네릭 + 트레이트 바운드로 클로저 받기</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="keyword">fn</span> <span class="function">apply_twice</span>&lt;<span class="type">F</span>&gt;(f: <span class="type">F</span>, x: <span class="type">i32</span>) -> <span class="type">i32</span></div>
+                <div class="code-line" style="animation-delay: 0.3s"><span class="keyword">where</span></div>
+                <div class="code-line" style="animation-delay: 0.4s">    <span class="type">F</span>: <span class="type">Fn</span>(<span class="type">i32</span>) -> <span class="type">i32</span></div>
+                <div class="code-line" style="animation-delay: 0.5s">{</div>
+                <div class="code-line" style="animation-delay: 0.6s">    <span class="function">f</span>(<span class="function">f</span>(x))</div>
+                <div class="code-line" style="animation-delay: 0.7s">}</div>
+                <div class="code-line" style="animation-delay: 0.9s"></div>
+                <div class="code-line" style="animation-delay: 1.0s"><span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                <div class="code-line" style="animation-delay: 1.1s">    <span class="keyword">let</span> add_five = <span class="closure">|x|</span> x + <span class="number">5</span>;</div>
+                <div class="code-line" style="animation-delay: 1.2s">    <span class="keyword">let</span> result = <span class="function">apply_twice</span>(add_five, <span class="number">10</span>);</div>
+                <div class="code-line" style="animation-delay: 1.3s">    <span class="macro">println!</span>(<span class="string">"{}"</span>, result);  <span class="comment">// 20</span></div>
+                <div class="code-line" style="animation-delay: 1.4s">}</div>
+            </div>
+            <div class="concept-box">
+                <p style="font-size: 24px;">
+                    <span class="ko">💡 <span class="highlight">Fn</span>, <span class="highlight">FnMut</span>, <span class="highlight">FnOnce</span> 트레이트로 클로저 타입을 표현합니다.</span>
+                    <span class="en">💡 Use <span class="highlight">Fn</span>, <span class="highlight">FnMut</span>, <span class="highlight">FnOnce</span> traits to express closure types.</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 7: Returning Closures -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">클로저 반환</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">함수에서 클로저 반환하기</h2>
+        <h2 class="en">Returning Closures from Functions</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// impl Trait으로 클로저 반환</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="keyword">fn</span> <span class="function">make_adder</span>(n: <span class="type">i32</span>) -> <span class="keyword">impl</span> <span class="type">Fn</span>(<span class="type">i32</span>) -> <span class="type">i32</span> {</div>
+                <div class="code-line" style="animation-delay: 0.3s">    <span class="keyword">move</span> <span class="closure">|x|</span> x + n</div>
+                <div class="code-line" style="animation-delay: 0.4s">}</div>
+                <div class="code-line" style="animation-delay: 0.6s"></div>
+                <div class="code-line" style="animation-delay: 0.7s"><span class="comment">// Box로 동적 디스패치 (다양한 클로저 반환시)</span></div>
+                <div class="code-line" style="animation-delay: 0.8s"><span class="keyword">fn</span> <span class="function">make_operation</span>(op: &amp;<span class="type">str</span>) -> <span class="type">Box</span>&lt;<span class="keyword">dyn</span> <span class="type">Fn</span>(<span class="type">i32</span>) -> <span class="type">i32</span>&gt; {</div>
+                <div class="code-line" style="animation-delay: 0.9s">    <span class="keyword">match</span> op {</div>
+                <div class="code-line" style="animation-delay: 1.0s">        <span class="string">"double"</span> => <span class="type">Box</span>::<span class="function">new</span>(<span class="closure">|x|</span> x * <span class="number">2</span>),</div>
+                <div class="code-line" style="animation-delay: 1.1s">        <span class="string">"square"</span> => <span class="type">Box</span>::<span class="function">new</span>(<span class="closure">|x|</span> x * x),</div>
+                <div class="code-line" style="animation-delay: 1.2s">        _ => <span class="type">Box</span>::<span class="function">new</span>(<span class="closure">|x|</span> x),</div>
+                <div class="code-line" style="animation-delay: 1.3s">    }</div>
+                <div class="code-line" style="animation-delay: 1.4s">}</div>
+                <div class="code-line" style="animation-delay: 1.6s"></div>
+                <div class="code-line" style="animation-delay: 1.7s"><span class="keyword">let</span> add_10 = <span class="function">make_adder</span>(<span class="number">10</span>);</div>
+                <div class="code-line" style="animation-delay: 1.8s"><span class="macro">println!</span>(<span class="string">"{}"</span>, <span class="function">add_10</span>(<span class="number">5</span>));  <span class="comment">// 15</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">정리</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">EP 4-02 요약</h2>
+        <h2 class="en">EP 4-02 Summary</h2>
+        <div class="content">
+            <div class="flex-container">
+                <div class="flex-item">
+                    <div class="closure-box">
+                        <h3 style="color: #fd79a8; margin-bottom: 20px;">클로저 핵심</h3>
+                        <ul class="bullet-list" style="font-size: 22px;">
+                            <li class="ko">|params| expression 문법</li>
+                            <li class="en">|params| expression syntax</li>
+                            <li class="ko">환경을 캡처하는 익명 함수</li>
+                            <li class="en">Anonymous functions that capture env</li>
+                            <li class="ko">Fn, FnMut, FnOnce 트레이트</li>
+                            <li class="en">Fn, FnMut, FnOnce traits</li>
+                            <li class="ko">move 키워드로 소유권 이동</li>
+                            <li class="en">move keyword for ownership</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #e94560; margin-bottom: 20px;">활용 패턴</h3>
+                        <ul class="bullet-list" style="font-size: 22px;">
+                            <li class="ko">Iterator의 map, filter, fold</li>
+                            <li class="en">Iterator's map, filter, fold</li>
+                            <li class="ko">함수 인자로 전달</li>
+                            <li class="en">Pass as function argument</li>
+                            <li class="ko">고차 함수 구현</li>
+                            <li class="en">Implement higher-order functions</li>
+                            <li class="ko">콜백과 이벤트 처리</li>
+                            <li class="en">Callbacks and event handling</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 50px;">
+                <p style="font-size: 32px; color: #ffc371;">
+                    <span class="ko">다음 시간: 스마트 포인터 (Box, Rc, RefCell) 🚀</span>
+                    <span class="en">Next: Smart Pointers (Box, Rc, RefCell) 🚀</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="progress-bar" id="progress"></div>
+    <div class="slide-number" id="slideNum">1 / 8</div>
+    <div class="nav-hint">← → 키 또는 클릭으로 이동</div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+
+        function showSlide(n) {
+            if (n < 1) n = 1;
+            if (n > totalSlides) n = totalSlides;
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            document.getElementById('progress').style.width = (n / totalSlides * 100) + '%';
+            document.getElementById('slideNum').textContent = n + ' / ' + totalSlides;
+            animateSlide();
+        }
+
+        function nextSlide() { showSlide(currentSlide + 1); }
+        function prevSlide() { showSlide(currentSlide - 1); }
+
+        function animateSlide() {
+            const slide = document.getElementById('slide' + currentSlide);
+            const lines = slide.querySelectorAll('.code-line');
+            lines.forEach((line, i) => {
+                line.style.animation = 'none';
+                line.offsetHeight;
+                line.style.animation = `slideIn 0.5s ${i * 0.1}s forwards`;
+            });
+        }
+
+        function setLang(lang) {
+            document.body.classList.remove('lang-en');
+            if (lang === 'en') document.body.classList.add('lang-en');
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.includes(lang === 'ko' ? '한국어' : 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                if (e.clientX > window.innerWidth / 2) nextSlide();
+                else prevSlide();
+            }
+        });
+
+        showSlide(1);
+    </script>
+</body>
+</html>

@@ -5,237 +5,294 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-economic-integration (Economic Integration).
+This document defines how an economic-
+integration operator integrates with the
+systems that surround cross-border trade: the
+World Trade Organization secretariat operating
+the TFA Notifications and Trade Policy
+Reviews; the World Customs Organization
+operating the WCO SAFE MRA register and the
+HS Committee revision cycle; the UN/CEFACT
+secretariat publishing the Recommendations
+and the Single Window Repository; the UN
+COMTRADE secretariat operating the cross-
+country trade-statistics database; the SWIFT
+network operating the cross-border payments
+correspondent-banking layer; the ICC Banking
+Commission operating the UCP / ISBP / URDG /
+URBPO; the EU Customs Single Window operating
+the EU's centralised submission layer; the
+ASEAN Single Window operating the ASEAN's
+network; and the supervisory data-protection
+authority overseeing per-message processing
+under GDPR and equivalent frameworks.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- WTO TFA, GATT 1994, GPA, TRIPS, Customs
+  Valuation Agreement
+- WCO SAFE 2018, WCO Data Model v3, WCO
+  HS-2022, WCO AEO Programme, WCO MRA
+- UN/EDIFACT, UN/CEFACT Recommendations 1, 16,
+  21, 33, 36, ISO 9735-1
+- UN COMTRADE submission specification
+- ISO 20022 message family + SWIFT GPI
+- ISO 4217, ISO 3166-1, ISO 9362 (BIC), ISO
+  13616 (IBAN), ISO 17442 (LEI)
+- ICC Incoterms 2020, ICC UCP 600, ICC ISBP
+  745, ICC URDG 758, ICC URBPO 750
+- ISO 9001:2015, ISO/IEC 27001:2022, ISO/IEC
+  17021-1:2015, ISO/IEC 17065:2012
+- IETF RFC 8259, RFC 9457, RFC 8615, RFC
+  9421, RFC 6234, RFC 6962
+- W3C Trace Context, W3C ODRL 2.2, W3C VC
+  v2.0
+- EU UCC Regulation (EU) 952/2013 + EU
+  Implementing Regulation 2015/2447 +
+  Delegated Regulation 2015/2446
+- EU Dual-Use Regulation (EU) 2021/821, EU
+  Common Military List
+- KR 관세법, KR 대외무역법, KR 외국환거래법, KR
+  자유무역협정 이행을 위한 관세법의 특례에 관한
+  법률
+- ASEAN Economic Community Blueprint, USMCA,
+  CPTPP, RCEP
 
 ---
 
-## §1 Scope
+## §1 WTO Secretariat Integration
 
-This PHASE document is one of four that together define the WIA-economic-integration
-standard. It addresses the integration layer of the standard.
+### §1.1 TFA Notification Submission
 
-## §2 Manifest
+The operator's national customs authority
+submits the operator's TFA notification
+schedule (the per-Article notification
+deadlines for Categories A, B, C) through
+the WTO TFA Facility's online submission
+endpoint. The operator's API publishes the
+per-notification status (committed,
+implemented, suspended) for transparency.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "economic-integration"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+### §1.2 Trade Policy Review
 
-## §3 Conformance Tiers
+The operator's national authorities
+contribute to the WTO Trade Policy Review
+cycle. The per-cycle submission carries the
+operator's per-period trade-facilitation
+performance indicators.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §2 WCO Secretariat Integration
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+### §2.1 WCO SAFE MRA register
 
-## §4 Discovery
+The operator queries the WCO SAFE MRA
+register on each cross-border declaration
+to verify the partner's AEO status. The
+register is queried with the partner's AEO
+identifier and the operator's MRA
+participation reference.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/economic-integration`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+### §2.2 HS Committee revision integration
 
-## §5 Time and Identity
+The WCO HS Committee revises the Harmonised
+System every five years; the operator
+subscribes to the HS Committee's revision-
+publishing endpoint and triggers an internal
+review cycle when a new edition is
+published.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### §2.3 WCO Data Model maintenance
 
-## §6 Versioning and Deprecation
+The operator subscribes to the WCO Data Model
+maintenance endpoint and keeps the per-
+element mapping table current with the
+published revisions.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §3 UN/CEFACT Secretariat Integration
 
-## §7 Privacy and Security
+The UN/CEFACT secretariat publishes the
+Recommendations and the Single Window
+Repository. The operator subscribes to the
+secretariat's publishing endpoint and binds
+the operator's per-Recommendation
+implementation to the published reference.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §4 UN COMTRADE Integration
 
-## §8 Open Governance
+The operator's national statistical office
+publishes the per-period trade-statistics
+dataset to UN COMTRADE through the COMTRADE
+submission endpoint. The submission carries
+the per-row commodity code (HS-2022 + the
+operator's national-extension digits), the
+partner-country code (ISO 3166-1), the trade-
+flow direction (import, export, re-import,
+re-export), and the per-row quantity-and-
+value envelope.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `economic-integration` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 SWIFT Network Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+A financial-institution operator participates
+in the SWIFT network through its BIC
+identifier. The SWIFT GPI tracking layer
+publishes the per-payment leg status; the
+operator's API ingests the GPI tracking
+events and binds them to the per-payment
+record.
 
+## §6 ICC Banking Commission Integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+The ICC Banking Commission publishes the
+UCP, ISBP, URDG, and URBPO with periodic
+revisions. The operator subscribes to the
+Banking Commission's publishing endpoint and
+adjusts the operator's documentary-credit
+discipline when a revision is published.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## §7 EU Customs Single Window Integration
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+A EU-Member-State operator binds the
+operator's declaration register to the EU
+Customs Single Window for Certificates
+Exchange (EU CSW-CERTEX) where the
+declaration involves a non-customs
+certificate (a sanitary certificate, a
+phytosanitary certificate, a CITES
+certificate). The CSW-CERTEX endpoint
+verifies the certificate's currency against
+the issuing authority's register.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 ASEAN Single Window Integration
 
-## Annex F — Adoption Roadmap
+An ASEAN-Member-State operator binds the
+operator's declaration register to the
+ASEAN Single Window. The ASW endpoint
+exchanges the per-declaration message
+between the ten ASEAN member states' national
+single windows.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Supervisory Data-Protection Authority Integration
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The supervisory data-protection authority
+overseeing the operator's per-message
+processing audits the operator's records of
+processing activities on demand. Where the
+operator processes personal data (the
+trader's natural-person LEI alternative, the
+beneficiary individual's account holder
+data), the operator's API publishes the
+records to the authority's endpoint.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Public Retrieval and Re-Issuance
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+### §10.1 Public declaration summary
 
-## Annex G — Test Vectors and Conformance Evidence
+The operator publishes per-period trade-
+volume statistics on the public-portal
+endpoint without per-declaration
+identifiers. The aggregated dataset is
+consumed by researchers, journalists, and
+policy analysts.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+### §10.2 Verifiable-credentials re-issuance
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+A certificate of origin is re-issuable as a
+W3C Verifiable Credential signed by the
+issuing chamber's public-key set so that a
+downstream destination-customs admin can
+verify the certificate without contacting
+the chamber directly.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+An AEO certificate is similarly re-issuable
+as a Verifiable Credential signed by the
+issuing customs authority's public-key set.
 
-## Annex H — Versioning and Deprecation Policy
+## §11 KR-Jurisdiction Integration
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+### §11.1 KR 관세청 register integration
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+A KR-jurisdiction operator binds the
+declaration to the KR Customs Service's
+UNI-PASS register. The KR Customs Service
+operates the register; the operator's API
+queries the register on each retrieval
+after the caching TTL.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+### §11.2 KR 한국무역협회 (KITA) trade-data
+       integration
 
-## Annex I — Interoperability Profiles
+A KR-jurisdiction operator participating in
+the KITA trade-data exchange binds the
+declaration to the KITA platform.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+### %11.3 KR 한국무역정보통신 (KTNET)
+       integration
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+A KR-jurisdiction operator using the KTNET
+single-window-of-trade exchanges UN/EDIFACT
+messages through KTNET's electronic-trade
+platform.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+### §11.4 KR 자유무역협정 portal integration
+
+The KR FTA portal published by the KR
+Ministry of Trade, Industry and Energy
+provides the per-FTA preferential-origin
+verification endpoint that an importing
+foreign customs admin can query.
+
+## §12 Audit and Conformity-Assessment
+       Integration
+
+### §12.1 ISO/IEC 17021-1 management-system audit
+
+The operator's quality-management system
+declared in PHASE-3 §11 is audited under
+ISO/IEC 17021-1 by an accredited
+certification body.
+
+### §12.2 ISO/IEC 17065 product certification
+
+Where the operator's per-AEO certification or
+per-origin certification is issued under a
+product-certification scheme, the
+certification body's ISO/IEC 17065:2012
+accreditation is bound to the certification
+reference.
+
+## §13 Regional Economic-Union Integration
+
+### §13.1 ASEAN Economic Community
+
+An ASEAN-Member-State operator publishes the
+per-period market-integration dataset to the
+ASEAN Economic Community Blueprint
+monitoring endpoint.
+
+### §13.2 USMCA / CPTPP / RCEP committees
+
+A signatory operator publishes the per-
+agreement implementation report to the
+agreement's joint committee endpoint where
+the operator is empowered to do so.
+
+## §14 References (consolidated)
+
+The references list across PHASE-1 to PHASE-4
+is the canonical citation set for the WIA-
+economic-integration standard. Implementations
+cite the multilateral and intergovernmental
+agreements (WTO, WCO, UN/CEFACT, UN COMTRADE,
+ISO 20022, ICC, ASEAN, USMCA, CPTPP, RCEP)
+and the ISO / IEC / IETF / W3C / EU / KR
+references by their issuing organisation and
+the publication year so that a downstream
+consumer can locate the authoritative text.
+Updates to a cited standard (for example,
+the next HS revision, a new ISO 20022
+message family release, a new ICC UCP
+edition) trigger an internal review cycle in
+the operator's quality-management discipline
+declared in PHASE-3 §11 before the new
+revision is bound into the operator's
+enumeration set.

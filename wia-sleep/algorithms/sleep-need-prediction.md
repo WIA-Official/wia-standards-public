@@ -455,9 +455,8 @@ Recommended assessments for sleep-performance relationship:
 
 ## 11. References
 
-1. 선행 연구. PER3 polymorphism predicts sleep structure and waking performance. Current Biology.
 2. Dijk, D.J., & Archer, S.N. (2010). PERIOD3, circadian phenotypes, and sleep homeostasis. Sleep Medicine Reviews.
-3. Van 선행 연구. Systematic interindividual differences in neurobehavioral impairment from sleep loss. Sleep.
+3. Van 관련 분야 자료. Systematic interindividual differences in neurobehavioral impairment from sleep loss. Sleep.
 
 ---
 

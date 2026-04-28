@@ -5,237 +5,315 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-catalyst-material (Catalyst Material).
+This document defines the protocols that govern a
+catalyst-research operator across the laboratory-to-
+manufacturer-to-licensee value chain: the catalyst-
+classification discipline that anchors every record
+to the IUPAC catalysis-nomenclature taxonomy, the
+characterisation discipline that ties each measurement
+to its declared test method, the certificate-issuance
+discipline that gates the publication of a certified
+reference material, the inter-laboratory comparison
+discipline that drives the ISO 5725 precision
+estimate, the substance-classification discipline
+that connects the registration record to the EU
+REACH and CLP hazard-class outcome, the chain-of-
+custody anchoring discipline that prevents silent
+mutation of the laboratory record, and the
+deactivation-tracking discipline that aligns an
+industrial-campaign performance trace with the
+catalyst-development laboratory's hypothesis.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO 17034:2016 (reference-material producer
+  competence) and ISO Guide 31:2015 / ISO Guide 33:
+  2015 / ISO Guide 35:2017 (reference-material
+  certificate content, characterisation approach,
+  uncertainty estimation)
+- ISO/IEC 17025:2017 (testing and calibration
+  laboratory competence)
+- ISO/IEC 17000:2020 (conformity-assessment
+  vocabulary) and ISO/IEC 17021-1:2015 (audit and
+  certification of management systems)
+- ISO 5725-1:2023 / 5725-2:2019 / 5725-3:2023 /
+  5725-4:2020 / 5725-6:1994 (accuracy and precision
+  of measurement methods and results)
+- ISO 13528:2022 (statistical methods for
+  proficiency testing by inter-laboratory
+  comparison)
+- ISO 9277:2022, ISO 13322-1:2014 / 13322-2:2021,
+  ISO 15901-1:2016 / 15901-2:2022 / 15901-3:2007
+  (the test-method standards cited in §2)
+- ASTM D3663-20, ASTM D4222-20, ASTM D4567-19,
+  ASTM D4641-17, ASTM D4824-13 (the test-method
+  standards cited in §2)
+- IUPAC Recommendations 2007 — Manual of Methods
+  and Procedures for Catalyst Characterization
+- IUPAC Quantities, Units and Symbols in Physical
+  Chemistry (the "Green Book") and IUPAC Compendium
+  of Chemical Terminology (the "Gold Book")
+- IUPAC Recommendations on Catalysis Nomenclature
+  (Pure Appl. Chem. 73, 2001, 1227–1241)
+- IETF RFC 9110 (HTTP Semantics), RFC 9421 (HTTP
+  Message Signatures), RFC 9457 (Problem Details),
+  RFC 8259 (JSON), RFC 8615 (well-known URIs),
+  RFC 6962 (Certificate Transparency — used as the
+  template for the per-event transparency log)
+- W3C Trace Context
+- EU REACH Regulation (EC) No 1907/2006 (Articles
+  10, 14, 31 — registration dossier, CSR, and
+  Safety Data Sheet supply-chain communication)
+- EU CLP Regulation (EC) No 1272/2008 (Articles
+  4–18 — substance and mixture classification)
+- EU Construction Products Regulation (EU)
+  305/2011 (cited where the catalyst is sold as a
+  construction-product additive)
 
 ---
 
-## §1 Scope
+## §1 Catalyst-Classification Discipline
 
-This PHASE document is one of four that together define the WIA-catalyst-material
-standard. It addresses the protocol layer of the standard.
+Every record carried by the operator's API is
+anchored to the IUPAC 2001 catalysis-nomenclature
+taxonomy declared in PHASE-1 §3 `catalystClass`. The
+operator's registry rejects a registration where the
+declared `catalystClass` is inconsistent with the
+declared `composition` — for example, a record whose
+`catalystClass` is `enzymatic` but whose
+`composition.activeComponent` is an inorganic
+formula returns `422 Unprocessable Entity` with a
+problem document carrying
+`type: /problems/iupac-class-composition-mismatch`.
 
-## §2 Manifest
+The classification rule is enforced before any
+characterisation record is accepted: a
+characterisation pointing at a catalyst whose class
+is `homogeneous` rejects the `BET-N2-77K` technique
+(BET surface area is defined by IUPAC Gold Book for
+solids only) and returns `422 Unprocessable Entity`.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "catalyst-material"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Characterisation Discipline
 
-## §3 Conformance Tiers
+### §2.1 Test-method binding
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Every characterisation record carries the
+`testStandard` enumeration declared in PHASE-2 §4.1.
+The operator's API enforces the technique-to-test-
+method mapping table:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- `BET-N2-77K` and `BET-Ar-87K` MUST cite
+  ISO 9277:2022, ASTM D3663-20, ASTM D4222-20,
+  ASTM D4567-19, or ASTM D4641-17.
+- `Hg-porosimetry` MUST cite ISO 15901-1:2016.
+- Gas-adsorption pore-size distribution MUST cite
+  ISO 15901-2:2022 (mesopores) or ISO 15901-3:2007
+  (micropores).
+- `TPD-NH3` for acidity quantification MUST cite
+  ASTM D4824-13.
+- Particle-size analysis by image method MUST cite
+  ISO 13322-1:2014 (static) or ISO 13322-2:2021
+  (dynamic).
 
-## §4 Discovery
+### §2.2 Uncertainty discipline
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/catalyst-material`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Every derived metric carries an uncertainty budget
+expressed at the ISO Guide 35 confidence level. The
+operator's API rejects a `derivedMetrics` envelope
+whose declared expanded uncertainty does not equal
+the coverage factor multiplied by the declared
+combined standard uncertainty (the ISO Guide 35 §6
+formula). The rejection carries a problem document
+with the offending JSON Pointer and the recomputed
+expected value so that the originating laboratory
+can correct the upload without re-running the
+measurement.
 
-## §5 Time and Identity
+### §2.3 Raw-data anchoring
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Every characterisation upload carries a raw-data
+file. The server stores the raw data under a
+content-addressable URI (the SHA-256 hex digest of
+the raw bytes is the path segment); the
+characterisation record references the digest, and
+PHASE-2 §4.2 retrieval returns the digest in the
+response envelope so that a downstream consumer can
+verify the raw bytes against the digest at fetch
+time.
 
-## §6 Versioning and Deprecation
+## §3 Certificate-Issuance Discipline
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+### §3.1 ISO 17034 accreditation gate
 
-## §7 Privacy and Security
+A CRM certificate is publishable only by an operator
+whose programme record carries an active ISO 17034
+RM-producer accreditation reference. The operator's
+API verifies the accreditation reference against the
+issuing accreditation-body's published register on
+each publication request and refuses publication
+where the reference is suspended, withdrawn, or
+expired.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+### §3.2 Characterisation design selection
 
-## §8 Open Governance
+The certificate's `characterisationDesign`
+enumeration declared in PHASE-1 §6 selects the
+ISO Guide 35 chapter that governs the assignment
+algorithm:
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `catalyst-material` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+- `ISO-Guide-35-§5-single-laboratory` — the
+  reference-material producer characterises the
+  candidate material in a single accredited
+  laboratory; the assigned value is the laboratory's
+  measurement and the uncertainty budget combines
+  measurement-method bias, repeatability, and the
+  homogeneity / stability components.
+- `ISO-Guide-35-§6-inter-laboratory` — the candidate
+  material is characterised by a panel of
+  accredited laboratories; the assigned value is
+  the panel mean (after the ISO 13528 §9 robust
+  statistic is applied) and the uncertainty budget
+  combines the panel reproducibility with the
+  homogeneity / stability components.
+- `ISO-Guide-35-§7-batch-certification` — the
+  reference-material producer certifies a batch of
+  candidate material against an existing higher-
+  order CRM; the assigned value is the higher-order
+  CRM's value adjusted for the measured difference
+  and the uncertainty budget combines the higher-
+  order CRM's expanded uncertainty with the
+  difference's measurement uncertainty.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+### §3.3 Intended-use binding
 
+The `intendedUse` declaration in PHASE-1 §6 binds
+the certificate to a characterisation technique
+declared in §2.1. A mismatch between the certificate
+and a downstream use returns `422 Unprocessable
+Entity` with a problem document at
+`/problems/crm-intended-use-mismatch`.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §4 Inter-Laboratory Comparison Discipline
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+### §4.1 Comparison-scheme enforcement
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The operator's API enforces the comparison-scheme
+enumeration declared in PHASE-1 §7. An
+`ISO-5725-design` round runs the ISO 5725-2 §7
+Cochran outlier-detection step before the
+repeatability and reproducibility standard
+deviations are computed. An `ISO-13528-PT` round
+runs the ISO 13528 §9 robust-Z step in place of
+classical outlier detection, and the per-laboratory
+z-score is computed using the ISO 13528 §7 assigned
+value and standard deviation for proficiency
+assessment.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+### §4.2 Participant-result authentication
 
-## Annex F — Adoption Roadmap
+Every participant submission carries an HTTP Message
+Signature (RFC 9421) issued under the participant's
+ISO/IEC 17025 testing-laboratory accreditation
+certificate. The server verifies the signature, the
+accreditation reference's currency in the issuing
+accreditation-body's register, and the scope of
+the accreditation against the comparison's declared
+test method. A submission whose accreditation scope
+does not cover the comparison's test method returns
+`403 Forbidden`.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §5 Substance-Classification Discipline
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+### §5.1 REACH registration linking
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A catalyst whose `composition.activeComponent`
+matches a REACH-registered substance MUST carry the
+REACH registration number in
+`identifierBindings.reachRegistrationNumber`. The
+operator's API enforces the registration-number
+format defined by Annex VI of EU REACH Regulation
+(EC) No 1907/2006 and rejects a registration where
+the format check fails.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+### §5.2 CLP hazard-class declaration
 
-## Annex G — Test Vectors and Conformance Evidence
+The `hazardLabelling` field declared in PHASE-1 §3
+carries the CLP Regulation hazard-class assignments
+and the signal word. The operator's API rejects a
+combination that is internally inconsistent — for
+example, a `Carcinogenicity Cat 1A` classification
+without the `H350` hazard statement, or a `Pyrophoric
+solid Cat 1` classification without the `H250`
+hazard statement — returning `422 Unprocessable
+Entity` with a problem document that names the
+expected hazard statement per the CLP Annex I
+classification rule.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §6 Chain-of-Custody Anchoring Discipline
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+### §6.1 Per-event transparency log
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+Every chain-of-custody event carried by PHASE-1 §8
+is appended to a per-operator transparency log
+modelled on the IETF RFC 6962 Certificate
+Transparency append-only-log structure. The log
+publishes a signed tree-head every signed-tree-head
+period (default 24 h, configurable per programme);
+the signed tree-head is anchored to the operator's
+public-key set declared in
+`/.well-known/wia/catalyst-material/keys.json`.
 
-## Annex H — Versioning and Deprecation Policy
+### §6.2 Mutation prevention
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+A custody event cannot be retroactively edited; an
+amendment is recorded as a new event with the
+`custodyEvent` value set to the same enumeration and
+a `previousEventRef` pointing at the event being
+amended. The amending event's narrative carries the
+reason (laboratory-recorded transcription error,
+witness re-attestation, customs-authority correction)
+and is reviewed by the operator's quality manager
+under the ISO 9001:2015 §10.2 nonconformity-and-
+corrective-action discipline.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §7 Deactivation-Tracking Discipline
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+### §7.1 Time-on-stream sampling cadence
 
-## Annex I — Interoperability Profiles
+The performance record's `deactivationCurve`
+declared in PHASE-1 §5 is sampled at a cadence that
+the catalyst-development laboratory declares at
+qualification time and the licensee operating the
+catalyst in a production unit honours during the
+industrial campaign.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+### §7.2 Mechanism inference handoff
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Where the deactivation-curve slope exceeds the
+qualification envelope, the operator's API marks
+the performance record `deactivationStatus` as
+`exceeds-envelope`. A downstream root-cause-analysis
+hand-off is initiated against the catalyst-
+development laboratory, and the hand-off envelope
+carries the suspected mechanism class (sintering,
+coke deposition, leaching, sulphur poisoning,
+phosphorus poisoning, alkali poisoning, structural
+collapse) under a controlled vocabulary mapped
+back to the IUPAC 2007 characterisation manual's
+deactivation-mechanism nomenclature.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §8 Quality-Management Discipline
+
+The operator runs an ISO 9001:2015 quality
+management system covering the catalyst-registration,
+characterisation-upload, certificate-issuance,
+inter-laboratory-comparison, and chain-of-custody
+processes. Internal audits run on a frequency
+declared in the programme's quality manual; the
+nonconformity register is reviewed in the ISO 9001
+§9.3 management-review cycle. ISO 17034 RM-producer
+operators add the ISO Guide 31 §3 certificate-
+issuance review and the ISO Guide 35 §10 stability-
+study renewal cycle on top of the ISO 9001
+discipline.

@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Matrix Factorization | WIA-AI-024</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 3rem 2rem; border-bottom: 3px solid #10B981; margin-bottom: 3rem; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 1rem; }
+        .chapter-info { color: #94a3b8; font-size: 1.1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin: 2.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin: 1.5rem 0 0.8rem 0; }
+        p { margin: 1rem 0; color: #cbd5e1; }
+        .code-block { background: #1e293b; border: 1px solid #334155; border-left: 4px solid #10B981; border-radius: 6px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.95rem; line-height: 1.6; }
+        .code-block code { color: #e2e8f0; }
+        .highlight { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 1.5rem 0; border-radius: 4px; }
+        .example { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; }
+        .example-title { color: #10B981; font-weight: 600; margin-bottom: 1rem; font-size: 1.1rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: #cbd5e1; }
+        li { margin: 0.5rem 0; }
+        .nav { display: flex; justify-content: space-between; margin: 3rem 0; padding: 1.5rem; background: #1e293b; border-radius: 8px; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: 600; transition: color 0.3s; }
+        .nav a:hover { color: #34d399; }
+        .summary { background: #1e293b; border: 2px solid #10B981; border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review { background: #1e293b; border: 2px solid #3b82f6; border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+        .review h2 { color: #3b82f6; border-bottom: none; margin-top: 0; }
+        .review ol { color: #cbd5e1; }
+        .philosophy { text-align: center; padding: 2rem; background: linear-gradient(135deg, #10B981 0%, #059669 100%); border-radius: 8px; margin: 3rem 0; color: white; font-size: 1.2rem; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border: 1px solid #334155; }
+        th { background: #334155; color: #10B981; font-weight: 600; }
+        td { color: #cbd5e1; }
+        .formula { background: #1e293b; border: 2px solid #3b82f6; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; text-align: center; font-family: 'Georgia', serif; font-size: 1.1rem; color: #e2e8f0; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🔢 Chapter 4: Matrix Factorization</h1>
+            <div class="chapter-info">WIA-AI-024 Recommendation AI Standard</div>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>🎯 The Power of Latent Factors</h2>
+        <p>
+            Matrix factorization revolutionized recommendation systems by discovering hidden patterns in user-item interactions. Instead of computing direct similarities, it decomposes the sparse rating matrix into lower-dimensional latent factor matrices that capture underlying preferences and item characteristics.
+        </p>
+        <p>
+            Imagine a movie rating matrix with millions of users and thousands of movies. Matrix factorization finds a compact representation where each user and movie is described by a small set of latent factors (perhaps 50-200 dimensions) representing abstract concepts like "how much sci-fi," "preference for action," "indie vs blockbuster," etc.
+        </p>
+
+        <div class="formula">
+            R ≈ P × Q<sup>T</sup><br>
+            <span style="font-size: 0.9rem; color: #94a3b8;">
+                (m×n matrix) ≈ (m×k matrix) × (k×n matrix)
+            </span>
+        </div>
+
+        <div class="highlight">
+            <strong>Key Insight:</strong> Matrix factorization learns compressed representations that generalize better than raw similarity computations, handling sparsity more effectively.
+        </div>
+
+        <h2>📊 Singular Value Decomposition (SVD)</h2>
+        <p>
+            SVD is a foundational matrix factorization technique. It decomposes a matrix R into three matrices: U, Σ, and V<sup>T</sup>.
+        </p>
+
+        <h3>Mathematical Foundation</h3>
+        <p>
+            For a rating matrix R (users × items), SVD finds:
+        </p>
+
+        <div class="formula">
+            R = U × Σ × V<sup>T</sup>
+        </div>
+
+        <ul>
+            <li><strong>U:</strong> User-factor matrix (users × latent factors)</li>
+            <li><strong>Σ:</strong> Diagonal matrix of singular values (factor importance)</li>
+            <li><strong>V:</strong> Item-factor matrix (items × latent factors)</li>
+        </ul>
+
+        <div class="code-block">
+<code>// Simplified SVD for recommendations
+class SVDRecommender {
+    private userFactors: Map<string, number[]>;
+    private itemFactors: Map<string, number[]>;
+    private latentDim: number;
+
+    constructor(latentDim: number = 50) {
+        this.latentDim = latentDim;
+        this.userFactors = new Map();
+        this.itemFactors = new Map();
+    }
+
+    // Train using gradient descent (simplified SVD++)
+    train(
+        ratings: Array<{userId: string, itemId: string, rating: number}>,
+        epochs: number = 100,
+        learningRate: number = 0.01,
+        lambda: number = 0.1  // Regularization
+    ): void {
+        // Initialize factors randomly
+        const users = new Set(ratings.map(r => r.userId));
+        const items = new Set(ratings.map(r => r.itemId));
+
+        for (const userId of users) {
+            this.userFactors.set(userId, this.randomVector());
+        }
+
+        for (const itemId of items) {
+            this.itemFactors.set(itemId, this.randomVector());
+        }
+
+        // Gradient descent
+        for (let epoch = 0; epoch < epochs; epoch++) {
+            let totalError = 0;
+
+            // Shuffle ratings for stochastic gradient descent
+            const shuffled = this.shuffle([...ratings]);
+
+            for (const {userId, itemId, rating} of shuffled) {
+                const userVec = this.userFactors.get(userId)!;
+                const itemVec = this.itemFactors.get(itemId)!;
+
+                // Predict rating
+                const prediction = this.dotProduct(userVec, itemVec);
+                const error = rating - prediction;
+                totalError += error * error;
+
+                // Update factors
+                for (let k = 0; k < this.latentDim; k++) {
+                    const userUpdate =
+                        learningRate * (error * itemVec[k] - lambda * userVec[k]);
+                    const itemUpdate =
+                        learningRate * (error * userVec[k] - lambda * itemVec[k]);
+
+                    userVec[k] += userUpdate;
+                    itemVec[k] += itemUpdate;
+                }
+            }
+
+            const rmse = Math.sqrt(totalError / ratings.length);
+            if (epoch % 10 === 0) {
+                console.log(`Epoch ${epoch}: RMSE = ${rmse.toFixed(4)}`);
+            }
+        }
+    }
+
+    // Predict rating for user-item pair
+    predict(userId: string, itemId: string): number {
+        const userVec = this.userFactors.get(userId);
+        const itemVec = this.itemFactors.get(itemId);
+
+        if (!userVec || !itemVec) {
+            return 0;  // Or global average
+        }
+
+        return this.dotProduct(userVec, itemVec);
+    }
+
+    // Recommend top-k items for user
+    recommend(
+        userId: string,
+        allItems: string[],
+        k: number = 10,
+        excludeItems: Set<string> = new Set()
+    ): Array<{itemId: string, score: number}> {
+        const userVec = this.userFactors.get(userId);
+        if (!userVec) return [];
+
+        const scores: Array<{itemId: string, score: number}> = [];
+
+        for (const itemId of allItems) {
+            if (excludeItems.has(itemId)) continue;
+
+            const score = this.predict(userId, itemId);
+            scores.push({ itemId, score });
+        }
+
+        return scores
+            .sort((a, b) => b.score - a.score)
+            .slice(0, k);
+    }
+
+    private randomVector(): number[] {
+        return Array.from(
+            { length: this.latentDim },
+            () => (Math.random() - 0.5) * 0.1
+        );
+    }
+
+    private dotProduct(a: number[], b: number[]): number {
+        return a.reduce((sum, val, i) => sum + val * b[i], 0);
+    }
+
+    private shuffle<T>(array: T[]): T[] {
+        const result = [...array];
+        for (let i = result.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [result[i], result[j]] = [result[j], result[i]];
+        }
+        return result;
+    }
+}</code>
+        </div>
+
+        <h2>⭐ SVD++ Enhancement</h2>
+        <p>
+            SVD++ extends basic SVD by incorporating implicit feedback and user/item biases, significantly improving prediction accuracy.
+        </p>
+
+        <div class="formula">
+            r̂<sub>ui</sub> = μ + b<sub>u</sub> + b<sub>i</sub> + p<sub>u</sub><sup>T</sup>q<sub>i</sub>
+        </div>
+
+        <ul>
+            <li><strong>μ:</strong> Global average rating</li>
+            <li><strong>b<sub>u</sub>:</strong> User bias (some users rate higher/lower)</li>
+            <li><strong>b<sub>i</sub>:</strong> Item bias (some items are universally loved/hated)</li>
+            <li><strong>p<sub>u</sub><sup>T</sup>q<sub>i</sub>:</strong> User-item latent factor interaction</li>
+        </ul>
+
+        <div class="code-block">
+<code>// SVD++ with biases
+class SVDPlusPlus extends SVDRecommender {
+    private userBiases: Map<string, number>;
+    private itemBiases: Map<string, number>;
+    private globalMean: number;
+
+    constructor(latentDim: number = 50) {
+        super(latentDim);
+        this.userBiases = new Map();
+        this.itemBiases = new Map();
+        this.globalMean = 0;
+    }
+
+    train(
+        ratings: Array<{userId: string, itemId: string, rating: number}>,
+        epochs: number = 100,
+        learningRate: number = 0.01,
+        lambda: number = 0.1
+    ): void {
+        // Calculate global mean
+        this.globalMean = ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
+
+        // Initialize biases
+        const users = new Set(ratings.map(r => r.userId));
+        const items = new Set(ratings.map(r => r.itemId));
+
+        for (const userId of users) {
+            this.userBiases.set(userId, 0);
+        }
+
+        for (const itemId of items) {
+            this.itemBiases.set(itemId, 0);
+        }
+
+        // Call parent initialization
+        super.train(ratings, 0);  // Initialize factors only
+
+        // Enhanced gradient descent with biases
+        for (let epoch = 0; epoch < epochs; epoch++) {
+            let totalError = 0;
+            const shuffled = this.shuffle([...ratings]);
+
+            for (const {userId, itemId, rating} of shuffled) {
+                const prediction = this.predictWithBias(userId, itemId);
+                const error = rating - prediction;
+                totalError += error * error;
+
+                // Update biases
+                const userBias = this.userBiases.get(userId)!;
+                const itemBias = this.itemBiases.get(itemId)!;
+
+                this.userBiases.set(
+                    userId,
+                    userBias + learningRate * (error - lambda * userBias)
+                );
+
+                this.itemBiases.set(
+                    itemId,
+                    itemBias + learningRate * (error - lambda * itemBias)
+                );
+
+                // Update latent factors (same as before)
+                const userVec = this.userFactors.get(userId)!;
+                const itemVec = this.itemFactors.get(itemId)!;
+
+                for (let k = 0; k < this.latentDim; k++) {
+                    const userUpdate =
+                        learningRate * (error * itemVec[k] - lambda * userVec[k]);
+                    const itemUpdate =
+                        learningRate * (error * userVec[k] - lambda * itemVec[k]);
+
+                    userVec[k] += userUpdate;
+                    itemVec[k] += itemUpdate;
+                }
+            }
+
+            const rmse = Math.sqrt(totalError / ratings.length);
+            if (epoch % 10 === 0) {
+                console.log(`Epoch ${epoch}: RMSE = ${rmse.toFixed(4)}`);
+            }
+        }
+    }
+
+    predictWithBias(userId: string, itemId: string): number {
+        const userBias = this.userBiases.get(userId) || 0;
+        const itemBias = this.itemBiases.get(itemId) || 0;
+        const interaction = this.predict(userId, itemId);
+
+        return this.globalMean + userBias + itemBias + interaction;
+    }
+
+    predict(userId: string, itemId: string): number {
+        return this.predictWithBias(userId, itemId);
+    }
+}</code>
+        </div>
+
+        <h2>🎯 Non-Negative Matrix Factorization (NMF)</h2>
+        <p>
+            NMF constrains factor matrices to be non-negative, leading to more interpretable latent factors. This is particularly useful when factors should represent additive components.
+        </p>
+
+        <h3>Applications of NMF</h3>
+        <ul>
+            <li><strong>Topic modeling:</strong> Each factor represents a topic</li>
+            <li><strong>Image processing:</strong> Each factor is a visual pattern</li>
+            <li><strong>Recommendations:</strong> Factors represent interpretable user segments or item categories</li>
+        </ul>
+
+        <h2>🔄 Alternating Least Squares (ALS)</h2>
+        <p>
+            ALS is an optimization algorithm particularly well-suited for implicit feedback and parallel computing. It alternates between fixing user factors and optimizing item factors, then vice versa.
+        </p>
+
+        <div class="code-block">
+<code>// Simplified ALS implementation
+class ALSRecommender {
+    private userFactors: Map<string, number[]>;
+    private itemFactors: Map<string, number[]>;
+    private latentDim: number;
+
+    constructor(latentDim: number = 50) {
+        this.latentDim = latentDim;
+        this.userFactors = new Map();
+        this.itemFactors = new Map();
+    }
+
+    // Train with implicit feedback (view counts, clicks, etc.)
+    trainImplicit(
+        interactions: Array<{userId: string, itemId: string, confidence: number}>,
+        epochs: number = 10,
+        lambda: number = 0.1
+    ): void {
+        // Initialize
+        const users = new Set(interactions.map(i => i.userId));
+        const items = new Set(interactions.map(i => i.itemId));
+
+        for (const userId of users) {
+            this.userFactors.set(userId, this.randomVector());
+        }
+
+        for (const itemId of items) {
+            this.itemFactors.set(itemId, this.randomVector());
+        }
+
+        // Build interaction maps
+        const userInteractions = new Map<string, Array<{itemId: string, confidence: number}>>();
+        const itemInteractions = new Map<string, Array<{userId: string, confidence: number}>>();
+
+        for (const {userId, itemId, confidence} of interactions) {
+            if (!userInteractions.has(userId)) {
+                userInteractions.set(userId, []);
+            }
+            userInteractions.get(userId)!.push({ itemId, confidence });
+
+            if (!itemInteractions.has(itemId)) {
+                itemInteractions.set(itemId, []);
+            }
+            itemInteractions.get(itemId)!.push({ userId, confidence });
+        }
+
+        // Alternating optimization
+        for (let epoch = 0; epoch < epochs; epoch++) {
+            // Fix item factors, optimize user factors
+            for (const [userId, userInteracts] of userInteractions) {
+                this.userFactors.set(
+                    userId,
+                    this.solveFactors(userInteracts, this.itemFactors, lambda)
+                );
+            }
+
+            // Fix user factors, optimize item factors
+            for (const [itemId, itemInteracts] of itemInteractions) {
+                this.itemFactors.set(
+                    itemId,
+                    this.solveFactors(itemInteracts, this.userFactors, lambda)
+                );
+            }
+
+            console.log(`ALS Epoch ${epoch + 1} completed`);
+        }
+    }
+
+    private solveFactors(
+        interactions: Array<{itemId?: string, userId?: string, confidence: number}>,
+        fixedFactors: Map<string, number[]>,
+        lambda: number
+    ): number[] {
+        // Simplified least squares solution
+        // In practice, use proper matrix operations
+        const k = this.latentDim;
+        const A = Array(k).fill(0).map(() => Array(k).fill(0));
+        const b = Array(k).fill(0);
+
+        for (const interaction of interactions) {
+            const id = interaction.itemId || interaction.userId!;
+            const factor = fixedFactors.get(id);
+            if (!factor) continue;
+
+            const confidence = interaction.confidence;
+
+            for (let i = 0; i < k; i++) {
+                for (let j = 0; j < k; j++) {
+                    A[i][j] += confidence * factor[i] * factor[j];
+                }
+                if (i === j) {
+                    A[i][j] += lambda;  // Regularization
+                }
+                b[i] += confidence * factor[i];
+            }
+        }
+
+        // Solve Ax = b (simplified - use proper linear algebra library)
+        return this.solveLeastSquares(A, b);
+    }
+
+    private solveLeastSquares(A: number[][], b: number[]): number[] {
+        // Simplified Gaussian elimination
+        // In production, use optimized libraries
+        const n = A.length;
+        const result = Array(n).fill(0);
+
+        // Very simplified - just return approximate solution
+        for (let i = 0; i < n; i++) {
+            result[i] = b[i] / (A[i][i] + 0.001);
+        }
+
+        return result;
+    }
+
+    private randomVector(): number[] {
+        return Array.from(
+            { length: this.latentDim },
+            () => Math.random() * 0.1
+        );
+    }
+
+    predict(userId: string, itemId: string): number {
+        const userVec = this.userFactors.get(userId);
+        const itemVec = this.itemFactors.get(itemId);
+
+        if (!userVec || !itemVec) return 0;
+
+        return userVec.reduce((sum, val, i) => sum + val * itemVec[i], 0);
+    }
+}</code>
+        </div>
+
+        <h2>⚡ Optimization Strategies</h2>
+        <p>
+            Production matrix factorization systems employ sophisticated optimizations:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Technique</th>
+                    <th>Benefit</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Stochastic Gradient Descent</strong></td>
+                    <td>Faster convergence</td>
+                    <td>Large datasets</td>
+                </tr>
+                <tr>
+                    <td><strong>Mini-batch Updates</strong></td>
+                    <td>Balance speed and accuracy</td>
+                    <td>Distributed training</td>
+                </tr>
+                <tr>
+                    <td><strong>Adaptive Learning Rates</strong></td>
+                    <td>Better convergence</td>
+                    <td>Complex optimization landscapes</td>
+                </tr>
+                <tr>
+                    <td><strong>Early Stopping</strong></td>
+                    <td>Prevent overfitting</td>
+                    <td>Limited validation data</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>🎨 Advanced Variations</h2>
+
+        <h3>Temporal Matrix Factorization</h3>
+        <p>
+            Incorporate time dynamics to capture evolving preferences and item popularity.
+        </p>
+
+        <h3>Factorization Machines</h3>
+        <p>
+            Generalize matrix factorization to handle arbitrary feature interactions, not just user-item pairs.
+        </p>
+
+        <h3>Bayesian Matrix Factorization</h3>
+        <p>
+            Add probabilistic framework for uncertainty quantification and better handling of sparse data.
+        </p>
+
+        <div class="example">
+            <div class="example-title">🎬 Netflix Prize Impact</div>
+            <p>
+                The Netflix Prize competition (2006-2009) popularized matrix factorization for recommendations. The winning solution combined multiple MF variants with ensemble methods, achieving a 10% improvement over Netflix's baseline algorithm. This success established MF as the gold standard for collaborative filtering.
+            </p>
+        </div>
+
+        <h2>📊 Evaluation and Tuning</h2>
+        <p>
+            Key hyperparameters to tune in matrix factorization:
+        </p>
+
+        <ul>
+            <li><strong>Latent dimensionality:</strong> Usually 20-200; higher for complex domains</li>
+            <li><strong>Learning rate:</strong> Typically 0.001-0.1; use adaptive methods</li>
+            <li><strong>Regularization (λ):</strong> Usually 0.01-0.1; prevents overfitting</li>
+            <li><strong>Epochs:</strong> Train until validation error plateaus</li>
+        </ul>
+
+        <h2>🚀 Production Considerations</h2>
+
+        <h3>Scalability</h3>
+        <p>
+            ALS is highly parallelizable, making it suitable for distributed systems like Apache Spark. Each user/item factor can be computed independently.
+        </p>
+
+        <h3>Incremental Updates</h3>
+        <p>
+            Instead of retraining from scratch, update factors incrementally as new data arrives using online learning techniques.
+        </p>
+
+        <h3>Cold Start Handling</h3>
+        <p>
+            Initialize new user/item factors using content features or demographic information before enough interactions accumulate.
+        </p>
+
+        <div class="summary">
+            <h2>📝 Summary</h2>
+            <ul>
+                <li>Matrix factorization decomposes sparse rating matrices into latent factor representations</li>
+                <li>SVD and its variants (SVD++) are foundational techniques for explicit feedback</li>
+                <li>ALS is particularly effective for implicit feedback and distributed computing</li>
+                <li>Adding biases (user, item, global) significantly improves prediction accuracy</li>
+                <li>NMF provides interpretable factors through non-negativity constraints</li>
+                <li>Key hyperparameters include latent dimensions, learning rate, and regularization</li>
+                <li>Production systems require incremental updates and parallelization strategies</li>
+                <li>MF forms the foundation of modern deep learning recommendation approaches</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>🤔 Review Questions</h2>
+            <ol>
+                <li>Explain the intuition behind matrix factorization for recommendations.</li>
+                <li>What are latent factors and how are they discovered?</li>
+                <li>How does SVD++ improve upon basic SVD?</li>
+                <li>Why is ALS well-suited for implicit feedback data?</li>
+                <li>What role does regularization play in preventing overfitting?</li>
+                <li>Compare gradient descent and alternating least squares optimization.</li>
+                <li>How would you choose the number of latent dimensions?</li>
+                <li>What are the advantages of NMF for interpretability?</li>
+                <li>Design an incremental update strategy for a production MF system.</li>
+                <li>How can matrix factorization handle the cold start problem?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) · Benefit All Humanity<br>
+            <span style="font-size: 0.9rem; margin-top: 0.5rem; display: block; opacity: 0.9;">
+                Use mathematical elegance to reveal hidden patterns that serve human needs
+            </span>
+        </div>
+
+        </div>
+</body>
+</html>

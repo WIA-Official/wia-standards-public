@@ -5,237 +5,345 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-fire-resistant-material (Fire Resistant Material).
+This document defines the protocols that govern
+a fire-resistant-material operator across the
+manufacturer-to-laboratory-to-notified-body-to-
+AHJ value chain: the EN 13501-1 reaction-to-fire
+classification discipline that ties the material
+to its Euroclass declaration, the EN 13501-2
+resistance-to-fire classification discipline
+that binds the load-bearing-and-separating
+performance to the time-to-failure declaration,
+the EU CPR Annex V conformity-assessment-system
+discipline that gates the issuance of a
+Declaration of Performance, the laboratory-
+accreditation discipline that anchors every test
+result to an ISO/IEC 17025 accredited test
+report, the manufacturing factory-production-
+control discipline that ties continuing
+production to the test-of-record conditions, the
+chain-of-custody anchoring discipline that
+prevents silent mutation of the test result, the
+post-installation Authority Having Jurisdiction
+audit discipline, and the recall-and-corrective-
+action discipline that handles a discovered non-
+conformance.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- EN 13501-1:2018+A1:2019, EN 13501-2:2023
+- EN 13823:2020+A1:2022, EN ISO 11925-2:2020
+- ISO 1182:2020, ISO 1716:2018, ISO 5660-1:2015,
+  ISO 5660-2:2002, ISO 9239-1:2010, ISO
+  13943:2017
+- ASTM E84-23, UL 723:2018, ASTM E119-23a,
+  ASTM E136-22, ASTM E2257-22
+- NFPA 251, NFPA 252, NFPA 257, NFPA 259, NFPA
+  268
+- EN 1363-1:2020, EN 1364 series, EN 1365 series,
+  EN 1366 series, EN 1634-1
+- KS F 2271:2016, KS F 2257-1:2019
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 17000:2020, ISO/IEC 17021-1:2015,
+  ISO/IEC 17025:2017, ISO/IEC 17065:2012
+- IETF RFC 9110, RFC 9421, RFC 9457, RFC 8615,
+  RFC 6962
+- W3C Trace Context
+- EU Construction Products Regulation (EU)
+  305/2011 (especially Annex V conformity-
+  assessment systems and Article 39 notified-
+  body designation)
+- EU Decision 2000/147/EC (reaction-to-fire
+  classes)
+- EU Decision 2000/367/EC (resistance-to-fire
+  classes)
 
 ---
 
-## §1 Scope
+## §1 EN 13501-1 Reaction-to-Fire Discipline
 
-This PHASE document is one of four that together define the WIA-fire-resistant-material
-standard. It addresses the protocol layer of the standard.
+### §1.1 Test-set completeness
 
-## §2 Manifest
+Every reaction-to-fire test record carries the
+test-set completeness check declared in PHASE-2
+§4.1. The operator's API rejects a record whose
+declared `classification.primaryClass` is not
+supported by the underlying test set; the
+rejection lists the missing test method per the
+EN 13501-1 Annex B classification table.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "fire-resistant-material"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+### §1.2 Smoke-class and droplet-class binding
 
-## §3 Conformance Tiers
+The smoke class (s1, s2, s3) is derived from
+the EN 13823 smoke-growth rate index (SMOGRA)
+and the total-smoke-production-in-600 s
+(TSP-600s). The droplet class (d0, d1, d2) is
+derived from the EN 13823 flaming-droplets-or-
+particles observation. The operator's API
+recomputes the two classes from the underlying
+measurement set and rejects a record whose
+declared classes do not match the recomputation.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+### §1.3 Floor-finish classification
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+A flooring product (`materialFamily: floor`)
+declares the floor-finish class per EN 13501-1
+Annex C — A1FL, A2FL, BFL, CFL, DFL, EFL, FFL —
+derived from ISO 1182, ISO 1716, ISO 9239-1
+critical-radiant-flux, and EN ISO 11925-2.
+The smoke class for floor finishes is s1 or s2;
+the droplet class is not declared for floors.
 
-## §4 Discovery
+## §2 EN 13501-2 Resistance-to-Fire Discipline
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/fire-resistant-material`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+### §2.1 R / E / I criterion enforcement
 
-## §5 Time and Identity
+Every resistance-to-fire test record is
+classified per EN 13501-2 §7 against the
+combined R (load-bearing capacity), E
+(integrity), and I (insulation) criteria. The
+operator's API enforces the criterion matching:
+a record claiming a load-bearing-only
+classification (R 60) is publishable only when
+the test specimen's load configuration satisfies
+EN 1363-1 §6 mechanical loading.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### §2.2 Heating-curve enforcement
 
-## §6 Versioning and Deprecation
+The heating curve declared in the test record
+binds the result's applicability scope. A
+hydrocarbon heating curve test result cannot be
+used to claim a standard cellulosic ISO 834
+heating curve resistance class; the operator's
+API rejects a classification that does not match
+the heating curve.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §3 EU CPR Conformity-Assessment-System Discipline
 
-## §7 Privacy and Security
+### §3.1 System 1+ for fire-performance products
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+A fire-performance product (a product whose
+declared performance includes a reaction-to-fire
+or resistance-to-fire essential characteristic)
+falls in scope of EU CPR Annex V system 1+. The
+notified body issues the certificate of
+constancy of performance, performs the initial
+type test (ITT), assesses the factory-production-
+control system, and conducts continuing
+surveillance.
 
-## §8 Open Governance
+### §3.2 ITT-and-FPC discipline
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `fire-resistant-material` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The initial type test (ITT) is the basis of the
+declared performance under EU CPR Article 4. The
+factory-production-control (FPC) system per EU
+CPR Article 12 ensures that ongoing production
+satisfies the ITT-of-record performance. The
+operator's API records the per-batch FPC
+measurement and binds the batch's DoP to the
+FPC log.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §4 Laboratory-Accreditation Discipline
 
+### §4.1 ISO/IEC 17025 scope binding
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Every test record is uploaded under an HTTP
+Message Signature (RFC 9421) issued under the
+testing laboratory's ISO/IEC 17025:2017
+accreditation certificate. The operator's API
+verifies the signature, the certificate's
+currency, and the scope of the accreditation
+against the declared test method. A scope
+mismatch returns `403 Forbidden`.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+### §4.2 Inter-laboratory comparison
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+A laboratory whose accreditation scope includes
+a fire test method participates in an inter-
+laboratory comparison run by the EU EFR (the
+European Group of Notified Bodies for the CPR)
+or an equivalent peer-review group. The
+comparison's outcome (the laboratory's z-score
+relative to the consensus statistic) is recorded
+in the laboratory's profile so that a downstream
+consumer can take the proficiency-testing record
+into account.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §5 Manufacturing Factory-Production-Control Discipline
 
-## Annex F — Adoption Roadmap
+### §5.1 Per-batch FPC measurement
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+The operator's API records the per-batch FPC
+measurement (the production-line surrogate test
+that correlates with the ITT — for example, the
+gypsum-board specific gravity, the mineral-wool
+fibre length distribution, the intumescent-
+coating dry-film thickness). The FPC measurement
+is run at the cadence declared in the FPC plan
+(typically per shift, per truck, or per batch).
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+### §5.2 Out-of-control corrective action
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Where an FPC measurement falls outside the
+declared control limit, the operator's API
+flags the affected batch and triggers an ISO
+9001 §10.2 nonconformity-and-corrective-action
+record. The corrective action's closure is
+gated on a confirmatory ITT-equivalent test
+that confirms the batch's classification
+remains valid.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §6 Chain-of-Custody Anchoring Discipline
 
-## Annex G — Test Vectors and Conformance Evidence
+### §6.1 Per-event transparency log
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Every chain-of-custody event carried by PHASE-1
+§8 is appended to a per-operator transparency
+log modelled on the IETF RFC 6962 Certificate
+Transparency append-only-log structure. The log
+publishes a signed tree-head every signed-tree-
+head period (default 24 h, configurable per
+programme).
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+### §6.2 Mutation prevention
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+A custody event cannot be retroactively edited;
+an amendment is recorded as a new event with
+`previousEventRef` pointing at the event being
+amended.
 
-## Annex H — Versioning and Deprecation Policy
+## §7 AHJ Audit Discipline
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+### §7.1 As-built verification
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+The Authority Having Jurisdiction inspecting the
+installed material verifies the as-built
+condition against the DoP declared performance.
+The verification carries the building-permit
+reference, the date of inspection, and the
+audit outcome. A non-conforming outcome
+triggers the AHJ's enforcement workflow under
+the local building code.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+### §7.2 Retroactive recall linkage
 
-## Annex I — Interoperability Profiles
+Where a DoP is later withdrawn (PHASE-2 §6) due
+to a discovered nonconformance, the operator's
+API publishes the withdrawal notice on the
+public retrieval endpoint and notifies every
+AHJ that has issued an audit referencing the
+withdrawn DoP so that the AHJ can re-audit the
+affected installation.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §8 Quality-Management Discipline
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+The operator runs an ISO 9001:2015 quality
+management system covering the material design,
+testing, classification, DoP publication, factory
+production control, and chain-of-custody
+processes. Internal audits run on a frequency
+declared in the quality manual; the
+nonconformity register is reviewed in the ISO
+9001 §9.3 management-review cycle. Notified
+bodies operating under EU CPR Article 39 audit
+the operator's QMS as part of the continuing
+surveillance discipline declared in §3.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §9 Recall and Corrective-Action Discipline
+
+### §9.1 EU CPR Article 56 corrective measures
+
+Where a DoP is found to misrepresent the
+declared performance, the manufacturer publishes
+a corrective measure under EU CPR Article 56
+(withdraw, recall, or correct). The notified
+body issuing the certificate of constancy of
+performance is informed and may suspend or
+withdraw the certificate.
+
+### §9.2 Public-retrieval annotation
+
+The operator's API annotates the public DoP
+retrieval response with the corrective-measure
+status flag and the date of the corrective
+measure so that a downstream building designer
+or AHJ can detect the measure without bilateral
+notification.
+
+## §10 KR-Jurisdiction Discipline
+
+### §10.1 KS F 2271 / KS F 2257-1 binding
+
+A KR-jurisdiction operator declares the KS F
+2271 surface-burning test and the KS F 2257-1
+fire-resistance test in the relevant test
+records. The KR Korean Building Code (건축물의
+피난·방화구조 등의 기준에 관한 규칙) cites
+these KS standards as the conformance basis for
+domestic-market building products.
+
+### §10.2 KR 건축자재 품질인정 discipline
+
+A material in scope of the KR Quality
+Recognition System for Building Materials is
+bound to the KR 건축자재 품질인정 인증 번호
+declared in the material record's
+`identifierBindings`. The operator's API queries
+the KR quality-recognition register on each
+publication request.
+
+## §11 Smoke and Toxicity Discipline
+
+### §11.1 Smoke-density binding
+
+For materials intended for egress-route finishes
+(`intendedUse: egress-route-finish`), the
+operator's API records the smoke-density
+measurement per ASTM E662 (smoke generated by
+solid materials) where the AHJ's local code
+references the test, in addition to the EN
+13501-1 smoke class.
+
+### §11.2 Toxic-gas declaration
+
+Where the operator publishes a toxic-gas
+emission profile (CO, CO₂, HCl, HBr, HCN, SO₂,
+NOₓ) per the relevant national code (for
+example, the BS 6853:1999 railway code), the
+emission profile is bound to the underlying
+test report and is published on the public
+retrieval endpoint.
+
+## §12 ASTM E84 / UL 723 Steiner-Tunnel Discipline
+
+A material declaring an ASTM E84 / UL 723
+classification (Class A, B, or C per the FSI
+and SDI thresholds — Class A: FSI ≤ 25 and
+SDI ≤ 450; Class B: FSI 26–75 and SDI ≤ 450;
+Class C: FSI 76–200 and SDI ≤ 450) carries the
+underlying tunnel test report from a UL-
+registered laboratory or an ASTM-recognised
+laboratory operating under ISO/IEC 17025. The
+operator's API verifies that the declared FSI
+and SDI ranges match the classification.
+
+The Steiner-tunnel test is run for ten minutes
+under a controlled flame source and the smoke-
+optical-density-versus-time curve is integrated
+to derive the SDI per ASTM E84 §11. The test
+specimen's mounting orientation (horizontal,
+vertical) is declared in the test record and
+checked against the material's intended-use
+declaration.
+
+## §13 ASTM E119 Time-Temperature Discipline
+
+A material declaring an ASTM E119 hourly fire-
+resistance rating (1-hour, 2-hour, 3-hour,
+4-hour) carries the underlying ASTM E119 test
+report from a UL-registered or NFPA-recognised
+laboratory. The operator's API verifies the
+ASTM E119 standard time-temperature curve was
+applied (the curve is published in ASTM E119
+§7), and that the test specimen's load
+configuration satisfies the load-bearing claim.

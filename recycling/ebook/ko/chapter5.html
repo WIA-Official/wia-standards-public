@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: AI 기반 분류 시스템 | WIA-RECYCLING</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --text: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border: #475569;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Noto Sans KR', 'Georgia', serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            font-size: 17px;
+        }
+
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            padding: 15px 20px;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-size: 0.95rem;
+        }
+
+        .nav a:hover { background: var(--bg-tertiary); color: var(--primary); }
+        .nav-title { color: var(--primary); font-weight: 600; }
+
+        .chapter-header {
+            background: linear-gradient(135deg, var(--bg) 0%, var(--bg-secondary) 100%);
+            padding: 140px 20px 80px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .chapter-number {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .chapter-header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .chapter-intro {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin: 50px 0 25px;
+            color: var(--text);
+            border-left: 4px solid var(--primary);
+            padding-left: 20px;
+        }
+
+        h3 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); }
+        h4 { font-size: 1.2rem; margin: 30px 0 15px; color: var(--primary); }
+
+        p { margin-bottom: 20px; color: var(--text-secondary); }
+
+        .highlight-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: 8px;
+            padding: 25px;
+            margin: 30px 0;
+        }
+
+        .highlight-box h4 { color: var(--primary); margin-top: 0; margin-bottom: 15px; }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        ul, ol { margin: 20px 0; padding-left: 25px; color: var(--text-secondary); }
+        li { margin-bottom: 12px; }
+
+        .code-block {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+            margin: 25px 0;
+        }
+
+        .code-block code { color: var(--text); }
+        .keyword { color: #f472b6; }
+        .string { color: #a5f3fc; }
+        .comment { color: #6b7280; }
+        .function { color: var(--primary-light); }
+        .number { color: #fbbf24; }
+
+        .philosophy-banner {
+            background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            margin: 50px 0;
+            border: 1px solid var(--border);
+        }
+
+        .philosophy-banner .chinese {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .philosophy-banner .meaning {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .diagram {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .diagram-title {
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 20px;
+        }
+
+        .flow-chart {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .flow-item {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px 25px;
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+
+        .flow-arrow { color: var(--primary); font-size: 1.5rem; }
+
+        .tech-comparison {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 30px 0;
+        }
+
+        .tech-comparison th,
+        .tech-comparison td {
+            padding: 15px;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+
+        .tech-comparison th {
+            background: var(--bg-tertiary);
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .tech-comparison td {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+        }
+
+        .tech-comparison tr:hover td {
+            background: var(--bg-tertiary);
+        }
+
+        .architecture-box {
+            background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px 0;
+        }
+
+        .architecture-layer {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+
+        .architecture-layer h5 {
+            color: var(--primary);
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .architecture-layer p {
+            margin-bottom: 0;
+            font-size: 0.9rem;
+        }
+
+        .performance-meter {
+            background: var(--bg);
+            border-radius: 10px;
+            height: 20px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .performance-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+
+        .alert-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--warning);
+            border-left: 4px solid var(--warning);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .alert-box.success {
+            border-color: var(--success);
+        }
+
+        .alert-box.error {
+            border-color: var(--error);
+        }
+
+        .chapter-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+            padding-top: 40px;
+            border-top: 1px solid var(--border);
+        }
+
+        .chapter-nav a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 15px 25px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .chapter-nav a:hover { border-color: var(--primary); color: var(--primary); }
+
+        footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            padding: 30px 20px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .grid-2col {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+        }
+
+        .feature-card h5 {
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .feature-card p {
+            font-size: 0.95rem;
+            margin-bottom: 0;
+        }
+
+        @media (max-width: 768px) {
+            .chapter-header h1 { font-size: 2rem; }
+            .chapter-intro { font-size: 1.1rem; }
+            h2 { font-size: 1.5rem; }
+            .stat-value { font-size: 2rem; }
+            .chapter-nav { flex-direction: column; gap: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <header class="chapter-header">
+        <div class="chapter-number">5장</div>
+        <h1>AI 기반 분류 시스템</h1>
+        <p class="chapter-intro">딥러닝과 컴퓨터 비전 기술을 활용한 차세대 자동 폐기물 분류 시스템의 설계, 구현 및 최적화 전략을 탐구합니다.</p>
+    </header>
+
+    <main class="content">
+        <div class="philosophy-banner">
+            <div class="chinese">弘益人間</div>
+            <div class="meaning">"널리 인간을 이롭게 하라" - 인공지능으로 지속 가능한 미래 구현</div>
+        </div>
+
+        <h2>AI 분류 시스템의 필요성</h2>
+
+        <p>전통적인 재활용 시설에서 수동 분류는 여전히 주요 병목 현상입니다. 작업자들은 빠르게 이동하는 컨베이어 벨트에서 다양한 재활용 가능 물질을 식별하고 분리해야 합니다. 이 과정은 피로, 부상 위험, 그리고 인간의 인지적 한계로 인해 상당한 오류율을 보입니다. AI 기반 분류 시스템은 이러한 문제를 근본적으로 해결합니다.</p>
+
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-value">98.5%</div>
+                <div class="stat-label">AI 분류 정확도</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">4,000+</div>
+                <div class="stat-label">시간당 분류 항목</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">24/7</div>
+                <div class="stat-label">무중단 운영</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">-70%</div>
+                <div class="stat-label">오염률 감소</div>
+            </div>
+        </div>
+
+        <p>AI 분류 시스템은 고속 카메라, 근적외선 센서, 그리고 딥러닝 알고리즘을 결합하여 인간의 능력을 훨씬 초월하는 속도와 정확도로 재활용 가능 물질을 식별합니다. 이러한 시스템은 밀리초 단위로 수백 가지 재료 유형을 구별할 수 있으며, 피로 없이 연속 작동이 가능합니다.</p>
+
+        <h3>왜 AI인가?</h3>
+
+        <p>재활용 물류의 복잡성은 기존 자동화 방식으로는 해결하기 어렵습니다. 재활용품은 형태, 색상, 크기, 오염 상태가 매우 다양하며, 새로운 포장재와 제품이 지속적으로 시장에 출시됩니다. 규칙 기반 시스템은 이러한 변동성에 적응하기 어렵지만, AI 시스템은 새로운 데이터로부터 학습하고 점진적으로 개선됩니다.</p>
+
+        <div class="highlight-box">
+            <h4>AI 분류의 핵심 장점</h4>
+            <ul>
+                <li><strong>적응성:</strong> 새로운 포장재와 제품에 대해 재학습 가능</li>
+                <li><strong>일관성:</strong> 피로, 기분, 주의력 변화에 영향받지 않음</li>
+                <li><strong>속도:</strong> 초당 수십 개의 항목을 처리</li>
+                <li><strong>정밀성:</strong> 미세한 재료 차이까지 감지</li>
+                <li><strong>데이터 생성:</strong> 분류 과정에서 귀중한 분석 데이터 생성</li>
+            </ul>
+        </div>
+
+        <h2>컴퓨터 비전 아키텍처</h2>
+
+        <p>현대 AI 분류 시스템의 핵심은 컴퓨터 비전입니다. 이 시스템은 여러 계층의 기술이 통합되어 작동합니다.</p>
+
+        <div class="architecture-box">
+            <h4>시스템 아키텍처 계층</h4>
+
+            <div class="architecture-layer">
+                <h5>1. 센서 계층 (Sensor Layer)</h5>
+                <p>고해상도 RGB 카메라, 근적외선(NIR) 분광계, 깊이 센서(LiDAR), 금속 탐지기가 원시 데이터를 수집합니다.</p>
+            </div>
+
+            <div class="architecture-layer">
+                <h5>2. 전처리 계층 (Preprocessing Layer)</h5>
+                <p>이미지 정규화, 노이즈 제거, 조명 보정, 분할(segmentation)을 통해 원시 데이터를 정제합니다.</p>
+            </div>
+
+            <div class="architecture-layer">
+                <h5>3. 특징 추출 계층 (Feature Extraction Layer)</h5>
+                <p>CNN(합성곱 신경망)이 시각적 특징을 추출하고, 분광 데이터가 재료 특성을 분석합니다.</p>
+            </div>
+
+            <div class="architecture-layer">
+                <h5>4. 분류 계층 (Classification Layer)</h5>
+                <p>멀티모달 퓨전을 통해 모든 데이터 소스를 결합하고 최종 분류 결정을 내립니다.</p>
+            </div>
+
+            <div class="architecture-layer">
+                <h5>5. 액추에이터 계층 (Actuator Layer)</h5>
+                <p>고속 로봇 암 또는 공기 분사기가 분류된 항목을 적절한 스트림으로 분리합니다.</p>
+            </div>
+        </div>
+
+        <h3>다중 센서 융합</h3>
+
+        <p>단일 센서 시스템은 특정 상황에서 한계를 보입니다. 예를 들어, RGB 카메라는 시각적으로 유사한 PET와 PP 플라스틱을 구별하기 어렵고, NIR 센서만으로는 검은색 플라스틱을 탐지할 수 없습니다. 다중 센서 융합은 각 센서의 강점을 결합하여 이러한 한계를 극복합니다.</p>
+
+        <div class="code-block">
+            <code>
+<span class="comment">// 다중 센서 융합 분류기 구현</span>
+
+<span class="keyword">import</span> tensorflow <span class="keyword">as</span> tf
+<span class="keyword">from</span> tensorflow.keras <span class="keyword">import</span> layers, models
+
+<span class="keyword">class</span> <span class="function">MultiSensorFusionClassifier</span>:
+    <span class="string">"""
+    RGB, NIR, 깊이 데이터를 융합하는 분류기
+    """</span>
+
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, num_classes=<span class="number">50</span>):
+        self.num_classes = num_classes
+        self.model = self._build_model()
+
+    <span class="keyword">def</span> <span class="function">_build_rgb_branch</span>(self, input_shape=(<span class="number">224</span>, <span class="number">224</span>, <span class="number">3</span>)):
+        <span class="comment"># RGB 이미지 처리 브랜치</span>
+        inputs = layers.Input(shape=input_shape, name=<span class="string">'rgb_input'</span>)
+
+        <span class="comment"># EfficientNet-B0 백본</span>
+        base = tf.keras.applications.EfficientNetB0(
+            include_top=<span class="keyword">False</span>,
+            weights=<span class="string">'imagenet'</span>,
+            input_tensor=inputs
+        )
+
+        x = layers.GlobalAveragePooling2D()(base.output)
+        x = layers.Dense(<span class="number">512</span>, activation=<span class="string">'relu'</span>)(x)
+        x = layers.Dropout(<span class="number">0.3</span>)(x)
+
+        <span class="keyword">return</span> models.Model(inputs, x, name=<span class="string">'rgb_branch'</span>)
+
+    <span class="keyword">def</span> <span class="function">_build_nir_branch</span>(self, input_shape=(<span class="number">256</span>,)):
+        <span class="comment"># NIR 분광 데이터 처리 브랜치</span>
+        inputs = layers.Input(shape=input_shape, name=<span class="string">'nir_input'</span>)
+
+        x = layers.Dense(<span class="number">512</span>, activation=<span class="string">'relu'</span>)(inputs)
+        x = layers.BatchNormalization()(x)
+        x = layers.Dense(<span class="number">256</span>, activation=<span class="string">'relu'</span>)(x)
+        x = layers.Dropout(<span class="number">0.3</span>)(x)
+        x = layers.Dense(<span class="number">128</span>, activation=<span class="string">'relu'</span>)(x)
+
+        <span class="keyword">return</span> models.Model(inputs, x, name=<span class="string">'nir_branch'</span>)
+
+    <span class="keyword">def</span> <span class="function">_build_depth_branch</span>(self, input_shape=(<span class="number">112</span>, <span class="number">112</span>, <span class="number">1</span>)):
+        <span class="comment"># 깊이 맵 처리 브랜치</span>
+        inputs = layers.Input(shape=input_shape, name=<span class="string">'depth_input'</span>)
+
+        x = layers.Conv2D(<span class="number">32</span>, <span class="number">3</span>, activation=<span class="string">'relu'</span>, padding=<span class="string">'same'</span>)(inputs)
+        x = layers.MaxPooling2D()(x)
+        x = layers.Conv2D(<span class="number">64</span>, <span class="number">3</span>, activation=<span class="string">'relu'</span>, padding=<span class="string">'same'</span>)(x)
+        x = layers.MaxPooling2D()(x)
+        x = layers.Conv2D(<span class="number">128</span>, <span class="number">3</span>, activation=<span class="string">'relu'</span>, padding=<span class="string">'same'</span>)(x)
+        x = layers.GlobalAveragePooling2D()(x)
+        x = layers.Dense(<span class="number">64</span>, activation=<span class="string">'relu'</span>)(x)
+
+        <span class="keyword">return</span> models.Model(inputs, x, name=<span class="string">'depth_branch'</span>)
+
+    <span class="keyword">def</span> <span class="function">_build_model</span>(self):
+        <span class="comment"># 모든 브랜치 결합</span>
+        rgb_branch = self._build_rgb_branch()
+        nir_branch = self._build_nir_branch()
+        depth_branch = self._build_depth_branch()
+
+        <span class="comment"># 특징 융합</span>
+        combined = layers.Concatenate()([
+            rgb_branch.output,
+            nir_branch.output,
+            depth_branch.output
+        ])
+
+        <span class="comment"># 분류 헤드</span>
+        x = layers.Dense(<span class="number">512</span>, activation=<span class="string">'relu'</span>)(combined)
+        x = layers.BatchNormalization()(x)
+        x = layers.Dropout(<span class="number">0.4</span>)(x)
+        x = layers.Dense(<span class="number">256</span>, activation=<span class="string">'relu'</span>)(x)
+        outputs = layers.Dense(self.num_classes, activation=<span class="string">'softmax'</span>)(x)
+
+        model = models.Model(
+            inputs=[
+                rgb_branch.input,
+                nir_branch.input,
+                depth_branch.input
+            ],
+            outputs=outputs
+        )
+
+        <span class="keyword">return</span> model
+
+    <span class="keyword">def</span> <span class="function">predict</span>(self, rgb_image, nir_spectrum, depth_map):
+        <span class="comment"># 실시간 추론</span>
+        predictions = self.model.predict([
+            rgb_image[np.newaxis, ...],
+            nir_spectrum[np.newaxis, ...],
+            depth_map[np.newaxis, ...]
+        ])
+
+        material_id = np.argmax(predictions[<span class="number">0</span>])
+        confidence = predictions[<span class="number">0</span>][material_id]
+
+        <span class="keyword">return</span> {
+            <span class="string">'material_id'</span>: material_id,
+            <span class="string">'confidence'</span>: float(confidence),
+            <span class="string">'processing_time_ms'</span>: self._get_inference_time()
+        }
+            </code>
+        </div>
+
+        <h2>딥러닝 모델 아키텍처</h2>
+
+        <p>재활용 분류를 위한 딥러닝 모델은 일반적인 이미지 분류 문제와 다른 특수한 요구사항을 가집니다. 실시간 처리 속도, 높은 정확도, 그리고 새로운 클래스에 대한 적응 능력이 모두 필요합니다.</p>
+
+        <h3>권장 모델 아키텍처</h3>
+
+        <table class="tech-comparison">
+            <thead>
+                <tr>
+                    <th>모델</th>
+                    <th>정확도</th>
+                    <th>추론 시간</th>
+                    <th>메모리 사용량</th>
+                    <th>적합한 사용 사례</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>EfficientNet-B0</td>
+                    <td>96.8%</td>
+                    <td>8ms</td>
+                    <td>512MB</td>
+                    <td>일반 분류 작업</td>
+                </tr>
+                <tr>
+                    <td>YOLOv8-Seg</td>
+                    <td>97.2%</td>
+                    <td>12ms</td>
+                    <td>768MB</td>
+                    <td>객체 감지 + 분할</td>
+                </tr>
+                <tr>
+                    <td>Vision Transformer</td>
+                    <td>98.1%</td>
+                    <td>25ms</td>
+                    <td>1.2GB</td>
+                    <td>고정밀 분류</td>
+                </tr>
+                <tr>
+                    <td>MobileNetV3</td>
+                    <td>94.5%</td>
+                    <td>4ms</td>
+                    <td>256MB</td>
+                    <td>엣지 디바이스</td>
+                </tr>
+                <tr>
+                    <td>Custom Hybrid</td>
+                    <td>98.5%</td>
+                    <td>15ms</td>
+                    <td>896MB</td>
+                    <td>프로덕션 환경</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>커스텀 하이브리드 모델</h3>
+
+        <p>WIA-RECYCLING 표준에서 권장하는 하이브리드 모델은 EfficientNet의 효율성과 Transformer의 전역 컨텍스트 이해 능력을 결합합니다. 이 아키텍처는 지역적 특징(텍스처, 색상)과 전역적 특징(형태, 문맥)을 동시에 활용합니다.</p>
+
+        <div class="code-block">
+            <code>
+<span class="comment">// 하이브리드 CNN-Transformer 모델</span>
+
+<span class="keyword">class</span> <span class="function">HybridRecyclingClassifier</span>(nn.Module):
+    <span class="string">"""
+    CNN과 Transformer를 결합한 하이브리드 분류기
+    로컬 및 글로벌 특징을 동시에 캡처
+    """</span>
+
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, num_classes=<span class="number">50</span>, embed_dim=<span class="number">512</span>):
+        super().__init__()
+
+        <span class="comment"># CNN 백본 (로컬 특징 추출)</span>
+        self.cnn_backbone = timm.create_model(
+            <span class="string">'efficientnet_b2'</span>,
+            pretrained=<span class="keyword">True</span>,
+            num_classes=<span class="number">0</span>  <span class="comment"># 헤드 제거</span>
+        )
+
+        <span class="comment"># CNN 출력을 Transformer 차원으로 프로젝션</span>
+        self.cnn_proj = nn.Linear(<span class="number">1408</span>, embed_dim)
+
+        <span class="comment"># Transformer 인코더 (글로벌 컨텍스트)</span>
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=embed_dim,
+            nhead=<span class="number">8</span>,
+            dim_feedforward=<span class="number">2048</span>,
+            dropout=<span class="number">0.1</span>,
+            activation=<span class="string">'gelu'</span>,
+            batch_first=<span class="keyword">True</span>
+        )
+        self.transformer = nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=<span class="number">4</span>
+        )
+
+        <span class="comment"># 위치 인코딩</span>
+        self.pos_embed = nn.Parameter(
+            torch.randn(<span class="number">1</span>, <span class="number">49</span>, embed_dim) * <span class="number">0.02</span>
+        )
+
+        <span class="comment"># 분류 헤드</span>
+        self.classifier = nn.Sequential(
+            nn.LayerNorm(embed_dim),
+            nn.Dropout(<span class="number">0.3</span>),
+            nn.Linear(embed_dim, num_classes)
+        )
+
+        <span class="comment"># 재료 속성 보조 헤드</span>
+        self.material_head = nn.Sequential(
+            nn.Linear(embed_dim, <span class="number">128</span>),
+            nn.ReLU(),
+            nn.Linear(<span class="number">128</span>, <span class="number">5</span>)  <span class="comment"># 밀도, 광택, 투명도, 유연성, 재활용성</span>
+        )
+
+    <span class="keyword">def</span> <span class="function">forward</span>(self, x):
+        <span class="comment"># CNN 특징 추출</span>
+        cnn_features = self.cnn_backbone.forward_features(x)
+
+        <span class="comment"># 공간 차원 평탄화: (B, C, H, W) -> (B, H*W, C)</span>
+        B, C, H, W = cnn_features.shape
+        cnn_features = cnn_features.flatten(<span class="number">2</span>).transpose(<span class="number">1</span>, <span class="number">2</span>)
+
+        <span class="comment"># 프로젝션 및 위치 인코딩</span>
+        x = self.cnn_proj(cnn_features)
+        x = x + self.pos_embed
+
+        <span class="comment"># Transformer 인코딩</span>
+        x = self.transformer(x)
+
+        <span class="comment"># 글로벌 평균 풀링</span>
+        x = x.mean(dim=<span class="number">1</span>)
+
+        <span class="comment"># 분류 및 재료 속성 예측</span>
+        class_logits = self.classifier(x)
+        material_props = self.material_head(x)
+
+        <span class="keyword">return</span> class_logits, material_props
+            </code>
+        </div>
+
+        <h2>근적외선(NIR) 분광 분석</h2>
+
+        <p>시각적으로 유사한 플라스틱을 구별하는 데 있어 NIR 분광법은 필수적입니다. NIR 센서는 각 재료의 고유한 분자 진동 패턴을 감지하여 화학적 조성을 식별합니다.</p>
+
+        <h3>NIR 스펙트럼 해석</h3>
+
+        <div class="diagram">
+            <div class="diagram-title">주요 플라스틱 유형별 NIR 스펙트럼 특성</div>
+            <div class="flow-chart">
+                <div class="flow-item">PET: 1660nm 피크</div>
+                <div class="flow-item">HDPE: 1720nm 피크</div>
+                <div class="flow-item">PP: 1195nm 피크</div>
+                <div class="flow-item">PS: 1685nm 피크</div>
+            </div>
+        </div>
+
+        <div class="code-block">
+            <code>
+<span class="comment">// NIR 스펙트럼 분석기 구현</span>
+
+<span class="keyword">import</span> numpy <span class="keyword">as</span> np
+<span class="keyword">from</span> scipy.signal <span class="keyword">import</span> savgol_filter
+<span class="keyword">from</span> sklearn.preprocessing <span class="keyword">import</span> StandardScaler
+
+<span class="keyword">class</span> <span class="function">NIRSpectrumAnalyzer</span>:
+    <span class="string">"""
+    NIR 스펙트럼 전처리 및 분석
+    """</span>
+
+    <span class="comment"># 알려진 재료의 특징적 피크 위치 (nm)</span>
+    MATERIAL_PEAKS = {
+        <span class="string">'PET'</span>: [<span class="number">1660</span>, <span class="number">2140</span>, <span class="number">2270</span>],
+        <span class="string">'HDPE'</span>: [<span class="number">1720</span>, <span class="number">1760</span>, <span class="number">2310</span>],
+        <span class="string">'LDPE'</span>: [<span class="number">1725</span>, <span class="number">1765</span>, <span class="number">2305</span>],
+        <span class="string">'PP'</span>: [<span class="number">1195</span>, <span class="number">1720</span>, <span class="number">2270</span>],
+        <span class="string">'PS'</span>: [<span class="number">1685</span>, <span class="number">2165</span>, <span class="number">2450</span>],
+        <span class="string">'PVC'</span>: [<span class="number">1720</span>, <span class="number">2275</span>, <span class="number">2390</span>],
+        <span class="string">'PAPER'</span>: [<span class="number">1450</span>, <span class="number">1940</span>, <span class="number">2100</span>],
+        <span class="string">'CARDBOARD'</span>: [<span class="number">1450</span>, <span class="number">1935</span>, <span class="number">2095</span>],
+    }
+
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, wavelengths):
+        <span class="string">"""
+        wavelengths: 센서의 파장 범위 (nm)
+        """</span>
+        self.wavelengths = wavelengths
+        self.scaler = StandardScaler()
+
+    <span class="keyword">def</span> <span class="function">preprocess_spectrum</span>(self, spectrum):
+        <span class="string">"""
+        원시 스펙트럼 데이터 전처리
+
+        1. Savitzky-Golay 평활화
+        2. 기준선 보정
+        3. SNV (표준 정규 변수) 정규화
+        4. 1차 미분
+        """</span>
+
+        <span class="comment"># 평활화 (노이즈 제거)</span>
+        smoothed = savgol_filter(spectrum, window_length=<span class="number">11</span>, polyorder=<span class="number">3</span>)
+
+        <span class="comment"># 기준선 보정 (다항식 피팅)</span>
+        baseline = self._fit_baseline(smoothed)
+        corrected = smoothed - baseline
+
+        <span class="comment"># SNV 정규화</span>
+        snv_normalized = (corrected - np.mean(corrected)) / np.std(corrected)
+
+        <span class="comment"># 1차 미분 (피크 강조)</span>
+        derivative = savgol_filter(
+            snv_normalized,
+            window_length=<span class="number">11</span>,
+            polyorder=<span class="number">3</span>,
+            deriv=<span class="number">1</span>
+        )
+
+        <span class="keyword">return</span> derivative
+
+    <span class="keyword">def</span> <span class="function">_fit_baseline</span>(self, spectrum):
+        <span class="string">"""다항식 기준선 피팅"""</span>
+        x = np.arange(len(spectrum))
+        coeffs = np.polyfit(x, spectrum, deg=<span class="number">2</span>)
+        baseline = np.polyval(coeffs, x)
+        <span class="keyword">return</span> baseline
+
+    <span class="keyword">def</span> <span class="function">identify_peaks</span>(self, processed_spectrum, threshold=<span class="number">0.1</span>):
+        <span class="string">"""특징적 피크 식별"""</span>
+        peaks = []
+
+        <span class="keyword">for</span> i <span class="keyword">in</span> range(<span class="number">1</span>, len(processed_spectrum) - <span class="number">1</span>):
+            <span class="keyword">if</span> (processed_spectrum[i] > processed_spectrum[i-<span class="number">1</span>] <span class="keyword">and</span>
+                processed_spectrum[i] > processed_spectrum[i+<span class="number">1</span>] <span class="keyword">and</span>
+                abs(processed_spectrum[i]) > threshold):
+
+                peak_wavelength = self.wavelengths[i]
+                peak_intensity = processed_spectrum[i]
+                peaks.append((peak_wavelength, peak_intensity))
+
+        <span class="keyword">return</span> sorted(peaks, key=<span class="keyword">lambda</span> x: abs(x[<span class="number">1</span>]), reverse=<span class="keyword">True</span>)
+
+    <span class="keyword">def</span> <span class="function">match_material</span>(self, peaks, top_n=<span class="number">3</span>):
+        <span class="string">"""피크 매칭을 통한 재료 식별"""</span>
+        scores = {}
+        peak_wavelengths = [p[<span class="number">0</span>] <span class="keyword">for</span> p <span class="keyword">in</span> peaks[:top_n]]
+
+        <span class="keyword">for</span> material, ref_peaks <span class="keyword">in</span> self.MATERIAL_PEAKS.items():
+            score = <span class="number">0</span>
+            <span class="keyword">for</span> peak_wl <span class="keyword">in</span> peak_wavelengths:
+                <span class="keyword">for</span> ref_wl <span class="keyword">in</span> ref_peaks:
+                    <span class="comment"># 허용 오차 범위 내 매칭</span>
+                    <span class="keyword">if</span> abs(peak_wl - ref_wl) < <span class="number">20</span>:  <span class="comment"># ±20nm</span>
+                        score += <span class="number">1</span> - abs(peak_wl - ref_wl) / <span class="number">20</span>
+
+            scores[material] = score / len(ref_peaks)
+
+        <span class="comment"># 점수로 정렬</span>
+        sorted_materials = sorted(
+            scores.items(),
+            key=<span class="keyword">lambda</span> x: x[<span class="number">1</span>],
+            reverse=<span class="keyword">True</span>
+        )
+
+        <span class="keyword">return</span> sorted_materials
+            </code>
+        </div>
+
+        <h3>검은색 플라스틱 문제</h3>
+
+        <p>검은색 플라스틱은 NIR 분광법의 주요 과제입니다. 카본 블랙 안료가 NIR 광을 흡수하여 스펙트럼 신호를 크게 감쇠시킵니다. 이 문제를 해결하기 위한 여러 접근법이 있습니다:</p>
+
+        <div class="grid-2col">
+            <div class="feature-card">
+                <h5>중적외선(MIR) 센서</h5>
+                <p>2.5-25μm 파장 범위에서 작동하며, 카본 블랙의 영향을 덜 받습니다. 하지만 비용이 높고 처리 속도가 느립니다.</p>
+            </div>
+            <div class="feature-card">
+                <h5>레이저 유도 파괴 분광법(LIBS)</h5>
+                <p>레이저로 물질을 기화시켜 원소 조성을 분석합니다. 모든 색상의 플라스틱에 효과적입니다.</p>
+            </div>
+            <div class="feature-card">
+                <h5>형광 표지자</h5>
+                <p>제조 단계에서 플라스틱에 형광 마커를 추가하여 분류를 용이하게 합니다. 신규 제품에만 적용 가능합니다.</p>
+            </div>
+            <div class="feature-card">
+                <h5>밀도 기반 분류</h5>
+                <p>물이나 염용액에서의 부력 차이를 이용합니다. 정확도는 낮지만 보조 수단으로 활용됩니다.</p>
+            </div>
+        </div>
+
+        <h2>로봇 분류 시스템</h2>
+
+        <p>AI 시스템이 물질을 식별한 후, 물리적으로 분리하는 것은 로봇 시스템의 역할입니다. 현대 재활용 시설에서는 고속 델타 로봇과 공압 분사기가 주로 사용됩니다.</p>
+
+        <h3>델타 로봇 아키텍처</h3>
+
+        <p>델타 로봇은 병렬 운동학적 구조로 인해 높은 속도와 정밀도를 제공합니다. 재활용 분류에서는 초당 2-4회의 픽 앤 플레이스 작업을 수행할 수 있습니다.</p>
+
+        <div class="highlight-box">
+            <h4>델타 로봇 사양 요구 사항</h4>
+            <ul>
+                <li><strong>작업 공간:</strong> 최소 800mm 직경</li>
+                <li><strong>페이로드:</strong> 0.5-2kg (대부분의 재활용품 처리)</li>
+                <li><strong>정확도:</strong> ±0.5mm 반복 정밀도</li>
+                <li><strong>사이클 시간:</strong> < 500ms (픽-이동-플레이스)</li>
+                <li><strong>내구성:</strong> IP65 이상 (먼지/습기 보호)</li>
+            </ul>
+        </div>
+
+        <div class="code-block">
+            <code>
+<span class="comment">// 로봇 분류 컨트롤러 인터페이스</span>
+
+<span class="keyword">interface</span> <span class="function">SortingRobotController</span> {
+    <span class="comment">// 로봇 상태</span>
+    robotId: string;
+    status: <span class="string">'idle'</span> | <span class="string">'picking'</span> | <span class="string">'placing'</span> | <span class="string">'error'</span>;
+    currentPosition: Position3D;
+
+    <span class="comment">// 대상 빈 정의</span>
+    targetBins: Map&lt;MaterialType, BinPosition&gt;;
+}
+
+<span class="keyword">interface</span> <span class="function">PickCommand</span> {
+    targetPosition: Position3D;      <span class="comment">// 픽업 위치</span>
+    objectDimensions: Dimensions3D;   <span class="comment">// 객체 크기</span>
+    gripperType: <span class="string">'vacuum'</span> | <span class="string">'finger'</span>;  <span class="comment">// 그리퍼 유형</span>
+    approachVector: Vector3D;         <span class="comment">// 접근 방향</span>
+    graspForce: number;               <span class="comment">// 파지력 (N)</span>
+}
+
+<span class="keyword">class</span> <span class="function">DeltaRobotController</span> <span class="keyword">implements</span> SortingRobotController {
+    <span class="keyword">private</span> motionPlanner: MotionPlanner;
+    <span class="keyword">private</span> visionSystem: VisionSystem;
+    <span class="keyword">private</span> conveyor: ConveyorBelt;
+
+    <span class="keyword">async</span> <span class="function">executeSortingCycle</span>(
+        detection: ObjectDetection,
+        targetBin: BinPosition
+    ): Promise&lt;SortingResult&gt; {
+
+        <span class="comment">// 1. 컨베이어 위치 예측</span>
+        <span class="keyword">const</span> pickupTime = this.calculatePickupTime(detection);
+        <span class="keyword">const</span> predictedPosition = this.conveyor.predictPosition(
+            detection.position,
+            pickupTime
+        );
+
+        <span class="comment">// 2. 궤적 계획</span>
+        <span class="keyword">const</span> trajectory = <span class="keyword">await</span> this.motionPlanner.planTrajectory({
+            start: this.currentPosition,
+            pickPoint: predictedPosition,
+            placePoint: targetBin.dropPosition,
+            constraints: {
+                maxVelocity: <span class="number">4.0</span>,     <span class="comment">// m/s</span>
+                maxAcceleration: <span class="number">40.0</span>, <span class="comment">// m/s²</span>
+                jerkLimit: <span class="number">500.0</span>       <span class="comment">// m/s³</span>
+            }
+        });
+
+        <span class="comment">// 3. 궤적 실행</span>
+        <span class="keyword">const</span> pickResult = <span class="keyword">await</span> this.executePickOperation(
+            trajectory.pickSegment,
+            detection.objectType
+        );
+
+        <span class="keyword">if</span> (!pickResult.success) {
+            <span class="keyword">return</span> {
+                success: <span class="keyword">false</span>,
+                error: <span class="string">'PICK_FAILED'</span>,
+                retryRecommended: <span class="keyword">true</span>
+            };
+        }
+
+        <span class="comment">// 4. 배치 실행</span>
+        <span class="keyword">const</span> placeResult = <span class="keyword">await</span> this.executePlaceOperation(
+            trajectory.placeSegment,
+            targetBin
+        );
+
+        <span class="comment">// 5. 결과 기록</span>
+        <span class="keyword">await</span> this.logSortingEvent({
+            timestamp: Date.now(),
+            objectType: detection.classification,
+            confidence: detection.confidence,
+            cycleTime: trajectory.totalTime,
+            success: placeResult.success
+        });
+
+        <span class="keyword">return</span> {
+            success: placeResult.success,
+            cycleTime: trajectory.totalTime,
+            energyConsumed: trajectory.energyEstimate
+        };
+    }
+
+    <span class="keyword">private</span> <span class="function">calculatePickupTime</span>(detection: ObjectDetection): number {
+        <span class="comment">// 로봇 가속/감속 시간 고려</span>
+        <span class="keyword">const</span> robotMoveTime = this.motionPlanner.estimateMoveTime(
+            this.currentPosition,
+            detection.position
+        );
+
+        <span class="comment">// 약간의 여유 추가</span>
+        <span class="keyword">return</span> robotMoveTime + <span class="number">50</span>; <span class="comment">// ms</span>
+    }
+}
+            </code>
+        </div>
+
+        <h3>공압 분사 시스템</h3>
+
+        <p>공압 분사기는 로봇 암보다 더 높은 처리량을 제공합니다. 압축 공기 제트가 대상 물체를 컨베이어에서 밀어 별도의 채널로 분리합니다. 이 시스템은 특히 평평하고 가벼운 물체(필름, 종이, 얇은 플라스틱)에 효과적입니다.</p>
+
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-value">10,000+</div>
+                <div class="stat-label">시간당 분사 횟수</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">6 bar</div>
+                <div class="stat-label">작동 압력</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">5-20ms</div>
+                <div class="stat-label">분사 지속 시간</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">99.2%</div>
+                <div class="stat-label">분리 성공률</div>
+            </div>
+        </div>
+
+        <h2>실시간 처리 파이프라인</h2>
+
+        <p>재활용 시설의 컨베이어 벨트는 초당 1-3미터의 속도로 이동합니다. AI 시스템은 물체가 분류 영역에 도달하기 전에 모든 처리를 완료해야 합니다. 이를 위해 최적화된 처리 파이프라인이 필수적입니다.</p>
+
+        <div class="diagram">
+            <div class="diagram-title">실시간 처리 파이프라인</div>
+            <div class="flow-chart">
+                <div class="flow-item">이미지 획득<br>< 5ms</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-item">전처리<br>< 3ms</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-item">AI 추론<br>< 15ms</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-item">결정<br>< 2ms</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-item">로봇 명령<br>< 5ms</div>
+            </div>
+        </div>
+
+        <h3>GPU 가속</h3>
+
+        <p>실시간 AI 추론을 위해 GPU 가속은 필수입니다. NVIDIA Jetson 시리즈나 Intel Movidius VPU와 같은 엣지 AI 가속기가 일반적으로 사용됩니다.</p>
+
+        <div class="code-block">
+            <code>
+<span class="comment">// TensorRT 최적화된 추론 엔진</span>
+
+<span class="keyword">import</span> tensorrt <span class="keyword">as</span> trt
+<span class="keyword">import</span> pycuda.driver <span class="keyword">as</span> cuda
+<span class="keyword">import</span> pycuda.autoinit
+<span class="keyword">import</span> numpy <span class="keyword">as</span> np
+
+<span class="keyword">class</span> <span class="function">TensorRTInferenceEngine</span>:
+    <span class="string">"""
+    TensorRT를 사용한 최적화된 추론 엔진
+    딥러닝 모델의 실시간 추론 가속
+    """</span>
+
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, engine_path: str):
+        <span class="comment"># TensorRT 로거</span>
+        self.logger = trt.Logger(trt.Logger.WARNING)
+
+        <span class="comment"># 엔진 로드</span>
+        <span class="keyword">with</span> open(engine_path, <span class="string">'rb'</span>) <span class="keyword">as</span> f:
+            engine_data = f.read()
+
+        runtime = trt.Runtime(self.logger)
+        self.engine = runtime.deserialize_cuda_engine(engine_data)
+        self.context = self.engine.create_execution_context()
+
+        <span class="comment"># CUDA 스트림 생성</span>
+        self.stream = cuda.Stream()
+
+        <span class="comment"># 메모리 할당</span>
+        self._allocate_buffers()
+
+    <span class="keyword">def</span> <span class="function">_allocate_buffers</span>(self):
+        <span class="string">"""입출력 버퍼 할당"""</span>
+        self.inputs = []
+        self.outputs = []
+        self.bindings = []
+
+        <span class="keyword">for</span> binding <span class="keyword">in</span> self.engine:
+            shape = self.engine.get_binding_shape(binding)
+            dtype = trt.nptype(self.engine.get_binding_dtype(binding))
+            size = trt.volume(shape)
+
+            <span class="comment"># 호스트 및 디바이스 메모리</span>
+            host_mem = cuda.pagelocked_empty(size, dtype)
+            device_mem = cuda.mem_alloc(host_mem.nbytes)
+
+            self.bindings.append(int(device_mem))
+
+            <span class="keyword">if</span> self.engine.binding_is_input(binding):
+                self.inputs.append({
+                    <span class="string">'host'</span>: host_mem,
+                    <span class="string">'device'</span>: device_mem,
+                    <span class="string">'shape'</span>: shape
+                })
+            <span class="keyword">else</span>:
+                self.outputs.append({
+                    <span class="string">'host'</span>: host_mem,
+                    <span class="string">'device'</span>: device_mem,
+                    <span class="string">'shape'</span>: shape
+                })
+
+    <span class="keyword">def</span> <span class="function">infer</span>(self, input_data: np.ndarray) -> np.ndarray:
+        <span class="string">"""
+        비동기 추론 실행
+
+        Args:
+            input_data: 전처리된 입력 이미지 (NCHW 형식)
+
+        Returns:
+            분류 확률 배열
+        """</span>
+        <span class="comment"># 입력 데이터 복사</span>
+        np.copyto(self.inputs[<span class="number">0</span>][<span class="string">'host'</span>], input_data.ravel())
+
+        <span class="comment"># 호스트 -> 디바이스 전송</span>
+        cuda.memcpy_htod_async(
+            self.inputs[<span class="number">0</span>][<span class="string">'device'</span>],
+            self.inputs[<span class="number">0</span>][<span class="string">'host'</span>],
+            self.stream
+        )
+
+        <span class="comment"># 추론 실행</span>
+        self.context.execute_async_v2(
+            bindings=self.bindings,
+            stream_handle=self.stream.handle
+        )
+
+        <span class="comment"># 디바이스 -> 호스트 전송</span>
+        cuda.memcpy_dtoh_async(
+            self.outputs[<span class="number">0</span>][<span class="string">'host'</span>],
+            self.outputs[<span class="number">0</span>][<span class="string">'device'</span>],
+            self.stream
+        )
+
+        <span class="comment"># 스트림 동기화</span>
+        self.stream.synchronize()
+
+        <span class="comment"># 출력 reshape</span>
+        output = self.outputs[<span class="number">0</span>][<span class="string">'host'</span>].reshape(
+            self.outputs[<span class="number">0</span>][<span class="string">'shape'</span>]
+        )
+
+        <span class="keyword">return</span> output
+
+<span class="comment"># 사용 예시</span>
+<span class="keyword">if</span> __name__ == <span class="string">'__main__'</span>:
+    engine = TensorRTInferenceEngine(<span class="string">'recycling_classifier.trt'</span>)
+
+    <span class="comment"># 카메라에서 프레임 획득</span>
+    frame = camera.capture()
+
+    <span class="comment"># 전처리</span>
+    preprocessed = preprocess_image(frame)
+
+    <span class="comment"># 추론 (약 8-15ms)</span>
+    predictions = engine.infer(preprocessed)
+
+    <span class="comment"># 결과 해석</span>
+    material_class = np.argmax(predictions)
+    confidence = predictions[material_class]
+            </code>
+        </div>
+
+        <h2>훈련 데이터 관리</h2>
+
+        <p>AI 분류 시스템의 성능은 훈련 데이터의 품질과 다양성에 크게 의존합니다. 재활용 분류를 위한 데이터셋 구축에는 특별한 고려사항이 있습니다.</p>
+
+        <h3>데이터 수집 전략</h3>
+
+        <div class="highlight-box">
+            <h4>효과적인 데이터 수집을 위한 지침</h4>
+            <ul>
+                <li><strong>다양성 확보:</strong> 같은 재료라도 다양한 브랜드, 형태, 오염 상태를 포함</li>
+                <li><strong>조명 변화:</strong> 다양한 조명 조건에서 이미지 수집</li>
+                <li><strong>계절적 변동:</strong> 포장재 트렌드의 계절별 변화 반영</li>
+                <li><strong>지역 특성:</strong> 지역별로 다른 제품 유형과 브랜드 포함</li>
+                <li><strong>손상 상태:</strong> 찌그러진, 찢어진, 오염된 상태의 샘플 포함</li>
+            </ul>
+        </div>
+
+        <h3>데이터 증강</h3>
+
+        <div class="code-block">
+            <code>
+<span class="comment">// 재활용 이미지를 위한 데이터 증강 파이프라인</span>
+
+<span class="keyword">import</span> albumentations <span class="keyword">as</span> A
+<span class="keyword">from</span> albumentations.pytorch <span class="keyword">import</span> ToTensorV2
+
+<span class="keyword">def</span> <span class="function">get_training_augmentation</span>():
+    <span class="string">"""
+    재활용 물질 분류를 위한 훈련 증강
+    실제 시설 환경을 시뮬레이션
+    """</span>
+    <span class="keyword">return</span> A.Compose([
+        <span class="comment"># 기하학적 변환</span>
+        A.RandomRotate90(p=<span class="number">0.5</span>),
+        A.HorizontalFlip(p=<span class="number">0.5</span>),
+        A.VerticalFlip(p=<span class="number">0.3</span>),
+        A.Affine(
+            scale=(<span class="number">0.8</span>, <span class="number">1.2</span>),
+            rotate=(-<span class="number">45</span>, <span class="number">45</span>),
+            shear=(-<span class="number">10</span>, <span class="number">10</span>),
+            p=<span class="number">0.7</span>
+        ),
+
+        <span class="comment"># 조명 시뮬레이션</span>
+        A.OneOf([
+            A.RandomBrightnessContrast(
+                brightness_limit=<span class="number">0.3</span>,
+                contrast_limit=<span class="number">0.3</span>,
+                p=<span class="number">1</span>
+            ),
+            A.RandomGamma(
+                gamma_limit=(<span class="number">70</span>, <span class="number">130</span>),
+                p=<span class="number">1</span>
+            ),
+            A.CLAHE(
+                clip_limit=<span class="number">4.0</span>,
+                p=<span class="number">1</span>
+            ),
+        ], p=<span class="number">0.8</span>),
+
+        <span class="comment"># 색상 변환 (다양한 조명 조건)</span>
+        A.OneOf([
+            A.HueSaturationValue(
+                hue_shift_limit=<span class="number">20</span>,
+                sat_shift_limit=<span class="number">30</span>,
+                val_shift_limit=<span class="number">20</span>,
+                p=<span class="number">1</span>
+            ),
+            A.RGBShift(
+                r_shift_limit=<span class="number">20</span>,
+                g_shift_limit=<span class="number">20</span>,
+                b_shift_limit=<span class="number">20</span>,
+                p=<span class="number">1</span>
+            ),
+        ], p=<span class="number">0.5</span>),
+
+        <span class="comment"># 노이즈 및 블러 (센서 노이즈, 모션 블러)</span>
+        A.OneOf([
+            A.GaussNoise(var_limit=(<span class="number">10</span>, <span class="number">50</span>), p=<span class="number">1</span>),
+            A.MotionBlur(blur_limit=<span class="number">7</span>, p=<span class="number">1</span>),
+            A.GaussianBlur(blur_limit=<span class="number">7</span>, p=<span class="number">1</span>),
+        ], p=<span class="number">0.4</span>),
+
+        <span class="comment"># 오염 시뮬레이션</span>
+        A.OneOf([
+            A.CoarseDropout(
+                max_holes=<span class="number">8</span>,
+                max_height=<span class="number">32</span>,
+                max_width=<span class="number">32</span>,
+                fill_value=<span class="number">0</span>,
+                p=<span class="number">1</span>
+            ),
+            A.GridDropout(ratio=<span class="number">0.3</span>, p=<span class="number">1</span>),
+        ], p=<span class="number">0.3</span>),
+
+        <span class="comment"># 정규화 및 텐서 변환</span>
+        A.Normalize(
+            mean=[<span class="number">0.485</span>, <span class="number">0.456</span>, <span class="number">0.406</span>],
+            std=[<span class="number">0.229</span>, <span class="number">0.224</span>, <span class="number">0.225</span>]
+        ),
+        ToTensorV2()
+    ])
+
+<span class="keyword">def</span> <span class="function">get_validation_augmentation</span>():
+    <span class="string">"""검증용 최소 변환"""</span>
+    <span class="keyword">return</span> A.Compose([
+        A.Normalize(
+            mean=[<span class="number">0.485</span>, <span class="number">0.456</span>, <span class="number">0.406</span>],
+            std=[<span class="number">0.229</span>, <span class="number">0.224</span>, <span class="number">0.225</span>]
+        ),
+        ToTensorV2()
+    ])
+            </code>
+        </div>
+
+        <h2>모델 모니터링 및 재훈련</h2>
+
+        <p>배포된 AI 모델은 시간이 지남에 따라 성능이 저하될 수 있습니다. 새로운 포장재 도입, 브랜드 디자인 변경, 계절적 변동 등이 원인입니다. 지속적인 모니터링과 재훈련이 필수적입니다.</p>
+
+        <h3>성능 메트릭</h3>
+
+        <table class="tech-comparison">
+            <thead>
+                <tr>
+                    <th>메트릭</th>
+                    <th>목표값</th>
+                    <th>경고 임계값</th>
+                    <th>비상 임계값</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>전체 정확도</td>
+                    <td>>= 97%</td>
+                    <td>< 95%</td>
+                    <td>< 90%</td>
+                </tr>
+                <tr>
+                    <td>클래스별 재현율</td>
+                    <td>>= 95%</td>
+                    <td>< 92%</td>
+                    <td>< 85%</td>
+                </tr>
+                <tr>
+                    <td>오염 검출률</td>
+                    <td>>= 99%</td>
+                    <td>< 97%</td>
+                    <td>< 95%</td>
+                </tr>
+                <tr>
+                    <td>추론 지연 시간</td>
+                    <td>< 20ms</td>
+                    <td>> 30ms</td>
+                    <td>> 50ms</td>
+                </tr>
+                <tr>
+                    <td>미인식률</td>
+                    <td>< 2%</td>
+                    <td>> 5%</td>
+                    <td>> 10%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>자동 재훈련 파이프라인</h3>
+
+        <div class="code-block">
+            <code>
+<span class="comment">// 자동 재훈련 파이프라인 (MLOps)</span>
+
+<span class="keyword">from</span> dataclasses <span class="keyword">import</span> dataclass
+<span class="keyword">from</span> typing <span class="keyword">import</span> Optional
+<span class="keyword">import</span> mlflow
+
+@dataclass
+<span class="keyword">class</span> <span class="function">RetrainingConfig</span>:
+    <span class="string">"""재훈련 설정"""</span>
+    accuracy_threshold: float = <span class="number">0.95</span>
+    min_new_samples: int = <span class="number">1000</span>
+    retraining_interval_days: int = <span class="number">7</span>
+    validation_split: float = <span class="number">0.2</span>
+    max_epochs: int = <span class="number">50</span>
+    early_stopping_patience: int = <span class="number">5</span>
+
+<span class="keyword">class</span> <span class="function">AutoRetrainingPipeline</span>:
+    <span class="string">"""
+    성능 저하 감지 시 자동 재훈련 수행
+    """</span>
+
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, config: RetrainingConfig):
+        self.config = config
+        self.performance_history = []
+        self.new_samples_buffer = []
+
+    <span class="keyword">def</span> <span class="function">log_prediction</span>(self, prediction, ground_truth, sample_data):
+        <span class="string">"""예측 결과 기록"""</span>
+        is_correct = prediction == ground_truth
+
+        self.performance_history.append({
+            <span class="string">'timestamp'</span>: datetime.now(),
+            <span class="string">'correct'</span>: is_correct,
+            <span class="string">'predicted'</span>: prediction,
+            <span class="string">'actual'</span>: ground_truth
+        })
+
+        <span class="comment"># 오분류된 샘플 저장</span>
+        <span class="keyword">if not</span> is_correct:
+            self.new_samples_buffer.append({
+                <span class="string">'data'</span>: sample_data,
+                <span class="string">'label'</span>: ground_truth
+            })
+
+    <span class="keyword">def</span> <span class="function">check_retraining_trigger</span>(self) -> bool:
+        <span class="string">"""재훈련 필요성 확인"""</span>
+
+        <span class="comment"># 최근 1시간 성능 계산</span>
+        recent = [p <span class="keyword">for</span> p <span class="keyword">in</span> self.performance_history
+                  <span class="keyword">if</span> p[<span class="string">'timestamp'</span>] > datetime.now() - timedelta(hours=<span class="number">1</span>)]
+
+        <span class="keyword">if</span> len(recent) < <span class="number">100</span>:
+            <span class="keyword">return</span> <span class="keyword">False</span>
+
+        accuracy = sum(<span class="number">1</span> <span class="keyword">for</span> p <span class="keyword">in</span> recent <span class="keyword">if</span> p[<span class="string">'correct'</span>]) / len(recent)
+
+        <span class="comment"># 정확도가 임계값 미만이고 충분한 새 샘플이 있으면</span>
+        <span class="keyword">if</span> (accuracy < self.config.accuracy_threshold <span class="keyword">and</span>
+            len(self.new_samples_buffer) >= self.config.min_new_samples):
+            <span class="keyword">return</span> <span class="keyword">True</span>
+
+        <span class="keyword">return</span> <span class="keyword">False</span>
+
+    <span class="keyword">async def</span> <span class="function">execute_retraining</span>(self) -> Optional[str]:
+        <span class="string">"""재훈련 실행"""</span>
+
+        <span class="keyword">with</span> mlflow.start_run():
+            <span class="comment"># 새 데이터 준비</span>
+            new_dataset = self.prepare_dataset(self.new_samples_buffer)
+
+            <span class="comment"># 기존 데이터와 결합</span>
+            combined_dataset = self.merge_with_existing(new_dataset)
+
+            <span class="comment"># 모델 로드</span>
+            model = self.load_current_model()
+
+            <span class="comment"># 재훈련</span>
+            trainer = Trainer(
+                model=model,
+                train_dataset=combined_dataset.train,
+                val_dataset=combined_dataset.val,
+                config=self.config
+            )
+
+            metrics = trainer.train()
+
+            <span class="comment"># 검증</span>
+            <span class="keyword">if</span> metrics[<span class="string">'val_accuracy'</span>] > self.get_current_model_accuracy():
+                <span class="comment"># 새 모델 배포</span>
+                model_uri = mlflow.pytorch.log_model(model, <span class="string">'model'</span>)
+                self.deploy_model(model_uri)
+
+                <span class="comment"># 버퍼 초기화</span>
+                self.new_samples_buffer = []
+
+                <span class="keyword">return</span> model_uri
+
+            <span class="keyword">return</span> <span class="keyword">None</span>
+            </code>
+        </div>
+
+        <h2>WIA-RECYCLING AI 표준</h2>
+
+        <p>WIA-RECYCLING 표준은 AI 분류 시스템의 상호운용성과 품질을 보장하기 위한 기술 사양을 제공합니다.</p>
+
+        <div class="highlight-box">
+            <h4>AI 시스템 인증 요구 사항</h4>
+            <ul>
+                <li><strong>최소 정확도:</strong> 주요 재료 카테고리에서 95% 이상</li>
+                <li><strong>실시간 성능:</strong> 추론 지연 50ms 미만</li>
+                <li><strong>표준 API:</strong> WIA-RECYCLING API 사양 준수</li>
+                <li><strong>데이터 형식:</strong> 표준화된 분류 결과 스키마 사용</li>
+                <li><strong>감사 로그:</strong> 모든 분류 결정에 대한 추적 가능성</li>
+                <li><strong>모델 버전 관리:</strong> 모델 이력 및 롤백 기능</li>
+            </ul>
+        </div>
+
+        <div class="alert-box success">
+            <h4>핵심 요약</h4>
+            <p>AI 기반 분류 시스템은 재활용 산업을 혁신하고 있습니다. 다중 센서 융합, 딥러닝 최적화, 로봇 자동화의 결합은 인간의 능력을 훨씬 초월하는 속도와 정확도를 제공합니다. WIA-RECYCLING 표준은 이러한 시스템이 상호운용 가능하고 신뢰할 수 있도록 보장합니다.</p>
+        </div>
+
+        </main>
+</body>
+</html>

@@ -5,237 +5,353 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-civic-participation (Civic Participation).
+This document defines the protocols that govern
+a public-administration body operating a
+citizen-engagement platform across the
+operator-to-citizen-to-elected-representative
+value chain: the OECD-engagement-ladder
+discipline that ties the consultation type to
+the citizen's expected influence on the
+outcome, the rights-and-policy-expression
+discipline that governs how citizen submissions
+may be re-used, the deliberation discipline that
+governs the operator's documented
+decision-making, the outcome-publication
+discipline that gates the operator's response
+commitment, the privacy-and-consent discipline
+that gates the processing of citizen-submission
+data under GDPR Article 9 special-category
+provisions, the chain-of-custody anchoring
+discipline that prevents silent mutation of the
+deliberative record, the engagement-KPI
+discipline that aligns the operator's reporting
+with ITU-T Y.4900 / ISO 37120 / UN DESA / OECD
+benchmarks, and the post-decision review
+discipline that handles a discovered
+nonconformance in the engagement process.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ITU-T Recommendation Y.4900/L.1600
+- ISO 37120:2018, ISO 37122:2019, ISO 37123:2019,
+  ISO 37100:2016, ISO 37101:2016
+- ISO 18091:2019 (local government QMS)
+- ISO 9001:2015 (quality management systems)
+- W3C Open Digital Rights Language (ODRL) 2.2
+  Information Model and Vocabulary
+- W3C Decentralised Identifiers (DIDs) v1.0
+- W3C Verifiable Credentials Data Model v2.0
+- W3C Data Catalog Vocabulary (DCAT) v3
+- OECD Recommendation of the Council on Open
+  Government (OECD/LEGAL/0438) and OECD Citizen
+  Engagement: A Guide to Public Engagement
+- UN DESA E-Government Survey
+- World Bank GovTech Maturity Index
+- ISO/IEC 27001:2022 (information-security
+  management) and ISO/IEC 17021-1:2015 (audit
+  and certification)
+- IETF RFC 9110, RFC 9421, RFC 9457, RFC 8615,
+  RFC 6962 (the per-event transparency log
+  template)
+- W3C Trace Context
+- EU GDPR (Regulation (EU) 2016/679) Articles
+  6, 9, 12-22, 24-30, 32-34
+- EU Single Digital Gateway Regulation (EU)
+  2018/1724 and EU Interoperable Europe Act
+  Regulation (EU) 2024/903
+- KR 행정기본법 (Framework Act on
+  Administrative Affairs) and KR 정보공개법
+  (Official Information Disclosure Act)
 
 ---
 
-## §1 Scope
+## §1 OECD Engagement-Ladder Discipline
 
-This PHASE document is one of four that together define the WIA-civic-participation
-standard. It addresses the protocol layer of the standard.
+Every consultation record carries the
+`engagementLadder` enumeration declared in
+PHASE-1 §3. The operator's API enforces the
+consultation-type-to-engagement-ladder mapping:
 
-## §2 Manifest
+- `inform` — the operator publishes information
+  to the public; no submission is solicited.
+- `consult` — the operator solicits citizen
+  feedback on a defined policy question.
+- `involve` — the operator works with citizens
+  to ensure that their concerns are
+  consistently understood and considered (a
+  public-consultation portal that publishes a
+  per-submission rationale-of-non-acceptance).
+- `collaborate` — the operator partners with
+  citizens in each aspect of the decision
+  including the development of alternatives
+  (a participatory-budgeting platform where
+  citizens propose and rank the projects).
+- `empower` — the operator places the final
+  decision in the hands of the public (a
+  binding referendum, a formal popular vote).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "civic-participation"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+A consultation declared above its actual
+engagement scope is rejected at publication
+with `422 Unprocessable Entity` at
+`/problems/oecd-engagement-ladder-overclaim`.
 
-## §3 Conformance Tiers
+## §2 Rights-and-Policy-Expression Discipline
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+### §2.1 W3C ODRL profile
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Every consultation record carries a W3C ODRL
+2.2 policy expression in `rightsExpression`.
+The policy declares the permitted re-use of the
+consultation envelope and the per-submission
+data — for example, the right to redistribute,
+to use for academic research, to publish as
+open data after a defined embargo period, to
+anonymise after closure. The operator's API
+parses the policy and refuses a re-use request
+that violates a `prohibition` or `obligation`
+clause.
 
-## §4 Discovery
+### §2.2 Per-submission sub-policy
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/civic-participation`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+A submission may carry a sub-policy that is
+more restrictive than the consultation-level
+policy (a citizen submitting under their
+verified identity may restrict the use to
+internal deliberation only). The sub-policy is
+reconciled with the consultation policy under
+the W3C ODRL evaluation rules; the most-
+restrictive policy applies.
 
-## §5 Time and Identity
+## §3 Deliberation Discipline
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### §3.1 Documented decision basis
 
-## §6 Versioning and Deprecation
+Every deliberation record cites the submission
+set that informed the decision. The operator's
+API enforces that the cited submissions are
+present in the consultation's submission
+register; a citation pointing at a submission
+that does not exist returns `422 Unprocessable
+Entity` at `/problems/deliberation-citation-
+unknown`.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+### §3.2 Sortition discipline for citizen panels
 
-## §7 Privacy and Security
+A `citizen-panel-sortition` deliberation
+declares the sortition algorithm parameters in
+`participantSet[].selectionMethod`. The
+algorithm carries the population frame, the
+randomisation seed source (a verifiable
+randomness service or a publicly auditable
+draw), and the per-participant selection
+criteria (age, residence, sortition cohort
+size).
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+### §3.3 Conflict-of-interest discipline
 
-## §8 Open Governance
+Every deliberation participant declares a
+conflict-of-interest envelope per ISO 37001:
+2016 anti-bribery management. The conflict-of-
+interest envelope is recorded as part of the
+participant profile and is reviewed by the
+operator's quality manager under PHASE-3 §10
+discipline.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `civic-participation` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §4 Privacy-and-Consent Discipline
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+### §4.1 GDPR Article 9 special-category basis
 
+A submission containing health data, political-
+opinion data, religious-belief data, or other
+GDPR Article 9 special-category data is
+processed only under an explicit Article 9(2)
+basis. The operator's API records the basis in
+`consentDirective.gdprBasis` and refuses a
+submission that does not declare a valid basis
+where the body's content is detected as
+special-category.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+### §4.2 Cross-border transfer
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Where the submitter's data is transferred
+across an EU/EEA boundary to a non-adequate
+country, the operator binds the transfer to a
+GDPR Article 46 appropriate safeguard (Standard
+Contractual Clauses, Binding Corporate Rules,
+ad-hoc transfer impact assessment). The
+transfer is recorded in the chain-of-custody
+record so that the supervisory data-protection
+authority can audit the transfer trail.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+### §4.3 Right-of-erasure interaction
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+A citizen submitter exercising the GDPR Article
+17 right of erasure triggers the operator's
+erasure workflow. Where the submission has
+already been cited in a deliberation record,
+the erasure is honoured by redacting the
+submitter's identity from the public-portal
+view but retaining the cited body for the
+duration of the operator's record-retention
+period under the regulator's retention
+discipline; the redaction is recorded as a
+chain-of-custody event.
 
-## Annex F — Adoption Roadmap
+## §5 Outcome-Publication Discipline
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+### §5.1 Response-schedule honouring
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The operator publishes the consultation outcome
+on or before the date declared in
+`responseSchedule.publishOutcomeBy`. A late
+publication is annotated with `publishedLate:
+true` in the response envelope and the
+underlying delay reason is recorded in the
+chain-of-custody record.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+### §5.2 Per-submission response
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+For consultations declared at the `involve` or
+`collaborate` engagement level, the operator
+publishes a per-submission rationale-of-
+non-acceptance where the submission's input
+was not adopted. The rationale is bound to the
+deliberation record that produced the decision.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §6 Chain-of-Custody Anchoring Discipline
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+### §6.1 Per-event transparency log
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Every chain-of-custody event carried by PHASE-1
+§8 is appended to a per-operator transparency
+log modelled on the IETF RFC 6962 Certificate
+Transparency append-only-log structure. The
+log publishes a signed tree-head every signed-
+tree-head period (default 24 h, configurable
+per programme); the signed tree-head is
+anchored to the operator's public-key set
+declared in
+`/.well-known/wia/civic-participation/keys.
+json`.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+### §6.2 Mutation prevention
 
-## Annex H — Versioning and Deprecation Policy
+A custody event cannot be retroactively edited;
+an amendment is recorded as a new event with
+`previousEventRef` pointing at the event being
+amended. The amending event's narrative carries
+the reason and is reviewed under the operator's
+ISO 9001 §10.2 nonconformity-and-corrective-
+action discipline.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §7 Engagement-KPI Discipline
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+### §7.1 ITU-T Y.4900 / ISO 37120 binding
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+The KPI bundle declared in PHASE-1 §7 binds the
+operator's engagement performance to the ITU-T
+Y.4900 smart-city engagement KPI series and
+the ISO 37120/37122 indicator catalogue. The
+operator's API enforces that the per-indicator
+value falls within the indicator's declared
+unit envelope (a percentage value reported in
+the [0,100] range, a time-to-respond reported
+in days).
 
-## Annex I — Interoperability Profiles
+### §7.2 UN DESA / OECD benchmark binding
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+The operator's reporting bundle additionally
+carries the UN DESA E-Participation Index sub-
+component and the OECD OURdata Index sub-
+component for the reporting period so that a
+cross-jurisdictional benchmark is preserved.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §8 Sortition-and-Random-Selection Discipline
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+A citizen panel selected by sortition uses a
+verifiable random-selection mechanism. The
+random seed is published in the deliberation
+envelope so that the selection can be re-run by
+an independent observer. The selection's
+demographic profile is published as a
+per-cohort summary so that the panel's
+representativeness can be audited.
+
+## §9 Disinformation-Resilience Discipline
+
+### §9.1 Bot-detection envelope
+
+The operator runs a bot-detection layer at
+submission-intake time. The detection layer's
+result (suspected, not-suspected) is recorded
+as a chain-of-custody event but does not
+unilaterally block the submission; suspect
+submissions are flagged for human review by
+the operator's secretariat under the operator's
+documented review discipline.
+
+### §9.2 Coordinated-inauthentic-behaviour layer
+
+The operator publishes a per-consultation
+report on coordinated inauthentic behaviour
+detected during the consultation (mass-
+template submissions, coordinated voting
+clusters). The report is reviewed by the
+operator's quality manager and the
+transparency observer.
+
+## §10 Quality-Management Discipline
+
+The operator runs an ISO 9001:2015 quality
+management system, with the local-government
+adaptation per ISO 18091:2019, covering the
+consultation-publication, submission-intake,
+deliberation, outcome-publication, KPI-
+publication, and chain-of-custody processes.
+Internal audits run on a frequency declared in
+the quality manual; the nonconformity register
+is reviewed in the ISO 9001 §9.3 management-
+review cycle. The operator's information-
+security management system declared under
+ISO/IEC 27001:2022 covers the protection of
+citizen-submission data.
+
+## §11 Post-Decision Review Discipline
+
+### §11.1 Adverse-finding review
+
+Where a transparency observer's audit produces
+an adverse finding (a missing submission, a
+decision-record citation pointing at a non-
+existent submission, a delayed outcome
+publication), the operator's API records the
+finding as a nonconformity event and runs the
+ISO 9001 §10.2 corrective-action workflow.
+
+### §11.2 Public-record reconciliation
+
+The operator publishes the reconciliation
+summary on the public-portal so that a
+downstream consumer can see the corrective
+action and the date of closure.
+
+## §12 KR-Jurisdiction Discipline
+
+### §12.1 KR 행정기본법 binding
+
+A KR-jurisdiction operator binds the
+consultation envelope to the relevant article
+of KR 행정기본법 (Framework Act on
+Administrative Affairs) and KR 행정절차법
+(Administrative Procedure Act) so that the
+consultation's procedural validity is
+preserved.
+
+### §12.2 KR 정보공개법 disclosure discipline
+
+A KR-jurisdiction operator handles a KR
+information-disclosure request under KR 정보
+공개법 (Official Information Disclosure Act).
+The operator publishes the per-request
+disclosure decision and the underlying
+documentary record per the act's discipline.

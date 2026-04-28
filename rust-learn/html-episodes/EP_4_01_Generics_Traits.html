@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 4-01: Generics & Traits - Rust NRT Academy</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e94560;
+            overflow: hidden;
+        }
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            display: none;
+            flex-direction: column;
+        }
+        .slide.active { display: flex; }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #e94560;
+        }
+        .episode-tag {
+            background: linear-gradient(90deg, #e94560, #ff6b6b);
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-size: 18px;
+            color: white;
+        }
+        .lang-toggle {
+            display: flex;
+            gap: 10px;
+        }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 2px solid #e94560;
+            background: transparent;
+            color: #e94560;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .lang-btn.active {
+            background: #e94560;
+            color: white;
+        }
+
+        h1 {
+            font-size: 72px;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #e94560, #ff6b6b, #ffc371);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+        h2 {
+            font-size: 48px;
+            color: #ff6b6b;
+            margin-bottom: 30px;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .code-block {
+            background: #0a0a12;
+            border-radius: 20px;
+            padding: 40px;
+            margin: 20px 0;
+            border: 2px solid #e94560;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 26px;
+            line-height: 1.6;
+            position: relative;
+            overflow: hidden;
+        }
+        .code-block::before {
+            content: 'RUST';
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            color: #e94560;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateX(-30px);
+            animation: slideIn 0.5s forwards;
+        }
+
+        @keyframes slideIn {
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .keyword { color: #ff6b6b; }
+        .type { color: #ffc371; }
+        .string { color: #a8e6cf; }
+        .comment { color: #6b7280; font-style: italic; }
+        .function { color: #74b9ff; }
+        .lifetime { color: #fd79a8; }
+        .number { color: #fab1a0; }
+        .macro { color: #a29bfe; }
+        .trait { color: #00cec9; }
+
+        .concept-box {
+            background: linear-gradient(135deg, rgba(233, 69, 96, 0.2), rgba(255, 107, 107, 0.1));
+            border: 2px solid #e94560;
+            border-radius: 20px;
+            padding: 40px;
+            margin: 20px 0;
+        }
+
+        .flex-container {
+            display: flex;
+            gap: 40px;
+            align-items: flex-start;
+        }
+        .flex-item {
+            flex: 1;
+        }
+
+        .highlight {
+            color: #ffc371;
+            font-weight: bold;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 30px 0;
+            font-size: 24px;
+        }
+        .comparison-table th, .comparison-table td {
+            padding: 20px;
+            text-align: left;
+            border: 2px solid #e94560;
+        }
+        .comparison-table th {
+            background: rgba(233, 69, 96, 0.3);
+            color: #ffc371;
+        }
+
+        .trait-box {
+            background: rgba(0, 206, 201, 0.1);
+            border: 2px solid #00cec9;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 15px 0;
+        }
+
+        .diagram {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            margin: 40px 0;
+        }
+        .box {
+            padding: 30px 50px;
+            border-radius: 15px;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .box-generic {
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+            color: white;
+        }
+        .box-trait {
+            background: linear-gradient(135deg, #00cec9, #74b9ff);
+            color: white;
+        }
+        .arrow {
+            font-size: 48px;
+            color: #ffc371;
+        }
+
+        .bullet-list {
+            list-style: none;
+            font-size: 28px;
+            line-height: 2;
+        }
+        .bullet-list li::before {
+            content: '🦀 ';
+        }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #e94560, #ffc371);
+            transition: width 0.3s;
+        }
+        .slide-number {
+            position: fixed;
+            bottom: 20px;
+            right: 40px;
+            font-size: 24px;
+            color: #e94560;
+        }
+        .nav-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 40px;
+            font-size: 18px;
+            color: #6b7280;
+        }
+
+        .ko { display: block; }
+        .en { display: none; }
+        body.lang-en .ko { display: none; }
+        body.lang-en .en { display: block; }
+
+        .center { text-align: center; }
+
+        .subtitle {
+            font-size: 32px;
+            color: #a8e6cf;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">EP 4-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="content center">
+            <h1>Generics & Traits</h1>
+            <p class="subtitle ko">제네릭과 트레이트: 추상화의 힘</p>
+            <p class="subtitle en">Generics & Traits: The Power of Abstraction</p>
+            <div class="diagram">
+                <div class="box box-generic">Generic&lt;T&gt;</div>
+                <div class="arrow">+</div>
+                <div class="box box-trait">Trait</div>
+                <div class="arrow">=</div>
+                <div class="box box-generic">Powerful Abstraction</div>
+            </div>
+            <p style="font-size: 28px; color: #6b7280; margin-top: 40px;">
+                <span class="ko">코드 재사용의 핵심 - 타입 안전성을 유지하면서 유연하게</span>
+                <span class="en">The core of code reuse - flexible while maintaining type safety</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Slide 2: Why Generics? -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Generics 기초</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">왜 제네릭이 필요한가?</h2>
+        <h2 class="en">Why Do We Need Generics?</h2>
+        <div class="content">
+            <div class="flex-container">
+                <div class="flex-item">
+                    <h3 style="color: #ff6b6b; margin-bottom: 20px;" class="ko">❌ 제네릭 없이</h3>
+                    <h3 style="color: #ff6b6b; margin-bottom: 20px;" class="en">❌ Without Generics</h3>
+                    <div class="code-block" style="font-size: 22px;">
+                        <div class="code-line" style="animation-delay: 0.1s"><span class="keyword">fn</span> <span class="function">largest_i32</span>(list: &amp;[<span class="type">i32</span>]) -> <span class="type">i32</span> {</div>
+                        <div class="code-line" style="animation-delay: 0.2s">    <span class="keyword">let mut</span> largest = list[<span class="number">0</span>];</div>
+                        <div class="code-line" style="animation-delay: 0.3s">    <span class="keyword">for</span> &amp;item <span class="keyword">in</span> list { ... }</div>
+                        <div class="code-line" style="animation-delay: 0.4s">}</div>
+                        <div class="code-line" style="animation-delay: 0.5s"></div>
+                        <div class="code-line" style="animation-delay: 0.6s"><span class="keyword">fn</span> <span class="function">largest_f64</span>(list: &amp;[<span class="type">f64</span>]) -> <span class="type">f64</span> {</div>
+                        <div class="code-line" style="animation-delay: 0.7s">    <span class="keyword">let mut</span> largest = list[<span class="number">0</span>];</div>
+                        <div class="code-line" style="animation-delay: 0.8s">    <span class="keyword">for</span> &amp;item <span class="keyword">in</span> list { ... }</div>
+                        <div class="code-line" style="animation-delay: 0.9s">}</div>
+                        <div class="code-line" style="animation-delay: 1.0s"><span class="comment">// 코드 중복! 😱</span></div>
+                    </div>
+                </div>
+                <div class="flex-item">
+                    <h3 style="color: #a8e6cf; margin-bottom: 20px;" class="ko">✅ 제네릭 사용</h3>
+                    <h3 style="color: #a8e6cf; margin-bottom: 20px;" class="en">✅ With Generics</h3>
+                    <div class="code-block" style="font-size: 22px;">
+                        <div class="code-line" style="animation-delay: 1.1s"><span class="keyword">fn</span> <span class="function">largest</span>&lt;<span class="type">T</span>: <span class="trait">PartialOrd</span>&gt;(</div>
+                        <div class="code-line" style="animation-delay: 1.2s">    list: &amp;[<span class="type">T</span>]</div>
+                        <div class="code-line" style="animation-delay: 1.3s">) -> &amp;<span class="type">T</span> {</div>
+                        <div class="code-line" style="animation-delay: 1.4s">    <span class="keyword">let mut</span> largest = &amp;list[<span class="number">0</span>];</div>
+                        <div class="code-line" style="animation-delay: 1.5s">    <span class="keyword">for</span> item <span class="keyword">in</span> list {</div>
+                        <div class="code-line" style="animation-delay: 1.6s">        <span class="keyword">if</span> item > largest { largest = item; }</div>
+                        <div class="code-line" style="animation-delay: 1.7s">    }</div>
+                        <div class="code-line" style="animation-delay: 1.8s">    largest</div>
+                        <div class="code-line" style="animation-delay: 1.9s">}</div>
+                        <div class="code-line" style="animation-delay: 2.0s"><span class="comment">// 모든 타입에 동작! ✨</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 3: Generic Syntax -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Generic 문법</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">제네릭 사용 위치</h2>
+        <h2 class="en">Where to Use Generics</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// 1. 함수에서</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="keyword">fn</span> <span class="function">swap</span>&lt;<span class="type">T</span>&gt;(a: <span class="type">T</span>, b: <span class="type">T</span>) -> (<span class="type">T</span>, <span class="type">T</span>) { (b, a) }</div>
+                <div class="code-line" style="animation-delay: 0.4s"></div>
+                <div class="code-line" style="animation-delay: 0.5s"><span class="comment">// 2. 구조체에서</span></div>
+                <div class="code-line" style="animation-delay: 0.6s"><span class="keyword">struct</span> <span class="type">Point</span>&lt;<span class="type">T</span>&gt; {</div>
+                <div class="code-line" style="animation-delay: 0.7s">    x: <span class="type">T</span>,</div>
+                <div class="code-line" style="animation-delay: 0.8s">    y: <span class="type">T</span>,</div>
+                <div class="code-line" style="animation-delay: 0.9s">}</div>
+                <div class="code-line" style="animation-delay: 1.1s"></div>
+                <div class="code-line" style="animation-delay: 1.2s"><span class="comment">// 3. Enum에서</span></div>
+                <div class="code-line" style="animation-delay: 1.3s"><span class="keyword">enum</span> <span class="type">Option</span>&lt;<span class="type">T</span>&gt; { <span class="type">Some</span>(<span class="type">T</span>), <span class="type">None</span> }</div>
+                <div class="code-line" style="animation-delay: 1.4s"><span class="keyword">enum</span> <span class="type">Result</span>&lt;<span class="type">T</span>, <span class="type">E</span>&gt; { <span class="type">Ok</span>(<span class="type">T</span>), <span class="type">Err</span>(<span class="type">E</span>) }</div>
+                <div class="code-line" style="animation-delay: 1.6s"></div>
+                <div class="code-line" style="animation-delay: 1.7s"><span class="comment">// 4. impl 블록에서</span></div>
+                <div class="code-line" style="animation-delay: 1.8s"><span class="keyword">impl</span>&lt;<span class="type">T</span>&gt; <span class="type">Point</span>&lt;<span class="type">T</span>&gt; {</div>
+                <div class="code-line" style="animation-delay: 1.9s">    <span class="keyword">fn</span> <span class="function">x</span>(&amp;<span class="keyword">self</span>) -> &amp;<span class="type">T</span> { &amp;<span class="keyword">self</span>.x }</div>
+                <div class="code-line" style="animation-delay: 2.0s">}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: What is a Trait? -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Trait 소개</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">트레이트란? - 공유된 행동 정의</h2>
+        <h2 class="en">What is a Trait? - Defining Shared Behavior</h2>
+        <div class="content">
+            <div class="concept-box">
+                <p style="font-size: 28px; line-height: 1.8;">
+                    <span class="ko">
+                        <span class="highlight">Trait</span>은 다른 언어의 Interface와 비슷합니다.<br>
+                        "이 타입이 할 수 있는 것"을 정의합니다.
+                    </span>
+                    <span class="en">
+                        <span class="highlight">Trait</span> is similar to Interface in other languages.<br>
+                        It defines "what this type can do".
+                    </span>
+                </p>
+            </div>
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// 트레이트 정의</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="keyword">trait</span> <span class="trait">Summary</span> {</div>
+                <div class="code-line" style="animation-delay: 0.3s">    <span class="keyword">fn</span> <span class="function">summarize</span>(&amp;<span class="keyword">self</span>) -> <span class="type">String</span>;</div>
+                <div class="code-line" style="animation-delay: 0.4s">}</div>
+                <div class="code-line" style="animation-delay: 0.6s"></div>
+                <div class="code-line" style="animation-delay: 0.7s"><span class="comment">// 트레이트 구현</span></div>
+                <div class="code-line" style="animation-delay: 0.8s"><span class="keyword">struct</span> <span class="type">Article</span> { title: <span class="type">String</span>, author: <span class="type">String</span> }</div>
+                <div class="code-line" style="animation-delay: 1.0s"></div>
+                <div class="code-line" style="animation-delay: 1.1s"><span class="keyword">impl</span> <span class="trait">Summary</span> <span class="keyword">for</span> <span class="type">Article</span> {</div>
+                <div class="code-line" style="animation-delay: 1.2s">    <span class="keyword">fn</span> <span class="function">summarize</span>(&amp;<span class="keyword">self</span>) -> <span class="type">String</span> {</div>
+                <div class="code-line" style="animation-delay: 1.3s">        <span class="macro">format!</span>(<span class="string">"{} by {}"</span>, <span class="keyword">self</span>.title, <span class="keyword">self</span>.author)</div>
+                <div class="code-line" style="animation-delay: 1.4s">    }</div>
+                <div class="code-line" style="animation-delay: 1.5s">}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 5: Trait Bounds -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Trait Bounds</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">트레이트 바운드 - 제네릭 제한하기</h2>
+        <h2 class="en">Trait Bounds - Constraining Generics</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// 방법 1: 콜론 문법</span></div>
+                <div class="code-line" style="animation-delay: 0.2s"><span class="keyword">fn</span> <span class="function">notify</span>&lt;<span class="type">T</span>: <span class="trait">Summary</span>&gt;(item: &amp;<span class="type">T</span>) {</div>
+                <div class="code-line" style="animation-delay: 0.3s">    <span class="macro">println!</span>(<span class="string">"속보! {}"</span>, item.<span class="function">summarize</span>());</div>
+                <div class="code-line" style="animation-delay: 0.4s">}</div>
+                <div class="code-line" style="animation-delay: 0.6s"></div>
+                <div class="code-line" style="animation-delay: 0.7s"><span class="comment">// 방법 2: impl Trait (간단한 경우)</span></div>
+                <div class="code-line" style="animation-delay: 0.8s"><span class="keyword">fn</span> <span class="function">notify</span>(item: &amp;<span class="keyword">impl</span> <span class="trait">Summary</span>) {</div>
+                <div class="code-line" style="animation-delay: 0.9s">    <span class="macro">println!</span>(<span class="string">"속보! {}"</span>, item.<span class="function">summarize</span>());</div>
+                <div class="code-line" style="animation-delay: 1.0s">}</div>
+                <div class="code-line" style="animation-delay: 1.2s"></div>
+                <div class="code-line" style="animation-delay: 1.3s"><span class="comment">// 방법 3: where 절 (복잡한 경우)</span></div>
+                <div class="code-line" style="animation-delay: 1.4s"><span class="keyword">fn</span> <span class="function">complex</span>&lt;<span class="type">T</span>, <span class="type">U</span>&gt;(t: &amp;<span class="type">T</span>, u: &amp;<span class="type">U</span>)</div>
+                <div class="code-line" style="animation-delay: 1.5s"><span class="keyword">where</span></div>
+                <div class="code-line" style="animation-delay: 1.6s">    <span class="type">T</span>: <span class="trait">Summary</span> + <span class="trait">Clone</span>,</div>
+                <div class="code-line" style="animation-delay: 1.7s">    <span class="type">U</span>: <span class="trait">Debug</span> + <span class="trait">PartialOrd</span>,</div>
+                <div class="code-line" style="animation-delay: 1.8s">{ <span class="comment">/* ... */</span> }</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 6: Common Traits -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">자주 쓰는 Trait</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">자주 사용하는 표준 트레이트</h2>
+        <h2 class="en">Commonly Used Standard Traits</h2>
+        <div class="content">
+            <table class="comparison-table">
+                <tr>
+                    <th>Trait</th>
+                    <th class="ko">용도</th>
+                    <th class="en">Purpose</th>
+                    <th class="ko">예시</th>
+                    <th class="en">Example</th>
+                </tr>
+                <tr>
+                    <td><span class="trait">Debug</span></td>
+                    <td class="ko">디버그 출력 {:?}</td>
+                    <td class="en">Debug formatting {:?}</td>
+                    <td><code>#[derive(Debug)]</code></td>
+                </tr>
+                <tr>
+                    <td><span class="trait">Clone</span></td>
+                    <td class="ko">명시적 복사</td>
+                    <td class="en">Explicit cloning</td>
+                    <td><code>value.clone()</code></td>
+                </tr>
+                <tr>
+                    <td><span class="trait">Copy</span></td>
+                    <td class="ko">암시적 복사 (스택 타입)</td>
+                    <td class="en">Implicit copy (stack types)</td>
+                    <td><code>#[derive(Copy, Clone)]</code></td>
+                </tr>
+                <tr>
+                    <td><span class="trait">PartialEq</span></td>
+                    <td class="ko">== 비교</td>
+                    <td class="en">== comparison</td>
+                    <td><code>a == b</code></td>
+                </tr>
+                <tr>
+                    <td><span class="trait">Default</span></td>
+                    <td class="ko">기본값 생성</td>
+                    <td class="en">Default value creation</td>
+                    <td><code>T::default()</code></td>
+                </tr>
+                <tr>
+                    <td><span class="trait">Display</span></td>
+                    <td class="ko">사용자 출력 {}</td>
+                    <td class="en">User-facing formatting {}</td>
+                    <td><code>impl Display for T</code></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Slide 7: Derive Macros -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">Derive</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">자동 구현: #[derive(...)]</h2>
+        <h2 class="en">Automatic Implementation: #[derive(...)]</h2>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line" style="animation-delay: 0.1s"><span class="comment">// 컴파일러가 자동으로 트레이트 구현 생성!</span></div>
+                <div class="code-line" style="animation-delay: 0.3s"><span class="macro">#[derive(Debug, Clone, PartialEq, Default)]</span></div>
+                <div class="code-line" style="animation-delay: 0.4s"><span class="keyword">struct</span> <span class="type">User</span> {</div>
+                <div class="code-line" style="animation-delay: 0.5s">    name: <span class="type">String</span>,</div>
+                <div class="code-line" style="animation-delay: 0.6s">    age: <span class="type">u32</span>,</div>
+                <div class="code-line" style="animation-delay: 0.7s">    active: <span class="type">bool</span>,</div>
+                <div class="code-line" style="animation-delay: 0.8s">}</div>
+                <div class="code-line" style="animation-delay: 1.0s"></div>
+                <div class="code-line" style="animation-delay: 1.1s"><span class="keyword">fn</span> <span class="function">main</span>() {</div>
+                <div class="code-line" style="animation-delay: 1.2s">    <span class="keyword">let</span> user = <span class="type">User</span>::<span class="function">default</span>();  <span class="comment">// Default</span></div>
+                <div class="code-line" style="animation-delay: 1.3s">    <span class="macro">println!</span>(<span class="string">"{:?}"</span>, user);      <span class="comment">// Debug</span></div>
+                <div class="code-line" style="animation-delay: 1.4s">    <span class="keyword">let</span> copy = user.<span class="function">clone</span>();    <span class="comment">// Clone</span></div>
+                <div class="code-line" style="animation-delay: 1.5s">    <span class="macro">assert!</span>(user == copy);       <span class="comment">// PartialEq</span></div>
+                <div class="code-line" style="animation-delay: 1.6s">}</div>
+            </div>
+            <div class="concept-box" style="margin-top: 30px;">
+                <p style="font-size: 24px;">
+                    <span class="ko">💡 <span class="highlight">derive</span>는 보일러플레이트를 없애줍니다. 하지만 모든 필드가 해당 트레이트를 구현해야 합니다!</span>
+                    <span class="en">💡 <span class="highlight">derive</span> eliminates boilerplate. But all fields must implement the trait!</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="logo">🦀 Rust NRT Academy</div>
+            <div class="episode-tag">정리</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h2 class="ko">EP 4-01 요약</h2>
+        <h2 class="en">EP 4-01 Summary</h2>
+        <div class="content">
+            <div class="flex-container">
+                <div class="flex-item">
+                    <div class="trait-box">
+                        <h3 style="color: #00cec9; margin-bottom: 20px;">Generics &lt;T&gt;</h3>
+                        <ul class="bullet-list" style="font-size: 22px;">
+                            <li class="ko">코드 중복 제거</li>
+                            <li class="en">Eliminate code duplication</li>
+                            <li class="ko">타입 안전성 유지</li>
+                            <li class="en">Maintain type safety</li>
+                            <li class="ko">컴파일 타임에 모노모픽화</li>
+                            <li class="en">Monomorphized at compile time</li>
+                            <li class="ko">런타임 비용 없음!</li>
+                            <li class="en">Zero runtime cost!</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex-item">
+                    <div class="concept-box">
+                        <h3 style="color: #e94560; margin-bottom: 20px;">Traits</h3>
+                        <ul class="bullet-list" style="font-size: 22px;">
+                            <li class="ko">공유 동작 정의</li>
+                            <li class="en">Define shared behavior</li>
+                            <li class="ko">제네릭 제약 (bounds)</li>
+                            <li class="en">Constrain generics (bounds)</li>
+                            <li class="ko">#[derive] 로 자동 구현</li>
+                            <li class="en">Auto-implement with #[derive]</li>
+                            <li class="ko">다형성의 핵심!</li>
+                            <li class="en">Core of polymorphism!</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 50px;">
+                <p style="font-size: 32px; color: #ffc371;">
+                    <span class="ko">다음 시간: 클로저 (Closures) 🚀</span>
+                    <span class="en">Next: Closures 🚀</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="progress-bar" id="progress"></div>
+    <div class="slide-number" id="slideNum">1 / 8</div>
+    <div class="nav-hint">← → 키 또는 클릭으로 이동 | Space: 재생</div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+
+        function showSlide(n) {
+            if (n < 1) n = 1;
+            if (n > totalSlides) n = totalSlides;
+
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+
+            document.getElementById('progress').style.width = (n / totalSlides * 100) + '%';
+            document.getElementById('slideNum').textContent = n + ' / ' + totalSlides;
+
+            animateSlide();
+        }
+
+        function nextSlide() { showSlide(currentSlide + 1); }
+        function prevSlide() { showSlide(currentSlide - 1); }
+
+        function animateSlide() {
+            const slide = document.getElementById('slide' + currentSlide);
+            const lines = slide.querySelectorAll('.code-line');
+            lines.forEach((line, i) => {
+                line.style.animation = 'none';
+                line.offsetHeight;
+                line.style.animation = `slideIn 0.5s ${i * 0.1}s forwards`;
+            });
+        }
+
+        function setLang(lang) {
+            document.body.classList.remove('lang-en');
+            if (lang === 'en') document.body.classList.add('lang-en');
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.includes(lang === 'ko' ? '한국어' : 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                if (e.clientX > window.innerWidth / 2) nextSlide();
+                else prevSlide();
+            }
+        });
+
+        showSlide(1);
+    </script>
+</body>
+</html>

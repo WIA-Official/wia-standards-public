@@ -349,16 +349,94 @@ Certificate Validation: CN must match sensorId
 
 ---
 
-<div align="center">
+---
 
-**WIA Urban Forest Creation Protocol v1.0.0**
+## 7. Federation handshake per WIA-INTENT
 
-**弘益人間 (홍익인간)** - Benefit All Humanity
+Hosts that federate with peer urban-forest hosts SHOULD complete a
+challenge-response handshake before exchanging any per-tenant
+envelope. The handshake follows the WIA Standards canonical
+federation pattern: (1) the initiating host publishes a
+capabilities document at `/.well-known/wia-urban-forest-capabilities`;
+(2) the responder fetches the capabilities document, validates the
+host certificate against the operator's trust list per WIA-AIR-SHIELD,
+and records the per-host fingerprint; (3) the initiator presents a
+signed `federation-intent` envelope per WIA-INTENT §3 carrying
+the operator's tenant identifier, the requested operation class
+(read · write · subscribe), and the per-operation scope limit
+(e.g., a per-bbox geofence so a federated request cannot pull
+the full per-host inventory); (4) the responder replies with a
+signed `federation-grant` envelope containing the granted scope,
+the granted retention window, and the per-grant audit hook;
+(5) every subsequent envelope crossing the federation boundary
+references the per-grant identifier so the responder can revoke
+a single grant without rotating the host certificate.
+
+## 8. Audit transport across federation
+
+Federation envelopes carry a W3C Trace Context `traceparent`
+header propagated end-to-end so the audit transport can reconstruct
+a single operation across both hosts. Each host emits a structured
+audit record at the host's audit transport per Phase 2 §11 with
+`wia.federation.peer` carrying the responder's host fingerprint
+and `wia.federation.grant_id` carrying the per-grant identifier.
+Investigators reconstructing a federation crossing follow the
+trace identifier from the initiator's audit transport into the
+responder's audit transport without out-of-band coordination.
+
+## 9. Continuity-of-operations envelope
+
+Hosts running this Phase publish a continuity-of-operations
+envelope per ISO 22301:2019 + ISO/IEC 27031 + NIST SP 800-34
+Rev 1 covering: per-host RTO (Recovery Time Objective) per the
+operator's business-impact analysis; per-host RPO (Recovery
+Point Objective) tied to the host's audit-stream replication
+policy; per-host backup envelope (per-region cross-replicated
+immutable backup with the per-tier retention envelope per the
+per-jurisdiction record-retention policy); per-host failover-
+rehearsal envelope (typically quarterly per the operator's BC/DR
+program); per-host vendor-exit envelope so the operator can
+migrate the host to an alternate implementation without losing
+audit-trail continuity. The DR envelope composes with WIA Secure
+Enclave for sealed-backup envelopes and with WIA-AIR-SHIELD for
+runtime trust-list re-hydration on the failover instance.
+
+## 10. Supply-chain envelope per SLSA
+
+Every host implementation publishes a software-bill-of-materials
+(SBOM) per the operator's chosen specification: SPDX 2.3 / 3.0 per
+ISO/IEC 5962 + Linux Foundation SPDX, or CycloneDX 1.6 per OWASP
+Foundation. The SBOM enumerates every direct + transitive
+dependency with the per-component name + version + licence +
+supplier + per-component hash + per-component PURL (Package URL
+per package-url spec) + per-component CPE (Common Platform
+Enumeration per NIST). Supply-chain attestation follows in-toto
+per CNCF in-toto + SLSA (Supply-chain Levels for Software
+Artifacts) per OpenSSF SLSA Framework — typically targeting
+SLSA Level 3 for hosted production deployments. The SBOM ships
+alongside the host's release artefact so downstream consumers
+can verify the per-release supply chain before adoption.
+
+弘益人間 — Benefit All Humanity.
 
 ---
 
-**© 2025 WIA**
+## 11. Privacy envelope across federation
 
-**MIT License**
+Federation grants that allow a peer host to subscribe to citizen-
+contributed data (e.g., crowd-sourced tree photographs per the
+per-host citizen-science envelope) MUST honour the operator's
+per-jurisdiction privacy law and MUST carry a per-grant data-
+processing agreement (DPA) reference per GDPR Art 28 + Art 46
+SCC envelope. Hosts that cannot present a valid DPA reference
+for the requested operation class MUST decline the grant with a
+`federation-grant-denied` envelope citing `dpa_required`. Subject-
+rights endpoints (access, rectification, erasure, portability,
+restriction, objection) flow through the host that originally
+collected the data and MUST cascade across grants per the per-
+DPA processing-chain envelope. Erasure cascades follow the per-
+host audit-stream replication policy so that an erasure request
+honoured at the originating host is provably honoured at every
+peer host that received the per-grant subscription.
 
-</div>
+弘益人間 — Benefit All Humanity.

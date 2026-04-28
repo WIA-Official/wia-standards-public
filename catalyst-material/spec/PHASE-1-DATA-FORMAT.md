@@ -5,237 +5,436 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-catalyst-material (Catalyst Material).
+This document defines the canonical data-format layer
+for WIA-catalyst-material. The standard covers the
+persistent record shapes that a catalyst-research
+laboratory, a reference-material producer, an
+industrial-catalyst manufacturer, a process-licensor's
+qualification team, or a regulatory-conformity body
+maintains when registering a catalyst, recording its
+physico-chemical characterisation, declaring its
+kinetic and selectivity performance, attesting its
+status as a certified reference material, tracking its
+deactivation across an industrial campaign, and
+participating in inter-laboratory comparison rounds.
+Records are consumed by the catalyst supplier's
+qualification team, by the licensee operating the
+catalyst in a production unit, by the certification
+body issuing the ISO 17034 reference-material
+attestation, by the testing laboratory accredited under
+ISO/IEC 17025, by the customs authority enforcing the
+REACH and CLP labelling discipline, and — where the
+catalyst handles a precious metal or a regulated
+substance — by the supervisory authority that audits
+the chain-of-custody record.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IUPAC Recommendations 2007 — "Manual of Methods and
+  Procedures for Catalyst Characterization" (Pure and
+  Applied Chemistry, normative for the characterisation
+  vocabulary used in this PHASE)
+- IUPAC Compendium of Chemical Terminology (the
+  "Gold Book") — the normative source for the
+  catalysis-specific terms (catalyst, catalysis,
+  turnover frequency, active site, selectivity,
+  inhibitor, promoter, support) cited in §3 and §5
+- IUPAC Quantities, Units, and Symbols in Physical
+  Chemistry (the "Green Book") — the normative
+  source for SI units, kinetic-parameter symbols, and
+  thermodynamic-quantity symbols used in §5 and §6
+- IUPAC Recommendations on Catalysis Nomenclature
+  (Pure Appl. Chem. 73, 2001, 1227–1241) — the
+  normative source for the catalyst-classification
+  taxonomy used in §2 (homogeneous, heterogeneous,
+  enzymatic, biomimetic, photocatalytic,
+  electrocatalytic)
+- ISO 17034:2016 (general requirements for the
+  competence of reference-material producers)
+- ISO/IEC 17025:2017 (general requirements for the
+  competence of testing and calibration laboratories)
+- ISO Guide 30:2015, ISO Guide 31:2015, ISO Guide 33:
+  2015, ISO Guide 35:2017 (reference-material
+  vocabulary, certificate content, characterisation
+  approaches, and uncertainty estimation)
+- ISO 5725-1:2023 / 5725-2:2019 / 5725-3:2023 /
+  5725-4:2020 / 5725-6:1994 (accuracy and precision
+  of measurement methods and results — repeatability,
+  reproducibility, intermediate precision, and
+  practical application of accuracy values)
+- ISO 9277:2022 (specific surface area determination
+  of solids by gas adsorption — the BET method)
+- ISO 13322-1:2014 / 13322-2:2021 (particle-size
+  analysis — image-analysis methods, static and
+  dynamic)
+- ISO 15901-1:2016 / 15901-2:2022 / 15901-3:2007
+  (mercury porosimetry and gas-adsorption pore-size
+  distribution)
+- ISO 18757:2003 (fine ceramics — determination of
+  specific surface area by BET)
+- ASTM D3663-20 (standard test method for surface
+  area of catalysts and catalyst carriers)
+- ASTM D4222-20 (standard test method for
+  determination of nitrogen adsorption and desorption
+  isotherms of catalysts)
+- ASTM D4567-19 (single-point determination of
+  surface area of catalysts and catalyst carriers)
+- ASTM D4641-17 (calculation of pore-size distribution
+  of catalysts and catalyst carriers from nitrogen
+  desorption isotherms)
+- ASTM D4824-13 (determination of catalyst acidity by
+  ammonia chemisorption)
+- IETF RFC 8259 (JSON) and RFC 4122 (UUID)
+- ISO 8601 (date and time representation)
+- ISO/IEC 27001:2022 (information-security management
+  — used for the chain-of-custody record discipline
+  in §8)
+- EU REACH Regulation (EC) No 1907/2006 (chemical-
+  substance registration; cited where the catalyst
+  contains a registered substance) and EU CLP
+  Regulation (EC) No 1272/2008 (GHS classification
+  and labelling)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-catalyst-material
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts
+exchanged when a catalyst is registered, characterised,
+qualified, and tracked across an industrial-campaign
+boundary. Implementations covered include:
 
-## §2 Manifest
+- Single-laboratory catalyst-development teams
+  exchanging characterisation results with a
+  manufacturing scale-up partner.
+- Multi-site catalyst manufacturers operating a
+  qualification batch register that links the
+  laboratory record to the production-batch record.
+- Reference-material producers operating under ISO
+  17034 issuing a certified reference material (CRM)
+  for catalyst characterisation cross-comparison.
+- Process licensors operating a catalyst-performance
+  qualification register linked to the licensee's
+  production-unit telemetry.
+- Inter-laboratory comparison organisers running
+  proficiency-testing rounds against an ISO 5725
+  precision-protocol design.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "catalyst-material"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The reference-material certificate, the laboratory
+test report, and the manufacturer's qualification
+record receive identical encoding in this PHASE; the
+additional safeguards required by the ISO 17034 RM
+producer audit, by the ISO/IEC 17025 laboratory
+accreditation audit, and by the REACH / CLP
+substance-registration audit are encoded in PHASE-3
+§5.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name of the
+                       operator — research laboratory,
+                       reference-material producer,
+                       manufacturer, process licensor,
+                       or proficiency-testing organiser)
+operatorRole         : enum ("research-laboratory" |
+                       "reference-material-producer" |
+                       "manufacturer-qualification" |
+                       "process-licensor" |
+                       "proficiency-testing-organiser" |
+                       "accredited-testing-laboratory" |
+                       "user-defined")
+accreditationStatus  : object (ISO 17034 RM-producer
+                       accreditation reference and / or
+                       ISO/IEC 17025 testing-laboratory
+                       accreditation reference; each
+                       carrying the issuing accreditation
+                       body, the scope of the
+                       accreditation, and the certificate
+                       number)
+governingFrameworks  : array of enum ("IUPAC-CATAL-
+                       NOMENCLATURE-2001" |
+                       "IUPAC-CHARACTERIZATION-2007" |
+                       "ISO-17034" | "ISO-17025" |
+                       "ISO-5725" | "ISO-9277" |
+                       "ISO-13322" | "ASTM-D3663" |
+                       "ASTM-D4222" | "ASTM-D4824" |
+                       "EU-REACH" | "EU-CLP" |
+                       "user-defined")
+programmeStatus      : enum ("design" | "operating" |
+                       "limited-rollout" | "wind-down"
+                       | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+The combination of `accreditationStatus` and
+`governingFrameworks` records the operator's
+qualification baseline. Implementations that publish
+a reference-material certificate declare both the ISO
+17034 accreditation reference and the ISO 5725
+characterisation-design reference so that PHASE-3 §3
+(certificate-issuance discipline) can derive the
+applicable assigned-value-and-uncertainty mechanism.
 
-## §4 Discovery
+## §3 Catalyst Material Record
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/catalyst-material`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The catalyst material record aligns with the IUPAC
+2007 characterisation-manual taxonomy:
 
-## §5 Time and Identity
+```
+catalystRecord:
+  catalystId         : string (uuidv7; the operator's
+                       internal catalyst identifier)
+  identifierBindings : array of object (per-
+                       jurisdiction substance
+                       identifiers — for example the
+                       EU REACH registration number,
+                       the CAS Registry Number, the
+                       EC inventory number, the IUPAC
+                       systematic name — each carrying
+                       the issuing authority and the
+                       scope of use)
+  catalystClass      : enum ("homogeneous" |
+                       "heterogeneous" | "enzymatic" |
+                       "biomimetic" | "photocatalytic" |
+                       "electrocatalytic" | "user-
+                       defined")
+  composition        : object (active-component
+                       composition expressed as mass-
+                       fraction or mole-fraction with
+                       the IUPAC stoichiometric formula
+                       for each component, the support
+                       material identification with the
+                       IUPAC inorganic-nomenclature
+                       string, and the promoter set
+                       with per-promoter mass-fraction)
+  preparationMethod  : enum ("incipient-wetness-
+                       impregnation" |
+                       "co-precipitation" |
+                       "sol-gel" | "deposition-
+                       precipitation" | "hydrothermal" |
+                       "flame-spray-pyrolysis" |
+                       "atomic-layer-deposition" |
+                       "user-defined")
+  pretreatment       : object (calcination temperature,
+                       calcination atmosphere, reduction
+                       temperature, reduction
+                       atmosphere — each value
+                       qualified by the IUPAC Green-
+                       Book quantity-and-unit symbol)
+  hazardLabelling    : object (CLP Regulation hazard-
+                       class assignments and signal-
+                       word — recorded where any
+                       component triggers a CLP
+                       classification)
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Characterisation Record
 
-## §6 Versioning and Deprecation
+The characterisation record carries the per-technique
+measurement set defined by the IUPAC 2007 manual:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+characterisationRecord:
+  characterisationId : string (uuidv7)
+  catalystRef        : string (PHASE-1 §3 record
+                       reference)
+  technique          : enum ("BET-N2-77K" | "BET-Ar-
+                       87K" | "Hg-porosimetry" |
+                       "XRD-powder" | "XRD-Rietveld" |
+                       "TEM-bright-field" | "HAADF-
+                       STEM" | "SEM-secondary-
+                       electron" | "EDS-mapping" |
+                       "XPS-survey" | "XPS-high-
+                       resolution" | "TPR-H2" |
+                       "TPD-NH3" | "TPD-CO2" |
+                       "TPO-O2" | "DRIFTS-pyridine" |
+                       "DRIFTS-CO" | "FT-IR-CO" |
+                       "in-situ-XAS-XANES" | "in-
+                       situ-XAS-EXAFS" | "user-
+                       defined")
+  instrument         : object (manufacturer + model +
+                       configuration; the Trigno-style
+                       manufacturer-model identification
+                       per CITATION-POLICY §2.1
+                       "tools and products of public
+                       sale")
+  testStandard       : enum ("ISO-9277" | "ISO-15901-
+                       1" | "ISO-15901-2" | "ISO-
+                       15901-3" | "ASTM-D3663" |
+                       "ASTM-D4222" | "ASTM-D4567" |
+                       "ASTM-D4641" | "ASTM-D4824" |
+                       "user-defined")
+  rawData            : string (URI of the raw-data
+                       file — the Sigstore-anchored
+                       attestation of the raw data
+                       hash is in PHASE-3 §6)
+  derivedMetrics     : object (per-technique derived
+                       quantities — BET specific
+                       surface area in m^2 / g, BJH
+                       pore-size-distribution mean and
+                       standard deviation in nm, XRD
+                       crystallite size by Scherrer
+                       in nm, TEM particle-size mean
+                       and standard deviation in nm,
+                       NH3-TPD acid-site density in
+                       µmol / g, H2-TPR consumption
+                       integrated peak in µmol / g)
+  uncertaintyBudget  : object (the ISO 5725
+                       repeatability and reproducibility
+                       components, expressed at the
+                       ISO Guide 35 confidence level
+                       declared in §6)
+```
 
-## §7 Privacy and Security
+## §5 Performance Record
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The performance record carries the kinetic-and-
+selectivity data set defined by the IUPAC Green-Book
+symbols:
 
-## §8 Open Governance
+```
+performanceRecord:
+  performanceId      : string (uuidv7)
+  catalystRef        : string (PHASE-1 §3 record
+                       reference)
+  reactionDescriptor : object (IUPAC reaction-name +
+                       balanced equation + reactant
+                       and product CAS Registry
+                       Numbers)
+  testRig            : enum ("fixed-bed-tubular" |
+                       "CSTR-stirred-tank" |
+                       "rotating-basket" | "fluidised-
+                       bed" | "trickle-bed" | "user-
+                       defined")
+  operatingPoint     : object (temperature in K,
+                       pressure in Pa, mass-hourly
+                       space velocity in 1 / h or gas
+                       hourly space velocity in
+                       1 / h, contact time in s, feed
+                       composition in mole-fraction
+                       per IUPAC Green-Book §2)
+  performanceMetrics : object (conversion in mole-
+                       fraction, selectivity in mole-
+                       fraction per product, yield in
+                       mole-fraction, turnover
+                       frequency in 1 / s per IUPAC
+                       Gold-Book "turnover frequency"
+                       definition, apparent activation
+                       energy in kJ / mol from
+                       Arrhenius regression, time-on-
+                       stream stability in h)
+  deactivationCurve  : array of object (per-time-on-
+                       stream conversion-and-
+                       selectivity sample with the
+                       sample timestamp in ISO 8601)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `catalyst-material` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Reference-Material Certificate
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+The reference-material certificate aligns with the
+ISO 17034 / ISO Guide 31 mandatory-content list:
 
+```
+crmCertificate:
+  certificateId      : string (uuidv7)
+  catalystRef        : string (PHASE-1 §3 record
+                       reference)
+  rmType             : enum ("certified-reference-
+                       material" | "reference-
+                       material" | "in-house-
+                       reference" | "user-defined")
+  assignedValues     : array of object (per-property
+                       assigned value with the
+                       expanded uncertainty at k=2
+                       per ISO Guide 35 and the
+                       coverage factor declaration)
+  characterisationDesign : enum ("ISO-Guide-35-§5-
+                       single-laboratory" |
+                       "ISO-Guide-35-§6-inter-
+                       laboratory" | "ISO-Guide-35-
+                       §7-batch-certification" |
+                       "user-defined")
+  homogeneityStudy   : object (ISO Guide 35 §8
+                       between-bottle and within-
+                       bottle component estimates)
+  stabilityStudy     : object (ISO Guide 35 §9 short-
+                       term and long-term stability
+                       components, each with the
+                       monitoring interval and the
+                       certificate's expiry date)
+  intendedUse        : string (the ISO Guide 31 §3
+                       intended-use declaration that
+                       binds the certificate to the
+                       characterisation technique
+                       declared in §4)
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+## §7 Inter-Laboratory Comparison Record
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```
+ilcRecord:
+  comparisonId       : string (uuidv7)
+  comparisonScheme   : enum ("ISO-5725-design" |
+                       "ISO-13528-PT" | "user-
+                       defined")
+  participantSet     : array of object (each
+                       participant carrying the
+                       accreditation reference and
+                       the per-participant blinded
+                       result)
+  assignedReference  : string (PHASE-1 §6 certificate
+                       reference, where the round
+                       uses a CRM as reference;
+                       otherwise the consensus
+                       statistic per ISO 13528 §7)
+  precisionEstimates : object (ISO 5725-2 repeatability
+                       and reproducibility standard
+                       deviations with the per-
+                       laboratory contribution)
+  outlierTreatment   : enum ("ISO-5725-2-§7-Cochran-
+                       Grubbs" | "ISO-13528-§9-
+                       robust-Z" | "user-defined")
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Chain-of-Custody Record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+custodyRecord:
+  custodyId          : string (uuidv7)
+  catalystRef        : string (PHASE-1 §3 record
+                       reference)
+  custodyEvent       : enum ("synthesis" |
+                       "calcination" | "reduction-
+                       activation" | "loading-into-
+                       reactor" | "discharge-from-
+                       reactor" | "regeneration" |
+                       "disposal" | "user-defined")
+  eventTimestamp     : string (ISO 8601 date-time)
+  performingParty    : string (the legal entity that
+                       executed the event)
+  observerParty      : string (the auditor, customs
+                       authority, or accreditation-
+                       body witness present at the
+                       event, where applicable)
+  hashOfArtefacts    : string (SHA-256 hex digest of
+                       the bundled raw-data and
+                       certificate artefacts at the
+                       moment of the event;
+                       PHASE-3 §6 anchors this digest
+                       to a Sigstore Rekor entry)
+```
 
-## Annex F — Adoption Roadmap
+## §9 Manifest
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations publish a signed manifest containing
+`standardSlug` (constant value "catalyst-material"),
+`version` (Semantic Versioning 2.0.0),
+`implementation` (legal name + build digest + SBOM
+URL), `accreditationStatus` (the §2 record), and the
+`profile` declaration that selects which of the
+optional records (CRM certificate, ILC record) the
+implementation supports. The manifest is signed using
+a key whose public part is published on the
+operator's `.well-known/wia/catalyst-material/`
+discovery endpoint declared in PHASE-2.

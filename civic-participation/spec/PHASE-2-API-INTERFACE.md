@@ -5,237 +5,413 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-civic-participation (Civic Participation).
+This document defines the HTTPS API contract that
+a public-administration body operating a citizen-
+engagement platform exposes for the records
+defined in PHASE-1. The contract carries the
+consultation publication, citizen-submission
+ingestion, deliberation record publication,
+outcome announcement, engagement-KPI publication,
+and chain-of-custody anchoring endpoints. The
+API is the canonical interoperability layer
+between the operator's platform, the citizen
+client, the elected representative's analysis
+workspace, the transparency observer's audit
+client, and the smart-city KPI dashboard.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics), RFC 9111 (HTTP
+  Caching), RFC 9457 (Problem Details for HTTP
+  APIs), RFC 8288 (Web Linking), RFC 6901 / 6902
+  (JSON Pointer / Patch), RFC 8259 (JSON), RFC
+  4122 (UUID), RFC 9421 (HTTP Message Signatures),
+  RFC 8615 (well-known URIs)
+- W3C Trace Context, W3C Data Catalog Vocabulary
+  (DCAT) v3, W3C Open Digital Rights Language
+  (ODRL) 2.2 Information Model and Vocabulary
+- W3C Decentralised Identifiers (DIDs) v1.0 and
+  W3C Verifiable Credentials Data Model v2.0
+- ISO/IEC 27001:2022 (information-security
+  management)
+- ITU-T Y.4900/L.1600 (smart sustainable cities
+  KPI overview)
+- ISO 37120:2018, ISO 37122:2019, ISO 37123:2019
+- ISO 18091:2019 (local government QMS)
+- OECD Recommendation of the Council on Open
+  Government (OECD/LEGAL/0438)
+- UN DESA E-Government Survey
+- World Bank GovTech Maturity Index
+- EU Single Digital Gateway Regulation (EU)
+  2018/1724 and EU Interoperable Europe Act
+  Regulation (EU) 2024/903 (cited where the
+  operator participates in the SDG or the
+  Interoperable Europe Portal)
+- EU GDPR (Regulation (EU) 2016/679) Articles
+  6 / 9 / 12-22 (the processing-basis envelope
+  carried by the submission endpoint)
+- KR 행정기본법 / KR 정보공개법
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-civic-participation
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by
+the operator. The OpenAPI 3.1 document at
+`/v1/openapi.json` is canonical for the WIA
+endpoints declared in this PHASE. Schema changes
+follow the non-breaking conventions in PHASE-1
+§2 (additive fields, additive enum values).
+Every endpoint carries a per-request signature
+using HTTP Message Signatures (RFC 9421)
+anchored to the operator's e-government
+identifier (the SDG operator identifier where
+the operator participates in the EU Single
+Digital Gateway, the operator's national
+government registry identifier otherwise); the
+signature key set is published at
+`/.well-known/wia/civic-participation/keys.json`.
 
-## §2 Manifest
+## §2 Root Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "civic-participation"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /v1/
+```
 
-## §3 Conformance Tiers
+```json
+{
+  "standard": "WIA-civic-participation",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":         "/v1/programmes",
+    "consultations":      "/v1/consultations",
+    "submissions":        "/v1/submissions",
+    "deliberations":      "/v1/deliberations",
+    "outcomes":           "/v1/outcomes",
+    "kpiRecords":         "/v1/kpi-records",
+    "custody":            "/v1/custody-events",
+    "openapi":            "/v1/openapi.json",
+    "wellKnown":          "/.well-known/wia/civic-participation"
+  }
+}
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Consultation Endpoints
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+### §3.1 Publish a consultation
 
-## §4 Discovery
+```
+POST /v1/consultations
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/civic-participation`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Request body carries the §3 record from PHASE-1
+(consultationType, engagementLadder, subject,
+rightsExpression, openingDate, closingDate,
+responseSchedule, jurisdictionalScope). The
+server validates the `engagementLadder` against
+the `consultationType`: a `binding-referendum`
+consultation MUST declare an `engagementLadder`
+of `empower`, while an `e-petition` consultation
+MUST declare `inform` or `consult` per the
+operator's published petition rules. A mismatch
+returns `422 Unprocessable Entity` with an RFC
+9457 problem document at `/problems/oecd-
+engagement-ladder-mismatch` and the offending
+field expressed as a JSON Pointer (RFC 6901).
 
-## §5 Time and Identity
+The `rightsExpression` is parsed as a W3C ODRL
+2.2 policy and validated against the operator's
+ODRL profile published in the discovery
+endpoint.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+### §3.2 Retrieve a consultation
 
-## §6 Versioning and Deprecation
+```
+GET /v1/consultations/{consultationId}
+Accept: application/json
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The response carries the consultation envelope
+together with a `Link` header (RFC 8288)
+pointing at the submissions, deliberations, and
+outcomes already published.
 
-## §7 Privacy and Security
+### §3.3 Search consultations
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+GET /v1/consultations?type={type}
+&jurisdictionalScope={scope}&openBetween={iso8601}/{iso8601}
+&engagementLadder={ladder}
+&page={cursor}&size={size}
+```
 
-## §8 Open Governance
+The response is an RFC 8288 `Link`-paginated
+collection.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `civic-participation` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §4 Submission Endpoints
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+### §4.1 Submit a citizen contribution
 
+```
+POST /v1/consultations/{consultationId}/submissions
+Content-Type: multipart/form-data; boundary=...
+Signature: <RFC 9421 signature where the
+            submitter is institutional, omitted
+            where the submitter is anonymous or
+            pseudonymous>
+```
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+The multipart body carries one JSON part with the
+§4 record from PHASE-1 (submitter, submissionType,
+body, consentDirective) and zero or more
+attachments. The server stores the attachments
+under a content-addressable URI (the SHA-256 hex
+digest is the path segment).
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+The server enforces the consultation's submission-
+type enumeration: a consultation that declares
+`submissionType: vote` rejects a `free-text`
+submission with `422 Unprocessable Entity` at
+`/problems/consultation-submission-type-mismatch`.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Where the submitter declares a verified-citizen
+identity via a W3C Verifiable Credential issued
+by a national identity provider, the server
+verifies the credential's issuer signature and
+the credential's revocation status before
+accepting the submission.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+### §4.2 Acknowledge a submission
 
-## Annex F — Adoption Roadmap
+```
+POST /v1/submissions/{submissionId}/acknowledgement
+Content-Type: application/json
+Signature: <RFC 9421 signature from the operator>
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+The operator publishes a per-submission
+acknowledgement at the cadence declared in the
+consultation's `responseSchedule`. The
+acknowledgement carries the submission's
+position in the consultation's intake queue,
+the expected processing-completion date, and
+the contact-channel for follow-up.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+### §4.3 Retrieve a submission
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+GET /v1/submissions/{submissionId}
+Accept: application/json
+Authorization: <bearer token from the submitter
+                 or from a transparency observer
+                 with audit scope>
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The response carries the submission envelope.
+The submitter's identity envelope is redacted
+according to the submitter's declared identity
+disclosure scope (anonymous, pseudonymous,
+verified-citizen with name redacted, verified-
+citizen with name disclosed).
 
-## Annex G — Test Vectors and Conformance Evidence
+### §4.4 Search submissions
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```
+GET /v1/consultations/{consultationId}/submissions
+?submissionType={type}&submittedAfter={iso8601}
+&submittedBefore={iso8601}
+&page={cursor}&size={size}
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §5 Deliberation Endpoints
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+### §5.1 Publish a deliberation record
 
-## Annex H — Versioning and Deprecation Policy
+```
+POST /v1/deliberations
+Content-Type: application/json
+Signature: <RFC 9421 signature from the
+            operator's deliberative-forum
+            secretariat>
+```
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Request body carries the §5 record from PHASE-1.
+The server enforces the participant-set
+discipline: a `citizen-panel-sortition`
+deliberation MUST declare a participant set
+selected through a sortition algorithm with the
+algorithm's parameters carried in
+`participantSet[].selectionMethod`.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+### §5.2 Retrieve a deliberation record
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+```
+GET /v1/deliberations/{deliberationId}
+Accept: application/json
+```
 
-## Annex I — Interoperability Profiles
+## §6 Outcome Endpoints
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+### §6.1 Publish an outcome
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+POST /v1/outcomes
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Request body carries the §6 record from PHASE-1.
+The server validates that the publication date
+is on or before the consultation's declared
+`responseSchedule.publishOutcomeBy` date; a late
+publication is published as the outcome
+envelope with a `publishedLate: true` flag and
+the underlying reason recorded in the
+chain-of-custody record (PHASE-3 §6).
+
+### §6.2 Retrieve an outcome
+
+```
+GET /v1/outcomes/{outcomeId}
+Accept: application/json
+```
+
+### §6.3 Subscribe to outcome notifications
+
+```
+POST /v1/consultations/{consultationId}/outcome-webhooks
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+A submitter, a transparency observer, or an
+external aggregator registers a webhook to
+receive a push notification when the outcome is
+published. The webhook envelope carries the
+operator's signing-key reference, the event
+type, and the resource identifier.
+
+## §7 Engagement-KPI Endpoint
+
+### §7.1 Publish a KPI bundle
+
+```
+POST /v1/kpi-records
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+The KPI bundle is published per the cadence
+declared in the operator's reporting plan
+(annual, biennial). The server validates the
+KPI envelope against the operator's declared
+KPI bundle (ITU-T Y.4900 + ISO 37120/37122 +
+UN DESA + OECD).
+
+### §7.2 Retrieve KPI history
+
+```
+GET /v1/programmes/{programmeId}/kpi-history
+?since={iso8601}&until={iso8601}
+Accept: application/json
+```
+
+## §8 Custody and Error Reporting
+
+### §8.1 Anchor a custody event
+
+```
+POST /v1/custody-events
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+### §8.2 Error envelope
+
+Errors are returned using RFC 9457 Problem
+Details. The problem-type identifiers are
+stable strings rooted at `/problems/` and are
+documented in the OpenAPI document. Validation
+errors carry a `pointer` field whose value is a
+JSON Pointer (RFC 6901). The server emits a
+per-request `traceparent` header (W3C Trace
+Context).
+
+## §9 Concurrency and Cache Discipline
+
+Every retrieval endpoint emits an `ETag` header
+(RFC 9110 §8.8.3). Conditional requests
+(`If-Match`, `If-None-Match`) are honoured on
+update endpoints. The server returns `412
+Precondition Failed` where the conditional
+request does not match.
+
+## §10 Bulk Export for Transparency Observers
+
+```
+GET /v1/consultations/{consultationId}/submissions:bulk
+Accept: application/x-ndjson
+Authorization: <bearer token from a transparency
+                 observer with audit scope>
+```
+
+A transparency observer running a portfolio-
+level audit requests the consultation's
+submission corpus as a newline-delimited JSON
+stream. The export is gated on the observer's
+audit-scope authorisation declared in the
+operator's open-data publication policy. A
+consumer resuming the stream provides an
+`If-Resume-After` header carrying the last-
+received submission timestamp.
+
+## §11 Single Digital Gateway Federation
+
+```
+GET /v1/consultations/{consultationId}/sdg-summary
+Accept: application/json
+```
+
+A consultation in scope of the EU Single Digital
+Gateway publishes a machine-readable summary
+suitable for ingestion into the SDG's cross-
+border-citizen-engagement layer. The summary
+carries the consultation's title in each EU
+official language declared by the operator, the
+opening and closing dates, and the per-language
+submission endpoint reference.
+
+## §12 Webhook Endpoint for KPI Publication
+
+```
+POST /v1/programmes/{programmeId}/kpi-webhooks
+Content-Type: application/json
+Signature: <RFC 9421 signature>
+```
+
+A smart-city dashboard or a transparency
+observer registers a webhook to receive a push
+notification when a KPI bundle is published.
+
+## §13 Schema-Validation and Conformance
+
+The OpenAPI 3.1 document at `/v1/openapi.json`
+carries JSON Schema 2020-12 schemas for every
+request and response envelope. Schemas are
+published with `additionalProperties: false` on
+top-level objects so that an unknown field is
+detected at the consumer side.
+
+```
+GET /v1/conformance/test-vectors
+Accept: application/json
+```
+
+The operator publishes the conformance test
+vectors used to qualify the API implementation
+against this specification. Each vector
+references the relevant ITU-T Y.4900 / ISO
+37120 / OECD CITIZEN-ENGAGEMENT clause.

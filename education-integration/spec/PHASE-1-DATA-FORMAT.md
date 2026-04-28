@@ -1,241 +1,413 @@
-# WIA-education-integration PHASE 1 — DATA-FORMAT Specification
+# WIA-education-integration PHASE 1 — Data Format Specification
 
 **Standard:** WIA-education-integration
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-education-integration (Education Integration).
+This document defines the canonical data-format layer
+for WIA-education-integration. The standard covers
+the persistent record shapes that an education-
+integration operator (a national education ministry,
+a multilateral education-cooperation programme, an
+international school, an education-development
+agency, an inter-institutional credit-recognition
+authority, a refugee-education programme, an
+adult-education or continuing-education provider, a
+cross-border-mobility scholarship operator, an
+education-data warehouse) maintains when registering
+an education programme, classifying a learner's
+qualification under the UNESCO ISCED 2011
+classification, recording a credit-recognition
+agreement, declaring a learning-mobility flow, and
+binding a learner's academic record to a recognition
+authority's register. Records are consumed by the
+host institution receiving an inbound learner, by
+the home institution releasing the outbound learner,
+by the credit-recognition authority issuing the
+recognition decision, by the supervisory ministry
+enforcing the national qualifications framework, and
+by the multilateral organisation collecting the
+education-statistics return.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- UNESCO Institute for Statistics ISCED 2011
+  (International Standard Classification of
+  Education) and ISCED-F 2013 (fields of
+  education and training)
+- UNESCO Convention on the Recognition of Studies,
+  Diplomas and Degrees in Higher Education in the
+  Asia and the Pacific (the Tokyo Convention,
+  2011), the UNESCO Global Convention on the
+  Recognition of Qualifications concerning
+  Higher Education (2019), the Council of Europe
+  / UNESCO Lisbon Recognition Convention (1997)
+- UNESCO 2030 Education Framework for Action
+- OECD Programme for International Student
+  Assessment (PISA), OECD Education at a Glance
+  indicator framework
+- ISO/IEC 19796-1:2005 (information technology
+  for learning, education and training — quality
+  management, assurance and metrics)
+- ISO/IEC 23988:2007 (information technology — a
+  code of practice for the use of information
+  technology in the delivery of assessments)
+- ISO 21001:2018 (educational organisations
+  management system requirements)
+- ISO/IEC 36000-1:2024 (information technology
+  for learning, education and training — overview)
+- ISO/IEC 19778-1:2015 / -2 / -3 (collaborative
+  workplace data model — collaborative
+  environment)
+- ISO/IEC 24751-1:2008 (individualized
+  adaptability and accessibility in e-learning)
+- IMS Global Learning Consortium standards (LTI
+  1.3 / Advantage, OneRoster 1.2, Caliper
+  Analytics 1.2, QTI 3.0, Common Cartridge 1.3,
+  Open Badges 3.0)
+- IEEE 1484.12.1-2020 (Learning Object Metadata)
+- ADL xAPI 2.0 (the Experience API specification)
+- Europass Qualifications Framework, the European
+  Qualifications Framework for Lifelong Learning
+  (EQF) Recommendation 2017/C 189/03
+- W3C Verifiable Credentials Data Model v2.0,
+  W3C Decentralized Identifiers v1.0
+- IETF RFC 8259 (JSON), RFC 4122 (UUID), ISO 8601
+  (date-time)
+- ISO 3166-1 alpha-3 (country codes), ISO 639-3
+  (language codes), ISO 4217 (currency codes)
+- ISO/IEC 27001:2022 (information security
+  management — used for the chain-of-custody
+  record discipline in §8)
+- KS X ISO/IEC 19796-1 (Korean adoption of
+  ISO/IEC 19796-1) and KS X ISO 21001 (Korean
+  adoption of ISO 21001)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-education-integration
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the
+artefacts exchanged when a learner's education
+record is registered, the qualification is
+classified per ISCED 2011, the inter-institutional
+credit-recognition is declared, the cross-border
+learning mobility is recorded, and the chain-of-
+custody trail of the academic record is anchored.
+Implementations covered include:
 
-## §2 Manifest
+- A national-education-ministry programme
+  registering its primary, lower-secondary,
+  upper-secondary, post-secondary non-tertiary,
+  short-cycle tertiary, bachelor, master, and
+  doctoral programmes against ISCED 2011 levels
+  0 to 8.
+- A multilateral education-cooperation programme
+  (the Erasmus+ programme operated by the
+  European Commission, the UNESCO UNITWIN /
+  UNESCO Chairs network, the OECD Centre for
+  Effective Learning Environments) registering
+  its inter-institutional mobility flows.
+- An international school operating across two or
+  more national qualifications frameworks (the
+  International Baccalaureate, the Cambridge
+  International Examinations, the Advanced
+  Placement programme of the College Board)
+  binding its learners' qualifications to each
+  national framework's recognition table.
+- An education-development agency (the Korea
+  International Cooperation Agency's KOICA
+  education programmes, the German GIZ education
+  programmes, the Japanese JICA education
+  programmes) registering its training-programme
+  flow.
+- An inter-institutional credit-recognition
+  authority (a Bologna-Process accredited body, a
+  Lisbon Recognition Convention competent
+  authority, an Asia-Pacific Tokyo Convention
+  competent authority) issuing recognition
+  decisions.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "education-integration"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The cross-jurisdictional recognition envelope
+under the Lisbon and Tokyo Conventions, the
+ISCED 2011 classification envelope, and the
+quality-management envelope under ISO 21001 and
+ISO/IEC 19796-1 receive distinct encodings in
+this PHASE; the additional safeguards required
+by each programme are encoded in PHASE-3 §3.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name of the
+                       operator — national
+                       education ministry,
+                       multilateral programme
+                       secretariat, international
+                       school, education-
+                       development agency,
+                       recognition authority)
+operatorRole         : enum ("education-ministry"
+                       | "multilateral-programme"
+                       | "international-school" |
+                       "education-development-
+                       agency" | "recognition-
+                       authority" | "user-defined")
+governingFrameworks  : array of enum ("ISCED-2011"
+                       | "ISCED-F-2013" |
+                       "ISO-21001" |
+                       "ISO-IEC-19796-1" |
+                       "ISO-IEC-23988" |
+                       "EQF" |
+                       "Lisbon-Recognition-
+                       Convention-1997" |
+                       "Tokyo-Recognition-
+                       Convention-2011" |
+                       "Global-Recognition-
+                       Convention-2019" |
+                       "OECD-PISA" |
+                       "ADL-xAPI-2.0" |
+                       "IMS-LTI-1.3" |
+                       "IMS-Caliper-1.2" |
+                       "IMS-OneRoster-1.2" |
+                       "IMS-QTI-3.0" |
+                       "IMS-OpenBadges-3.0" |
+                       "IEEE-1484.12.1-2020" |
+                       "W3C-VC-2.0" |
+                       "W3C-DID-1.0" |
+                       "user-defined")
+accreditationStatus  : object (the ISO 21001
+                       certification reference for
+                       educational-organisation
+                       management-system operators,
+                       the ISO/IEC 19796-1
+                       conformance reference for
+                       e-learning quality, the
+                       Lisbon / Tokyo / Global
+                       Convention competent-
+                       authority designation
+                       reference)
+programmeStatus      : enum ("design" | "operating"
+                       | "limited-rollout" |
+                       "wind-down" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 ISCED 2011 Programme Record
 
-## §4 Discovery
+```
+iscedRecord:
+  iscedRecordId      : string (uuidv7)
+  programmeRef       : string (PHASE-1 §2 record
+                       reference)
+  iscedLevel         : enum (UNESCO ISCED 2011
+                       Levels 0 through 8 —
+                       0 early-childhood
+                       education, 1 primary, 2
+                       lower-secondary, 3 upper-
+                       secondary, 4 post-secondary
+                       non-tertiary, 5 short-cycle
+                       tertiary, 6 bachelor or
+                       equivalent, 7 master or
+                       equivalent, 8 doctoral or
+                       equivalent)
+  iscedField         : object (UNESCO ISCED-F 2013
+                       narrow-field-of-education
+                       three-digit classification —
+                       for example "061 Information
+                       and Communication
+                       Technologies (ICTs)" or
+                       "0114 Teacher training
+                       with subject specialisation")
+  duration           : object (declared duration in
+                       years and ECTS credits or
+                       equivalent national credit
+                       unit)
+  awardName          : string (the qualification
+                       awarded — for example
+                       "Bachelor of Science", "고
+                       등학교 졸업장", "Diplôme
+                       National de Master")
+  awardLanguage      : string (BCP 47 language tag
+                       — for example "en", "ko",
+                       "fr", "ja", "ar")
+  nationalFrameworkRef : object (the per-country
+                       national qualifications
+                       framework binding —
+                       Korean Qualifications
+                       Framework KQF level
+                       reference, EQF level
+                       reference, Australian
+                       Qualifications Framework
+                       AQF reference, US Higher
+                       Education degree level
+                       reference)
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/education-integration`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Curriculum Record
 
-## §5 Time and Identity
+```
+curriculumRecord:
+  curriculumId       : string (uuidv7)
+  programmeRef       : string (PHASE-1 §2 record
+                       reference)
+  iscedRecordRef     : string (PHASE-1 §3 record
+                       reference)
+  curriculumName     : string (localised
+                       curriculum name)
+  modules            : array of object (per-module
+                       descriptor — module
+                       identifier, module title,
+                       module's ECTS credit value
+                       or national-credit
+                       equivalent, module's
+                       learning outcomes per the
+                       Bologna learning-outcomes
+                       framework, module's
+                       prerequisite identifiers)
+  totalCredits       : number (ECTS credits or
+                       national credit unit)
+  qualityAssuranceRef : string (the ISO 21001
+                       quality-assurance reference
+                       for the curriculum)
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 Learner Record
 
-## §6 Versioning and Deprecation
+```
+learnerRecord:
+  learnerId          : string (uuidv7) — pseudonymous
+                       per the operator's privacy-
+                       discipline declaration in
+                       §8
+  homeInstitutionRef : string (the learner's home
+                       institution's PHASE-1 §2
+                       reference)
+  hostInstitutionRef : string (the learner's host
+                       institution's PHASE-1 §2
+                       reference, where mobility
+                       applies)
+  enrolmentRef       : object (the per-programme
+                       enrolment identifier and
+                       the enrolment date)
+  iscedLevel         : enum (the learner's current
+                       ISCED 2011 level)
+  citizenshipCountry : string (ISO 3166-1 alpha-3
+                       — used for the recognition-
+                       authority verification, not
+                       for any commercial purpose)
+  preferredLanguage  : string (BCP 47 language tag)
+  accessibilityProfile : object (per ISO/IEC 24751
+                       individualised-adaptability
+                       declaration)
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 Recognition-Decision Record
 
-## §7 Privacy and Security
+```
+recognitionRecord:
+  recognitionId      : string (uuidv7)
+  applicantRef       : string (PHASE-1 §5 record
+                       reference)
+  homeQualificationRef : string (the qualification
+                       presented for recognition,
+                       referenced through the
+                       home institution's PHASE-1
+                       §3 record)
+  decisionAuthorityRef : string (the recognition
+                       authority's PHASE-1 §2
+                       reference)
+  applicableConvention : enum ("Lisbon-Recognition-
+                       Convention-1997" |
+                       "Tokyo-Recognition-
+                       Convention-2011" |
+                       "Global-Recognition-
+                       Convention-2019" | "user-
+                       defined")
+  decisionOutcome    : enum ("recognised-fully" |
+                       "recognised-with-conditions"
+                       | "partially-recognised" |
+                       "not-recognised")
+  decisionRationale  : string (per Lisbon Article
+                       III.3, the recognition
+                       authority's substantive
+                       reasoning)
+  appealRights       : object (per Lisbon Article
+                       III.5, the applicant's
+                       appeal-and-review rights)
+  decisionDate       : string (ISO 8601 date-time)
+  decisionExpiry     : string (ISO 8601 date-time
+                       — where the decision is
+                       time-limited)
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 Mobility Record
 
-## §8 Open Governance
+```
+mobilityRecord:
+  mobilityId         : string (uuidv7)
+  learnerRef         : string (PHASE-1 §5 record
+                       reference)
+  programmeType      : enum ("erasmus-plus-credit"
+                       | "erasmus-plus-degree" |
+                       "joint-degree" |
+                       "exchange-semester" |
+                       "summer-school" |
+                       "research-stay" |
+                       "internship" | "user-
+                       defined")
+  fromInstitutionRef : string (the sending
+                       institution's PHASE-1 §2
+                       reference)
+  toInstitutionRef   : string (the receiving
+                       institution's PHASE-1 §2
+                       reference)
+  fromCountry        : string (ISO 3166-1 alpha-3)
+  toCountry          : string (ISO 3166-1 alpha-3)
+  startDate          : string (ISO 8601)
+  endDate            : string (ISO 8601)
+  creditsEarned      : number (ECTS or national
+                       credit unit)
+  learningAgreementRef : string (URL of the
+                       countersigned learning
+                       agreement)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `education-integration` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §8 Chain-of-Custody Record
+
+```
+custodyRecord:
+  custodyId          : string (uuidv7)
+  artefactRef        : string (the recognition
+                       decision, mobility record,
+                       or curriculum identifier)
+  custodyEvent       : enum ("recognition-decision-
+                       issued" | "mobility-
+                       agreement-signed" |
+                       "curriculum-published" |
+                       "transcript-issued" |
+                       "diploma-issued" |
+                       "credential-revoked" |
+                       "user-defined")
+  eventTimestamp     : string (ISO 8601 date-time)
+  performingParty    : string (legal entity
+                       reference)
+  hashOfArtefacts    : string (SHA-256 hex digest)
+```
+
+## §9 Manifest
+
+Implementations publish a signed manifest carrying
+`standardSlug` (constant value "education-
+integration"), `version`, `implementation`, the
+operator's `accreditationStatus`, and the
+`profile` declaration that selects which of the
+optional records (curriculum, recognition,
+mobility) the implementation supports. The
+manifest is signed using a key whose public part
+is published on the operator's
+`.well-known/wia/education-integration/`
+discovery endpoint declared in PHASE-2.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
-
-
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.

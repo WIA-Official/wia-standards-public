@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Cold Start Problem | WIA-AI-024</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 3rem 2rem; border-bottom: 3px solid #10B981; margin-bottom: 3rem; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 1rem; }
+        .chapter-info { color: #94a3b8; font-size: 1.1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin: 2.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin: 1.5rem 0 0.8rem 0; }
+        p { margin: 1rem 0; color: #cbd5e1; }
+        .code-block { background: #1e293b; border: 1px solid #334155; border-left: 4px solid #10B981; border-radius: 6px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.95rem; line-height: 1.6; }
+        .highlight { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 1.5rem 0; border-radius: 4px; }
+        .example { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; }
+        .example-title { color: #10B981; font-weight: 600; margin-bottom: 1rem; font-size: 1.1rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: #cbd5e1; }
+        li { margin: 0.5rem 0; }
+        .nav { display: flex; justify-content: space-between; margin: 3rem 0; padding: 1.5rem; background: #1e293b; border-radius: 8px; }
+        .nav a { color: #10B981; text-decoration: none; font-weight: 600; }
+        .summary { background: #1e293b; border: 2px solid #10B981; border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review { background: #1e293b; border: 2px solid #3b82f6; border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+        .review h2 { color: #3b82f6; border-bottom: none; margin-top: 0; }
+        .philosophy { text-align: center; padding: 2rem; background: linear-gradient(135deg, #10B981 0%, #059669 100%); border-radius: 8px; margin: 3rem 0; color: white; font-size: 1.2rem; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border: 1px solid #334155; }
+        th { background: #334155; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🆕 Chapter 7: Cold Start Problem</h1>
+            <div class="chapter-info">WIA-AI-024 Recommendation AI Standard</div>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>🎯 The Bootstrap Challenge</h2>
+        <p>
+            The cold start problem is one of the most persistent challenges in recommendation systems: how do you recommend items to new users with no interaction history? How do you recommend new items that no one has rated yet? This chicken-and-egg problem affects every recommendation system.
+        </p>
+        <p>
+            There are three types of cold start scenarios: new users, new items, and completely new systems. Each requires different strategies, and production systems typically employ multiple approaches simultaneously.
+        </p>
+
+        <div class="highlight">
+            <strong>Key Challenge:</strong> Collaborative filtering fails completely for cold start scenarios because it depends on interaction history. Solutions must leverage alternative information sources.
+        </div>
+
+        <h2>👤 New User Cold Start</h2>
+        <p>
+            When a user first joins your platform, you have no data about their preferences. How do you make that crucial first impression?
+        </p>
+
+        <h3>Strategy 1: Popularity-Based Recommendations</h3>
+        <p>
+            Start with what works for most people—popular items, trending content, or bestsellers:
+        </p>
+
+        <div class="code-block">
+<code>// Popularity-based cold start recommender
+class PopularityRecommender {
+    private popularityScores: Map<string, number>;
+
+    constructor() {
+        this.popularityScores = new Map();
+    }
+
+    // Calculate popularity from interactions
+    calculatePopularity(
+        interactions: Array<{userId: string, itemId: string, weight?: number}>
+    ): void {
+        const itemCounts = new Map<string, number>();
+
+        for (const interaction of interactions) {
+            const weight = interaction.weight || 1;
+            const current = itemCounts.get(interaction.itemId) || 0;
+            itemCounts.set(interaction.itemId, current + weight);
+        }
+
+        // Normalize scores
+        const maxCount = Math.max(...itemCounts.values());
+        for (const [itemId, count] of itemCounts) {
+            this.popularityScores.set(itemId, count / maxCount);
+        }
+    }
+
+    // Get trending items (time-decayed popularity)
+    getTrending(
+        interactions: Array<{itemId: string, timestamp: Date}>,
+        decayDays: number = 7,
+        k: number = 10
+    ): string[] {
+        const now = Date.now();
+        const decayMs = decayDays * 24 * 60 * 60 * 1000;
+
+        const scores = new Map<string, number>();
+
+        for (const {itemId, timestamp} of interactions) {
+            const age = now - timestamp.getTime();
+            const decayFactor = Math.exp(-age / decayMs);
+            const current = scores.get(itemId) || 0;
+            scores.set(itemId, current + decayFactor);
+        }
+
+        return Array.from(scores.entries())
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, k)
+            .map(([itemId]) => itemId);
+    }
+
+    recommend(k: number = 10): string[] {
+        return Array.from(this.popularityScores.entries())
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, k)
+            .map(([itemId]) => itemId);
+    }
+}</code>
+        </div>
+
+        <h3>Strategy 2: Onboarding Questionnaire</h3>
+        <p>
+            Ask users about their preferences explicitly during signup:
+        </p>
+
+        <div class="code-block">
+<code>// Questionnaire-based profile builder
+interface OnboardingResponse {
+    categories: string[];      // Preferred categories
+    favoriteItems?: string[];  // Known items they like
+    dislikes?: string[];      // Items/categories to avoid
+    demographics?: {
+        age?: number;
+        location?: string;
+        gender?: string;
+    };
+}
+
+class OnboardingRecommender {
+    buildInitialProfile(
+        response: OnboardingResponse,
+        categoryItemMap: Map<string, string[]>,
+        itemFeatures: Map<string, number[]>
+    ): {
+        profileVector: number[],
+        blacklist: Set<string>
+    } {
+        const profileVector: number[] = [];
+        const blacklist = new Set(response.dislikes || []);
+
+        // Build profile from liked items
+        if (response.favoriteItems && response.favoriteItems.length > 0) {
+            const likedVectors = response.favoriteItems
+                .map(id => itemFeatures.get(id))
+                .filter(v => v !== undefined) as number[][];
+
+            if (likedVectors.length > 0) {
+                // Average feature vectors
+                for (let i = 0; i < likedVectors[0].length; i++) {
+                    const avg = likedVectors.reduce((sum, v) => sum + v[i], 0) / likedVectors.length;
+                    profileVector.push(avg);
+                }
+            }
+        }
+
+        return { profileVector, blacklist };
+    }
+
+    recommendFromOnboarding(
+        response: OnboardingResponse,
+        allItems: string[],
+        categoryMap: Map<string, string[]>,
+        k: number = 10
+    ): string[] {
+        // Gather candidate items from preferred categories
+        const candidates = new Set<string>();
+
+        for (const category of response.categories) {
+            const categoryItems = categoryMap.get(category) || [];
+            categoryItems.forEach(item => candidates.add(item));
+        }
+
+        // Remove dislikes
+        const dislikes = new Set(response.dislikes || []);
+        const filtered = Array.from(candidates).filter(item => !dislikes.has(item));
+
+        // Return top k (could add additional ranking logic)
+        return filtered.slice(0, k);
+    }
+}</code>
+        </div>
+
+        <h3>Strategy 3: Demographic-Based Recommendations</h3>
+        <p>
+            Use demographic information (age, location, gender) to find similar users:
+        </p>
+
+        <div class="code-block">
+<code>// Demographic-based recommender
+interface UserDemographics {
+    age: number;
+    location: string;
+    gender: string;
+}
+
+class DemographicRecommender {
+    findSimilarUsers(
+        newUser: UserDemographics,
+        existingUsers: Map<string, UserDemographics>,
+        k: number = 50
+    ): string[] {
+        const similarities: Array<{userId: string, score: number}> = [];
+
+        for (const [userId, demographics] of existingUsers) {
+            const score = this.calculateDemographicSimilarity(newUser, demographics);
+            similarities.push({ userId, score });
+        }
+
+        return similarities
+            .sort((a, b) => b.score - a.score)
+            .slice(0, k)
+            .map(s => s.userId);
+    }
+
+    private calculateDemographicSimilarity(
+        user1: UserDemographics,
+        user2: UserDemographics
+    ): number {
+        let score = 0;
+
+        // Age similarity (closer ages = higher similarity)
+        const ageDiff = Math.abs(user1.age - user2.age);
+        const ageScore = Math.exp(-ageDiff / 10);  // Decay function
+        score += ageScore * 0.3;
+
+        // Location match
+        if (user1.location === user2.location) {
+            score += 0.4;
+        }
+
+        // Gender match
+        if (user1.gender === user2.gender) {
+            score += 0.3;
+        }
+
+        return score;
+    }
+
+    recommendFromDemographics(
+        newUser: UserDemographics,
+        existingUsers: Map<string, UserDemographics>,
+        userPreferences: Map<string, string[]>,
+        k: number = 10
+    ): string[] {
+        // Find similar users
+        const similarUsers = this.findSimilarUsers(newUser, existingUsers, 50);
+
+        // Aggregate their preferences
+        const itemScores = new Map<string, number>();
+
+        for (const userId of similarUsers) {
+            const preferences = userPreferences.get(userId) || [];
+            for (const itemId of preferences) {
+                const current = itemScores.get(itemId) || 0;
+                itemScores.set(itemId, current + 1);
+            }
+        }
+
+        return Array.from(itemScores.entries())
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, k)
+            .map(([itemId]) => itemId);
+    }
+}</code>
+        </div>
+
+        <h2>📦 New Item Cold Start</h2>
+        <p>
+            How do you recommend a brand new movie, product, or article that no one has interacted with yet?
+        </p>
+
+        <h3>Strategy 1: Content-Based Features</h3>
+        <p>
+            Use item metadata to find similar items:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Domain</th>
+                    <th>Features to Extract</th>
+                    <th>Method</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Movies</td>
+                    <td>Genre, director, actors, plot</td>
+                    <td>TF-IDF, embeddings</td>
+                </tr>
+                <tr>
+                    <td>Products</td>
+                    <td>Category, brand, specs, images</td>
+                    <td>CNN features, metadata</td>
+                </tr>
+                <tr>
+                    <td>News</td>
+                    <td>Topics, entities, sentiment</td>
+                    <td>NLP, knowledge graphs</td>
+                </tr>
+                <tr>
+                    <td>Music</td>
+                    <td>Genre, artist, audio features</td>
+                    <td>MFCCs, embeddings</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Strategy 2: Active Learning</h3>
+        <p>
+            Strategically show new items to diverse user groups to quickly gather feedback:
+        </p>
+
+        <div class="code-block">
+<code>// Active learning for new items
+class ActiveLearningColdStart {
+    // Select users to show new item for maximum information gain
+    selectUsersForNewItem(
+        newItemId: string,
+        newItemFeatures: number[],
+        users: Map<string, number[]>,  // User preference vectors
+        alreadyShown: Set<string>,
+        k: number = 100
+    ): string[] {
+        const candidates: Array<{userId: string, score: number}> = [];
+
+        for (const [userId, userVector] of users) {
+            if (alreadyShown.has(userId)) continue;
+
+            // Score based on expected information gain
+            // Higher score for users whose preferences match item features
+            const similarity = this.cosineSimilarity(userVector, newItemFeatures);
+
+            // Also consider user diversity (not all similar users)
+            const diversityBonus = this.calculateDiversityScore(userId, Array.from(alreadyShown), users);
+
+            const score = similarity * 0.7 + diversityBonus * 0.3;
+            candidates.push({ userId, score });
+        }
+
+        return candidates
+            .sort((a, b) => b.score - a.score)
+            .slice(0, k)
+            .map(c => c.userId);
+    }
+
+    private cosineSimilarity(a: number[], b: number[]): number {
+        let dot = 0, magA = 0, magB = 0;
+        for (let i = 0; i < a.length; i++) {
+            dot += a[i] * b[i];
+            magA += a[i] * a[i];
+            magB += b[i] * b[i];
+        }
+        return dot / (Math.sqrt(magA) * Math.sqrt(magB) + 1e-8);
+    }
+
+    private calculateDiversityScore(
+        userId: string,
+        shownUsers: string[],
+        allUsers: Map<string, number[]>
+    ): number {
+        if (shownUsers.length === 0) return 1;
+
+        const userVec = allUsers.get(userId);
+        if (!userVec) return 0;
+
+        // Calculate average similarity to already shown users
+        let avgSimilarity = 0;
+        for (const shownUserId of shownUsers) {
+            const shownVec = allUsers.get(shownUserId);
+            if (shownVec) {
+                avgSimilarity += this.cosineSimilarity(userVec, shownVec);
+            }
+        }
+        avgSimilarity /= shownUsers.length;
+
+        // Return diversity (inverse of similarity)
+        return 1 - avgSimilarity;
+    }
+}</code>
+        </div>
+
+        <h3>Strategy 3: Expert Curation</h3>
+        <p>
+            For high-value new items, have domain experts create initial placements and featured spots.
+        </p>
+
+        <h2>🌟 Hybrid Cold Start Strategies</h2>
+        <p>
+            The most effective approach combines multiple strategies:
+        </p>
+
+        <div class="example">
+            <div class="example-title">🎵 Spotify's New User Experience</div>
+            <ol>
+                <li><strong>Onboarding:</strong> Ask for favorite artists and genres</li>
+                <li><strong>Popularity:</strong> Show trending playlists in selected genres</li>
+                <li><strong>Content-based:</strong> Recommend similar artists to favorites</li>
+                <li><strong>Active learning:</strong> Ask for thumbs up/down on initial recommendations</li>
+                <li><strong>Quick adaptation:</strong> Update recommendations after every interaction</li>
+            </ol>
+        </div>
+
+        <h2>🔄 From Cold to Warm: Transition Strategies</h2>
+        <p>
+            As users accumulate interactions, smoothly transition from cold start methods to collaborative filtering:
+        </p>
+
+        <div class="code-block">
+<code>// Hybrid recommender that transitions from cold to warm
+class TransitionRecommender {
+    recommendHybrid(
+        userId: string,
+        interactionCount: number,
+        demographics: UserDemographics,
+        recentInteractions: string[],
+        k: number = 10
+    ): string[] {
+        // Weight different strategies based on interaction count
+        const coldWeight = Math.exp(-interactionCount / 10);  // Decay as user interacts
+        const warmWeight = 1 - coldWeight;
+
+        let recommendations: string[] = [];
+
+        if (coldWeight > 0.5) {
+            // Still mostly cold - use demographic + popularity
+            const demographic = this.getDemographicRecs(demographics, k);
+            const popular = this.getPopularRecs(k);
+            recommendations = this.merge(demographic, popular, 0.6, 0.4, k);
+        } else if (warmWeight > 0.5) {
+            // Warming up - use content-based + early collaborative
+            const contentBased = this.getContentBasedRecs(recentInteractions, k);
+            const collaborative = this.getCollaborativeRecs(userId, k);
+            recommendations = this.merge(contentBased, collaborative, coldWeight, warmWeight, k);
+        } else {
+            // Fully warm - primarily collaborative with content-based fallback
+            const collaborative = this.getCollaborativeRecs(userId, k);
+            const contentBased = this.getContentBasedRecs(recentInteractions, Math.floor(k * 0.2));
+            recommendations = [...collaborative.slice(0, Math.floor(k * 0.8)), ...contentBased];
+        }
+
+        return recommendations.slice(0, k);
+    }
+
+    private merge(
+        list1: string[],
+        list2: string[],
+        weight1: number,
+        weight2: number,
+        k: number
+    ): string[] {
+        const count1 = Math.floor(k * weight1);
+        const count2 = k - count1;
+
+        const merged = [...list1.slice(0, count1), ...list2.slice(0, count2)];
+        return merged;
+    }
+
+    // Placeholder methods (implement with actual logic)
+    private getDemographicRecs(demographics: UserDemographics, k: number): string[] {
+        return [];
+    }
+
+    private getPopularRecs(k: number): string[] {
+        return [];
+    }
+
+    private getContentBasedRecs(interactions: string[], k: number): string[] {
+        return [];
+    }
+
+    private getCollaborativeRecs(userId: string, k: number): string[] {
+        return [];
+    }
+}</code>
+        </div>
+
+        <h2>🎯 Multi-Armed Bandit Approach</h2>
+        <p>
+            Treat cold start as an exploration-exploitation problem using bandit algorithms:
+        </p>
+
+        <ul>
+            <li><strong>Epsilon-greedy:</strong> With probability ε, explore random items; otherwise exploit best known</li>
+            <li><strong>Upper Confidence Bound (UCB):</strong> Balance exploration of uncertain items with exploitation</li>
+            <li><strong>Thompson Sampling:</strong> Bayesian approach sampling from posterior distributions</li>
+        </ul>
+
+        <h2>🌐 Cross-Domain Transfer Learning</h2>
+        <p>
+            Leverage data from related domains or platforms:
+        </p>
+
+        <ul>
+            <li>Social media connections predict content preferences</li>
+            <li>Movie preferences correlate with book tastes</li>
+            <li>Music listening patterns relate to podcast interests</li>
+        </ul>
+
+        <h2>⚠️ Best Practices</h2>
+
+        <h3>Do's</h3>
+        <ul>
+            <li>Make the first experience count—bad initial recommendations hurt retention</li>
+            <li>Ask for minimal information—long onboarding reduces conversion</li>
+            <li>Learn quickly from early interactions</li>
+            <li>Provide explanations—users are more forgiving when they understand</li>
+            <li>Offer control—let users customize or skip recommendations</li>
+        </ul>
+
+        <h3>Don'ts</h3>
+        <ul>
+            <li>Don't show only popular items—lacks personalization</li>
+            <li>Don't ignore implicit signals—views, time spent, skips all provide data</li>
+            <li>Don't treat all new users the same—demographics and context matter</li>
+            <li>Don't wait too long to personalize—adapt after first few interactions</li>
+        </ul>
+
+        <div class="summary">
+            <h2>📝 Summary</h2>
+            <ul>
+                <li>Cold start affects new users, new items, and new systems</li>
+                <li>Popularity-based recommendations provide safe defaults for new users</li>
+                <li>Onboarding questionnaires collect explicit preferences efficiently</li>
+                <li>Demographic information enables user similarity without interaction history</li>
+                <li>Content-based features allow new item recommendations immediately</li>
+                <li>Active learning strategically gathers feedback on new items</li>
+                <li>Hybrid approaches combine multiple strategies for robustness</li>
+                <li>Smooth transitions from cold to warm state improve user experience</li>
+            </ul>
+        </div>
+
+        <div class="review">
+            <h2>🤔 Review Questions</h2>
+            <ol>
+                <li>What are the three types of cold start problems?</li>
+                <li>Why does collaborative filtering fail for cold start scenarios?</li>
+                <li>Compare popularity-based and demographic-based cold start strategies.</li>
+                <li>How can onboarding questionnaires balance information gain with user friction?</li>
+                <li>What role does content-based filtering play in solving new item cold start?</li>
+                <li>Explain how active learning can accelerate new item recommendations.</li>
+                <li>Design a cold start strategy for a new e-commerce platform.</li>
+                <li>How should recommendation strategies transition as users accumulate interactions?</li>
+                <li>What are the tradeoffs between asking for explicit preferences vs. inferring from behavior?</li>
+                <li>How can multi-armed bandits address the cold start exploration-exploitation dilemma?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) · Benefit All Humanity<br>
+            <span style="font-size: 0.9rem; margin-top: 0.5rem; display: block; opacity: 0.9;">
+                Welcome every user with care—first impressions shape lasting relationships
+            </span>
+        </div>
+
+        </div>
+</body>
+</html>

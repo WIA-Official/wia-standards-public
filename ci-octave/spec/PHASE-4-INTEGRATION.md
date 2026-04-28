@@ -1,274 +1,334 @@
-# WIA-ci-octave PHASE 4 — INTEGRATION Specification
+# WIA-ci-octave PHASE 4 — Integration Specification
 
 **Standard:** WIA-ci-octave
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-ci-octave (Ci Octave).
+This document defines how a CI-OCTAVE risk-
+management operator integrates with the
+systems that surround the asset-to-treatment-
+to-audit value chain: the CMU SEI CERT
+Division operating the OCTAVE Allegro / FORTE
+methodology references; the ISO/IEC 27001
+certification body issuing the per-cycle
+certification; the NIST RMF authorising
+official issuing the per-system Authorisation
+to Operate; the EU NIS2 / DORA / CRA
+supervisory authority enforcing the sectoral
+risk-management obligations; the sectoral CSIRT
+or ISAC operating the per-sector incident-
+information-sharing layer; the cyber-insurance
+underwriter pricing the residual-risk envelope;
+the supply-chain risk-management partner; the
+internal-audit function running the second-line
+review; and the audit committee approving the
+per-cycle risk-treatment plan.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- CMU SEI CERT OCTAVE Allegro and OCTAVE
+  FORTE methodologies, CERT-RMM v1.2
+- ISO/IEC 27001:2022, ISO/IEC 27002:2022,
+  ISO/IEC 27005:2022, ISO/IEC 27017:2015,
+  ISO/IEC 27018:2019, ISO/IEC 27036 series
+- ISO 31000:2018, ISO/IEC 31010:2019, ISO/IEC
+  17021-1:2015, ISO/IEC 17065:2012
+- NIST SP 800-30 Rev. 1, NIST SP 800-37 Rev. 2,
+  NIST SP 800-53 Rev. 5, NIST CSF 2.0
+- US FIPS PUB 199, FIPS PUB 200, FedRAMP
+- EU NIS2 Directive 2022/2555, EU DORA
+  Regulation 2022/2554, EU CRA Regulation
+  2024/2847
+- ENISA Threat Landscape, ENISA Risk Assessment
+  Methodology
+- Open FAIR (The Open Group)
+- IEC 62443-3-2:2020
+- W3C Verifiable Credentials Data Model v2.0
+- IETF RFC 8259, RFC 9457, RFC 8615, RFC 9421
+- W3C Trace Context
+- KR 정보통신망 이용촉진 및 정보보호 등에 관한
+  법률, KR 개인정보 보호법, KR 전자금융거래법, KR
+  중요정보통신기반시설 보호법
+- KR-ISMS-P certification scheme operated by
+  KISA
 
 ---
 
-## §1 Scope
+## §1 SEI CERT Methodology Integration
 
-This PHASE document is one of four that together define the WIA-ci-octave
-standard. It addresses the integration layer of the standard.
+The operator subscribes to the CMU SEI CERT
+Division's publishing endpoint for OCTAVE
+Allegro and OCTAVE FORTE methodology updates.
+A new SEI publication triggers an internal
+review cycle in the operator's quality-
+management discipline declared in PHASE-3 §5
+before the new methodology revision is bound
+into the operator's per-cycle template.
 
-## §2 Manifest
+## §2 ISO/IEC 27001 Certification-Body Integration
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "ci-octave"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+A certification body accredited under ISO/IEC
+17021-1:2015 issues the per-cycle ISO/IEC
+27001 certification on the per-cycle audit
+outcome. The certification body queries the
+operator's API for the per-cycle audit
+record, the per-cycle nonconformity register,
+and the per-cycle management response. The
+certification body's audit envelope is signed
+and recorded in the operator's audit trail.
 
-## §3 Conformance Tiers
+## §3 NIST RMF Authorising Official Integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+A US federal-agency operator running the NIST
+RMF authorisation cycle integrates with the
+authorising-official's authorisation-decision
+endpoint. The authorisation-decision envelope
+is published per NIST SP 800-37 Rev. 2 and
+records the per-system Authorisation to
+Operate, the per-system continuous-monitoring
+strategy, and the per-system authorisation-
+termination date.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 EU NIS2 Supervisory-Authority Integration
 
-## §4 Discovery
+A NIS2-essential or NIS2-important entity
+publishes the per-period risk-management
+report to the EU Member-State supervisory
+authority. The report carries the per-
+obligation evidence register, the per-incident
+significant-incident register, and the per-
+period business-continuity-test envelope.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/ci-octave`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §5 EU DORA Supervisory-Authority Integration
 
-## §5 Time and Identity
+A DORA-financial-entity publishes the per-
+period digital-operational-resilience report
+to the EU financial-services supervisory
+authority. The report carries the per-period
+ICT-risk-management framework attestation, the
+per-period digital-operational-resilience
+testing outcome, and the per-period third-
+party ICT-risk register.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §6 EU CRA Conformity-Assessment Integration
 
-## §6 Versioning and Deprecation
+A CRA-product-with-digital-elements
+manufacturer publishes the per-product
+conformity-assessment envelope per CRA
+Article 32. The envelope is verified by an
+EU-CRA-designated notified body for high-risk
+products and by the manufacturer for default-
+risk products under the CRA's conformity-
+assessment-procedure tiers.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §7 Sectoral CSIRT / ISAC Integration
 
-## §7 Privacy and Security
+The operator's sectoral CSIRT or ISAC (the EU
+CSIRTs Network, the US sector-specific ISACs
+— FS-ISAC, H-ISAC, E-ISAC, IT-ISAC, the KR
+ISAC operated by KISA) receives the per-
+incident significant-incident envelope. The
+operator's API publishes the per-incident
+envelope to the CSIRT / ISAC's intake endpoint
+per the CSIRT's information-sharing
+agreement.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §8 Cyber-Insurance Underwriter Integration
 
-## §8 Open Governance
+A cyber-insurance underwriter pricing the
+operator's residual-risk envelope queries the
+operator's API for the per-asset risk-score
+register, the per-treatment decision register,
+and the per-cycle audit envelope. The
+underwriter's per-policy pricing is bound to
+the operator's evidence; the per-policy
+exclusion clauses are documented in the
+operator's risk-transfer envelope.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `ci-octave` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §9 Supply-Chain Risk-Management Partner Integration
+
+An operator participating in a supply-chain
+risk-management programme (the US CISA
+Information and Communications Technology
+Supply Chain Risk Management Task Force, the
+EU NIS2 supply-chain coordination) publishes
+the per-supplier risk envelope per the
+operator's data-sharing agreement.
+
+## §10 Internal-Audit Function Integration
+
+The operator's internal-audit function (the
+second-line-of-defence, per the IIA Three
+Lines Model) runs the per-cycle independent
+review. The function's audit envelope is
+recorded in the operator's audit trail and is
+referenced from the audit-committee response.
+
+## §11 Audit-Committee Integration
+
+The operator's audit committee approves the
+per-cycle risk-treatment plan and the per-
+cycle residual-risk acceptance envelope. The
+committee's per-cycle minutes are stored in
+the operator's audit envelope and are
+available to the certification body and the
+supervisory regulator on demand.
+
+## §12 Public Retrieval and Re-Issuance
+
+### §12.1 Public risk-summary publication
+
+The operator publishes per-period aggregate-
+risk statistics (the per-impact-level risk
+count, the per-treatment-decision count, the
+per-status mitigation count) on the public-
+portal endpoint without per-asset
+identifiers. The aggregated dataset is
+consumed by sectoral analysts, journalists,
+and policy researchers.
+
+### §12.2 Verifiable-credentials re-issuance
+
+An ISO/IEC 27001 certification or a NIST RMF
+ATO is re-issuable as a W3C Verifiable
+Credential signed by the certification body's
+or authorising official's signing-key set so
+that a downstream counterparty can verify
+the certification offline.
+
+## §13 KR-Jurisdiction Integration
+
+### §13.1 KR-ISMS-P certification body integration
+
+A KR-jurisdiction operator certified under
+the KISA-operated ISMS-P scheme integrates
+with the certification body's audit
+endpoint. The body's per-cycle audit envelope
+is recorded in the operator's audit trail.
+
+### §13.2 KR 정보보호 최고책임자 designation
+
+A KR-jurisdiction operator designates the
+information-security chief officer (정보
+보호 최고책임자, CISO) per the KR 정보통신망법.
+The operator's API publishes the CISO
+designation reference and the per-period
+CISO-led risk-evaluation report.
+
+### §13.3 KR 중요정보통신기반시설 binding
+
+A KR critical-information-infrastructure
+operator binds the per-cycle evaluation to
+the KR Ministry of Science and ICT's
+CIIP-supervision endpoint and to the per-
+sector CIIP-coordinating-authority's
+register.
+
+### §13.4 KR 전자금융감독규정 binding
+
+A KR financial-services operator binds the
+per-cycle evaluation to the KR Financial
+Services Commission's electronic-finance-
+supervision regulation envelope.
+
+## §14 References (consolidated)
+
+The references list across PHASE-1 to PHASE-4
+is the canonical citation set for the WIA-
+ci-octave standard. Implementations cite the
+SEI CERT Division publications, the ISO / IEC
+/ NIST / EU / KR references, and the The Open
+Group Open FAIR by their issuing organisation
+and the publication year so that a downstream
+consumer can locate the authoritative text.
+Updates to a cited standard (for example, a
+new SEI OCTAVE methodology revision, a new
+ISO/IEC 27005 amendment, a new NIST CSF
+release, a new EU NIS2 implementing-act)
+trigger an internal review cycle in the
+operator's quality-management discipline
+declared in PHASE-3 §5 before the new
+revision is bound into the operator's
+enumeration set.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## §15 Public-Sector Procurement Integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+A public-sector procurement programme
+selecting an OCTAVE-trained MSSP applies the
+WTO Government Procurement Agreement
+discipline where in scope. The operator
+publishes the per-tender entry with the
+procurement timetable, the technical-
+specifications envelope (the SEI OCTAVE-
+trained-evaluator designation reference, the
+ISO/IEC 27001 certification reference, the
+NIST RMF authorisation reference), and the
+award criteria.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## §16 Open-Source Tool Integration
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The operator's per-cycle evaluation may use
+open-source tooling (the SEI's OCTAVE Allegro
+worksheet templates, the ISO/IEC 27005 risk-
+register templates, the OWASP Threat Dragon
+threat-modelling tool, the MITRE ATT&CK
+framework). The operator publishes the per-
+cycle tool-version envelope so that a
+downstream auditor can reproduce the per-
+cycle evidence.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §17 Continuous Improvement Programme
 
-## Annex F — Adoption Roadmap
+Each operator publishes an annual improvement
+plan addressing per-cycle risk-trend,
+treatment-implementation-rate, audit-finding-
+remediation-rate, and per-supplier risk
+register. The programme is open and the
+annual report is published on the operator's
+public-portal endpoint per PHASE-2 §12.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §18 Sectoral-Specific Bindings
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+### §18.1 Healthcare-IT binding
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A healthcare-IT operator binds the per-cycle
+evaluation to the HIPAA Security Rule §164.308
+risk-analysis requirement (where US scope
+applies) or the equivalent national health-
+information-security framework. The operator's
+API publishes the per-cycle evidence to the
+healthcare-IT-supervisory authority.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+### §18.2 Financial-services binding
 
-## Annex G — Test Vectors and Conformance Evidence
+A financial-services operator binds the per-
+cycle evaluation to the FFIEC IT Examination
+Handbook (where US scope applies), the EU
+DORA Regulation (where EU scope applies), or
+the equivalent national financial-regulator
+framework. The operator's API publishes the
+per-cycle evidence to the relevant supervisory
+authority.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+### §18.3 OT and ICS binding
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+A critical-infrastructure operator binding
+operational-technology assets binds the per-
+cycle evaluation to the IEC 62443-3-2:2020
+security-risk-assessment-for-system-design
+discipline. The operator's API publishes the
+per-zone-and-conduit risk-and-vulnerability
+register.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §19 Risk-Maturity Programme Integration
 
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
-
-## Annex J — Reference Implementation Topology
-
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
-
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-4-INTEGRATION validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
-
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+The operator's per-cycle evaluation includes
+the operator's risk-maturity declaration per
+the CMU SEI CERT-RMM v1.2 maturity-indicator
+levels. The maturity declaration is published
+to the operator's audit committee and to the
+SEI CERT Division's optional benchmarking
+endpoint.

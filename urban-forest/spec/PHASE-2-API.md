@@ -568,16 +568,65 @@ X-RateLimit-Reset: 1642248000
 
 ---
 
-<div align="center">
-
-**WIA Urban Forest Creation API v1.0.0**
-
-**弘益人間 (홍익인간)** - Benefit All Humanity
-
 ---
 
-**© 2025 WIA**
+## 11. Audit transport and observability
 
-**MIT License**
+Every Phase 2 endpoint emits a structured audit record at the host's
+audit transport. The record carries: a UTC timestamp per RFC 3339,
+the host identifier, the tenant identifier, the endpoint path, the
+HTTP method, the response status, the response latency in milliseconds,
+the W3C Trace Context `traceparent` header propagated end-to-end, the
+caller's authenticated identity per WIA-OMNI-API §3, and (where the
+request body or response body carries an envelope) the envelope class
+plus envelope identifier so an investigator can reconstruct the full
+operation across the host and the upstream identity provider. Audit
+records compose with OpenTelemetry semantic conventions: `wia.standard.slug`
+= `urban-forest`, `wia.standard.phase` = `2`, and `wia.envelope.class`
+keyed off the body. Operators feed the records into the operator's SIEM
+(Splunk, Elastic, Sumo Logic, Wazuh, Microsoft Sentinel) per OpenTelemetry
+exporter envelopes. The trace identifier surfaces as the `X-WIA-Trace-Id`
+response header so a downstream consumer can pivot from the response back
+into the audit transport without out-of-band coordination.
 
-</div>
+## 12. Capabilities discovery and SemVer
+
+Hosts SHOULD publish a capabilities document at
+`/.well-known/wia-urban-forest-capabilities` enumerating per-endpoint
+optionality (e.g., the `lidar-canopy-import` endpoint is optional;
+hosts that only consume Sentinel-2 NDVI MAY omit it; hosts MUST
+respond with `501 Not Implemented` and include `Sunset:` and
+`Deprecation:` headers per IETF RFC 8594 + RFC 9745 when an optional
+endpoint is intentionally not served). Clients MUST treat unsupported
+capabilities as absent rather than as an error condition. SemVer
+applies per semver.org: within a 1.x line every endpoint path remains
+reachable and continues to honour the documented status codes; new
+fields ride a minor bump; new endpoint paths ride a minor bump;
+breaking changes ride a major bump with a 12-month deprecation window
+per IETF RFC 8594/9745 and require a two-thirds Committee vote.
+
+## 13. Backwards-compatibility and SemVer
+
+Within the 1.x line, every Phase 2 endpoint remains reachable and
+continues to honour the documented status codes and content shapes.
+Hosts MAY add optional query parameters and optional response fields;
+hosts MUST NOT remove existing endpoint paths. Breaking changes ride
+a major version bump with a 12-month deprecation window per IETF RFC
+8594 and require a two-thirds Committee vote. Hosts moving from one
+minor version to the next MUST publish the change in the host's
+release notes with the per-capability migration window so machine
+consumers can plan migration without waiting for human-channel
+notification.
+
+## 14. Privacy envelope
+
+Phase 2 endpoints that handle citizen-contributed data (e.g.,
+crowd-sourced tree photographs per the per-host citizen-science
+envelope) honour the operator's per-jurisdiction privacy law
+(EU GDPR per Regulation 2016/679, UK GDPR per UK Data Protection
+Act 2018, California CPRA per Cal. Civ. Code §1798.100, Brazil
+LGPD per Lei 13.709/2018, Korea PIPA per 개인정보 보호법). Subject-
+rights endpoints (access, rectification, erasure, portability,
+restriction, objection) compose with WIA-OMNI-API §5.
+
+弘益人間 — Benefit All Humanity.

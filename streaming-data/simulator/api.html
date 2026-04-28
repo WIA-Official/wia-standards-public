@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streaming Data - API Reference</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 30px;
+            line-height: 1.8;
+        }
+
+        h1, h2, h3 {
+            color: #10B981;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            border-bottom: 3px solid #10B981;
+            padding-bottom: 10px;
+        }
+
+        .api-section {
+            background: rgba(30, 41, 59, 0.6);
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #10B981;
+        }
+
+        .endpoint {
+            background: rgba(16, 185, 129, 0.1);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border: 1px solid #10B981;
+        }
+
+        .method {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-right: 10px;
+        }
+
+        .method.post { background: #10B981; color: #0f172a; }
+        .method.get { background: #3b82f6; color: white; }
+        .method.put { background: #f59e0b; color: white; }
+        .method.delete { background: #ef4444; color: white; }
+
+        pre {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 15px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        code {
+            color: #10B981;
+            font-family: 'Courier New', monospace;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #334155;
+        }
+
+        th {
+            background: #10B981;
+            color: #0f172a;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) {
+            background: rgba(30, 41, 59, 0.4);
+        }
+
+        .parameter {
+            color: #34d399;
+        }
+
+        .type {
+            color: #60a5fa;
+            font-style: italic;
+        }
+
+        .required {
+            color: #f87171;
+            font-weight: bold;
+        }
+
+        .optional {
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <h1>⚙️ API Reference</h1>
+
+    <div class="api-section">
+        <h2>Stream Producer API</h2>
+        <p>APIs for producing events to streaming platforms.</p>
+
+        <div class="endpoint">
+            <h3>
+                <span class="method post">POST</span>
+                <code>/api/v1/streams/{streamName}/events</code>
+            </h3>
+            <p>Publish a single event to a stream.</p>
+
+            <h4>Path Parameters</h4>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><span class="parameter">streamName</span></td>
+                    <td><span class="type">string</span></td>
+                    <td><span class="required">Required.</span> Name of the target stream</td>
+                </tr>
+            </table>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "key": "user-123",
+  "value": {
+    "eventType": "user-action",
+    "timestamp": "2025-01-15T10:30:00Z",
+    "data": {
+      "action": "click",
+      "element": "checkout-button"
+    }
+  },
+  "headers": {
+    "correlationId": "abc-123",
+    "source": "web-app"
+  },
+  "partitionKey": "user-123"
+}</code></pre>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "eventId": "evt_1234567890",
+  "partition": 3,
+  "offset": 1234567,
+  "timestamp": "2025-01-15T10:30:00.123Z",
+  "status": "published"
+}</code></pre>
+        </div>
+
+        <div class="endpoint">
+            <h3>
+                <span class="method post">POST</span>
+                <code>/api/v1/streams/{streamName}/events/batch</code>
+            </h3>
+            <p>Publish multiple events in a single batch.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "events": [
+    {
+      "key": "user-123",
+      "value": { "eventType": "login", "userId": "123" }
+    },
+    {
+      "key": "user-456",
+      "value": { "eventType": "purchase", "amount": 99.99 }
+    }
+  ],
+  "options": {
+    "compression": "gzip",
+    "timeout": 5000
+  }
+}</code></pre>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "batchId": "batch_abc123",
+  "totalEvents": 2,
+  "successCount": 2,
+  "failureCount": 0,
+  "results": [
+    { "eventId": "evt_001", "partition": 0, "offset": 100 },
+    { "eventId": "evt_002", "partition": 1, "offset": 200 }
+  ]
+}</code></pre>
+        </div>
+    </div>
+
+    <div class="api-section">
+        <h2>Stream Consumer API</h2>
+        <p>APIs for consuming events from streaming platforms.</p>
+
+        <div class="endpoint">
+            <h3>
+                <span class="method get">GET</span>
+                <code>/api/v1/streams/{streamName}/events</code>
+            </h3>
+            <p>Consume events from a stream with optional filtering.</p>
+
+            <h4>Query Parameters</h4>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><span class="parameter">consumerGroup</span></td>
+                    <td><span class="type">string</span></td>
+                    <td><span class="required">Required.</span> Consumer group identifier</td>
+                </tr>
+                <tr>
+                    <td><span class="parameter">offset</span></td>
+                    <td><span class="type">string</span></td>
+                    <td><span class="optional">Optional.</span> Starting offset (earliest, latest, or number)</td>
+                </tr>
+                <tr>
+                    <td><span class="parameter">limit</span></td>
+                    <td><span class="type">integer</span></td>
+                    <td><span class="optional">Optional.</span> Maximum events to return (default: 100)</td>
+                </tr>
+                <tr>
+                    <td><span class="parameter">timeout</span></td>
+                    <td><span class="type">integer</span></td>
+                    <td><span class="optional">Optional.</span> Poll timeout in milliseconds (default: 1000)</td>
+                </tr>
+            </table>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "events": [
+    {
+      "eventId": "evt_001",
+      "partition": 0,
+      "offset": 1234,
+      "timestamp": "2025-01-15T10:30:00Z",
+      "key": "user-123",
+      "value": {
+        "eventType": "user-action",
+        "data": { "action": "click" }
+      }
+    }
+  ],
+  "metadata": {
+    "consumerGroup": "analytics-group",
+    "lag": 0,
+    "nextOffset": 1235
+  }
+}</code></pre>
+        </div>
+
+        <div class="endpoint">
+            <h3>
+                <span class="method post">POST</span>
+                <code>/api/v1/consumers/{consumerGroup}/commit</code>
+            </h3>
+            <p>Manually commit offsets for a consumer group.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "offsets": [
+    {
+      "stream": "user-events",
+      "partition": 0,
+      "offset": 1234
+    },
+    {
+      "stream": "user-events",
+      "partition": 1,
+      "offset": 5678
+    }
+  ]
+}</code></pre>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "status": "committed",
+  "committedOffsets": [
+    { "stream": "user-events", "partition": 0, "offset": 1234 },
+    { "stream": "user-events", "partition": 1, "offset": 5678 }
+  ]
+}</code></pre>
+        </div>
+    </div>
+
+    <div class="api-section">
+        <h2>Stream Management API</h2>
+        <p>APIs for managing streams and topics.</p>
+
+        <div class="endpoint">
+            <h3>
+                <span class="method post">POST</span>
+                <code>/api/v1/streams</code>
+            </h3>
+            <p>Create a new stream.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "name": "user-events",
+  "partitions": 10,
+  "replicationFactor": 3,
+  "config": {
+    "retentionMs": 604800000,
+    "compressionType": "gzip",
+    "maxMessageBytes": 1048576
+  }
+}</code></pre>
+        </div>
+
+        <div class="endpoint">
+            <h3>
+                <span class="method get">GET</span>
+                <code>/api/v1/streams/{streamName}</code>
+            </h3>
+            <p>Get stream metadata and statistics.</p>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "name": "user-events",
+  "partitions": 10,
+  "replicationFactor": 3,
+  "totalMessages": 1234567,
+  "totalSize": 1048576000,
+  "config": {
+    "retentionMs": 604800000,
+    "compressionType": "gzip"
+  },
+  "partitionDetails": [
+    {
+      "partition": 0,
+      "leader": "broker-1",
+      "replicas": ["broker-1", "broker-2", "broker-3"],
+      "startOffset": 0,
+      "endOffset": 123456
+    }
+  ]
+}</code></pre>
+        </div>
+
+        <div class="endpoint">
+            <h3>
+                <span class="method delete">DELETE</span>
+                <code>/api/v1/streams/{streamName}</code>
+            </h3>
+            <p>Delete a stream and all its data.</p>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "status": "deleted",
+  "streamName": "user-events",
+  "deletedAt": "2025-01-15T10:30:00Z"
+}</code></pre>
+        </div>
+    </div>
+
+    <div class="api-section">
+        <h2>Stream Processing API</h2>
+        <p>APIs for stream processing operations.</p>
+
+        <div class="endpoint">
+            <h3>
+                <span class="method post">POST</span>
+                <code>/api/v1/processors</code>
+            </h3>
+            <p>Create a stream processing pipeline.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "name": "fraud-detection",
+  "source": "transactions",
+  "operations": [
+    {
+      "type": "filter",
+      "predicate": "value.amount > 1000"
+    },
+    {
+      "type": "map",
+      "function": "enrichWithUserData"
+    },
+    {
+      "type": "window",
+      "windowType": "tumbling",
+      "duration": 300000
+    },
+    {
+      "type": "aggregate",
+      "aggregation": "count",
+      "groupBy": "userId"
+    }
+  ],
+  "sink": "fraud-alerts",
+  "config": {
+    "parallelism": 4,
+    "checkpointInterval": 60000
+  }
+}</code></pre>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "processorId": "proc_abc123",
+  "status": "running",
+  "createdAt": "2025-01-15T10:30:00Z",
+  "metrics": {
+    "eventsProcessed": 0,
+    "throughput": 0,
+    "lag": 0
+  }
+}</code></pre>
+        </div>
+
+        <div class="endpoint">
+            <h3>
+                <span class="method get">GET</span>
+                <code>/api/v1/processors/{processorId}/metrics</code>
+            </h3>
+            <p>Get real-time metrics for a stream processor.</p>
+
+            <h4>Response</h4>
+            <pre><code>{
+  "processorId": "proc_abc123",
+  "status": "running",
+  "metrics": {
+    "eventsProcessed": 1234567,
+    "throughput": 5000,
+    "avgLatency": 45,
+    "lag": 100,
+    "errorRate": 0.001
+  },
+  "windows": [
+    {
+      "windowStart": "2025-01-15T10:00:00Z",
+      "windowEnd": "2025-01-15T10:05:00Z",
+      "eventsCount": 5000
+    }
+  ]
+}</code></pre>
+        </div>
+    </div>
+
+    <div class="api-section">
+        <h2>Error Codes</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Message</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1001</td>
+                    <td>STREAM_NOT_FOUND</td>
+                    <td>The specified stream does not exist</td>
+                </tr>
+                <tr>
+                    <td>1002</td>
+                    <td>INVALID_OFFSET</td>
+                    <td>The specified offset is invalid or out of range</td>
+                </tr>
+                <tr>
+                    <td>1003</td>
+                    <td>CONSUMER_GROUP_NOT_FOUND</td>
+                    <td>The specified consumer group does not exist</td>
+                </tr>
+                <tr>
+                    <td>1004</td>
+                    <td>SERIALIZATION_ERROR</td>
+                    <td>Failed to serialize/deserialize event data</td>
+                </tr>
+                <tr>
+                    <td>1005</td>
+                    <td>QUOTA_EXCEEDED</td>
+                    <td>Request rate or throughput quota exceeded</td>
+                </tr>
+                <tr>
+                    <td>1006</td>
+                    <td>TIMEOUT</td>
+                    <td>Operation timed out</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
