@@ -1,241 +1,338 @@
-# WIA-pq-crypto PHASE 4 — INTEGRATION Specification
+# WIA-pq-crypto PHASE 4 — Integration Specification
 
 **Standard:** WIA-pq-crypto
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-pq-crypto (Pq Crypto).
+This PHASE specifies how a post-quantum-cryptography
+(PQC) deployment integrates the data, APIs, and protocols
+from PHASEs 1–3 with broader operational systems: PKI / CA
+roster, HSM and key-management infrastructure, TLS / IKE /
+SSH endpoints, code-signing pipelines, document signature
+infrastructure, hardware-token (PIV/CAC/FIDO2) ecosystems,
+and the cross-domain consumers that depend on cryptographic
+state. It also specifies the migration-phase declarations
+that other WIA standards reference to gate hybrid-mode
+adoption.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- NIST FIPS 203 — Module-Lattice-Based Key-Encapsulation Mechanism (ML-KEM)
+- NIST FIPS 204 — Module-Lattice-Based Digital Signature Algorithm (ML-DSA)
+- NIST FIPS 205 — Stateless Hash-Based Digital Signature Algorithm (SLH-DSA)
+- NIST SP 800-208 — Recommendation for Stateful Hash-Based Signature Schemes (LMS / HSS / XMSS)
+- NIST SP 800-227 (draft) — Recommendations for Key-Encapsulation Mechanisms
+- NSA CNSA 2.0 — Commercial National Security Algorithm Suite 2.0 transition guidance
+- BSI TR-02102-1 — Cryptographic Mechanisms recommendations
+- ANSSI Avis sur la migration vers la cryptographie post-quantique
+- IETF RFC 8446 (TLS 1.3), RFC 9180 (HPKE), RFC 8391 (XMSS), RFC 8554 (LMS / HSS)
+- IETF Hybrid PQ KEX drafts (X25519+ML-KEM-768, secp256r1+ML-KEM-768, X-Wing)
+- ISO/IEC 18033-2 — Encryption algorithms (asymmetric reference)
+- ISO/IEC 14888-2/-3 — Digital signatures with appendix
+- ISO/IEC 19790:2025 — Security requirements for cryptographic modules
+- FIPS 140-3 — Security Requirements for Cryptographic Modules
 
 ---
 
-## §1 Scope
+## §1 PKI / CA roster integration
 
-This PHASE document is one of four that together define the WIA-pq-crypto
-standard. It addresses the integration layer of the standard.
+PQC migration touches every PKI in the deployment:
 
-## §2 Manifest
+- **Internal CA**: deployment-operated; rolls to ML-DSA
+  (default ML-DSA-65 for end-entity, ML-DSA-87 for root /
+  intermediate)
+- **External commercial CA**: tracked per CA's published PQC
+  roadmap; the deployment maintains the CA-roster manifest
+  with each CA's PQC support status
+- **National PKI**: KR 행정전자서명·NPKI, EU eIDAS QSCD,
+  US FPKI — tracked separately because each migrates on a
+  national timeline
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "pq-crypto"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The boundary surfaces a per-endpoint PQC capability matrix:
+which TLS endpoint supports hybrid (Phase B), which is
+PQC-only (Phase C), which is still classical-only (Phase A).
+Migration phase declarations (per PHASE 1 §6) are queryable
+by operating standards (e.g., `WIA-medical-data-privacy`,
+`WIA-payment-system`) so they can refuse classical-only
+endpoints once their own phase target is reached.
 
-## §3 Conformance Tiers
+## §2 HSM / KMS integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+PQC parameter sets are large compared to classical (ML-KEM-768
+public key 1184 B, ciphertext 1088 B, ML-DSA-65 signature 3293 B,
+SLH-DSA-128f signature 17088 B). HSM integration:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- HSM firmware version + supported PQC algorithm list pinned
+  per device in the HSM-fleet manifest
+- KMS partitions tagged with the PQC algorithm allow-list
+  per partition (e.g., a partition restricted to ML-DSA only)
+- Hybrid keys (classical + PQC) carry both sub-key references;
+  the KMS surfaces both so callers can verify the hybrid
+  binding integrity
+- Key wrapping uses ML-KEM-768 + AES-256-Wrap (RFC 5649 KW)
+  or, where supported, ML-KEM-1024 for higher-tier wrapping
 
-## §4 Discovery
+The deployment maintains a per-HSM-vendor compatibility matrix
+because PQC adoption varies (FIPS 140-3 PQC validation is
+phased; some vendors ship pre-validation FIPS-140-3 boundary
+parameters first).
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/pq-crypto`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 TLS / IKE / SSH endpoint integration
 
-## §5 Time and Identity
+TLS 1.3 hybrid handshakes adopt named groups from the IETF
+Hybrid PQ KEX drafts:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- `X25519MLKEM768` — production-recommended hybrid (Phase B)
+- `SecP256r1MLKEM768` — alternative hybrid for FIPS-only
+  environments
+- `X-Wing` — combiner with explicit security proof (per
+  the IETF specification)
 
-## §6 Versioning and Deprecation
+The boundary's TLS surface declares supported groups in the
+capability document; the migration-phase declaration controls
+which groups are acceptable to peers per WIA standard. IKEv2
+(RFC 7296) with PQ extensions tracks the IETF
+`pqc-ikev2` work; SSH (RFC 4253) hybrid kex tracks the
+`sntrup761x25519-sha512` (and successor ML-KEM-based) drafts.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Code-signing pipeline integration
 
-## §7 Privacy and Security
+Signed-software supply chains migrate to PQC signatures:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Build-time signing: ML-DSA-65 default; SLH-DSA reserved
+  for high-assurance (long-lived) artifacts where statefulness
+  isn't acceptable
+- Stateful hash-based signing (LMS / HSS / XMSS per NIST
+  SP 800-208 + RFC 8391 / RFC 8554): firmware roots-of-trust
+  where lifecycle keys + tree-state management are tractable
+- Verifier-side: code-signing verifiers maintain hybrid
+  signing trust during migration (both classical + PQC
+  signatures verified; either passing is acceptable per the
+  deployment's hybrid policy)
 
-## §8 Open Governance
+## §5 Document-signature integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `pq-crypto` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Long-lived documents (notarial, archival, regulated records)
+adopt PQC signatures with extra discipline:
+
+- `validityWindow` declarations per signature so verifiers
+  know whether to trust a classical-only signature (per
+  WIA-pq-crypto PHASE 1 §6 phase target valid at signing
+  time)
+- Signature renewal: a document signed under classical-only
+  in 2026 may be re-signed under hybrid or PQC-only in 2030
+  to extend its trust horizon
+- Long-term archival: prefer SLH-DSA (stateless) for
+  documents archived for decades because LMS / HSS state
+  loss invalidates the key
+
+The renewal trail itself is signed and audit-chained so
+verifiers see the full signature lineage.
+
+## §6 Hardware-token integration
+
+PIV / CAC / FIDO2 tokens migrate to PQC algorithms as the
+respective specifications publish PQC profiles:
+
+- PIV (NIST SP 800-73) — PQC profile drafting
+- FIDO2 / WebAuthn — CTAP2.2 PQ extensions tracked
+- KR 공동인증·금융인증 — KISA PQC profile timeline
+  per regulator publication
+
+Token capability is part of the deployment's identity
+infrastructure (cross-reference to WIA-identity-management
+PHASE 4 §3); a token's declared PQC algorithm set gates
+its acceptance for high-assurance authentication flows.
+
+## §7 Cross-domain phase declaration
+
+Other WIA standards reference WIA-pq-crypto PHASE 1 §6
+phase declarations:
+
+- `WIA-medical-data-privacy` PHASE 3 §10 — clinical TLS
+  cipher-suite floor
+- `WIA-payment-system` PHASE 3 §8 — payment-rail TLS floor
+- `WIA-mobile-payment` PHASE 3 §7 — wallet-attestation
+  signature suite
+- `WIA-network-security` PHASE 3 — sensor / endpoint TLS
+  surfaces
+- `WIA-military-satellite` PHASE 3 §8 — TT&C link
+  cryptography
+- `WIA-nft` PHASE 4 — bridge / wallet attestation
+- `WIA-medical-robot` PHASE 3 — surgical-robot tele-link
+  encryption
+
+Each consumer publishes its phase-target declaration in
+its capability document; the migration-coordination service
+(this PHASE §9) aggregates these declarations to surface
+deployment-wide migration status.
+
+## §8 Algorithm-rollout governance
+
+Adopting a new PQC algorithm into production follows:
+
+1. **Pilot lane**: enabled on non-critical endpoints with
+   detailed telemetry (handshake success rate, latency,
+   parameter-size impact on packet fragmentation)
+2. **Expanded pilot**: progressively wider lanes as
+   telemetry validates correctness; per-region rollouts
+   to absorb edge-network MTU sensitivity
+3. **General availability**: full migration target with
+   classical fallback retained per phase target
+4. **Deprecation**: classical-only acceptance retired per
+   the deployment's published deprecation timeline; the
+   audit chain captures every retired algorithm
+
+Each rollout stage emits an audit-chain entry with the
+algorithm identifier, scope (endpoints / regions affected),
+and the operating authority's signature.
+
+## §9 Migration-coordination service
+
+The deployment runs a migration-coordination service that:
+
+- Aggregates per-domain phase declarations
+- Surfaces gap analysis (which domains lag the deployment-wide
+  target)
+- Schedules cross-domain handover windows (e.g., when a
+  domain's downstream consumer can't yet handle PQC, the
+  coordinator schedules a planned downgrade window)
+- Publishes the deployment-wide migration dashboard
+
+Cross-coalition coordination (where the deployment serves
+partners) follows a documented exchange schedule so the
+ecosystem migrates in coordinated waves rather than
+fragmenting into incompatible islands.
+
+## §10 Operational SLAs
+
+| Concern                                | Default SLA                |
+|----------------------------------------|----------------------------|
+| Phase-declaration query                | ≤ 100 ms p95               |
+| HSM PQC operation (ML-DSA-65 sign)     | per HSM vendor spec        |
+| TLS hybrid handshake overhead          | < 30% over classical       |
+| Algorithm-roster refresh               | daily                      |
+| CA-roster PQC-status refresh           | hourly                     |
+| Audit-chain entry availability         | ≤ 10 s                     |
+| Migration-dashboard refresh            | hourly                     |
+
+## §11 Quarterly compliance report
+
+The boundary emits a quarterly compliance report:
+
+- Endpoint inventory by phase (A / B / C)
+- Algorithm distribution across endpoints
+- Hybrid-handshake success vs. classical-only fallback rates
+- HSM PQC validation status
+- CA-roster PQC-readiness summary
+- Pilot-lane telemetry summary
+- Cross-domain gap analysis
+- Audit-chain integrity check results
+
+## §12 Acceptance criteria
+
+A deployment claims conformance when:
+
+1. Every cryptographic endpoint declares a phase per PHASE 1 §6
+2. Every HSM in service is in the fleet manifest with current
+   PQC algorithm support
+3. Hybrid TLS is operational on at least the high-priority
+   endpoints (per the deployment's prioritisation)
+4. Migration-phase declarations are referenced and honoured by
+   downstream WIA-domain consumers
+5. Audit-chain entries match the deployment's algorithm-rollout
+   timeline for the prior quarter
+6. Quarterly compliance report has no integrity-check failures
+
+## §13 Common pitfalls (informative)
+
+- **Parameter-size MTU fragmentation** — PQC handshakes
+  exceed 1500-byte MTU for many parameter combinations;
+  deployments SHOULD test on real-world network paths,
+  including legacy middleboxes that fragment poorly
+- **HSM firmware lag** — vendors ship PQC support behind
+  validation timelines; deployments SHOULD plan for
+  vendor-staged rollout, not a single cutover
+- **CA migration desync** — different CAs migrate on
+  different schedules; mixed PQC / classical chains common
+  during transition
+- **Stateful HBS state-loss** — LMS / HSS / XMSS state must
+  not be lost or replayed across HSM partitions; deployment
+  policy SHOULD prefer SLH-DSA where state management is
+  hard
+- **Hybrid binding misuse** — naive concatenation of
+  classical + PQC keys is insecure; combiners must follow
+  the IETF Hybrid PQ KEX draft's binding rules (or X-Wing's
+  explicit construction)
+- **Algorithm-identifier confusion** — Kyber / Dilithium are
+  pre-FIPS names; FIPS-published names are ML-KEM / ML-DSA
+  with different parameter selections. Deployments MUST
+  reference the FIPS identifiers in normative records
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cross-domain reference table
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+| Reference                  | Use site                                                     |
+|----------------------------|--------------------------------------------------------------|
+| WIA-network-security       | sensor / endpoint TLS cipher-suite floor                     |
+| WIA-identity-management    | hardware-token PQC profile attestation                       |
+| WIA-payment-system         | payment-rail TLS migration phase                             |
+| WIA-mobile-payment         | wallet-attestation signature suite                           |
+| WIA-medical-data-privacy   | clinical-TLS hybrid floor                                    |
+| WIA-military-satellite     | TT&C link cryptography                                       |
+| WIA-supply-chain           | code-signing pipeline                                        |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## Annex B — Decommissioning checklist (informative)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+When a deployment retires a classical-only endpoint:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+- [ ] Phase target met for the endpoint's domain
+- [ ] Downstream consumers acknowledge readiness
+- [ ] Audit-chain entry recording retirement signed
+- [ ] CA / KMS / HSM partitions reconfigured
+- [ ] Capability document published with updated surface
+- [ ] Migration dashboard reflects retirement
 
-## Annex F — Adoption Roadmap
+## Annex C — Conformance disclosure
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Sections §1, §2, §3, §7, §10, §11, §12 are mandatory.
+§4 (code-signing) is mandatory for deployments running
+software-supply-chain pipelines. §5 (document-signature) is
+mandatory for archival / notarial deployments. §6 (hardware
+token) is mandatory for deployments accepting hardware-token
+authentication.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex D — Worked migration calendar (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A worked migration calendar for a deployment with
+moderate cryptographic surface:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+- 2026 Q1–Q2: HSM firmware audit + hybrid TLS pilot on
+  internal endpoints
+- 2026 Q3: hybrid TLS general availability for internal
+  east-west traffic
+- 2026 Q4: hybrid TLS pilot for external customer-facing
+  TLS (limit to allow-listed customers)
+- 2027 Q1: code-signing pipeline migration (ML-DSA-65 default)
+- 2027 Q2–Q3: external customer-facing hybrid TLS GA
+- 2028: classical-only deprecation begins on internal
+  endpoints
+- 2030+: hybrid → PQC-only migration tracked by deployment
+  policy
 
-## Annex G — Test Vectors and Conformance Evidence
+The actual calendar varies per deployment; the audit chain
+captures the deployment's actual progression for compliance
+purposes.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## Annex E — Algorithm allow-list anchoring
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The deployment's allow-list of permitted PQC algorithms is
+anchored to the deployment's signing key. Allow-list mutations
+(adding / retiring algorithms) require a counter-signature
+from the deployment's cryptographic-policy authority and emit
+an audit-chain entry.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The allow-list itself references upstream guidance (NIST
+FIPS 203/204/205, CNSA 2.0, BSI TR-02102-1, ANSSI guidance);
+mutations document which upstream change motivated them.
