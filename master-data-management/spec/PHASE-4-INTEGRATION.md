@@ -1,241 +1,273 @@
-# WIA-master-data-management PHASE 4 — INTEGRATION Specification
+# WIA-master-data-management PHASE 4 — Integration Specification
 
 **Standard:** WIA-master-data-management
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-master-data-management (Master Data Management).
+This PHASE specifies how WIA-master-data-management
+integrates with adjacent operational, analytical, and
+regulatory systems: enterprise applications (ERP, CRM,
+HCM, billing, KYC), data warehouses and lakehouses,
+business-intelligence and analytics consumers, supply-
+chain trace systems, financial-reporting frameworks
+(IFRS / GAAP / regulator-specific reporting), reference-
+data authorities (GS1, GLEIF, LEI ROC, ISO TC, GBIF /
+ITIS / Catalogue of Life), privacy-rights pipelines,
+and downstream WIA companion standards. It also
+specifies the publication / consumption contracts that
+operational systems honour.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- ISO 8000-110 / 8000-115 / 8000-120 — master-data exchange
+- ISO/IEC 11179-3 / 11179-6 — metadata-registry exchange and registration
+- ISO/IEC 19763 — metamodel framework
+- DAMA-DMBOK — Data Management Body of Knowledge (reference)
+- HL7 FHIR R5 — Patient, Practitioner, Organization, Location, Substance, Bulk Data
+- HL7 SMART App Launch 2.0
+- GLEIF / LEI ROC — Global LEI System and CDF format
+- GS1 GTIN, GLN, SSCC; GS1 EPCIS / CBV
+- ISO 17442 — Legal Entity Identifier
+- ISO 6166 (ISIN), ISO 4217 (currency), ISO 3166 (country / region)
+- W3C SKOS, W3C SHACL, W3C R2RML — relational-to-RDF mapping
+- US SEC 17a-4 (financial record retention), GDPR (EU 2016/679),
+  K-PIPA (KR), CCPA / CPRA (US-CA), LGPD (BR), PIPL (CN)
+- IETF RFC 9110 (HTTP), RFC 7515 (JWS), RFC 8259 (JSON), RFC 8785 (JCS)
 
 ---
 
-## §1 Scope
+## §1 ERP / CRM / HCM / billing integration
 
-This PHASE document is one of four that together define the WIA-master-data-management
-standard. It addresses the integration layer of the standard.
+Master records publish to operational applications via
+one of three patterns:
 
-## §2 Manifest
+| Pattern         | Description                                       |
+|-----------------|---------------------------------------------------|
+| Registry-style  | downstream apps query MDM by reference; MDM is    |
+|                 | read-aside; downstream retains operational state  |
+| Transactional   | MDM is system of record; downstream uses cached  |
+|                 | replicas refreshed on change-events               |
+| Coexistence     | MDM holds golden values; downstream retains       |
+|                 | local extensions; bidirectional reconciliation    |
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "master-data-management"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Per-application binding is recorded on the source-
+system reference record so an audit can verify which
+domain attributes a system contributes versus consumes.
 
-## §3 Conformance Tiers
+## §2 Data warehouse / lakehouse integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+| Target                | Binding                                          |
+|-----------------------|--------------------------------------------------|
+| Data warehouse        | dimension-table publication (slowly-changing     |
+|                       | dimension type 2 with effective-dating)          |
+| Data lake / lakehouse | NDJSON / Parquet snapshot per-domain;            |
+|                       | golden-record changes feed CDC topic             |
+| Iceberg / Delta tables| atomic snapshot + change-data-feed               |
+| Streaming             | Kafka / Pulsar topic of change-events             |
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Downstream consumers receive the golden record and the
+change-event stream so analytics can replay any prior
+state.
 
-## §4 Discovery
+## §3 Reference-data authority integration
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/master-data-management`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+| Authority         | Reference                                          |
+|-------------------|----------------------------------------------------|
+| GLEIF             | LEI ROC; LEI CDF format; daily LEI file             |
+| GS1 GO            | GS1 GTIN / GLN / SSCC; GS1 GDSN data pool           |
+| D&B               | DUNS directory                                     |
+| ANNA              | ISIN issuance                                      |
+| OpenFIGI          | financial-instrument identifier                    |
+| ITIS / GBIF       | taxonomic reference (where bio-domain bound)        |
+| ISO TC            | ISO standards portal                                |
+| W3C / IETF / IEEE | technical-standard catalogue                       |
 
-## §5 Time and Identity
+Reference-data sets ingest with provenance (PHASE 1
+§7); cross-walks expose SKOS match relations (exact /
+close / broad / narrow / related).
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Financial-reporting frameworks
 
-## §6 Versioning and Deprecation
+| Framework        | Binding                                            |
+|------------------|----------------------------------------------------|
+| IFRS             | account / asset taxonomy alignment                  |
+| US GAAP          | XBRL US-GAAP taxonomy alignment                    |
+| ESEF (EU)        | XBRL ESEF taxonomy for issuer reporting             |
+| Solvency II      | EIOPA reporting                                    |
+| Basel III / IV   | counterparty / exposure reporting                  |
+| FATCA / CRS      | tax-jurisdictional reporting                        |
+| KR DART (KR)     | regulator-issuer disclosure                         |
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The party / asset / account hierarchies bind to the
+applicable framework's taxonomy version; reporting
+exports cite the taxonomy version in force at the
+reporting date.
 
-## §7 Privacy and Security
+## §5 Supply-chain trace integration
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+| Standard / system           | Binding                                |
+|-----------------------------|----------------------------------------|
+| GS1 EPCIS / CBV             | event-based supply-chain trace         |
+| WIA-food-traceability       | food / agriculture lots                |
+| WIA-pharmaceutical-trace    | DSCSA / EU FMD trace                   |
+| WIA-vehicle-trace           | VIN / battery-passport                 |
 
-## §8 Open Governance
+Product / location / party master records resolve the
+trace events to identified entities; the trace partner
+sees the same golden record.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `master-data-management` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Privacy-rights pipeline
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Master-record systems are the natural locus of subject-
+rights operations:
 
+| Right                 | Action                                       |
+|-----------------------|----------------------------------------------|
+| Access (GDPR Art. 15) | export of all party / personal records       |
+| Rectification (Art. 16)| steward task with audit trail               |
+| Erasure (Art. 17)     | tombstone — preserves audit chain hash, payload removed |
+| Portability (Art. 20) | machine-readable export of party data        |
+| Restriction (Art. 18) | flag prevents downstream processing           |
+| Objection (Art. 21)   | restriction + steward review                 |
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+Subject-rights events emit audit events and propagate
+to operational systems via the change-event stream.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## §7 Cross-domain WIA bindings
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+| Companion standard          | Binding purpose                                |
+|-----------------------------|------------------------------------------------|
+| WIA-data-governance         | stewardship-policy linkage                     |
+| WIA-data-lineage            | cross-system lineage edges                     |
+| WIA-data-quality            | continuous monitoring of quality scores        |
+| WIA-data-catalog            | catalog of master domains                      |
+| WIA-financial-data-exchange | party / asset / account binding                |
+| WIA-healthcare-integration  | Patient / Practitioner / Organization binding   |
+| WIA-food-traceability       | product / location binding                     |
+| WIA-cross-border-payment    | counterparty / party binding                   |
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Each binding identifies the consumed PHASE.
 
-## Annex F — Adoption Roadmap
+## §8 Long-term archival
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+| Domain / regulator                | Retention                          |
+|-----------------------------------|------------------------------------|
+| Party (KYC / AML)                 | per regulator (typ. ≥ 5 y after end of relationship) |
+| Financial / asset (US SEC)        | 17a-4 — 6 years (3 readily accessible) |
+| Tax records                       | per jurisdiction (typ. 7-10 years) |
+| Personal data                     | per lawful basis + DPIA            |
+| Reference-data versions           | indefinite (active + retired)       |
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The audit-chain hash is preserved even on personal-
+data erasure; the payload is replaced with a tombstone
+that records the erasure rationale and the steward.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §9 Conformance test suite
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The reference test suite covers, at minimum:
 
-## Annex G — Test Vectors and Conformance Evidence
+- ISO 8000-110 round-trip on a party / product record
+- LEI resolution on a legalEntity party record
+- DUNS resolution on a legalEntity party record
+- GTIN cross-walk to UNSPSC and GPC
+- SHACL validation on a malformed record
+- match-cluster steward action with survivorship override
+- hierarchy effective-date query at a prior date
+- bitemporal correction with `validFrom` distinct from
+  `recordedAt`
+- privacy erasure with audit-chain preservation
+- FHIR R5 export of Organization / Patient (where
+  clinical context applies)
+- change-event stream ordering and replay
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §10 Internationalisation
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Localised attributes (display names, address lines,
+reference labels) carry BCP 47 language tags; the
+golden record exposes the canonical fallback locale
+declared in the survivorship-policy reference record.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §11 Security and privacy posture
 
-## Annex H — Versioning and Deprecation Policy
+- Transport: TLS 1.3 with mutual TLS for sponsor /
+  authority / regulator transmissions
+- Authentication: SMART on FHIR (clinical contexts);
+  client_credentials with key attestation (sponsor)
+- At-rest: AES-256-GCM with sponsor-controlled KMS;
+  per-domain key wrapping per ISO/IEC 27002 §8.24
+- Audit: tamper-evident chain (PHASE 3 §8) exportable
+  per ISO/IEC 27037 forensic-evidence guidance
+- Privacy: special-category data follows ISO/IEC 27701
+  controls; subject-rights pipeline (§6) applies
+- Steward / regulator access: role-segregated;
+  operations on personal data require justification
+  recorded on the audit chain
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Operational metrics
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Sponsors report (informationally) on the WIA registry:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+- domain-record counts and growth
+- golden-record completeness / accuracy / uniqueness
+  rolling scores
+- match-cluster auto-merge vs. steward-review
+  proportion
+- stewardship SLA compliance per priority
+- privacy-rights queue (open / resolved per period)
 
-## Annex I — Interoperability Profiles
+## §13 Recovery and continuity
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- API outage — local change-event queue at source
+  systems; replay on reconnect
+- reference-authority outage — local mirror keyed by
+  release identifier; integrity via SHA-256 manifest
+- KMS outage — sealed back-up keys per sponsor's BCP
+- audit-chain corruption — chain repair via prior
+  snapshot + replay of the change-event stream
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## Annex A — Worked end-to-end example (informative)
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+A multinational manufacturer consolidates three
+regional ERP installations onto a transactional MDM
+backbone for the party / product / location domains.
+A daily LEI file from GLEIF refreshes legal-entity
+identifiers; SHACL shapes flag legalName mismatches
+for steward review. A merge of two duplicate "Acme
+Logistics" parties consolidates 12 GLN-bearing
+locations and 3,400 GTIN-bearing products. Downstream
+ERP, CRM, billing, and warehouse systems consume the
+golden record via the change-event stream; the data-
+warehouse populates SCD type 2 dimension tables. A
+GDPR Art. 17 erasure on a former employee's HCM party
+record propagates to all consumers; the audit-chain
+hash is preserved.
+
+## Annex B — Conformance disclosure
+
+Implementations declare the publication patterns
+(registry / transactional / coexistence) supported,
+the reference-authority bindings enabled, the FHIR R5
+IG profiles exposed (where applicable), and the
+financial-reporting taxonomies aligned. Disclosure is
+machine-readable at `/.well-known/wia-mdm-conformance.
+json`.
+
+## Annex C — Versioning
+
+Adding a new reference-authority binding is minor;
+changing the canonical FHIR mapping is major.
+
+## Annex D — Stewardship-policy registry
+
+The stewardship policy in force at any point in time
+is recorded as a reference record. Policy fields
+include:
+
+- match thresholds per domain
+- survivorship strategy per attribute
+- SLA tiers per priority
+- escalation paths
+- attestation requirements (steward credential)
+
+Policy changes emit audit events and re-trigger
+golden-record builds where the change affects survival.

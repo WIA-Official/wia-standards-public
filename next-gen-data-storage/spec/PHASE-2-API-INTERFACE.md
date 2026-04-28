@@ -1,241 +1,310 @@
-# WIA-next-gen-data-storage PHASE 2 — API-INTERFACE Specification
+# WIA-next-gen-data-storage PHASE 2 — API Interface Specification
 
 **Standard:** WIA-next-gen-data-storage
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-next-gen-data-storage (Next Gen Data Storage).
+This PHASE defines the resource-oriented API surface
+for next-gen storage operations: storage-domain and
+namespace management, volume / file-system / bucket
+provisioning, performance-profile and QoS control,
+durability and replication management, encryption-
+envelope lifecycle, content-addressed artefact ingest
+(S3 / OCI Distribution), tier-promotion / tier-
+demotion, fault and health monitoring, and capacity /
+performance reporting.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9110 (HTTP), RFC 9112 (HTTP/1.1), RFC 9113 (HTTP/2)
+- IETF RFC 9457 (Problem Details for HTTP APIs)
+- IETF RFC 8259 (JSON), RFC 8785 (JCS), RFC 4122 (UUID), RFC 9530 (Content-Digest)
+- DMTF Redfish 2024.x; SNIA Swordfish 1.2.6; SNIA SMI-S 1.8
+- NVM Express Base Specification 2.0; NVMe-MI 1.2; NVMe-oF 1.1
+- AWS S3 API; S3 Object Lock; S3 Multi-Region Access Points
+- OCI Distribution Specification 1.1; OCI Image Specification 1.1
+- DMTF Redfish OEM Extensions registry
+- IEEE 802.1Qbv / Qbu (Time-Sensitive Networking, where TSN-bound)
 
 ---
 
-## §1 Scope
+## §1 Endpoint root
 
-This PHASE document is one of four that together define the WIA-next-gen-data-storage
-standard. It addresses the api-interface layer of the standard.
+API root is implementation-controlled. All endpoints
+are TLS 1.3 (RFC 8446). Management endpoints
+(Swordfish / Redfish) follow the DMTF base API. S3
+endpoints follow the de-facto S3 contract; OCI
+Distribution endpoints follow the OCI Distribution
+specification.
 
-## §2 Manifest
+## §2 Storage-domain endpoints
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "next-gen-data-storage"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+POST   /v1/domains                          register storage domain
+GET    /v1/domains/{ref}                    retrieve
+PATCH  /v1/domains/{ref}                    amend (admin)
+GET    /v1/domains?topology=&media=         list / filter
+GET    /v1/domains/{ref}/health             health-check status
+```
 
-## §3 Conformance Tiers
+Health-check responses include per-component status,
+firmware version, and the last fault event.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Namespace endpoints
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+POST   /v1/namespaces                       create namespace
+GET    /v1/namespaces/{ref}                 retrieve
+PATCH  /v1/namespaces/{ref}                 amend (capacity / quota)
+DELETE /v1/namespaces/{ref}                 release (with WORM gate)
+GET    /v1/namespaces?domain=&kind=         list / filter
+POST   /v1/namespaces/{ref}/zns/zone-actions  ZNS zone management
+                                              (open / close / finish / reset)
+```
 
-## §4 Discovery
+ZNS zone-actions follow the NVMe ZNS Command Set
+semantics (TP 4053a).
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/next-gen-data-storage`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Volume / file-system / bucket endpoints
 
-## §5 Time and Identity
+```
+POST   /v1/volumes                          create volume (block / fs / bucket)
+GET    /v1/volumes/{ref}                    retrieve
+PATCH  /v1/volumes/{ref}                    amend (capacity / quota)
+DELETE /v1/volumes/{ref}                    release
+POST   /v1/volumes/{ref}/snapshot           create snapshot
+POST   /v1/volumes/{ref}/clone              clone from snapshot
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Object-bucket operations follow the S3 API in addition
+to this resource-oriented surface.
 
-## §6 Versioning and Deprecation
+## §5 Performance-profile endpoints
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+POST   /v1/performance-profiles             create profile
+GET    /v1/performance-profiles/{ref}       retrieve
+POST   /v1/namespaces/{ref}/profile         apply profile
+GET    /v1/namespaces/{ref}/qos-status      QoS adherence summary
+```
 
-## §7 Privacy and Security
+QoS adherence reports per-percentile actual versus
+target; sustained miss raises a stewardship task.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Durability and replication endpoints
 
-## §8 Open Governance
+```
+POST   /v1/replication-topologies           define topology
+PATCH  /v1/replication-topologies/{ref}     amend members
+POST   /v1/replication-topologies/{ref}/$test  trigger consistency test
+GET    /v1/replication-topologies/{ref}/lag site-to-site replication lag
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `next-gen-data-storage` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Replication-lag reports per-site lag in bytes / time;
+exceeding the RPO budget emits a critical alert.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Encryption-envelope endpoints
 
+```
+POST   /v1/encryption-envelopes              register envelope
+PATCH  /v1/encryption-envelopes/{ref}/rotate trigger key rotation
+GET    /v1/encryption-envelopes/{ref}        retrieve (gated)
+POST   /v1/encryption-envelopes/{ref}/wrap   wrap a DEK
+POST   /v1/encryption-envelopes/{ref}/unwrap unwrap a DEK (audited)
+```
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+Wrap / unwrap operations sign with the requesting
+service's authentication; unwrap operations record the
+audit-event and the requesting service identity.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## §8 Content-addressed artefact endpoints (S3 / OCI)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+S3-compatible (per AWS S3):
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+GET    /{bucket}/                            list objects
+PUT    /{bucket}/{key}                       put object
+GET    /{bucket}/{key}                       get object
+DELETE /{bucket}/{key}                       delete object
+POST   /{bucket}/?uploads                    multipart upload init
+PUT    /{bucket}/{key}?partNumber=N&uploadId=  upload part
+POST   /{bucket}/{key}?uploadId=             complete multipart upload
+```
 
-## Annex F — Adoption Roadmap
+OCI Distribution (per OCI Distribution v1.1):
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+GET    /v2/                                  Discovery
+GET    /v2/{name}/manifests/{reference}      pull manifest
+PUT    /v2/{name}/manifests/{reference}      push manifest
+GET    /v2/{name}/blobs/{digest}             pull blob
+POST   /v2/{name}/blobs/uploads/             initiate blob upload
+PATCH  /v2/{name}/blobs/uploads/{uuid}       chunked upload
+PUT    /v2/{name}/blobs/uploads/{uuid}       complete upload
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §9 Tier-promotion / tier-demotion endpoints
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+POST   /v1/objects/{ref}/promote-to-tier     move artefact to faster tier
+POST   /v1/objects/{ref}/demote-to-tier      move to slower tier
+GET    /v1/objects/{ref}/tier                current tier
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Tier transitions emit cost / performance impact
+estimates. Sponsor-policy may auto-tier based on
+access-pattern telemetry.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §10 Fault / health monitoring endpoints
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```
+GET    /v1/health                            domain-wide health summary
+GET    /v1/faults                            recent faults
+POST   /v1/faults/{ref}/acknowledge          acknowledge fault
+GET    /v1/faults?severity=&since=           list faults
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Faults follow the SNIA Swordfish / Redfish fault
+taxonomy (informational, warning, critical, fatal).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §11 Capacity / performance report endpoints
 
-## Annex H — Versioning and Deprecation Policy
+```
+GET    /v1/reports/capacity                  per-domain capacity report
+GET    /v1/reports/performance               per-namespace performance report
+POST   /v1/reports/$run                      run ad-hoc report
+GET    /v1/reports/{ref}                     retrieve report
+```
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Error model (RFC 9457)
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+```json
+{
+  "type":   "urn:wia:storage:problem:worm-locked",
+  "title":  "Object is WORM-locked",
+  "status": 423,
+  "detail": "Object o-2026-001 retained until 2030-12-31",
+  "instance": "/v1/objects/o-2026-001"
+}
+```
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Common type URIs:
 
-## Annex I — Interoperability Profiles
+| Type URI suffix              | HTTP | Meaning                                       |
+|------------------------------|-----:|-----------------------------------------------|
+| `worm-locked`                | 423  | object retention policy disallows mutation    |
+| `quota-exceeded`             | 507  | namespace quota reached                        |
+| `replication-lag-exceeded`   | 507  | sustained replication lag above policy        |
+| `qos-violation`              | 503  | service degraded; QoS target unmet             |
+| `kek-unavailable`            | 503  | KMS unreachable                                |
+| `firmware-mismatch`          | 409  | controller firmware mismatch in domain         |
+| `media-unavailable`          | 503  | back-end media offline                         |
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §13 Bulk export
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+GET  /v1/$export?_type=Domain,Namespace,Volume
+GET  /v1/$status/{exportId}
+GET  /v1/$result/{exportId}/{file}
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+NDJSON output. Storage reports may also export to a
+sponsor-internal data lake via the change-event
+stream.
+
+## §14 Audit headers
+
+| Header                  | Meaning                                       |
+|-------------------------|-----------------------------------------------|
+| `X-Request-Id`          | client-set, echoed                            |
+| `X-Audit-Event-Id`      | server-set, links to PHASE 3 audit chain      |
+| `Content-Digest`        | RFC 9530 SHA-256 of the response body         |
+
+## Annex A — OpenAPI reference
+
+A canonical OpenAPI 3.1 description is published at
+`api/openapi-3.1.yaml`.
+
+## Annex B — Worked Swordfish provisioning (informative)
+
+```http
+POST /v1/namespaces HTTP/1.1
+Authorization: Bearer ...
+Content-Type: application/json
+
+{
+  "domainRef": "domain-pod-A",
+  "namespaceKind": "nvme-namespace",
+  "capacityBytes": 1099511627776,
+  "lbaSize": 4096,
+  "performanceProfileRef": "perf-tier-0"
+}
+```
+
+Response 201 returns the namespace identifier and the
+NVMe-CNTLID binding for the controller.
+
+## Annex C — Webhook surface
+
+Implementations expose webhooks for `fault-raised`,
+`replication-lag-exceeded`, `quota-warning`, and
+`encryption-key-rotated` events. Payloads sign with
+RFC 7515 JWS; receivers verify against
+`/.well-known/wia-storage-keys.json`. Delivery is at-
+least-once; receivers are expected to be idempotent on
+`eventId`.
+
+## Annex D — Conformance disclosure
+
+Implementations declare the management protocols
+served, the NVMe / NVMe-oF revisions, the S3 API
+version, the OCI Distribution version, the encryption
+ciphers supported, and the durability tiers offered.
+
+## Annex E — Async export pattern
+
+```
+POST   /v1/$export                      → 202 Accepted, Content-Location
+GET    /v1/$status/{id}                 → 202 in-progress / 200 manifest
+GET    /v1/$result/{id}/{file}          → 200 NDJSON
+DELETE /v1/$status/{id}                 → 202 cancellation
+```
+
+The 202 response carries `Retry-After` for the
+polling client.
+
+## Annex F — Discovery service
+
+```
+GET   /v1/discovery                            top-level discovery endpoint
+GET   /v1/discovery/nvme-oF                    NVMe-oF discovery service
+GET   /v1/discovery/s3-endpoints               S3 endpoint inventory
+GET   /v1/discovery/oci-distribution           OCI Distribution origin set
+GET   /.well-known/wia-storage                 sponsor-published discovery doc
+```
+
+Discovery responses include the supported management
+protocols, the per-protocol endpoint URI, and the
+supported feature flags so a client provisions
+without bilateral configuration.
+
+## Annex G — Long-running operations
+
+Some storage operations (large rebuild, bulk fixity
+audit, capacity expansion) are long-running. The
+implementation exposes them via the async export
+pattern (Annex E) plus a per-operation status:
+
+```
+POST   /v1/operations                          start operation
+GET    /v1/operations/{ref}                    retrieve state + progress
+DELETE /v1/operations/{ref}                    cancel (where permissible)
+GET    /v1/operations?type=&status=            list operations
+```
+
+Operation events emit to the audit chain so a post-
+hoc inspection can correlate operations to outcomes.
+
+Long-running operations also publish progress to
+webhook receivers (Annex C) so dashboards reflect
+real-time progress without polling.

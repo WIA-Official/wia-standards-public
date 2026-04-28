@@ -1,241 +1,367 @@
-# WIA-microbiome PHASE 2 — API-INTERFACE Specification
+# WIA-microbiome PHASE 2 — API Interface Specification
 
 **Standard:** WIA-microbiome
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-microbiome (Microbiome).
+This PHASE defines the resource-oriented API surface
+for microbiome operations: specimen registration,
+library and run lifecycle, read-set ingest, taxonomic
+and functional analysis dispatch, analytical-result
+retrieval, biobank cataloguing, and INSDC submission
+binding. The API is designed for both clinical
+laboratory operations (FHIR R5 alignment) and large-
+scale research data flow (sequencing-centre LIMS,
+public archive submission).
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9110 (HTTP semantics), RFC 9112 (HTTP/1.1), RFC 9113 (HTTP/2)
+- IETF RFC 9457 (Problem Details for HTTP APIs)
+- IETF RFC 8259 (JSON), RFC 8785 (JCS), RFC 4122 (UUID), RFC 9530 (Content-Digest)
+- HL7 FHIR R5 — Specimen, MolecularSequence, Observation, Bulk Data
+- HL7 v2.x — OUL^R22 laboratory result message
+- INSDC submission — NCBI SRA submission portal, ENA Webin REST, DDBJ DRA
+- ISO/IEC 17025:2017 — testing laboratory accreditation
+- BIOM v2.1 (HDF5) — microbial feature-table format
+- Common Workflow Language (CWL) v1.2, Workflow Description Language (WDL) 1.1, Nextflow nf-core
+- ISO/IEC 18004 (QR code) — chain-of-custody label
 
 ---
 
-## §1 Scope
+## §1 Endpoint root
 
-This PHASE document is one of four that together define the WIA-microbiome
-standard. It addresses the api-interface layer of the standard.
+API root is implementation-controlled. All endpoints
+are TLS 1.3 (RFC 8446). For clinical contexts the API
+participates in the SMART on FHIR launch flow; for
+research and biobank contexts the API uses
+`client_credentials` with key attestation.
 
-## §2 Manifest
+## §2 Specimen endpoints
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "microbiome"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+POST   /v1/specimens                    register specimen
+GET    /v1/specimens/{ref}              retrieve
+PATCH  /v1/specimens/{ref}              amend non-identity fields
+GET    /v1/specimens?subjectRef=&matrix=  list / filter
+POST   /v1/specimens/{ref}/custody      append chain-of-custody event
+DELETE /v1/specimens/{ref}              logical exclude (status=excluded)
+```
 
-## §3 Conformance Tiers
+Chain-of-custody events are append-only; events are
+not editable once posted. Each event carries the actor,
+timestamp, location, container temperature, and a
+witness signature (RFC 7515 JWS).
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Library and run endpoints
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+POST   /v1/libraries                    open library record
+PATCH  /v1/libraries/{ref}              amend during prep
+POST   /v1/libraries/{ref}/qc           record QC measurement
+POST   /v1/runs                         open sequencing run
+POST   /v1/runs/{ref}/start             record start event
+POST   /v1/runs/{ref}/finish            record finish event
+GET    /v1/runs/{ref}                   retrieve
+GET    /v1/runs?instrument=&date=       list / filter
+```
 
-## §4 Discovery
+Open / Start / Finish are idempotent under an
+`Idempotency-Key` header; resubmission returns the
+existing event without side effects.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/microbiome`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Read-set endpoints
 
-## §5 Time and Identity
+```
+POST   /v1/read-sets                    ingest read-set metadata
+POST   /v1/read-sets/{ref}/upload       multipart upload for raw files
+GET    /v1/read-sets/{ref}              retrieve
+GET    /v1/read-sets/{ref}/download     server-presigned URL with expiry
+DELETE /v1/read-sets/{ref}              soft delete (raw retained per policy)
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Raw read files are stored at the implementation's
+object store under content-addressed paths (file SHA-256
+prefix). The API never exposes the raw bytes to a
+client without an authenticated authorisation grant.
 
-## §6 Versioning and Deprecation
+## §5 Analysis dispatch
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+POST   /v1/analyses                     dispatch a workflow run
+GET    /v1/analyses/{ref}               retrieve status
+GET    /v1/analyses/{ref}/log           streamed log (Server-Sent Events)
+GET    /v1/analyses/{ref}/result        result manifest URI
+DELETE /v1/analyses/{ref}               cancellation
+```
 
-## §7 Privacy and Security
+The dispatch payload includes:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```json
+{
+  "workflow":     "nf-core/ampliseq:2.7",
+  "containerDigest": "sha256:7f9f...",
+  "inputManifest": "wia-mb://manifest/cohort-IBD-2026-Q1",
+  "params":        {"primer_set": "16S-V3V4", "trunc_q": 25}
+}
+```
 
-## §8 Open Governance
+The container digest pins the exact image used for the
+analysis so re-execution is byte-equivalent.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `microbiome` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Result endpoints
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+GET    /v1/analyses/{ref}/result/feature-table     BIOM v2.1
+GET    /v1/analyses/{ref}/result/taxonomy           TSV / Parquet
+GET    /v1/analyses/{ref}/result/functional         TSV / Parquet
+GET    /v1/analyses/{ref}/result/diversity          JSON
+POST   /v1/analyses/{ref}/result/biomarker          recorded reviewer call
+```
 
+Results are content-addressed: the response
+`Content-Digest: sha-256=:...` header per RFC 9530
+allows clients to verify integrity end-to-end.
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+## §7 Biobank endpoints
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+```
+POST   /v1/biobank/aliquots             register aliquot
+GET    /v1/biobank/aliquots/{ref}       retrieve
+POST   /v1/biobank/aliquots/{ref}/move  freezer / shelf / box / position
+GET    /v1/biobank/aliquots?status=     list / filter
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Aliquot moves are the only writable surface after
+registration; aliquot identity and parent-specimen
+reference are immutable.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 INSDC submission endpoints
 
-## Annex F — Adoption Roadmap
+```
+POST   /v1/insdc/submission             open submission session
+POST   /v1/insdc/submission/{ref}/biosample
+POST   /v1/insdc/submission/{ref}/experiment
+POST   /v1/insdc/submission/{ref}/run
+POST   /v1/insdc/submission/{ref}/release   (move from suppressed to public)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Submission events are bound to the upstream specimen,
+library, run, and read-set records so the public-archive
+state is reverse-resolvable.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §9 Error model (RFC 9457)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```json
+{
+  "type":   "urn:wia:mb:problem:custody-broken",
+  "title":  "Chain-of-custody event missing",
+  "status": 409,
+  "detail": "Specimen S-101 has no custody event between collection and extraction",
+  "instance": "/v1/libraries"
+}
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Common type URIs:
 
-## Annex G — Test Vectors and Conformance Evidence
+| Type URI suffix              | HTTP | Meaning                                       |
+|------------------------------|-----:|-----------------------------------------------|
+| `custody-broken`             | 409  | missing chain-of-custody event                |
+| `negative-control-missing`   | 422  | library has no extraction-blank linkage       |
+| `positive-control-missing`   | 422  | run has no mock-community linkage              |
+| `qc-fail`                    | 422  | QC metric below threshold                     |
+| `unsupported-pipeline-version`| 400 | requested workflow version not available      |
+| `host-removal-required`      | 422  | human specimen submitted without host filter   |
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §10 Pagination and filtering
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+List endpoints return cursor-paginated responses:
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+```json
+{
+  "items": [...],
+  "nextCursor": "eyJsYXN0IjoiU3BlY2ltZW4tMTIzIn0"
+}
+```
 
-## Annex H — Versioning and Deprecation Policy
+Filtering supports MIxS-aligned terms (`matrix`,
+`anatomicalSite`, `studyRef`, `runRef`, `instrument`,
+`pipelineVersion`).
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 Bulk export (FHIR alignment)
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+```
+GET  /v1/$export?_type=Specimen,Observation,MolecularSequence
+GET  /v1/$status/{exportId}
+GET  /v1/$result/{exportId}/{file}
+```
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Export output is NDJSON of FHIR R5 resources, one
+resource per line.
 
-## Annex I — Interoperability Profiles
+## §12 Rate limits
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+API gateways enforce `429 Too Many Requests` with a
+`Retry-After` header. INSDC submission endpoints carry a
+separate quota mirroring the upstream archive's limits.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §13 Versioning
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Resource paths are version-prefixed (`/v1/...`). Major
+version bumps change the prefix; minor and patch
+revisions are documented in the OpenAPI changelog.
+
+## §14 Authentication and scopes (informative)
+
+For clinical contexts:
+
+```
+patient/Specimen.read
+patient/Observation.read
+user/MolecularSequence.read
+system/Bulk.export
+```
+
+For research / biobank contexts: client_credentials
+with `wia-mb:specimen.write`, `wia-mb:run.write`,
+`wia-mb:analysis.dispatch`, `wia-mb:insdc.submit`.
+
+## Annex A — OpenAPI reference
+
+A canonical OpenAPI 3.1 description of the endpoints in
+this PHASE is published at `api/openapi-3.1.yaml`. The
+OpenAPI document is the authoritative wire-format
+reference; this PHASE is the authoritative semantic
+reference.
+
+## Annex B — Audit headers
+
+| Header                  | Meaning                                       |
+|-------------------------|-----------------------------------------------|
+| `X-Request-Id`          | client-set, echoed by server                  |
+| `X-Audit-Event-Id`      | server-set, links to PHASE 3 §6 event         |
+| `Content-Digest`        | RFC 9530 SHA-256 of the response body         |
+| `X-Trace-Id`            | W3C Trace Context (`traceparent`)             |
+
+## Annex C — Conformance disclosure
+
+Implementations declare the OpenAPI revision they serve,
+the FHIR R5 IG (US Core, KR Core, IPS) profiles they
+implement, the SMART scopes required, and the workflow
+runtimes they accept (CWL v1.2, WDL 1.1, Nextflow with
+nf-core conventions).
+
+## Annex D — Worked specimen registration (informative)
+
+```http
+POST /v1/specimens HTTP/1.1
+Authorization: Bearer ...
+WIA-MB-Schema-Version: 1.0
+Idempotency-Key: 7c0d9b0f-...
+
+{
+  "subjectRef": "MB-007",
+  "matrix": "stool",
+  "preservationMethod": "OMNIgene-GUT",
+  "collectionDate": "2026-04-12",
+  "storageTemp": -80,
+  "consentRef": "consent:MB-007:protocol-v1.2",
+  "studyRef": "study:IBD-WIA-2026"
+}
+```
+
+Response 201 returns the `specimenRef` UUID, the
+audit-event identifier, and the FHIR R5 mapping.
+
+## Annex E — Async export pattern
+
+```
+POST   /v1/$export                      → 202 with Content-Location
+GET    /v1/$status/{id}                 → 202 in-progress / 200 manifest
+GET    /v1/$result/{id}/{file}          → 200 NDJSON
+DELETE /v1/$status/{id}                 → 202 cancellation
+```
+
+The 202 response carries `Retry-After` for the polling
+client and `X-Progress` for human-readable progress.
+
+## Annex F — Workflow dispatch parameters
+
+| Parameter             | Type   | Default                          |
+|-----------------------|--------|----------------------------------|
+| `primer_set`          | enum   | per study                        |
+| `trunc_q`             | int    | 25                               |
+| `min_reads_per_sample`| int    | 5000                             |
+| `host_reference`      | URI    | per study (GRCh38 / mm10 / null) |
+| `random_seed`         | int    | study-fixed                      |
+| `decontam_method`     | enum   | `prevalence` / `frequency`        |
+| `taxonomy_classifier` | enum   | `naive-bayes` / `vsearch` /       |
+|                       |        | `kraken2-bracken` / `metaphlan`  |
+
+Workflows record the resolved parameter set on the
+analytical-result record so re-execution under newer
+defaults still yields a byte-equivalent re-run from the
+recorded parameters.
+
+## Annex G — Bulk specimen ingest
+
+```
+POST   /v1/specimens/$batch
+Content-Type: application/x-ndjson
+
+{"matrix":"stool","subjectRef":"MB-001",...}
+{"matrix":"stool","subjectRef":"MB-002",...}
+...
+```
+
+Batch ingest returns a per-line outcome (created /
+duplicate / rejected) so partial-failure handling is
+explicit. Idempotency is per-line via a content hash.
+
+## Annex H — Reproducibility query
+
+```
+GET /v1/reproducibility/{analysisRef}
+```
+
+Returns a payload describing what is needed to re-
+execute the analysis byte-for-byte:
+
+```json
+{
+  "workflow":         "nf-core/ampliseq:2.7",
+  "containerDigest":  "sha256:7f9f...",
+  "inputManifest":    "wia-mb://manifest/cohort-IBD-2026-Q1",
+  "params":           {"primer_set": "16S-V3V4", "trunc_q": 25, "random_seed": 42},
+  "referenceDb":      [{"name": "SILVA", "version": "138.2"}],
+  "tier":             "reproducible-strong"
+}
+```
+
+The reproducibility payload is intentionally reusable:
+a downstream tool can invoke the same workflow runtime
+with the listed digests and parameters to obtain the
+identical artefact.
+
+## Annex I — Cross-archive resolution
+
+```
+GET /v1/specimens/{ref}/insdc-mapping
+GET /v1/runs/{ref}/insdc-mapping
+GET /v1/analyses/{ref}/derived-mapping
+```
+
+Resolution endpoints return the assigned INSDC
+accession (BioSample / Experiment / Run / BioProject)
+plus any MGnify or community-derived analysis URI bound
+to the underlying record.
+
+## Annex J — Notification and webhook surface
+
+Implementations may expose webhook endpoints for run-
+finish, qc-fail, embargo-lift, and analysis-success
+events. The webhook payload signs with RFC 7515 JWS
+and the receiver verifies against a published JWK set
+at `/.well-known/wia-mb-keys.json`. Webhook delivery
+follows at-least-once semantics; the receiver is
+expected to be idempotent on `eventId`.

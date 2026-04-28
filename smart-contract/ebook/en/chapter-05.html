@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 5: Phase 2 API Interface - WIA-FIN-007</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.8; color: #1a1a1a; background: #f8fafc; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); color: white; padding: 3rem 2rem; }
+        .header .chapter-number { font-size: 1rem; opacity: 0.9; margin-bottom: 0.5rem; }
+        .header h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+        .content { padding: 3rem 2rem; }
+        .nav { display: flex; justify-content: space-between; padding: 1.5rem 2rem; background: #f8fafc; border-top: 1px solid #e2e8f0; }
+        .nav a { color: #22C55E; text-decoration: none; font-weight: 600; }
+        h2 { color: #1e293b; font-size: 1.8rem; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #22C55E; }
+        h3 { color: #334155; font-size: 1.4rem; margin: 1.5rem 0 1rem; }
+        p { margin-bottom: 1rem; color: #334155; }
+        code { background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; font-family: 'Courier New', monospace; color: #e11d48; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; color: inherit; padding: 0; }
+        ul { margin: 1rem 0 1rem 2rem; color: #334155; }
+        li { margin: 0.5rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">WIA-FIN-007 📜 Chapter 5</div>
+            <h1>Phase 2: API Interface</h1>
+            <p>Standardized SDK methods, event handling, and transaction management</p>
+        </div>
+        <div class="content">
+            <h2>WIA SDK Architecture</h2>
+            <p>The WIA SDK provides a unified interface for interacting with smart contracts across all supported blockchains. Built on TypeScript, it offers type safety, comprehensive error handling, and optimized gas management.</p>
+            
+            <h3>SDK Installation and Setup</h3>
+            <pre><code>npm install @wia/smart-contract ethers
+
+import { WIASmartContract, WIAProvider } from '@wia/smart-contract';
+import { ethers } from 'ethers';
+
+// Initialize provider
+const provider = new WIAProvider({
+    chain: 'ethereum',
+    rpcUrl: 'https://eth.llamarpc.com',
+    fallbackRpcs: [
+        'https://ethereum.publicnode.com',
+        'https://rpc.ankr.com/eth'
+    ]
+});
+
+// Initialize contract
+const contract = new WIASmartContract({
+    address: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+    abi: contractABI,
+    provider: provider
+});
+
+// Connect wallet
+const signer = new ethers.Wallet(privateKey, provider);
+const contractWithSigner = contract.connect(signer);</code></pre>
+
+            <h2>Core SDK Methods</h2>
+            
+            <h3>Read Methods</h3>
+            <pre><code>// Standard read operations (no gas cost)
+const balance = await contract.balanceOf(userAddress);
+const totalSupply = await contract.totalSupply();
+const decimals = await contract.decimals();
+const name = await contract.name();
+const symbol = await contract.symbol();
+
+// Batch read with multicall
+const results = await contract.multicall([
+    { method: 'balanceOf', args: [user1] },
+    { method: 'balanceOf', args: [user2] },
+    { method: 'totalSupply', args: [] }
+]);
+
+// Advanced queries
+const metadata = await contract.getMetadata();
+const securityInfo = await contract.getSecurityConfig();
+const deploymentInfo = await contract.getDeploymentInfo();</code></pre>
+
+            <h3>Write Methods</h3>
+            <pre><code>// Standard write operations
+const tx = await contractWithSigner.transfer(toAddress, amount);
+const receipt = await tx.wait();
+
+console.log('Transaction hash:', receipt.transactionHash);
+console.log('Gas used:', receipt.gasUsed.toString());
+console.log('Block number:', receipt.blockNumber);
+
+// Approve with infinite approval protection
+await contractWithSigner.approve(spenderAddress, amount, {
+    maxApproval: ethers.utils.parseEther('1000000')
+});
+
+// Batch operations
+const batchTx = await contractWithSigner.batchTransfer([
+    { to: user1, amount: amount1 },
+    { to: user2, amount: amount2 },
+    { to: user3, amount: amount3 }
+]);
+
+// With custom gas settings
+const customTx = await contractWithSigner.transfer(to, amount, {
+    maxPriorityFeePerGas: ethers.utils.parseUnits('2', 'gwei'),
+    maxFeePerGas: ethers.utils.parseUnits('50', 'gwei'),
+    gasLimit: 100000
+});</code></pre>
+
+            <h2>Event Handling</h2>
+            
+            <h3>Event Listeners</h3>
+            <pre><code>// Listen to Transfer events
+contract.on('Transfer', (from, to, value, event) => {
+    console.log(\`Transfer: \${from} → \${to}: \${ethers.utils.formatEther(value)}\`);
+    console.log('Block:', event.blockNumber);
+    console.log('Transaction:', event.transactionHash);
+});
+
+// Listen to all WIA standard events
+contract.on('WIATokenTransfer', (from, to, value, data, timestamp, event) => {
+    console.log('WIA Transfer event:', {
+        from, to, value, data, timestamp
+    });
+});
+
+// One-time listener
+contract.once('Approval', (owner, spender, value) => {
+    console.log('Approval event received once');
+});
+
+// Remove listener
+const transferHandler = (from, to, value) => { /* ... */ };
+contract.on('Transfer', transferHandler);
+contract.off('Transfer', transferHandler);
+
+// Remove all listeners
+contract.removeAllListeners('Transfer');</code></pre>
+
+            <h3>Historical Event Queries</h3>
+            <pre><code>// Query past events
+const filter = contract.filters.Transfer(userAddress, null);
+const events = await contract.queryFilter(filter, fromBlock, toBlock);
+
+events.forEach(event => {
+    console.log('Transfer:', event.args.from, '→', event.args.to, event.args.value);
+});
+
+// Query with pagination
+const paginatedEvents = await contract.getPaginatedEvents({
+    eventName: 'Transfer',
+    fromBlock: 18000000,
+    toBlock: 'latest',
+    pageSize: 100,
+    filter: {
+        from: userAddress
+    }
+});
+
+// Real-time event streaming
+const stream = contract.streamEvents('Transfer', {
+    fromBlock: 'latest',
+    filter: { from: userAddress }
+});
+
+for await (const event of stream) {
+    console.log('New transfer:', event);
+}</code></pre>
+
+            <h2>Transaction Management</h2>
+            
+            <h3>Gas Estimation and Optimization</h3>
+            <pre><code>// Accurate gas estimation
+const gasEstimate = await contract.estimateGas.transfer(to, amount);
+console.log('Estimated gas:', gasEstimate.toString());
+
+// Get current gas prices
+const gasPrices = await provider.getGasPrice();
+console.log('Current gas price:', ethers.utils.formatUnits(gasPrices, 'gwei'), 'gwei');
+
+// EIP-1559 fee estimation
+const feeData = await provider.getFeeData();
+console.log('Base fee:', ethers.utils.formatUnits(feeData.lastBaseFeePerGas, 'gwei'));
+console.log('Max priority fee:', ethers.utils.formatUnits(feeData.maxPriorityFeePerGas, 'gwei'));
+console.log('Max fee:', ethers.utils.formatUnits(feeData.maxFeePerGas, 'gwei'));
+
+// Optimized transaction with gas strategies
+const optimizedTx = await contractWithSigner.sendOptimized('transfer', [to, amount], {
+    strategy: 'fast', // 'slow', 'standard', 'fast', 'instant'
+    maxSlippage: 10 // percentage
+});
+
+// Simulate transaction before sending
+const simulation = await contract.simulate('transfer', [to, amount]);
+console.log('Simulation success:', simulation.success);
+console.log('Expected gas:', simulation.gasUsed);
+console.log('State changes:', simulation.stateChanges);</code></pre>
+
+            <h3>Transaction Tracking</h3>
+            <pre><code>// Wait for transaction with callbacks
+const receipt = await contract.waitForTransaction(txHash, {
+    confirmations: 2,
+    timeout: 120000,
+    onConfirmation: (confirmationNumber) => {
+        console.log(\`Confirmation \${confirmationNumber}/2\`);
+    }
+});
+
+// Monitor transaction status
+const status = await contract.getTransactionStatus(txHash);
+console.log('Status:', status); // 'pending', 'confirmed', 'failed'
+
+// Get transaction details
+const txDetails = await provider.getTransaction(txHash);
+console.log('From:', txDetails.from);
+console.log('To:', txDetails.to);
+console.log('Value:', ethers.utils.formatEther(txDetails.value));
+console.log('Gas price:', ethers.utils.formatUnits(txDetails.gasPrice, 'gwei'));
+
+// Cancel/speed up pending transaction
+const newTx = await contractWithSigner.speedUpTransaction(txHash, {
+    gasPriceIncrease: 20 // 20% increase
+});
+
+const cancelTx = await contractWithSigner.cancelTransaction(txHash);</code></pre>
+
+            <h2>Multi-Chain Support</h2>
+            
+            <h3>Cross-Chain Operations</h3>
+            <pre><code>// Deploy same contract on multiple chains
+import { WIAMultiChainDeployer } from '@wia/smart-contract';
+
+const deployer = new WIAMultiChainDeployer({
+    privateKey: process.env.PRIVATE_KEY,
+    chains: ['ethereum', 'polygon', 'arbitrum', 'optimism']
+});
+
+const deployments = await deployer.deployToAll({
+    contract: 'WIASecureToken',
+    constructorArgs: [],
+    initializeArgs: {
+        name: 'WIA Token',
+        symbol: 'WIA',
+        initialSupply: ethers.utils.parseEther('1000000')
+    },
+    salt: 'WIA-v1-2025' // For CREATE2 deterministic addresses
+});
+
+// Same address on all chains!
+console.log('Addresses:', deployments.addresses);
+
+// Multi-chain contract instance
+const multiChainContract = new WIASmartContract({
+    addresses: {
+        1: '0x...',      // Ethereum
+        137: '0x...',    // Polygon
+        42161: '0x...',  // Arbitrum
+        10: '0x...'      // Optimism
+    },
+    abi: contractABI,
+    defaultChain: 'ethereum'
+});
+
+// Switch chains
+await multiChainContract.switchChain('polygon');
+
+// Execute on specific chain
+const balance = await multiChainContract.onChain('arbitrum').balanceOf(userAddress);</code></pre>
+
+            <h2>Error Handling</h2>
+            
+            <h3>Comprehensive Error Types</h3>
+            <pre><code>import { 
+    WIAContractError,
+    WIAInsufficientBalanceError,
+    WIAUnauthorizedError,
+    WIAContractPausedError
+} from '@wia/smart-contract';
+
+try {
+    await contractWithSigner.transfer(to, amount);
+} catch (error) {
+    if (error instanceof WIAInsufficientBalanceError) {
+        console.error('Insufficient balance:', error.available, '<', error.required);
+        // Show user-friendly message
+    } else if (error instanceof WIAUnauthorizedError) {
+        console.error('Unauthorized:', error.caller, 'needs role:', error.requiredRole);
+    } else if (error instanceof WIAContractPausedError) {
+        console.error('Contract is paused');
+    } else if (error.code === 'UNPREDICTABLE_GAS_LIMIT') {
+        console.error('Transaction would fail');
+        // Simulate to get detailed error
+        const simulation = await contract.simulate('transfer', [to, amount]);
+        console.error('Failure reason:', simulation.error);
+    } else {
+        console.error('Transaction failed:', error.message);
+    }
+}
+
+// Graceful error recovery
+const result = await contract.transferWithRetry(to, amount, {
+    maxRetries: 3,
+    retryDelay: 1000,
+    onRetry: (attempt, error) => {
+        console.log(\`Retry attempt \${attempt}: \${error.message}\`);
+    }
+});</code></pre>
+
+            <h2>Advanced Features</h2>
+            
+            <h3>Permit (Gasless Approvals)</h3>
+            <pre><code>// ERC-2612 Permit support
+const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour
+
+const permitSignature = await contractWithSigner.signPermit({
+    owner: ownerAddress,
+    spender: spenderAddress,
+    value: amount,
+    deadline: deadline
+});
+
+// Spender can now execute permit without owner transaction
+await contract.permit(
+    ownerAddress,
+    spenderAddress,
+    amount,
+    deadline,
+    permitSignature.v,
+    permitSignature.r,
+    permitSignature.s
+);</code></pre>
+
+            <h3>Meta-Transactions</h3>
+            <pre><code>// Execute transaction without paying gas
+const metaTx = await contract.executeMetaTransaction({
+    functionSignature: contract.interface.encodeFunctionData('transfer', [to, amount]),
+    signerAddress: userAddress
+});
+
+// Relayer pays gas
+await relayer.submitMetaTransaction(metaTx);</code></pre>
+
+            <h3>Batch Operations</h3>
+            <pre><code>// Efficient batch operations
+const batch = contract.createBatch();
+
+batch.add('transfer', [user1, amount1]);
+batch.add('transfer', [user2, amount2]);
+batch.add('transfer', [user3, amount3]);
+
+// Execute all in single transaction
+const batchReceipt = await batch.execute();
+console.log('Batch gas used:', batchReceipt.gasUsed);
+
+// Atomic batch (all or nothing)
+const atomicBatch = await contract.executeBatchAtomic([
+    { method: 'approve', args: [spender, amount] },
+    { method: 'transfer', args: [to, amount] }
+]);</code></pre>
+
+            <h2>Testing Utilities</h2>
+            
+            <h3>Mock Contracts</h3>
+            <pre><code>import { WIAMockContract } from '@wia/smart-contract/testing';
+
+// Create mock for testing
+const mockContract = new WIAMockContract({
+    abi: contractABI,
+    initialState: {
+        balances: {
+            [user1]: ethers.utils.parseEther('100'),
+            [user2]: ethers.utils.parseEther('50')
+        },
+        totalSupply: ethers.utils.parseEther('150')
+    }
+});
+
+// Mock method responses
+mockContract.mock('balanceOf').returns(ethers.utils.parseEther('100'));
+mockContract.mock('transfer').reverts('Insufficient balance');
+
+// Verify calls
+expect(mockContract.getCallCount('transfer')).toBe(1);
+expect(mockContract.getLastCall('transfer').args).toEqual([to, amount]);</code></pre>
+
+            <h2>Performance Monitoring</h2>
+            
+            <h3>Built-in Analytics</h3>
+            <pre><code>// Enable performance tracking
+const contract = new WIASmartContract({
+    address: contractAddress,
+    abi: contractABI,
+    provider: provider,
+    analytics: {
+        enabled: true,
+        endpoint: 'https://analytics.wia.org'
+    }
+});
+
+// Get performance metrics
+const metrics = await contract.getMetrics();
+console.log('Average gas used:', metrics.avgGasUsed);
+console.log('Total transactions:', metrics.totalTransactions);
+console.log('Success rate:', metrics.successRate);
+console.log('Average confirmation time:', metrics.avgConfirmationTime);</code></pre>
+
+            <p>Phase 2 API Interface provides developers with powerful, type-safe tools for smart contract interaction. Next, we'll explore Phase 3 Protocol standards for deployment and upgrades.</p>
+        </div>
+        </div>
+</body>
+</html>

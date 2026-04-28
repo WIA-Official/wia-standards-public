@@ -1,241 +1,287 @@
-# WIA-pest-detection PHASE 1 — DATA-FORMAT Specification
+# WIA-pest-detection PHASE 1 — Data Format Specification
 
 **Standard:** WIA-pest-detection
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-pest-detection (Pest Detection).
+This PHASE defines the canonical data format for crop-
+pest detection covering field-, greenhouse-, orchard-,
+forestry-, and stored-product contexts. Records bind
+specimen and trap observations, remote-sensing imagery,
+edge-AI inference, scout reports, regulatory reportable-
+pest records, and intervention-decision artefacts so an
+agronomist, a national plant-protection organisation
+(NPPO) inspector, or a buyer's quality-assurance party
+can reconstruct the lifecycle of any pest event.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IPPC International Plant Protection Convention — ISPM 1, ISPM 5 (Glossary), ISPM 6 (Surveillance), ISPM 8 (Pest status), ISPM 17 (Pest reporting), ISPM 23 (Inspection)
+- ISPM 27 — Diagnostic protocols for regulated pests; ISPM 31 — Sampling of consignments
+- EPPO Diagnostic Standards (PM 7 series) and EPPO PRA (PM 5)
+- EPPO Code (Bayer Code / EPPO Code) — pest taxonomy reference
+- FAO Crop Production / Plant Protection guidance
+- Codex Alimentarius MRL — maximum residue limits for harvested produce
+- ISO 17025:2017 — testing laboratory accreditation (diagnostic labs)
+- ISO 19115-2:2019 — geographic information metadata (imagery)
+- ISO 19139 — geographic information metadata XML
+- OGC GeoTIFF, OGC SensorThings, OGC GeoPackage
+- ISO 11783 (ISOBUS) — agricultural electronics (tractor-mounted sensors)
+- ISO 14961 / AgGateway ADAPT — agricultural exchange of business-process data
+- ISO 8601 (date / time), ISO 3166 (country / region), BCP 47 (language)
+- IETF RFC 8259 (JSON), RFC 8785 (JCS), RFC 4122 (UUID), RFC 7515 (JWS), RFC 9530 (Content-Digest)
+- WIPO ST.26 — sequence listing format (where pathogen identification is genomic)
+- LSID (Life Science Identifier) — taxon-identity URI scheme
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-pest-detection
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to systems that detect, classify,
+report, and trigger response to plant pests (insects,
+mites, plant-pathogenic fungi, oomycetes, bacteria,
+viruses, viroids, phytoplasmas, parasitic plants, weeds,
+and quarantine pests as defined under ISPM 5).
 
-## §2 Manifest
+In scope: field-unit record, observation record, trap
+record, sample record, diagnostic-result record, edge-
+inference record, remote-sensing record, alert record,
+intervention-decision record, NPPO reporting record,
+and the cross-references binding pest events to traceable
+agricultural lots.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "pest-detection"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Out of scope: animal-veterinary pest control (handled
+by veterinary standards), urban structural pest control
+(handled by urban-pest standards), and stored-grain
+mycotoxin assays beyond pest-causation (handled by
+food-safety standards).
 
-## §3 Conformance Tiers
+## §2 Field-unit record
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `fieldUnitRef`       | UUID (RFC 4122)                                 |
+| `geometry`           | OGC Simple Features WKT or GeoJSON polygon      |
+| `crs`                | EPSG identifier (e.g. EPSG:4326)                |
+| `crop`               | EPPO Code or ITIS TSN; cultivar at sub-level    |
+| `phenologyStage`     | BBCH-scale code (00–99 across cereals, fruit,   |
+|                      | vegetables, ornamentals)                        |
+| `productionSystem`   | open-field / greenhouse / tunnel / orchard /    |
+|                      | nursery / forestry / stored-product             |
+| `irrigationMethod`   | rainfed / drip / sprinkler / flood              |
+| `ipmTier`            | per FAO IPM tiers — preventive, monitoring,     |
+|                      | intervention, evaluation                        |
+| `region`             | ISO 3166-2 sub-national region                  |
+| `farmRef`            | upstream farm / property identifier              |
+| `seasonRef`          | growing-season identifier                       |
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Field units bind to the agricultural-supply-chain
+standard so harvested lots inherit the pest-event
+history.
 
-## §4 Discovery
+## §3 Observation record
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/pest-detection`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `observationRef`     | UUID                                            |
+| `fieldUnitRef`       | §2                                              |
+| `observationTime`    | ISO 8601 with timezone                          |
+| `observerKind`       | scout / agronomist / farmer / drone / fixed-cam |
+|                      | / pheromone-trap / yellow-sticky-trap / light-  |
+|                      | trap / sentinel-plant / extension-officer       |
+| `observerRef`        | identity (operator UUID for human; device UUID  |
+|                      | for sensor)                                     |
+| `pestCandidate`      | EPPO Code; multi-candidate lists allowed        |
+| `count`              | numeric per unit area or per trap               |
+| `severityScale`      | EPPO standardised severity per crop / pest      |
+| `lifeStage`          | egg / nymph / instar-N / pupa / adult /         |
+|                      | mycelial / sporulating                          |
+| `mediaRef`           | URI to imagery / audio / SEM / micrograph       |
+| `notes`              | free-text up to 4 KiB                           |
 
-## §5 Time and Identity
+Observation records may stand alone (visual scout
+report) or bind to a downstream sample record for lab
+confirmation.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Trap record
 
-## §6 Versioning and Deprecation
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `trapRef`            | UUID                                            |
+| `kind`               | pheromone / yellow-sticky / light / pitfall /   |
+|                      | malaise / interception                          |
+| `lureRef`            | for pheromone: lure compound + manufacturer +   |
+|                      | release-rate; freshness window                  |
+| `position`           | OGC point (lat / lon / elevation)               |
+| `installedAt`        | ISO 8601                                        |
+| `serviceCadence`     | days between checks                             |
+| `lastService`        | ISO 8601                                        |
+| `replacementDue`     | ISO 8601                                        |
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Trap captures bind to observation records; a single
+trap record may have many observation records over its
+operating life.
 
-## §7 Privacy and Security
+## §5 Sample record
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `sampleRef`          | UUID                                            |
+| `observationRef`     | §3 (where the sample originates from a flagged  |
+|                      | observation)                                    |
+| `sampleType`         | leaf / fruit / stem / root / soil / insect /    |
+|                      | trap-catch / inflorescence / seed / wood        |
+| `collectionTime`     | ISO 8601                                        |
+| `collectorRef`       | scout / inspector identity                      |
+| `chainOfCustody[]`   | events (transport temperature, container,       |
+|                      | handover signature)                             |
+| `labRef`             | accredited laboratory identifier (ISO 17025)    |
+| `submissionTime`     | ISO 8601                                        |
 
-## §8 Open Governance
+## §6 Diagnostic-result record
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `pest-detection` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `diagnosticRef`      | UUID                                            |
+| `sampleRef`          | §5                                              |
+| `methodCode`         | EPPO PM 7 protocol identifier (e.g. PM 7/119    |
+|                      | for *Xylella fastidiosa*); ISPM 27 reference    |
+| `methodKind`         | morphological / DNA-barcoding / qPCR / RT-PCR / |
+|                      | LAMP / NGS-metagenomic / serological-ELISA      |
+| `confirmedTaxon`     | EPPO Code + LSID + canonical scientific name    |
+|                      | (per ITIS / GBIF / Catalogue of Life)           |
+| `confidence`         | per-method qualitative / quantitative           |
+| `analystRef`         | accredited analyst identity                     |
+| `reportTime`         | ISO 8601                                        |
+| `replicates`         | per-replicate Ct, melt, sequence accession      |
+|                      | (where sequencing applied; INSDC accession)     |
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Diagnostic results that confirm a quarantine pest
+trigger the NPPO reporting workflow (§9).
 
+## §7 Edge-inference record
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `inferenceRef`       | UUID                                            |
+| `mediaRef`           | URI to source image / spectral cube              |
+| `modelRef`           | model identifier + semantic version + container |
+|                      | digest                                          |
+| `pipelineRef`        | preprocessing + post-processing chain reference |
+| `predictions`        | per-class probability vector with EPPO Code keys|
+| `confidence`         | scalar top-1 + entropy + per-class margin       |
+| `provenanceRef`      | edge-device serial + firmware version           |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+Edge-inference records that exceed an alert threshold
+trigger an alert record (§10) but do not by themselves
+enter the NPPO report. NPPO reporting requires
+diagnostic confirmation (§6) per ISPM 17.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Remote-sensing record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `imageryRef`         | UUID                                            |
+| `sensor`             | satellite (Sentinel-2 MSI, Sentinel-1 SAR,      |
+|                      | Landsat 8/9, PlanetScope) / aerial (UAV multi-  |
+|                      | / hyperspectral) / fixed (RGB / NIR / IR)        |
+| `acquisitionTime`    | ISO 8601                                        |
+| `bands`              | per-band centre wavelength (nm)                  |
+| `coverage`           | OGC polygon                                     |
+| `groundTruthRef`     | optional binding to observation record(s)       |
+| `vegetationIndex`    | NDVI / NDRE / NDWI / GNDVI / EVI per pixel,     |
+|                      | aggregated to field-unit if requested            |
+| `sourceMetadata`     | ISO 19115-2 metadata payload URI                 |
 
-## Annex F — Adoption Roadmap
+## §9 NPPO reporting record
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+For pests under ISPM 17 reporting obligation:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `reportRef`          | UUID                                            |
+| `nppoRef`            | issuing NPPO identifier (ISO 3166-1 country)    |
+| `regulatedPestCode`  | EPPO Code; quarantine status flag                |
+| `reportType`         | first-report / periodic / outbreak / eradication-|
+|                      | declared                                          |
+| `eventTime`          | ISO 8601                                        |
+| `affectedAreaRef`    | polygon                                         |
+| `controlMeasures`    | reference list                                  |
+| `submissionRef`      | IPPC submission identifier (NPPO official)       |
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+NPPO reports propagate to the IPPC International
+Phytosanitary Portal and to relevant Regional Plant
+Protection Organisations (e.g. EPPO, NAPPO, COSAVE,
+APPPC, IAPSC).
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Alert record
 
-## Annex G — Test Vectors and Conformance Evidence
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `alertRef`           | UUID                                            |
+| `triggerKind`        | observation / edge-inference / sensor-threshold |
+| `triggerRef`         | the upstream record that produced the alert     |
+| `severity`           | informational / advisory / action / critical    |
+| `recipients`         | farm operator / agronomist / extension officer  |
+| `dispatchTime`       | ISO 8601                                        |
+| `acknowledgement`    | recipient confirmation (signed)                  |
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Intervention-decision record
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `decisionRef`        | UUID                                            |
+| `triggerRef`         | alert / diagnostic / NPPO directive             |
+| `interventionKind`   | none / cultural / biological / mechanical /     |
+|                      | chemical                                        |
+| `pesticideRef`       | for chemical: ISO 1750 active-ingredient name + |
+|                      | local-registry product code                     |
+| `dosePlanned`        | dose per ha + application timing                |
+| `mrlBinding`         | Codex / national MRL identifier                 |
+| `phiDays`            | pre-harvest interval (days)                     |
+| `applicatorRef`      | trained applicator credential identifier         |
+| `recordOfApplication`| application record per local regulator          |
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+Intervention decisions cite the IPM hierarchy and the
+trigger; chemical interventions cite the MRL and PHI
+so a downstream lot inherits the necessary pre-harvest
+interval.
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Cross-domain references (informative)
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+- WIA-precision-agriculture — variable-rate prescription
+- WIA-agricultural-supply-chain — lot inheritance
+- WIA-food-traceability — regulator notification
+- WIA-agricultural-drone — UAV mission binding
+- WIA-soil-sensor — soil-borne pest correlation
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex A — Worked alert payload (informative)
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+```json
+{
+  "alertRef": "alert-2026-04-12-1834",
+  "triggerKind": "edge-inference",
+  "triggerRef": "inference:tomato-leafminer:0.93",
+  "severity": "action",
+  "recipients": ["farm:fieldA","agronomist:KE-NRT-ext-007"],
+  "dispatchTime": "2026-04-12T09:14:00+03:00"
+}
+```
 
-## Annex I — Interoperability Profiles
+## Annex B — EPPO Code coverage
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+The standard requires EPPO Code at the genus + species
+resolution where available. Sub-species or pathotype is
+recorded on `confirmedTaxon.subspecies` when the
+diagnostic protocol resolves to that level.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## Annex C — Conformance disclosure
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations declare the JSON-Schema URIs they
+serve, the canonicalisation form (RFC 8785), and the
+NPPO bindings they participate in.
+
+## Annex D — Versioning
+
+Field additions are minor; semantic redefinition is
+major.

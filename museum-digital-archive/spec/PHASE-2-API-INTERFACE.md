@@ -1,241 +1,298 @@
-# WIA-museum-digital-archive PHASE 2 — API-INTERFACE Specification
+# WIA-museum-digital-archive PHASE 2 — API Interface Specification
 
 **Standard:** WIA-museum-digital-archive
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-museum-digital-archive (Museum Digital Archive).
+This PHASE defines the resource-oriented API surface
+for museum digital-archive operations: object record
+ingest and retrieval, accession and provenance
+management, conservation logging, exhibition / loan
+workflow, surrogate (image / 3D / multimedia) serving
+with IIIF, descriptive-metadata and multilingual-
+label exchange, rights / licence retrieval,
+preservation-event publication (PREMIS), discovery and
+search, and OAIS submission / dissemination contracts.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9110 (HTTP), RFC 9112 (HTTP/1.1), RFC 9113 (HTTP/2)
+- IETF RFC 9457 (Problem Details for HTTP APIs)
+- IETF RFC 8259 (JSON), RFC 8785 (JCS), RFC 4122 (UUID), RFC 9530 (Content-Digest)
+- IIIF Image API 3.0; IIIF Presentation API 3.0; IIIF Auth 2.0; IIIF Search API 1.0
+- W3C Activity Streams 2.0 (for change discovery)
+- W3C Web Annotation Protocol
+- OAI-PMH 2.0 — Open Archives Initiative Protocol for Metadata Harvesting
+- ResourceSync (NISO Z39.99-2017) — change-discovery
+- ISO 14721 OAIS — Submission Information Package (SIP), Archival
+  Information Package (AIP), Dissemination Information Package (DIP)
+- Linked Data Platform (W3C LDP); SPARQL 1.1 Protocol
 
 ---
 
-## §1 Scope
+## §1 Endpoint root
 
-This PHASE document is one of four that together define the WIA-museum-digital-archive
-standard. It addresses the api-interface layer of the standard.
+API root is implementation-controlled. All endpoints
+are TLS 1.3 (RFC 8446). Public discovery endpoints
+(IIIF, OAI-PMH, ResourceSync) are TLS-served read-
+only. Authenticated endpoints (write, restricted
+imagery) use OAuth 2 with PKCE.
 
-## §2 Manifest
+## §2 Object endpoints
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "museum-digital-archive"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+POST   /v1/objects                      register object
+GET    /v1/objects/{ref}                retrieve
+PATCH  /v1/objects/{ref}                amend (curatorial)
+GET    /v1/objects?type=&period=        list / filter
+GET    /v1/objects/{ref}/provenance     full provenance chain
+GET    /v1/objects/{ref}/conservation   conservation timeline
+```
 
-## §3 Conformance Tiers
+## §3 Accession / provenance endpoints
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+POST   /v1/accessions                   record accession event
+POST   /v1/provenance                   record provenance event
+GET    /v1/accessions/{ref}             retrieve
+GET    /v1/provenance/{ref}             retrieve
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Each event is signed by the curator / collections-
+manager who recorded it; the chain is append-only.
 
-## §4 Discovery
+## §4 Conservation endpoints
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/museum-digital-archive`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+POST   /v1/conservation                 log treatment event
+GET    /v1/conservation/{ref}           retrieve
+PATCH  /v1/conservation/{ref}           amend narrative (audited)
+GET    /v1/conservation?conservator=    list / filter
+```
 
-## §5 Time and Identity
+## §5 Exhibition / loan endpoints
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST   /v1/exhibitions                  open exhibition
+GET    /v1/exhibitions/{ref}            retrieve
+POST   /v1/loans                        open loan
+PATCH  /v1/loans/{ref}/status           update (in-transit / installed /
+                                                de-installed / returned)
+GET    /v1/loans/{ref}                  retrieve
+GET    /v1/loans?borrower=&active=      list active loans
+```
 
-## §6 Versioning and Deprecation
+Loan status events emit on the audit chain so an
+inspector can reconstruct the object's whereabouts.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 Surrogate endpoints (IIIF integration)
 
-## §7 Privacy and Security
+```
+GET    /iiif/3/{prefix}/info.json                     IIIF Image API info
+GET    /iiif/3/{prefix}/{region}/{size}/{rotation}/{quality}.{format}
+GET    /iiif/presentation/3/{ref}/manifest            IIIF Presentation
+GET    /iiif/auth/2/probe                             IIIF Auth probe
+GET    /iiif/search/1/{ref}/search?q={query}          IIIF Search
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+POST   /v1/surrogates                                 register surrogate metadata
+POST   /v1/surrogates/{ref}/upload                    chunked upload
+GET    /v1/surrogates/{ref}                           retrieve metadata
+```
 
-## §8 Open Governance
+Restricted imagery (e.g. for sensitive cultural-
+material) requires IIIF Auth 2.0 cookie / token; the
+probe service signals the access tier.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `museum-digital-archive` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §7 Descriptive-metadata endpoints
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+GET    /v1/objects/{ref}/lido                         LIDO XML
+GET    /v1/objects/{ref}/linked-art                   Linked Art JSON-LD
+GET    /v1/objects/{ref}/cidoc-crm                    CIDOC-CRM RDF
+GET    /v1/objects/{ref}/edm                          Europeana EDM
+GET    /v1/objects/{ref}/dc                           Dublin Core
+```
 
+The implementation produces these views from a single
+canonical store; the canonical store is sponsor-
+controlled.
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+## §8 Multilingual-label endpoints
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+```
+POST   /v1/labels                                     publish label
+GET    /v1/labels/{ref}                               retrieve
+GET    /v1/objects/{ref}/labels?lang=                 list per language
+PATCH  /v1/labels/{ref}                               edit (curatorial)
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §9 Rights / licence endpoints
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+GET    /v1/objects/{ref}/rights                       retrieve rights record
+PATCH  /v1/objects/{ref}/rights                       update (committee gated)
+```
 
-## Annex F — Adoption Roadmap
+Rights changes require an institutional committee
+approval (recorded as a stewardship task).
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §10 Preservation endpoints (PREMIS)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+POST   /v1/preservation-events                        log preservation event
+GET    /v1/preservation-events/{ref}                  retrieve
+GET    /v1/objects/{ref}/preservation-events          per-object timeline
+POST   /v1/preservation-events/$fixity-check          run fixity verification
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Fixity-check verifies content digests against the
+recorded values; mismatches open stewardship tasks
+and emit a PREMIS validation outcome.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §11 Discovery and harvest endpoints
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+GET    /oai/2.0?verb=Identify                         OAI-PMH Identify
+GET    /oai/2.0?verb=ListMetadataFormats              OAI-PMH formats
+GET    /oai/2.0?verb=ListRecords&metadataPrefix=lido  OAI-PMH harvest
+GET    /resourcesync/capability-list                  ResourceSync
+GET    /resourcesync/changelist                       ResourceSync change-list
+GET    /sparql                                        SPARQL endpoint (read-only)
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+OAI-PMH supports `lido`, `oai_dc`, and `edm` metadata
+prefixes; ResourceSync provides change discovery for
+incremental harvesters.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §12 OAIS endpoints
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+```
+POST   /oais/sip                       submit information package
+GET    /oais/sip/{ref}                 retrieve SIP status
+POST   /oais/dip                       request dissemination package
+GET    /oais/dip/{ref}                 retrieve DIP
+```
 
-## Annex H — Versioning and Deprecation Policy
+SIP / DIP packaging follows METS 1.12; storage in the
+trusted-repository back-end follows ISO 16363
+guidance.
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §13 Error model (RFC 9457)
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+```json
+{
+  "type":   "urn:wia:mu:problem:rights-restricted",
+  "title":  "Imagery access restricted",
+  "status": 403,
+  "detail": "Object o-2026-001 is sacred-secret; imagery requires committee approval",
+  "instance": "/iiif/3/o-2026-001/info.json"
+}
+```
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Common type URIs:
 
-## Annex I — Interoperability Profiles
+| Type URI suffix              | HTTP | Meaning                                       |
+|------------------------------|-----:|-----------------------------------------------|
+| `rights-restricted`          | 403  | imagery / metadata access restricted           |
+| `accession-incomplete`       | 422  | object lacks accession record                 |
+| `provenance-gap`             | 422  | provenance chain has unexplained gap          |
+| `loan-conflict`              | 409  | loan period overlaps existing loan / display  |
+| `conservation-pending`       | 409  | object pending conservation cannot ship        |
+| `due-diligence-incomplete`   | 422  | accession lacks due-diligence record          |
+| `preservation-fixity-fail`   | 422  | fixity-check failed                            |
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Bulk export
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+GET  /v1/$export?_type=Object,Provenance,Conservation,Loan
+GET  /v1/$status/{exportId}
+GET  /v1/$result/{exportId}/{file}
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+NDJSON output. Consumers may consume the OAI-PMH or
+ResourceSync surface for incremental change capture
+instead.
+
+## §15 Audit headers
+
+| Header                  | Meaning                                       |
+|-------------------------|-----------------------------------------------|
+| `X-Request-Id`          | client-set, echoed                            |
+| `X-Audit-Event-Id`      | server-set, links to PHASE 3 audit chain      |
+| `Content-Digest`        | RFC 9530 SHA-256 of the response body         |
+
+## Annex A — OpenAPI reference
+
+A canonical OpenAPI 3.1 description is published at
+`api/openapi-3.1.yaml`.
+
+## Annex B — Worked IIIF Presentation 3.0 (informative)
+
+```json
+{
+  "@context": "http://iiif.io/api/presentation/3/context.json",
+  "id":   "https://museum.example/iiif/presentation/3/o-2026-001/manifest",
+  "type": "Manifest",
+  "label": {"en":["Untitled (2026)"]},
+  "items": [{
+    "id":"https://museum.example/iiif/presentation/3/o-2026-001/canvas/p1",
+    "type":"Canvas",
+    "items":[]
+  }]
+}
+```
+
+## Annex C — Webhook surface
+
+Implementations expose webhooks for `object-published`,
+`loan-status-changed`, `conservation-recorded`, and
+`fixity-check-failed` events. Payloads sign with RFC
+7515 JWS; receivers verify against
+`/.well-known/wia-mu-keys.json`.
+
+## Annex D — Conformance disclosure
+
+Implementations declare the IIIF profiles served, the
+LIDO / Linked Art / CIDOC-CRM versions served, the
+OAI-PMH metadata prefixes supported, the ResourceSync
+profile, the OAIS package format, and the SPARQL
+endpoint conformance.
+
+## Annex E — Async export pattern
+
+```
+POST   /v1/$export                      → 202 Accepted, Content-Location
+GET    /v1/$status/{id}                 → 202 in-progress / 200 manifest
+GET    /v1/$result/{id}/{file}          → 200 NDJSON or LIDO XML
+DELETE /v1/$status/{id}                 → 202 cancellation
+```
+
+The 202 response carries `Retry-After` for the
+polling client and `X-Progress` for human-readable
+progress.
+
+## Annex F — Federated query (SPARQL)
+
+```
+GET  /sparql?query=...
+POST /sparql
+```
+
+Read-only SPARQL endpoint exposes the institution's
+linked-data graph. Federated queries from external
+endpoints (Europeana SPARQL, Wikidata Query Service)
+participate per the federation policy. Long-running
+queries enforce a per-query time-budget; queries that
+exceed the budget receive a `503` with `Retry-After`.
+
+## Annex G — Image-derivative endpoints
+
+```
+GET  /v1/objects/{ref}/derivative/iiif?{params}    derived IIIF view
+GET  /v1/objects/{ref}/derivative/oembed           oEmbed JSON
+GET  /v1/objects/{ref}/derivative/oai-dc           Dublin Core
+```
+
+Derivative endpoints honour the rights record's
+access tier; restricted derivatives require IIIF
+Auth 2.0 cookie / token.

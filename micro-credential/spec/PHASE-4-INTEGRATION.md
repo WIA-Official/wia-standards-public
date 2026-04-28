@@ -1,241 +1,308 @@
-# WIA-micro-credential PHASE 4 — INTEGRATION Specification
+# WIA-micro-credential PHASE 4 — Integration Specification
 
 **Standard:** WIA-micro-credential
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-micro-credential (Micro Credential).
+This PHASE specifies how WIA-micro-credential
+integrates with adjacent identity, learning, employer,
+and regulator systems: digital-identity wallets (EUDI
+Wallet, Apple / Google wallet via OID4VCI bridges),
+learning management systems, MOOC platforms, employer
+HRIS recruitment pipelines, public-employment-service
+skills-matching, EU EBSI, EU Europass, national NQF
+authorities, ESCO / O*NET-SOC skills frameworks,
+academic transcript exchange (ELMO XML, EDI TS 130 / 138),
+proctoring services, and sponsor-internal data-warehouse
+pipelines. It also specifies the operational binding
+to companion WIA standards.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- W3C VC Data Model 2.0; W3C DID 1.0; W3C Status List 2021
+- 1EdTech Open Badges 3.0; 1EdTech CLR 2.0; 1EdTech Caliper Analytics
+- Europass Credentials specification; European Learning Model (ELM)
+- ESCO classification; O*NET-SOC; ISCO-08
+- ENQA ESG 2015 — Standards and Guidelines for QA in EHEA
+- Bologna Process / Lisbon Recognition Convention
+- EU eIDAS Regulation (910/2014, EUDI Wallet Reg 2024)
+- EU EBSI specification
+- KR DTAB / KISA Digital Trust Framework
+- ELMO (European Learner Mobility Object) XML
+- HR-XML / HR Open Standards (recruitment data exchange)
+- ISO 21001 — educational organisations management system
+- IETF RFC 9110 (HTTP), RFC 7515 (JWS), RFC 8259 (JSON), RFC 8785 (JCS)
+- ISO 8601, ISO 3166, BCP 47
 
 ---
 
-## §1 Scope
+## §1 Wallet and identity-framework integration
 
-This PHASE document is one of four that together define the WIA-micro-credential
-standard. It addresses the integration layer of the standard.
+| Wallet / framework      | Binding                                       |
+|-------------------------|-----------------------------------------------|
+| EU EUDI Wallet          | per Reg 2024/... (eIDAS 2.0)                  |
+| Apple / Google wallet   | OID4VCI bridge with platform-issued profile    |
+| EBSI Verifiable         | EBSI accreditation chain                      |
+| KR mobile ID / 모바일신분증 | KR DTAB profile                               |
+| Sponsor / employer wallet| sponsor's DID method + trust list             |
 
-## §2 Manifest
+The wallet integration's `holder` claim binds to the
+recipient DID; per-wallet onboarding records the
+wallet implementation reference and the controller-key
+attestation.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "micro-credential"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 LMS / MOOC platform integration
 
-## §3 Conformance Tiers
+| Platform            | Integration profile                              |
+|---------------------|--------------------------------------------------|
+| LTI-compliant LMS   | IMS LTI 1.3 + LTI Advantage; Caliper Analytics   |
+| Caliper consumers   | ingest learning events to CLR                    |
+| MOOC platforms      | Open Badges 3.0 / CLR; xAPI fall-back            |
+| Bespoke LMS         | OAuth-protected REST per OID4VCI / OID4VP        |
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Learning events emitted by the LMS / MOOC platform
+populate the evidence record (PHASE 1 §6); credential
+classes catalogued in the platform map to PHASE 1 §4
+classes via a lightweight publish/subscribe contract.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Employer HRIS integration
 
-## §4 Discovery
+| HRIS pattern           | Integration                                    |
+|------------------------|------------------------------------------------|
+| HR-XML staffing        | HR Open Standards messages                      |
+| Bespoke ATS API        | OID4VP request profile                         |
+| O*NET / ESCO matching  | skill-binding query                            |
+| Recruiter dashboard    | OID4VP request + selective disclosure           |
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/micro-credential`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Recruiters request only the claims they need
+(selective disclosure); recipients consent at
+presentation-time so the recruiter never sees
+unrelated credentials.
 
-## §5 Time and Identity
+## §4 Public-employment-service / skills-matching
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+| Service                 | Binding                                         |
+|-------------------------|-------------------------------------------------|
+| EU EURES                | Europass + ELM credential exchange               |
+| KR Worknet              | National NQF binding                            |
+| Public skills-match API | ESCO / O*NET-SOC skill predicate match           |
 
-## §6 Versioning and Deprecation
+Public services consume the framework-mapping records
+(PHASE 1 §8) to suggest training, employment, or
+recognition pathways.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 EBSI / eIDAS 2.0 integration
 
-## §7 Privacy and Security
+EBSI / EUDI Wallet binding profile:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+issuer-accreditation-on-EBSI →  trust-anchor-published →
+  issuer-DID-resolved-on-chain →  status-list-fetched →
+  proof-validated →  outcome-published-to-EBSI
+```
 
-## §8 Open Governance
+The implementation may operate without EBSI (sponsor-
+internal trust list) or with EBSI (broader European
+verifier acceptance). EBSI-bound issuances cite the
+EBSI accreditation event identifier.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `micro-credential` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Europass and EU learning frameworks
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Europass Credentials format complements W3C VC:
+issuers may dual-issue (W3C VC + Europass XML) so EU-
+legacy verifiers and W3C-aware verifiers both work.
+The cross-format binding records the same issuance in
+both forms with a shared content hash.
 
+| Format                | Operator                                      |
+|-----------------------|-----------------------------------------------|
+| Europass Credentials  | European Commission                            |
+| ELM XML               | European Commission                            |
+| W3C VC + Open Badges  | open-source / industry                         |
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §7 Proctoring and identity-verification integration
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+Proctored assessments integrate with proctoring
+services per the issuer's evidence policy:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+- live human proctoring (web-camera supervision)
+- AI-assisted proctoring (anomaly detection)
+- proctoring-centre (in-person)
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Proctoring artefacts carry their own provenance hash;
+evidence records reference the artefact hash so a
+recognising party can request the artefact under
+recipient consent.
 
-## Annex F — Adoption Roadmap
+## §8 Cross-domain WIA bindings
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+| Companion standard           | Binding purpose                               |
+|------------------------------|-----------------------------------------------|
+| WIA-digital-credential       | parallel-track digital-id binding              |
+| WIA-learning-analytics       | outcome / evidence pipeline                   |
+| WIA-virtual-classroom        | instructor / proctor identity                 |
+| WIA-content-ai               | AI-generated evidence governance              |
+| WIA-mooc                     | platform-specific learning events             |
+| WIA-data-portability         | recipient export / migration                  |
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Each binding identifies the consumed PHASE.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §9 Long-term archival
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+| Authority / context           | Retention                                |
+|-------------------------------|------------------------------------------|
+| Issuer (regulated education)  | per national rules; typically ≥ 25 years |
+| Issuer (vocational)           | per national rules; ≥ 10 years           |
+| Recipient wallet              | recipient-controlled                      |
+| Verifier audit                | per regulator; typically ≥ 5 years        |
+| Status-list publication       | indefinite (per W3C SL recommendation)    |
 
-## Annex G — Test Vectors and Conformance Evidence
+Personal-data erasure tombstones the issuance payload
+while preserving the audit-chain hash.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §10 Conformance test suite
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The reference test suite covers:
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+- OID4VCI pre-authorised flow round-trip
+- OID4VP presentation_definition match with selective
+  disclosure
+- W3C Status List 2021 bit lookup with cache control
+- EBSI trust-list resolution against an EBSI test
+  registry
+- Europass dual-issuance binding
+- selective disclosure of a single claim from a
+  multi-claim VC
+- holder-binding proof preventing presentation replay
+- revocation propagation across verifier cache
+- EQF / ESCO mapping retrieval
+- cross-wallet credential transfer
 
-## Annex H — Versioning and Deprecation Policy
+## §11 Internationalisation
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Localised attributes (class names, achievement
+narratives, evidence narratives, framework labels)
+carry BCP 47 language tags. Country-specific NQF
+binding is recorded per ISO 3166-1 alpha-3.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §12 Security and privacy posture
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+- Transport: TLS 1.3 with mutual TLS for issuer ↔
+  regulator transmissions
+- Authentication: OID4VCI / OID4VP for credential flow;
+  client_credentials with key attestation for sponsor
+  back-end integrations
+- At-rest: AES-256-GCM with sponsor-controlled KMS;
+  per-issuer key wrapping per ISO/IEC 27002 §8.24
+- Audit: tamper-evident chain (PHASE 3 §9) exportable
+  per ISO/IEC 27037 forensic-evidence guidance
+- Privacy: recipient holds credentials in a wallet
+  under their control; selective disclosure minimises
+  data shared with verifier; recipient rights honoured
+  per PHASE 3 §10
+- Key management: issuer signing keys rotate on a
+  policy clock (typically annual); old keys remain
+  resolvable via the DID Document key-history
 
-## Annex I — Interoperability Profiles
+## §13 Operational metrics
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Sponsors / issuers report (informationally) on the
+WIA registry:
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+- credential classes published
+- issuances per class
+- revocation rate (by reason)
+- presentation-acceptance rate at recognising parties
+- trust-list updates honoured
+- accreditation status
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §14 Recovery and continuity
+
+- API outage — wallet caches issuances offline;
+  status-list refresh is best-effort
+- DID-resolution outage — cached DID Documents permit
+  short-window verification with degraded confidence
+- status-list outage — verifiers fall back to last-
+  known status (cache-control honoured) and surface a
+  warning
+- KMS outage — sealed back-up keys per sponsor's BCP
+
+## Annex A — Worked end-to-end example (informative)
+
+A national vocational authority accredits an issuer at
+NQF level 4. The issuer publishes a "Solar PV
+Installer" micro-credential class with a 60-hour
+notional learning load and an EQF level 4 mapping. A
+learner completes the course; assessor evidence is
+captured per PHASE 3 §3; the issuer issues a credential
+via OID4VCI. The learner stores the credential in an
+EU EUDI Wallet. An employer in another EU member state
+runs an OID4VP request asking only for credential
+class, EQF level, and validity. The wallet constructs
+a selectively-disclosed presentation; the employer's
+verification policy accepts the credential. The
+employer hires the learner; the learner's NQF level
+4 binding satisfies the local regulator's installer
+licensing prerequisite.
+
+## Annex B — Conformance disclosure
+
+Implementations declare the wallet integrations
+supported, the OID4VCI / OID4VP profiles, the W3C VC
+formats, the trust frameworks consumed, the Europass /
+ELM binding, and the framework-mapping registries
+indexed. Disclosure is machine-readable at
+`/.well-known/wia-mc-conformance.json`.
+
+## Annex C — Versioning
+
+Adding a new wallet integration is minor; changing
+the W3C VC binding format is major.
+
+## Annex D — Recipient data-portability export
+
+Recipient wallets request a portable archive:
+
+```
+GET /v1/recipients/{ref}/portability-export
+```
+
+Output is a signed bundle (W3C VC list + audit-chain
+proof) suitable for import into another wallet. The
+bundle's container format follows the OCI Distribution
+content-addressing convention so any tooling that
+understands content-addressed bundles can carry it.
+
+## Annex E — Cross-jurisdiction recognition
+
+Recognition across jurisdictions consumes the
+applicable convention or directive:
+
+| Convention / directive    | Scope                                  |
+|---------------------------|----------------------------------------|
+| Lisbon Recognition        | Council of Europe / UNESCO higher-      |
+| Convention                 | education recognition                  |
+| Bologna Process            | EHEA (European Higher Education Area)   |
+| EU Directive 2005/36       | regulated-profession recognition       |
+| UNESCO Global Convention   | global higher-education recognition    |
+|                            | (in force 2023)                         |
+| Mutual recognition         | bilateral / sector-specific            |
+| arrangements               |                                         |
+
+Recognition events bind to the convention identifier
+so recognising parties resolve the applicable
+provision automatically.
+
+## Annex F — ELMO / Europass dual-issuance
+
+Issuers operating in EU contexts may dual-issue:
+
+```
+W3C VC issuance ──────┐
+                      ├── shared content hash
+Europass / ELM XML ───┘
+```
+
+The dual-issuance event records both forms with a
+shared `contentDigest` so a verifier consuming either
+format can cross-verify against the other.

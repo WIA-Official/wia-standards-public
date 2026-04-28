@@ -1371,7 +1371,7 @@ interface MemoryEnhancementAPI {
 
 ### 13.1 Neuroscience Standards
 
-1. Kandel, E. R., et al. - Principles of Neural Science (6th ed.)
+1. ICH E6 (R3) — Good Clinical Practice (International Council for Harmonisation)
 2. Squire, L. R. - Memory Systems of the Brain
 3. Eichenbaum, H. - The Cognitive Neuroscience of Memory
 4. Nader, K. - Memory Reconsolidation Research

@@ -1,241 +1,325 @@
-# WIA-master-data-management PHASE 3 — PROTOCOL Specification
+# WIA-master-data-management PHASE 3 — Protocol Specification
 
 **Standard:** WIA-master-data-management
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-master-data-management (Master Data Management).
+This PHASE defines the operational protocols binding
+data records (PHASE 1) and API resources (PHASE 2)
+into auditable lifecycles: record-lifecycle, golden-
+record build cycle, match-cluster review, hierarchy
+promotion, stewardship-task SLA, quality-rule
+evaluation cadence, change-history retention, and the
+audit-event chain. The protocols are framed so a data-
+governance audit (per ISO 8000-150 / DAMA-DMBOK) can
+reconstruct the full provenance of any master record
+from the event log.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- ISO 8000-1, 8000-110, 8000-115, 8000-120, 8000-150 — Data quality / master data
+- ISO/IEC 11179-1, 11179-3, 11179-6 — Metadata registry
+- ISO/IEC 19763 — Metamodel framework
+- DAMA-DMBOK — Data Management Body of Knowledge (reference)
+- ISO/IEC 27037 — digital evidence preservation
+- ISO/IEC 27701 — privacy information management
+- W3C SHACL — Shapes Constraint Language
+- IETF RFC 5424 (Syslog), RFC 8941, RFC 7515 (JWS), RFC 8785 (JCS)
 
 ---
 
-## §1 Scope
+## §1 Record lifecycle
 
-This PHASE document is one of four that together define the WIA-master-data-management
-standard. It addresses the protocol layer of the standard.
+```
+ingested  →  validated  →  matched  →  survived  →  published
+                  │            │
+                  └→ rejected  └→ in-review (steward task)
+```
 
-## §2 Manifest
+Validation enforces the per-domain SHACL shapes (PHASE
+1 §13). Match runs Fellegi-Sunter-style probabilistic
+matching with optional ML rerankers; clusters above the
+auto-merge threshold survive automatically; clusters
+in the steward-review band open a stewardship task.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "master-data-management"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Golden-record build cycle
 
-## §3 Conformance Tiers
+```
+trigger → gather sources → score attributes → survive →
+  publish snapshot → archive prior snapshot
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Build triggers include: ingestion of a new source
+record, steward action on a cluster, change to a
+quality rule, or scheduled rebuild. Builds are
+idempotent on the input set so re-runs produce the
+same survivor under the same survivorship rules.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Match-cluster review
 
-## §4 Discovery
+```
+auto-merged → published
+mid-band → steward-review → merged | split | hold
+no-match → published as singleton
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/master-data-management`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Steward actions are bounded by SLA tiers (PHASE 1
+§12). A cluster `hold` action freezes downstream
+golden-record consumption to prevent drift while the
+review proceeds.
 
-## §5 Time and Identity
+## §4 Hierarchy promotion
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+draft → reviewed → promoted (active) → superseded
+            │
+            └→ rejected → re-drafted
+```
 
-## §6 Versioning and Deprecation
+Promotion is single-version invariant per hierarchy
+kind: only one version can be `active` at a time.
+Effective-dating allows queries to retrieve any prior
+version (`?at=<ISO-8601>`).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Stewardship-task SLA
 
-## §7 Privacy and Security
+| Priority   | Target acknowledgement | Target resolution |
+|------------|------------------------|-------------------|
+| critical   | 1 hour                 | 1 business day     |
+| high       | 1 business day         | 5 business days    |
+| medium     | 3 business days        | 15 business days   |
+| low        | 5 business days        | 30 business days   |
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+SLAs are sponsor-tunable; the configured table is
+recorded on the stewardship-policy reference record so
+audits see the SLAs in force at any point in time.
 
-## §8 Open Governance
+## §6 Quality-rule evaluation cadence
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `master-data-management` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+| Trigger                          | Action                       |
+|----------------------------------|------------------------------|
+| New rule registered              | full re-evaluation queued     |
+| Record write                     | rule subset matched at write |
+| Daily / weekly / monthly         | scheduled batch evaluation    |
+| Steward request                  | ad-hoc evaluation              |
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Critical-rule violations on a record block the
+golden-record from publishing until resolved; warning
+violations annotate the record's quality-score.
 
+## §7 Change-history retention
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+| Domain                      | Retention                              |
+|-----------------------------|----------------------------------------|
+| Party (regulated KYC / AML) | per regulator (typ. ≥ 5 years post-    |
+|                             | relationship close)                    |
+| Product                     | per regulator (lot trace) + sponsor    |
+| Financial / asset           | per regulator (e.g. SEC 17a-4 — 6 y)   |
+| Reference data              | indefinite (active + retired versions)  |
+| Personal data               | per privacy basis + retention policy    |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Personal-data deletion under privacy law (GDPR Art. 17,
+K-PIPA Art. 21, CCPA §1798.105) is supported by a
+controlled erasure procedure that preserves the audit
+chain hash but deletes the personally-identifiable
+payload.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Audit event chain
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+| Field          | Meaning                                                 |
+|----------------|---------------------------------------------------------|
+| `eventId`      | UUID                                                    |
+| `eventTime`    | ISO 8601 with timezone                                  |
+| `actor`        | identity (system / steward / source)                    |
+| `resourceRef`  | URI of the resource that changed                        |
+| `action`       | created / updated / merged / split / promoted / retired |
+| `priorHash`    | SHA-256 of the prior event payload                      |
+| `signature`    | RFC 7515 JWS over the canonical event payload (RFC 8785)|
 
-## Annex F — Adoption Roadmap
+The chain is per-domain and exportable to a SIEM via
+RFC 5424 syslog envelopes.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Source-record ingest contract
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+| Concern                | Contract                                       |
+|------------------------|------------------------------------------------|
+| Idempotency            | `Idempotency-Key` header on POST               |
+| Ordering               | event-sourced; out-of-order tolerated          |
+| Late-arriving event    | bitemporal: `validFrom` distinct from `recordedAt` |
+| Schema evolution       | `WIA-MDM-Schema-Version` header                 |
+| Provenance             | `sourceSystemRef` mandatory                    |
+| Quality                | rules evaluated at ingest                      |
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Survivorship rules
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Survivorship picks the surviving value per attribute
+based on a precedence model:
 
-## Annex G — Test Vectors and Conformance Evidence
+| Strategy           | Description                                 |
+|--------------------|---------------------------------------------|
+| source-priority    | highest-trust source wins                    |
+| recency            | most recent value wins                      |
+| completeness       | longest non-null wins                       |
+| reference-anchored | value bound to a regulator-issued anchor    |
+|                    | (e.g. LEI for legalName) wins               |
+| steward-override   | steward decision wins                       |
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Strategy selection is per-attribute and recorded in
+the survivorship-policy reference record.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §11 Reproducibility
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+A golden-record snapshot is reproducible-strong if the
+input source-record set, the rules applied, the
+survivorship policy, and the algorithm version are all
+content-addressed. Re-execution under the same inputs
+produces a byte-equivalent snapshot.
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Privacy posture
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+- Subject identifiers are opaque in cross-domain
+  publication
+- Personal data lives in domains under a lawful basis
+  declaration (GDPR / K-PIPA / CCPA)
+- Erasure preserves the audit-chain hash; the payload
+  is removed and replaced with a tombstone
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex A — Worked steward review (informative)
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+A match cluster covering three "Acme Inc." records
+falls in the steward-review band (probability 0.71).
+The steward reviews the supporting evidence: two
+records carry the same DUNS Number; the third lacks
+DUNS but bears the same LEI as the first. The steward
+applies a merge with a survivorship override that
+prefers the LEI-bearing source for the address (post-
+relocation). The merge emits an audit event; the
+golden-record rebuild publishes the new snapshot.
 
-## Annex I — Interoperability Profiles
+## Annex B — Conformance disclosure
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Implementations declare the audit-chain schema
+version, the JWS algorithm registry, the survivorship-
+policy registry version, the SHACL shape catalogue
+version, and the time source.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## Annex C — Versioning
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Field additions are minor; semantic redefinition or
+removal is major.
+
+## Annex D — Bitemporal exposure
+
+Records expose two time axes:
+
+| Axis            | Meaning                                          |
+|-----------------|--------------------------------------------------|
+| `validFrom/To`  | when the modelled fact holds in the real world   |
+| `recordedFrom/To` | when the record exists in the system            |
+
+Queries support `?validAt=<ISO-8601>` and
+`?recordedAt=<ISO-8601>` to reconstruct prior beliefs
+or correct retroactively without losing history.
+
+## Annex E — Quality-dimension reference
+
+Per ISO 8000-150 the system records per-record scores
+for at least:
+
+- completeness
+- accuracy
+- consistency
+- timeliness
+- uniqueness
+- validity
+- referential integrity
+
+Aggregate scores roll up to the domain and to the
+implementation; quality-rule evaluations contribute
+to the rolling score.
+
+## Annex F — Time-source declaration
+
+Audit-chain timestamps cite the time-source authority
+(NTP stratum-1, NIST, KASI, KRISS, PTB). Cross-region
+implementations use UTC for the audit-chain canonical
+timestamp; local offset is preserved on each event.
+
+## Annex G — Steward credential binding
+
+| Credential                | Source                                |
+|---------------------------|---------------------------------------|
+| Data-steward attestation  | sponsor-internal certification        |
+| Privacy officer (DPO)     | per regulator (GDPR Art. 37 / K-PIPA) |
+| Subject-rights handler    | sponsor-issued                        |
+| Reference-data steward    | sponsor / regulator (e.g. for ISO     |
+|                           | TC representatives)                   |
+
+A merge / split / survivorship-override action cannot
+be signed by a steward without an active credential.
+
+## Annex H — Coexistence reconciliation cycle
+
+In coexistence-pattern deployments the protocol runs
+a reconciliation cycle:
+
+```
+fetch local extensions → diff vs. last sync →
+  classify (golden-affecting / local-only) →
+  apply golden updates → push back local-only →
+  emit audit event
+```
+
+The cycle frequency is sponsor-configurable (typically
+hourly to daily). Out-of-band changes that affect
+golden attributes raise stewardship tasks rather than
+silently overwriting the golden value.
+
+## Annex I — Late-arriving event handling
+
+Source systems may emit events with `validFrom` in the
+past (e.g. a party's address change recorded weeks
+later). The protocol:
+
+1. accepts the event with its real-world `validFrom`
+2. records the system-time `recordedAt` separately
+3. re-runs survivorship for the affected attribute
+4. re-builds the golden snapshot for the impacted date
+   range
+5. publishes a corrected change-event marked
+   `correction=true`
+
+Downstream consumers honouring the bitemporal exposure
+update both their current view and their historical
+view; consumers that only honour the current view see
+the latest value plus a tag indicating the correction.
+
+## Annex J — Golden-record snapshot publication
+
+| Snapshot kind          | Cadence                                   |
+|------------------------|-------------------------------------------|
+| Per-record on change   | event-driven; CDC topic                   |
+| Daily full snapshot    | end-of-day file + manifest digest         |
+| Quarterly full archive | snapshot + retention-tier promotion       |
+
+Daily snapshot manifests sign with the implementation's
+JWS key so consumers can verify integrity end-to-end.
+
+## Annex K — Operational metrics for protocol audit
+
+The protocol records the following metrics on the
+audit chain so an inspection can compute compliance:
+
+- per-priority steward-task SLA compliance
+- per-domain match-rate distribution
+- coexistence reconciliation latency
+- subject-rights handling latency
+- late-arriving correction frequency
+- snapshot publication completeness
+
+These metrics export to the sponsor's data-governance
+dashboard at the cadence configured in the
+stewardship-policy reference record (typically daily for
+operational metrics and quarterly for trend analyses).
+Steward attestations (sign-off on quarterly metrics)
+are themselves audit events on the chain.

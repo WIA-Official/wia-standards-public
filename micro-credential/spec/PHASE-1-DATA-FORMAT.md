@@ -1,241 +1,288 @@
-# WIA-micro-credential PHASE 1 — DATA-FORMAT Specification
+# WIA-micro-credential PHASE 1 — Data Format Specification
 
 **Standard:** WIA-micro-credential
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-micro-credential (Micro Credential).
+This PHASE defines the canonical data format for digital
+micro-credentials covering issuer, recipient, credential
+class, issuance event, evidence record, framework
+mapping, endorsement, revocation, and verification
+artefacts. The format aligns with W3C Verifiable
+Credentials Data Model 2.0, IMS Open Badges 3.0, the
+Europass Credentials profile, and the European
+Qualifications Framework so credentials are portable
+across awarding bodies, learning platforms, and
+employer recognition systems.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- W3C Verifiable Credentials Data Model 2.0
+- W3C Decentralized Identifiers (DIDs) 1.0
+- W3C Data Integrity 1.0; W3C VC JOSE 1.0; W3C Status List 2021
+- 1EdTech Open Badges 3.0 (IMS Open Badges)
+- 1EdTech Comprehensive Learner Record (CLR) 2.0
+- Europass Credentials specification (European Commission)
+- European Learning Model (ELM); ESCO classification (skills, occupations)
+- European Qualifications Framework (EQF); national NQF mappings
+- ISCED 2011 — International Standard Classification of Education
+- ISCED-F 2013 — Fields of Education and Training
+- ECTS — European Credit Transfer and Accumulation System
+- ISO/IEC 19796-1 — IT for learning, education, and training: quality management
+- ISO/IEC 21724-1 — Information technology for learning, education, and training (extensions to OB)
+- IETF RFC 8259 (JSON), RFC 8785 (JCS), RFC 4122 (UUID), RFC 7515 (JWS), RFC 9530 (Content-Digest)
+- IETF RFC 6749, RFC 7636 (PKCE) — for issuer / verifier flows where bearer-token authn applies
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-micro-credential
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to systems that issue, hold, present,
+verify, or revoke digital micro-credentials covering
+short-form learning achievements, micro-degrees,
+professional badges, language proficiency attestations,
+training-certificate awards, and continuing-education
+records issued by accredited or recognised bodies.
 
-## §2 Manifest
+In scope: issuer, recipient, credential-class,
+issuance, evidence, framework-mapping, endorsement,
+revocation, status-list, presentation, and verification
+records. Out of scope: full-degree academic transcripts
+that span multiple credentials (handled by the academic-
+credential standard), and unverifiable participation
+acknowledgements that make no learning-outcome claim
+(handled by general consumer-record standards).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "micro-credential"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Issuer record
 
-## §3 Conformance Tiers
+| Field                | Source / Binding                                 |
+|----------------------|--------------------------------------------------|
+| `issuerRef`          | DID (W3C DID 1.0); also UUID for internal index  |
+| `legalName`          | localised label (BCP 47)                         |
+| `accreditationRef`   | upstream accreditation body identifier (national |
+|                      | quality-assurance agency, ISO 21001)             |
+| `eqfBindings[]`      | EQF level(s) the issuer is recognised to award   |
+| `nqfBindings[]`      | national NQF level(s)                            |
+| `domainAuthority`    | per ISCED-F 2013 broad-field codes                |
+| `publicKeySet`       | JWKS URL / verification-method list              |
+| `revocationEndpoint` | status-list publication URL                      |
+| `issuancePolicyRef`  | issuance-policy document hash                    |
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Issuers expose their public key set so any verifier can
+resolve credential signatures without contacting the
+issuer.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Recipient record
 
-## §4 Discovery
+| Field                | Source / Binding                                 |
+|----------------------|--------------------------------------------------|
+| `recipientRef`       | DID (preferred) or hashed identifier             |
+| `pseudonymRef`       | study- or platform-local pseudonym                |
+| `controllerKey`      | controller public key (DID Document)             |
+| `wallet`             | wallet implementation reference (per W3C VC      |
+|                      | implementer registry)                            |
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/micro-credential`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Recipients hold their credentials in a wallet under
+their control; issuers issue to a DID and never to an
+opaque platform identifier.
 
-## §5 Time and Identity
+## §4 Credential-class record
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+| Field                | Source / Binding                                 |
+|----------------------|--------------------------------------------------|
+| `credentialClassRef` | URI                                              |
+| `name`               | localised label                                  |
+| `kind`               | `badge`, `micro-degree`, `certificate`,          |
+|                      | `attestation`, `professional-recognition`         |
+| `learningOutcomes`   | array of learning-outcome statements; each tied  |
+|                      | to ESCO skills / competences and Bloom's revised |
+|                      | taxonomy verb                                    |
+| `eqfLevel`           | EQF level (1-8)                                  |
+| `iscedLevel`         | ISCED 2011 level                                 |
+| `fieldCode`          | ISCED-F 2013                                     |
+| `creditValue`        | ECTS points / national equivalent                |
+| `notionalLearning`   | hours estimated; assessment hours separate        |
+| `assessmentMethod`   | proctored exam / portfolio / capstone /           |
+|                      | observation / e-assessment                        |
+| `prerequisites`      | optional list of pre-required credential classes |
+| `expiry`             | optional default-validity period                  |
 
-## §6 Versioning and Deprecation
+Credential classes are catalogued; issuance instances
+reference the class so re-issuance shares lineage.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Issuance record
 
-## §7 Privacy and Security
+| Field                | Source / Binding                                 |
+|----------------------|--------------------------------------------------|
+| `issuanceRef`        | UUID                                             |
+| `credentialClassRef` | §4                                               |
+| `issuerRef`          | §2                                               |
+| `recipientRef`       | §3                                               |
+| `issuedAt`           | ISO 8601                                         |
+| `validFrom`          | ISO 8601                                         |
+| `validUntil`         | ISO 8601 (open if perpetual)                     |
+| `evidenceRef[]`      | links to evidence records (§6)                    |
+| `endorsementRef[]`   | links to endorsement records (§7)                 |
+| `proof`              | W3C Data Integrity proof or JOSE compact form    |
+| `revocationStatus`   | active / suspended / revoked                     |
+| `statusListUri`      | issuer's W3C Status List 2021 entry              |
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The proof binds the issuance to the issuer's signing
+key (resolved via the issuer DID Document); the
+recipient verifies and stores the issuance in the
+wallet.
 
-## §8 Open Governance
+## §6 Evidence record
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `micro-credential` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+| Field                | Source / Binding                                 |
+|----------------------|--------------------------------------------------|
+| `evidenceRef`        | UUID                                             |
+| `kind`               | exam-result / portfolio / assessor-observation / |
+|                      | e-portfolio-link / project-deliverable /         |
+|                      | proctoring-recording                             |
+| `assessorRef`        | credentialed assessor identity                   |
+| `assessmentTime`     | ISO 8601                                         |
+| `score`              | per-instrument raw and standardised              |
+| `narrative`          | localised text (BCP 47)                          |
+| `artefactDigest`     | SHA-256 of the artefact (PDF / video / link)     |
+| `qaSampleRef`        | quality-assurance sample reference (where the    |
+|                      | issuer's QA process samples this evidence)       |
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Evidence is held by the issuer (or a sub-processor
+identified in the issuance policy) and presented under
+recipient consent at verification time.
 
+## §7 Endorsement record
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+| Field                | Source / Binding                                 |
+|----------------------|--------------------------------------------------|
+| `endorsementRef`     | UUID                                             |
+| `endorserRef`        | DID of the endorsing body / employer / regulator |
+| `endorsementText`    | localised text                                   |
+| `validFrom`          | ISO 8601                                         |
+| `validUntil`         | ISO 8601                                         |
+| `proof`              | W3C Data Integrity proof                         |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+Endorsements layer trust onto a credential; an
+employer endorsement of an issuer's micro-credential
+class signals industry recognition.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Framework-mapping record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+| Field                | Source / Binding                                 |
+|----------------------|--------------------------------------------------|
+| `mappingRef`         | UUID                                             |
+| `credentialClassRef` | §4                                               |
+| `targetFramework`    | EQF / NQF (per country) / ESCO / O*NET-SOC       |
+| `targetCode`         | level / qualification / skill / occupation code  |
+| `relation`           | `equivalent`, `partial`, `sub-domain`,           |
+|                      | `aligned-broader`, `aligned-narrower`            |
+| `attestor`           | who maintains the mapping                        |
 
-## Annex F — Adoption Roadmap
+Mappings are versioned; framework changes (EQF
+revisions, ESCO releases) emit re-mapping events.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Revocation and status-list record
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Revocation aligns with W3C Status List 2021. The
+issuer publishes a status list URL; each issuance
+records the bit position. Verifiers fetch the status
+list, decode, and check the relevant bit. Suspension
+uses a separate list per the W3C Status List
+specification (revoked vs suspended bits).
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+| Field                | Source / Binding                                 |
+|----------------------|--------------------------------------------------|
+| `revocationRef`      | UUID                                             |
+| `issuanceRef`        | §5                                               |
+| `reason`             | issuer-error / fraud / withdrawn / superseded /  |
+|                      | regulatory-direction                             |
+| `revokedAt`          | ISO 8601                                         |
+| `effectiveListEntry` | bit position on the active status list           |
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Presentation record
 
-## Annex G — Test Vectors and Conformance Evidence
+A recipient presents one or more credentials to a
+verifier as a Verifiable Presentation (VP). Presentation
+records capture:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+| Field                | Source / Binding                                 |
+|----------------------|--------------------------------------------------|
+| `presentationRef`    | UUID                                             |
+| `holderRef`          | recipient DID                                    |
+| `verifierRef`        | verifier DID / domain                             |
+| `selectedDisclosure` | which fields of which credentials presented      |
+| `proof`              | W3C Data Integrity proof of presentation         |
+| `audience`           | verifier identifier or audience claim            |
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Selective disclosure (SD-JWT VC, BBS+ signatures, or
+analogous schemes) is supported so a recipient can
+prove a credential's claims without revealing all
+attributes.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+## §11 Verification record
 
-## Annex H — Versioning and Deprecation Policy
+| Field                | Source / Binding                                 |
+|----------------------|--------------------------------------------------|
+| `verificationRef`    | UUID                                             |
+| `presentationRef`    | §10                                              |
+| `verifierRef`        | the verifying party                              |
+| `verificationTime`   | ISO 8601                                         |
+| `outcome`            | `valid`, `revoked`, `suspended`, `expired`,      |
+|                      | `signature-invalid`, `issuer-not-trusted`        |
+| `policyRef`          | the verification policy applied                  |
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Cross-domain references (informative)
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+- WIA-digital-credential — for parallel-track digital-id
+  binding
+- WIA-learning-analytics — for outcome-evidence pipeline
+- WIA-virtual-classroom — for instructor identity
+- WIA-content-ai — for AI-generated evidence governance
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## Annex A — Worked Open Badge 3.0 issuance (informative)
 
-## Annex I — Interoperability Profiles
+```json
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json"
+  ],
+  "type": ["VerifiableCredential", "OpenBadgeCredential"],
+  "issuer": {"id":"did:web:issuer.example","name":"Issuer Inc."},
+  "credentialSubject": {
+    "id": "did:key:z6Mk...",
+    "achievement": {
+      "id": "https://issuer.example/achievements/sql-101",
+      "type": ["Achievement"],
+      "name": "Introduction to SQL",
+      "criteria": {"narrative":"Learner completed all 12 modules and the final assessment."}
+    }
+  },
+  "issuanceDate":"2026-04-12T09:14:00Z"
+}
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## Annex B — Conformance disclosure
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Implementations declare the W3C VC Data Model version,
+the IMS Open Badges revision, the proof types
+supported, the status-list scheme, the EQF / NQF
+mappings indexed, and the canonicalisation form.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex C — Versioning
+
+Field additions are minor; semantic redefinition or
+removal is major.
+
+## Annex D — Selective-disclosure mechanism
+
+Selective disclosure binds to one of:
+
+- SD-JWT (IETF) — selectively-disclosable JWTs
+- BBS+ signatures (W3C VC-DI registry) — multi-message
+  signature with disclosure of subset
+- Hash-based salting and disclosure (Open Badges)
+
+The mechanism in force is recorded on the issuance
+record so verifiers know which scheme to apply.

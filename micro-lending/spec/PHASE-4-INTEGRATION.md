@@ -1,241 +1,269 @@
-# WIA-micro-lending PHASE 4 — INTEGRATION Specification
+# WIA-micro-lending PHASE 4 — Integration Specification
 
 **Standard:** WIA-micro-lending
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-micro-lending (Micro Lending).
+This PHASE specifies how WIA-micro-lending integrates
+with adjacent regulatory, payment, credit-bureau,
+investor-reporting, social-performance, and supervisory
+systems: central-bank reporting gateways, financial
+intelligence units (FIU), payment rails (mobile money
+and bank rails over ISO 20022), credit-bureau
+exchanges, IFC E&S reporting, SPI4 social-performance
+reporting, sanctions-list providers (UN, US OFAC, EU
+CSL, UK OFSI, KR MOFA), MIX Market reporting (CGAP /
+SPTF inventory), open-banking / open-finance APIs, and
+the IDMP-equivalent product / counterparty taxonomies.
+It also specifies the operational binding to companion
+WIA standards.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- BIS — payment-systems oversight; Basel Core Principles
+- FATF Recommendations; FATF Recommendation 16 (wire transfers)
+- ISO 20022 — pacs / pain / camt message families
+- IETF RFC 9110 (HTTP), RFC 7515 (JWS), RFC 8259 (JSON), RFC 8785 (JCS)
+- ITU-T X.1216 — security framework for digital financial services
+- IFC Performance Standards (PS 1, PS 2)
+- SPI4 (CERISE+SPTF) reporting taxonomy
+- Client Protection Pathway (CPP)
+- IFRS 9 — Financial Instruments
+- ISO 17442 — LEI; ISO 4217; ISO 3166; BCP 47
+- US Reg E (12 CFR 1005), Reg Z (12 CFR 1026)
+- EU PSD2 (2015/2366); EU PSD3 proposal
+- UK Open Banking, NextGenPSD2 (Berlin Group)
+- Sanctions providers — UN Sanctions Lists, US OFAC SDN, EU Consolidated List, UK OFSI, KR MOFA
+- HL7 FHIR R5 (where bank-to-clinical interop applies, e.g. bancassurance)
+- CGAP MIX-Market reporting (legacy / SPI4 inventory)
 
 ---
 
-## §1 Scope
+## §1 Central-bank reporting integration
 
-This PHASE document is one of four that together define the WIA-micro-lending
-standard. It addresses the integration layer of the standard.
+| Authority             | Reporting interface                            |
+|-----------------------|------------------------------------------------|
+| Central bank (KE BoK) | KE-BoK supervision portal                       |
+| Central bank (NG CBN) | CBN supervisory portal                         |
+| Central bank (PH BSP) | BSP FIES                                       |
+| Central bank (IN RBI) | RBI XBRL reporting                              |
+| Central bank (MX CNBV)| CNBV reporting portal                          |
+| Central bank (US OCC) | OCC large-exposure reporting (where bound)     |
 
-## §2 Manifest
+Each authority's profile is recorded in the regulator-
+binding reference record; submissions sign with the
+sponsor's reporting key and the regulator-issued
+gateway acknowledgement identifier records on the
+report.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "micro-lending"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 FIU integration
 
-## §3 Conformance Tiers
+| Authority                | Submission profile                            |
+|--------------------------|-----------------------------------------------|
+| FIU (UN)                 | goAML (most common globally)                   |
+| FIU (US FinCEN)          | BSA E-Filing                                   |
+| FIU (UK NCA)             | NCA SAR Online                                 |
+| FIU (KR KOFIU)           | KOFIU online portal                            |
+| FIU (JP JAFIC)           | JAFIC submission                               |
+| FIU (NG NFIU)            | NFIU portal                                    |
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+STR / CTR submissions follow the FIU's profile; the
+implementation records the FIU acknowledgement
+reference and the period covered.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Payment rail integration
 
-## §4 Discovery
+| Rail                     | Profile                                       |
+|--------------------------|-----------------------------------------------|
+| Bank rail (cross-border) | ISO 20022 pacs.008 / pain.001                  |
+| Bank rail (domestic)     | local-net (e.g. SEPA, ACH, RTGS, FAST)         |
+| Mobile money             | operator-specific (M-PESA Daraja, Airtel       |
+|                          | Money APIs, MTN MoMo APIs, Wave, bKash, GCash) |
+| Card rail                | EMVCo / scheme-specific                        |
+| Open banking / open      | UK OBIE; NextGenPSD2; AU CDR                   |
+| finance                  |                                                |
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/micro-lending`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The disbursement / repayment record cites the rail
+identifier; reconciliation matches operator-side daily
+reports to ledger postings.
 
-## §5 Time and Identity
+## §4 Credit-bureau integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+| Bureau type           | Profile                                          |
+|-----------------------|--------------------------------------------------|
+| National public bureau| per-country regulator profile                    |
+| Private credit bureau | per-bureau profile                                |
+| Microfinance-specific | sector-specific bureau where present              |
 
-## §6 Versioning and Deprecation
+Reporting cadence is per bureau (often monthly). The
+implementation records the bureau acknowledgement
+identifier and the period covered.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Sanctions-list integration
 
-## §7 Privacy and Security
+| List provider          | Update profile                                  |
+|------------------------|-------------------------------------------------|
+| UN Sanctions Lists     | UN portal (consolidated)                         |
+| US OFAC SDN            | OFAC SDN list (XML / delta / full)               |
+| EU Consolidated List   | EU FSF download                                  |
+| UK OFSI                | UK consolidated list                             |
+| KR MOFA                | KR MOFA list                                     |
+| In-house watchlist     | sponsor-internal                                 |
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Screening events cite the list version; the periodic
+re-screen re-runs over the active customer base when
+a list update publishes.
 
-## §8 Open Governance
+## §6 Investor / IFC reporting integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `micro-lending` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+| Investor reporting kind | Binding                                        |
+|-------------------------|------------------------------------------------|
+| IFC E&S reporting       | IFC PS 1 / PS 2 mapping                         |
+| SPI4 social audit       | CERISE+SPTF Universal Standards report          |
+| Investor portfolio data | sponsor-defined NDJSON / Parquet feed           |
+| Public MIX Market       | legacy / SPI4 inventory profile                 |
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Investor reports sign with the sponsor's investor-
+reporting key; mismatches between regulator-reported
+PAR and investor-reported PAR raise a discrepancy
+event for resolution.
 
+## §7 Open banking / open finance integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+Implementations may consume bank-rail data through
+open-banking APIs (UK OBIE, NextGenPSD2 Berlin Group,
+EU PSD2 RTS-AISP, AU CDR). This is most relevant for
+SME loans where the customer's bank-statement view
+informs the income-verification step. Consent flows
+follow the relevant regulator's authentication
+requirements.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## §8 Cross-domain WIA bindings
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+| Companion standard          | Binding purpose                                |
+|-----------------------------|------------------------------------------------|
+| WIA-mobile-payment          | disbursement / repayment rail                  |
+| WIA-cross-border-payment    | international remittance                       |
+| WIA-kyc-aml                 | screening pipeline                             |
+| WIA-credit-scoring          | model governance                               |
+| WIA-financial-inclusion     | outcomes attribution                           |
+| WIA-financial-data-exchange | counterparty / lender records                  |
+| WIA-cbdc                    | retail-CBDC rail (where applicable)            |
+| WIA-master-data-management  | counterparty / customer master                 |
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Each binding identifies the consumed PHASE.
 
-## Annex F — Adoption Roadmap
+## §9 Long-term archival
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+| Authority / context           | Retention                              |
+|-------------------------------|----------------------------------------|
+| Central-bank inspection        | 5-7 years per national rules           |
+| FATF — KYC records            | minimum 5 years post-relationship       |
+| Tax records                    | per jurisdiction (typ. 7-10 years)     |
+| FIU — STR records              | typically ≥ 5 years                    |
+| Customer-protection complaint  | per regulator (typ. ≥ 3-5 years)       |
+| IFRS 9 ECL evidence            | per audit cycle                         |
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Personal-data deletion under privacy law tombstones
+the customer-record payload while preserving the
+audit-chain hash.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Conformance test suite
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The reference test suite covers:
 
-## Annex G — Test Vectors and Conformance Evidence
+- KYC / CDD gate enforcement before account-open
+- sanctions / PEP screening at customer-onboarding and
+  before each disbursement
+- four-eyes approval on large loans
+- ISO 20022 pacs.008 round-trip with mobile-money rail
+- end-of-day reconciliation matching operator statements
+- restructuring decision with IFRS 9 stage transition
+- write-off propagation to bureau and PAR report
+- STR generation on a flagged transaction pattern
+- customer-protection disclosure round-trip with
+  acceptance proof
+- collections-conduct cap enforcement
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Internationalisation
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+User-facing strings (disclosures, repayment-schedule
+text, dispute-resolution contact details) carry BCP 47
+language tags. Country-specific regulator paths are
+resolved by the customer's primary jurisdiction (ISO
+3166-1 alpha-3).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §12 Security and privacy posture
 
-## Annex H — Versioning and Deprecation Policy
+- Transport: TLS 1.3 with mutual TLS for sponsor /
+  rail / regulator transmissions
+- Authentication: client_credentials with key
+  attestation for sponsor back-end; OAuth 2 with PKCE
+  + device attestation for agent / field-officer apps
+- At-rest: AES-256-GCM with sponsor-controlled KMS;
+  per-customer key wrapping
+- Audit: tamper-evident chain (PHASE 3 §11) exportable
+  per ISO/IEC 27037 forensic-evidence guidance
+- Privacy: customer identifiers opaque cross-domain;
+  FATF-required CDD records held under regulator-
+  approved DPIA
+- Connectivity: agent / field-officer apps operate
+  offline-first; transactions queue locally and submit
+  on reconnect; the queue is hash-chained
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §13 Operational metrics
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Sponsors / investors report (informationally) on the
+WIA registry:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+- portfolio at risk (PAR>30, PAR>90)
+- write-off ratio
+- restructuring rate
+- approval / rejection rate (with model bias slice)
+- complaint volume vs. SLA
+- sanctions-screening hit rate
 
-## Annex I — Interoperability Profiles
+## §14 Recovery and continuity
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- API outage — agent / field apps queue locally;
+  reconcile on reconnect
+- rail-operator outage — disbursements queued; daily
+  reconciliation flags pending; investor / regulator
+  notice if outage persists
+- KMS outage — sealed back-up keys per sponsor's BCP
+- regulator-gateway outage — submissions queue and
+  replay; FIU clock paused only on regulator-declared
+  outage
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## Annex A — Worked end-to-end example (informative)
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+A microfinance institution operating in three sub-
+Saharan markets onboards 25,000 customers through
+agent-network field officers. KYC uses national
+identification cards verified through the country's
+identity-management system. Loans disburse over M-
+PESA / Airtel Money / MTN MoMo rails. Repayments
+collect over the same rails. End-of-day reconciliation
+matches operator statements; mismatches feed
+stewardship tasks. The MIS submits PAR aging monthly
+to each central bank via the supervisory portal; STRs
+file with the relevant FIU through goAML; SPI4 social
+performance reports annually to investors. A pre-
+holiday liquidity event triggers a restructuring
+decision under §7; the restructuring committee
+approves a 3-month payment holiday for affected
+customers; IFRS 9 ECL provisioning increases.
+
+## Annex B — Conformance disclosure
+
+Implementations declare the central-bank, FIU, rail-
+operator, and bureau bindings supported, the
+sanctions-list updates honoured, the IFRS 9 stage-
+transition rules applied, and the SPI4 audit version
+implemented. Disclosure is machine-readable at
+`/.well-known/wia-ml-conformance.json`.
+
+## Annex C — Versioning
+
+Adding a new rail-operator binding is minor; changing
+the ISO 20022 message version is major.

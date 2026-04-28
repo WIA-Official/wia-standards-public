@@ -1,241 +1,286 @@
-# WIA-museum-digital-archive PHASE 3 — PROTOCOL Specification
+# WIA-museum-digital-archive PHASE 3 — Protocol Specification
 
 **Standard:** WIA-museum-digital-archive
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-museum-digital-archive (Museum Digital Archive).
+This PHASE defines the operational protocols binding
+records and API resources into auditable lifecycles:
+accession workflow with due diligence, conservation
+schedule, exhibition / loan operating discipline,
+imagery / surrogate authoring with rights enforcement,
+preservation cycle (OAIS / PREMIS), descriptive-
+metadata QA, multilingual-label QA, and the audit-
+event chain. The protocols are framed so an ICOM
+ethics audit, a national heritage authority's
+inspection, or a trustworthy-digital-repository (ISO
+16363) certification can reconstruct any object from
+the event log.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- ICOM Code of Ethics for Museums (current edition)
+- ICOM Code of Ethics for Natural-History Museums
+- UNESCO 1970 Convention on the Means of Prohibiting and Preventing the Illicit Import, Export and Transfer of Ownership of Cultural Property
+- UNIDROIT 1995 Convention on Stolen or Illegally Exported Cultural Objects
+- ISO 21127 (CIDOC-CRM) — reference ontology
+- ISO 14721 (OAIS) — Open Archival Information System
+- ISO 16363 — Trustworthy Digital Repositories
+- Spectrum 5.1 — collections-management procedures
+- LIDO 1.1; Linked Art; PREMIS 3.0; METS 1.12
+- IIIF Image / Presentation / Auth / Search APIs
+- ISO/IEC 27037 — digital evidence preservation
+- IETF RFC 5424 (Syslog), RFC 7515 (JWS), RFC 8785 (JCS)
 
 ---
 
-## §1 Scope
+## §1 Accession workflow
 
-This PHASE document is one of four that together define the WIA-museum-digital-archive
-standard. It addresses the protocol layer of the standard.
+```
+proposed → due-diligence → committee-reviewed → accessioned →
+  catalogued → published
+                                  │
+                                  └→ rejected → returned-to-source
+```
 
-## §2 Manifest
+Due-diligence checks include UNESCO 1970 / UNIDROIT
+1995 compliance, the ICOM Red List risk categorisation,
+provenance research consistent with Spectrum 5.1, and
+sale / gift / bequest documentation.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "museum-digital-archive"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Provenance discipline
 
-## §3 Conformance Tiers
+Provenance is an append-only chain of E10 / E8 events
+per CIDOC-CRM. Gaps are recorded with explicit
+acknowledgement; an unresolved provenance gap raises a
+stewardship task and may delay public publication.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Conservation schedule
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+| Cadence kind        | Cadence                                       |
+|---------------------|-----------------------------------------------|
+| Routine inspection  | per institutional schedule (typ. annually for |
+|                     | sensitive media; multi-year for stable media) |
+| Pre-loan inspection | mandatory before any loan                     |
+| Post-loan inspection| mandatory at return                           |
+| Disaster-response   | event-driven (fire / flood / pest)            |
 
-## §4 Discovery
+Conservator-credential is recorded; treatments without
+an active credential are rejected.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/museum-digital-archive`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Exhibition / loan operating discipline
 
-## §5 Time and Identity
+```
+loan: requested → reviewed → approved → packed → in-transit →
+      installed → de-installed → returned-in-transit → received
+                       │
+                       └→ damaged → conservation-task
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Loan reviews check the borrower's facilities-report,
+courier credentials, insurance coverage, and the
+object's stability in a touring environment. The
+condition reports at packing and installation form the
+contractual baseline for damage attribution.
 
-## §6 Versioning and Deprecation
+## §5 Surrogate authoring
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+capture-planned → captured → quality-checked →
+  metadata-bound → rights-classified → published / restricted
+```
 
-## §7 Privacy and Security
+Capture metadata records the device, lighting, colour
+target, and operator. Quality-check protocols include:
+colour-target verification (per the institution's
+colour-management SOP), focus / sharpness, exposure
+range, geometric correction, and ICC profile binding.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Preservation cycle (OAIS / PREMIS)
 
-## §8 Open Governance
+```
+ingest (SIP) → quality-control → ingest-confirmed →
+  AIP-stored → fixity-monitored → migration / normalisation →
+  dissemination (DIP)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `museum-digital-archive` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Fixity-check cadence is risk-based:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+| Risk tier        | Cadence                                       |
+|------------------|-----------------------------------------------|
+| Critical (signed  | weekly                                        |
+| originals)       |                                               |
+| High             | monthly                                       |
+| Standard         | quarterly                                     |
+| Low / large      | annually                                      |
 
+Fixity failure raises a preservation-event with
+outcome `failure`; recovery from replicas (with
+chain-of-custody recorded) restores the canonical
+copy.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §7 Descriptive-metadata QA
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+| Check                      | Discipline                              |
+|----------------------------|-----------------------------------------|
+| Required fields per LIDO   | accession-number, type, title, creator   |
+| Authority binding           | Getty AAT / TGN / ULAN linkage           |
+| CIDOC-CRM consistency      | E22 / E84 type alignment                  |
+| Language coverage          | minimum gallery-public label per           |
+|                            | institutional default + accessible label  |
+| Iconographic vocabulary    | Iconclass mapping where applicable        |
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Validation runs on metadata write; violations gate
+publication.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 Multilingual-label QA
 
-## Annex F — Adoption Roadmap
+Per the institution's audience-tier policy:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+| Tier                    | QA discipline                              |
+|-------------------------|--------------------------------------------|
+| Gallery-public          | curator review + readability metric        |
+| Scholarly catalogue     | peer review per institution                |
+| Accessible easy-language| communications-team review                  |
+| Audio-description       | trained-describer review per accessibility |
+|                         | guidelines                                 |
+| Sign-language           | native-signer review                       |
+| Machine-translated      | MT-with-human-post-edit; flag MT-only      |
+|                         | warning to public consumers                |
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Multilingual labels are versioned; corrections emit
+audit events.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §9 Rights / sensitivity enforcement
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```
+rights-recorded → access-tier-determined → published / restricted
+                                                      │
+                                                      └→ committee-review
+                                                         (community / curator)
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+Sensitive material (sacred-secret, indigenous-
+ancestral remains, depictions causing distress)
+follows local communities' wishes; access tiers
+include `public`, `community-only`, `restricted-
+research`, and `not-publishable`. Indigenous-
+community engagement records the consultation.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §10 Audit event chain
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+| Field          | Meaning                                                 |
+|----------------|---------------------------------------------------------|
+| `eventId`      | UUID                                                    |
+| `eventTime`    | ISO 8601 with timezone                                  |
+| `actor`        | identity (curator / conservator / archivist / lender)   |
+| `resourceRef`  | URI of the resource that changed                        |
+| `action`       | accessioned / loaned / conserved / published / migrated |
+| `priorHash`    | SHA-256 of the prior event payload                      |
+| `signature`    | RFC 7515 JWS over the canonical event payload (RFC 8785)|
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §11 Repatriation and restitution flow
 
-## Annex H — Versioning and Deprecation Policy
+Per UNESCO 1970 / UNIDROIT 1995 and applicable
+national laws, restitution flows:
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+```
+claim-filed → evaluated → committee-reviewed → decision →
+  decision-implemented (return / agreed-keep / mediated outcome)
+```
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+The institution's audit chain records each step; the
+return event is itself a provenance E10 Transfer-of-
+Custody.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §12 Reproducibility
 
-## Annex I — Interoperability Profiles
+A surrogate-publication is `reproducible-strong` when
+capture parameters, colour profile, processing
+pipeline (with container digest), and rights
+classification are content-addressed; `weak` when any
+is absent.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## Annex A — Worked accession example (informative)
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+A modern-art bequest comprising 47 paintings,
+sketches, and personal papers enters the institution
+under §1. Due-diligence research uses Getty Provenance
+Index and the Art Loss Register; six items show
+provenance gaps in the 1933-1945 period and move to
+extended-due-diligence (Spoliation Advisory Panel
+involvement). After 18 months of research, four items
+are deemed clean and accessioned; two items resolve
+through a restitution agreement with the original
+owner's heirs. The accession event chain records each
+step.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex B — Conformance disclosure
+
+Implementations declare the audit-chain schema
+version, the JWS algorithm registry, the OAIS / PREMIS
+revisions implemented, the IIIF profiles served, the
+ICOM Code of Ethics edition followed, and the ISO
+16363 certification status.
+
+## Annex C — Versioning
+
+Field additions are minor; semantic redefinition is
+major.
+
+## Annex D — Time-source declaration
+
+Audit-chain timestamps cite the time-source authority
+(NTP stratum-1, NIST, KASI, KRISS, PTB).
+
+## Annex E — Operator-credential binding
+
+| Credential                | Source                              |
+|---------------------------|-------------------------------------|
+| Curator                   | institutional appointment           |
+| Conservator               | per professional body (ICOM-CC,     |
+|                           | AIC, IIC)                           |
+| Registrar / collections    | institutional + RCAAA / equivalent  |
+| Archivist                 | institutional + ICA / SAA           |
+| IIIF / digital-asset       | sponsor                             |
+| operator                  |                                     |
+| Indigenous-community      | community-recognised                |
+| representative            |                                     |
+
+A signing event by an operator without an active
+credential rejects.
+
+## Annex F — De-accessioning protocol
+
+Per ICOM Code of Ethics §2.13-2.16 and Spectrum 5.1
+de-accessioning is a controlled procedure:
+
+```
+proposed → reviewed (committee) → community-consultation →
+  approved → executed → recorded
+```
+
+De-accessioning artefacts include the rationale, the
+mode (transfer / sale / destruction / repatriation),
+the approving committee minutes, and the post-de-
+accession provenance event. De-accessioning by sale
+follows the institution's collection-trust principle
+that proceeds reinvest in collection-care.
+
+## Annex G — Inspector replay payload
+
+For an audit (institutional, accreditation, or trust-
+repository certification) the protocol exposes a
+replay payload covering:
+
+- accession + provenance chain
+- conservation timeline
+- exhibition / loan history
+- imagery / surrogate manifests with content digests
+- preservation cycle events
+- rights / access-tier history
+- audit-chain export
+
+The payload signs with the institution's audit-chain
+JWS key so the inspector verifies integrity end-to-end
+without trusting the API operator at runtime.

@@ -1,241 +1,302 @@
-# WIA-master-data-management PHASE 2 — API-INTERFACE Specification
+# WIA-master-data-management PHASE 2 — API Interface Specification
 
 **Standard:** WIA-master-data-management
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-master-data-management (Master Data Management).
+This PHASE defines the resource-oriented API surface
+for master-data management operations: domain-record
+ingest and retrieval, golden-record construction,
+match-cluster review, hierarchy management,
+stewardship-task workflow, change-history retrieval,
+quality-rule registration, and downstream consumer
+publication. The API supports two architectural
+patterns — registry-style (read-aside) and
+transactional (read-and-write) — and a coexistence
+profile that bridges them.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9110 (HTTP), RFC 9112 (HTTP/1.1), RFC 9113 (HTTP/2)
+- IETF RFC 9457 (Problem Details for HTTP APIs)
+- IETF RFC 8259 (JSON), RFC 8785 (JCS), RFC 4122 (UUID), RFC 9530 (Content-Digest)
+- IETF RFC 5789 (PATCH), RFC 6902 (JSON Patch), RFC 7396 (JSON Merge Patch)
+- HL7 SMART App Launch 2.0 (clinical contexts where party = Patient)
+- HL7 FHIR R5 — Patient, Practitioner, Organization, Location, Substance
+- W3C SHACL (validation), W3C SKOS (controlled vocabulary)
+- ISO/IEC 11179-3 — metadata-registry registry metamodel
 
 ---
 
-## §1 Scope
+## §1 Endpoint root
 
-This PHASE document is one of four that together define the WIA-master-data-management
-standard. It addresses the api-interface layer of the standard.
+API root is implementation-controlled. All endpoints
+are TLS 1.3 (RFC 8446). For clinical contexts the API
+participates in SMART on FHIR launch flows; for
+sponsor-to-sponsor machine integrations the API uses
+client_credentials with key attestation.
 
-## §2 Manifest
+## §2 Domain endpoints
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "master-data-management"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+For each domain `{d}` ∈ {parties, products, locations,
+assets, accounts, reference-sets} the API exposes:
 
-## §3 Conformance Tiers
+```
+POST   /v1/{d}                          create record
+GET    /v1/{d}/{ref}                    retrieve current state
+PATCH  /v1/{d}/{ref}                    JSON Patch (RFC 6902) or Merge Patch
+DELETE /v1/{d}/{ref}                    soft delete (status = retired)
+GET    /v1/{d}                          list / filter
+GET    /v1/{d}/{ref}/history            change-history (paged)
+GET    /v1/{d}/{ref}/sources            source-records contributing
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+`PATCH` requests carry an `If-Match: <etag>` header to
+guard against lost updates; the server rejects with
+`412 Precondition Failed` on stale.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Golden-record endpoints
 
-## §4 Discovery
+```
+POST   /v1/golden-records/$rebuild      trigger rebuild for a domain or cluster
+GET    /v1/golden-records/{ref}         retrieve
+GET    /v1/golden-records/{ref}/lineage source-record graph
+PATCH  /v1/golden-records/{ref}         per-attribute survivorship override
+                                       (steward-only, audited)
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/master-data-management`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Survivorship overrides are recorded as steward actions
+on the change-history; they cannot be silently mutated.
 
-## §5 Time and Identity
+## §4 Match-cluster endpoints
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST   /v1/match-clusters/$run          run / re-run match for a domain
+GET    /v1/match-clusters/{ref}         retrieve
+POST   /v1/match-clusters/{ref}/merge   apply merge (steward decision)
+POST   /v1/match-clusters/{ref}/split   apply split (steward decision)
+POST   /v1/match-clusters/{ref}/hold    hold for further review
+GET    /v1/match-clusters?status=       list / filter
+```
 
-## §6 Versioning and Deprecation
+Merge / split actions emit audit events and re-run the
+golden-record build for the affected cluster.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Hierarchy endpoints
 
-## §7 Privacy and Security
+```
+POST   /v1/hierarchies                  create hierarchy version
+GET    /v1/hierarchies/{ref}            retrieve current version
+GET    /v1/hierarchies/{ref}/version/{v} retrieve effective-dated version
+POST   /v1/hierarchies/{ref}/promote    promote draft to active
+GET    /v1/hierarchies/{ref}/walk       traverse (DFS / BFS, depth limit)
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Hierarchy versions are effective-dated (PHASE 1 §10);
+the active version at a given date is resolvable via
+`?at=<ISO-8601>`.
 
-## §8 Open Governance
+## §6 Stewardship-task endpoints
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `master-data-management` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST   /v1/tasks                        create steward task
+GET    /v1/tasks/{ref}                  retrieve
+PATCH  /v1/tasks/{ref}                  update status / assignment
+POST   /v1/tasks/{ref}/comment          append steward comment
+GET    /v1/tasks?assignee=&priority=    list / filter
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Quality-rule endpoints
 
+```
+POST   /v1/quality-rules                register rule
+GET    /v1/quality-rules/{ref}          retrieve
+PATCH  /v1/quality-rules/{ref}          amend (active / retired)
+POST   /v1/quality-rules/$evaluate      evaluate corpus (async)
+GET    /v1/quality-rules/$evaluate/{run-id} retrieve evaluation result
+```
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+Evaluations return per-rule violations bound to the
+record references that fail; violations open
+stewardship tasks per the configured automation.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## §8 Reference-data endpoints
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+POST   /v1/reference-sets                       register reference set
+GET    /v1/reference-sets/{ref}                  retrieve set metadata
+GET    /v1/reference-sets/{ref}/codes            list codes
+GET    /v1/reference-sets/{ref}/mappings/{tgtSet} cross-walk to another set
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Cross-walk mappings expose SKOS exact / close / broad /
+narrow / related match relations; consumers select the
+appropriate semantic.
 
-## Annex F — Adoption Roadmap
+## §9 Bulk export
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+GET  /v1/$export?_type=Party,Product,Location,Asset,Account
+GET  /v1/$status/{exportId}
+GET  /v1/$result/{exportId}/{file}
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Export output is NDJSON. For clinical-context
+implementations the FHIR Bulk Data profile is the
+authoritative export channel for `Patient`,
+`Organization`, `Practitioner`, and `Location`.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Error model (RFC 9457)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```json
+{
+  "type":   "urn:wia:mdm:problem:lost-update",
+  "title":  "Optimistic concurrency violation",
+  "status": 412,
+  "detail": "If-Match etag does not match current resource version",
+  "instance": "/v1/parties/p-2026-001"
+}
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+Common type URIs:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+| Type URI suffix              | HTTP | Meaning                                       |
+|------------------------------|-----:|-----------------------------------------------|
+| `lost-update`                | 412  | etag-precondition mismatch                    |
+| `quality-rule-violation`     | 422  | record fails an active critical rule          |
+| `cluster-locked`             | 409  | match-cluster under steward review            |
+| `survivorship-override-only-steward` | 403 | non-steward attempted survivorship override |
+| `hierarchy-cycle`            | 422  | hierarchy modification would create a cycle   |
+| `reference-deprecated`       | 410  | reference-data code retired                   |
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §11 Pagination
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Cursor-paginated list endpoints return:
 
-## Annex H — Versioning and Deprecation Policy
+```json
+{
+  "items": [...],
+  "nextCursor": "eyJsYXN0Ijoi..."
+}
+```
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Audit headers
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+| Header                  | Meaning                                       |
+|-------------------------|-----------------------------------------------|
+| `X-Request-Id`          | client-set, echoed by server                  |
+| `X-Audit-Event-Id`      | server-set, links to PHASE 3 audit chain      |
+| `X-Trace-Id`            | W3C Trace Context (`traceparent`)             |
+| `Content-Digest`        | RFC 9530 SHA-256 of the response body         |
+| `ETag`                  | weak (W/"…") version tag for optimistic        |
+|                         | concurrency                                   |
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Versioning
 
-## Annex I — Interoperability Profiles
+Resource paths are version-prefixed (`/v1/...`).
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Authentication and scopes (informative)
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+For sponsor-to-sponsor machine flows:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+```
+mdm:party.read
+mdm:party.write
+mdm:product.write
+mdm:cluster.review
+mdm:hierarchy.promote
+mdm:steward.assign
+mdm:quality-rule.evaluate
+mdm:export.read
+```
+
+Steward actions (cluster merge / split, survivorship
+override, hierarchy promote) require scopes elevated
+beyond standard write.
+
+## Annex A — OpenAPI reference
+
+A canonical OpenAPI 3.1 description is published at
+`api/openapi-3.1.yaml`.
+
+## Annex B — Worked merge action (informative)
+
+```http
+POST /v1/match-clusters/c-2026-04-12-007/merge HTTP/1.1
+Authorization: Bearer ...
+WIA-MDM-Schema-Version: 1.0
+Idempotency-Key: 7c0d9b0f-...
+
+{
+  "stewardRef": "steward:KE-007",
+  "rationale":  "Confirmed identity via LEI 5493001RKR55V4X61F71",
+  "decision":   "merge",
+  "survivorshipOverride": {"legalName": "Acme Inc."}
+}
+```
+
+Response 202 returns the queued rebuild identifier so
+the caller can poll for golden-record refresh.
+
+## Annex C — Async export pattern
+
+```
+POST   /v1/$export                      → 202 with Content-Location
+GET    /v1/$status/{id}                 → 202 in-progress / 200 manifest
+GET    /v1/$result/{id}/{file}          → 200 NDJSON
+DELETE /v1/$status/{id}                 → 202 cancellation
+```
+
+## Annex D — Conformance disclosure
+
+Implementations declare the OpenAPI revision served,
+the SHACL shape catalogue version, the FHIR R5 IG
+profiles supported (where applicable), and the
+canonicalisation form (RFC 8785).
+
+## Annex E — Bitemporal query parameters
+
+Domain endpoints support bitemporal lookups:
+
+```
+GET /v1/parties/{ref}?validAt=2026-01-15T00:00:00Z
+GET /v1/parties/{ref}?recordedAt=2026-04-12T09:14:00Z
+GET /v1/parties/{ref}?validAt=...&recordedAt=...
+```
+
+`validAt` reconstructs the modelled fact at a point in
+real-world time; `recordedAt` reconstructs the system's
+belief at a point in record time. Combined queries
+support audit reconstructions ("what did the system
+know on date X about the state of the world on date Y").
+
+## Annex F — Subject-rights endpoints
+
+For privacy-rights operations (PHASE 4 §6) the API
+exposes:
+
+```
+GET    /v1/subject-rights/{partyRef}/access      data subject access export
+POST   /v1/subject-rights/{partyRef}/rectification  request rectification
+POST   /v1/subject-rights/{partyRef}/erasure     request erasure (GDPR Art. 17)
+POST   /v1/subject-rights/{partyRef}/portability portable export
+POST   /v1/subject-rights/{partyRef}/restriction restrict processing
+POST   /v1/subject-rights/{partyRef}/objection   record objection
+GET    /v1/subject-rights/{partyRef}/queue       open requests for this party
+```
+
+Subject-rights endpoints emit dedicated audit events
+gated by an elevated steward scope (`mdm:subject-
+rights.handle`).
+
+## Annex G — Webhook surface
+
+Implementations expose webhooks for `golden-record-
+updated`, `cluster-merged`, `cluster-split`, `quality-
+violation`, and `subject-rights-resolved` events.
+Payloads sign with RFC 7515 JWS; receivers verify
+against `/.well-known/wia-mdm-keys.json`. Delivery is
+at-least-once; receivers are expected to be idempotent
+on `eventId`. Webhook receivers may register a content-
+filter expression (SQL-like predicate) so the
+implementation only delivers matching events.

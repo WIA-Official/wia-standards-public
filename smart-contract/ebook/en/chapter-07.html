@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 7: Phase 4 Integration - WIA-FIN-007</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.8; color: #1a1a1a; background: #f8fafc; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); color: white; padding: 3rem 2rem; }
+        .header .chapter-number { font-size: 1rem; opacity: 0.9; margin-bottom: 0.5rem; }
+        .header h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+        .content { padding: 3rem 2rem; }
+        .nav { display: flex; justify-content: space-between; padding: 1.5rem 2rem; background: #f8fafc; border-top: 1px solid #e2e8f0; }
+        .nav a { color: #22C55E; text-decoration: none; font-weight: 600; }
+        h2 { color: #1e293b; font-size: 1.8rem; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #22C55E; }
+        h3 { color: #334155; font-size: 1.4rem; margin: 1.5rem 0 1rem; }
+        p { margin-bottom: 1rem; color: #334155; }
+        code { background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; font-family: 'Courier New', monospace; color: #e11d48; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; color: inherit; padding: 0; }
+        ul { margin: 1rem 0 1rem 2rem; color: #334155; }
+        li { margin: 0.5rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">WIA-FIN-007 📜 Chapter 7</div>
+            <h1>Phase 4: Integration</h1>
+            <p>Wallet connectivity, oracle integration, DeFi protocols, and cross-chain bridges</p>
+        </div>
+        <div class="content">
+            <h2>Wallet Integration</h2>
+            <p>WIA-FIN-007 Phase 4 ensures seamless integration with all major Web3 wallets through standardized connection protocols and transaction signing.</p>
+            
+            <h3>Universal Wallet Connector</h3>
+            <pre><code>import { WIAWalletConnector } from '@wia/wallet';
+
+const walletConnector = new WIAWalletConnector({
+    supportedWallets: [
+        'metamask',
+        'walletconnect',
+        'coinbase',
+        'trust',
+        'ledger',
+        'trezor',
+        'safe'
+    ],
+    supportedChains: [1, 137, 42161, 10, 56, 43114],
+    appMetadata: {
+        name: 'WIA DApp',
+        description: 'WIA-compliant decentralized application',
+        url: 'https://app.example.com',
+        icons: ['https://app.example.com/icon.png']
+    }
+});
+
+// Auto-detect and connect to available wallet
+const wallet = await walletConnector.connect();
+
+console.log('Connected wallet:', wallet.type);
+console.log('Address:', wallet.address);
+console.log('Chain ID:', wallet.chainId);
+
+// Listen for account changes
+wallet.on('accountsChanged', (accounts) => {
+    console.log('Account changed:', accounts[0]);
+});
+
+// Listen for chain changes
+wallet.on('chainChanged', (chainId) => {
+    console.log('Chain changed:', chainId);
+});
+
+// Request chain switch
+await wallet.switchChain(137); // Polygon
+
+// Sign message
+const signature = await wallet.signMessage('Welcome to WIA DApp');
+
+// Sign typed data (EIP-712)
+const typedSignature = await wallet.signTypedData({
+    domain: {
+        name: 'WIA Token',
+        version: '1',
+        chainId: 1,
+        verifyingContract: contractAddress
+    },
+    types: {
+        Transfer: [
+            { name: 'from', type: 'address' },
+            { name: 'to', type: 'address' },
+            { name: 'amount', type: 'uint256' }
+        ]
+    },
+    value: {
+        from: wallet.address,
+        to: recipientAddress,
+        amount: ethers.utils.parseEther('100')
+    }
+});</code></pre>
+
+            <h3>Hardware Wallet Support</h3>
+            <pre><code>// Ledger integration
+const ledger = await walletConnector.connectHardware('ledger', {
+    derivationPath: "m/44'/60'/0'/0/0"
+});
+
+// Confirm transaction on device
+await ledger.confirmOnDevice();
+
+// Sign with hardware wallet
+const hwSignature = await ledger.signTransaction(txData);
+
+// Trezor integration
+const trezor = await walletConnector.connectHardware('trezor');
+const trezorTx = await trezor.signTransaction(txData);</code></pre>
+
+            <h2>Oracle Integration</h2>
+            
+            <h3>Chainlink Price Feeds</h3>
+            <pre><code>// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+
+contract WIAOracleIntegration {
+    mapping(address => AggregatorV3Interface) public priceFeeds;
+    uint256 public constant PRICE_STALENESS_THRESHOLD = 1 hours;
+    
+    event PriceFeedAdded(address indexed token, address indexed priceFeed);
+    event PriceUpdated(address indexed token, int256 price, uint256 timestamp);
+    
+    function addPriceFeed(address token, address priceFeed) external {
+        require(token != address(0), "Invalid token");
+        require(priceFeed != address(0), "Invalid price feed");
+        
+        priceFeeds[token] = AggregatorV3Interface(priceFeed);
+        emit PriceFeedAdded(token, priceFeed);
+    }
+    
+    function getLatestPrice(address token) public view returns (
+        uint256 price,
+        uint256 timestamp
+    ) {
+        AggregatorV3Interface priceFeed = priceFeeds[token];
+        require(address(priceFeed) != address(0), "Price feed not set");
+        
+        (
+            uint80 roundId,
+            int256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        ) = priceFeed.latestRoundData();
+        
+        require(answeredInRound >= roundId, "Stale price");
+        require(answer > 0, "Invalid price");
+        require(block.timestamp - updatedAt < PRICE_STALENESS_THRESHOLD, "Price too old");
+        
+        return (uint256(answer), updatedAt);
+    }
+    
+    function getPriceWithFallback(
+        address token,
+        address[] memory fallbackFeeds
+    ) public view returns (uint256 price, uint256 timestamp) {
+        try this.getLatestPrice(token) returns (uint256 p, uint256 t) {
+            return (p, t);
+        } catch {
+            // Try fallback feeds
+            for (uint i = 0; i < fallbackFeeds.length; i++) {
+                try AggregatorV3Interface(fallbackFeeds[i]).latestRoundData() returns (
+                    uint80, int256 answer, uint256, uint256 updatedAt, uint80
+                ) {
+                    if (answer > 0 && block.timestamp - updatedAt < PRICE_STALENESS_THRESHOLD) {
+                        return (uint256(answer), updatedAt);
+                    }
+                } catch {
+                    continue;
+                }
+            }
+            revert("No valid price available");
+        }
+    }
+}</code></pre>
+
+            <h3>Decentralized Oracle Networks</h3>
+            <pre><code>// WIA Multi-Oracle Aggregator
+contract WIAMultiOracleAggregator {
+    struct OracleData {
+        address oracleAddress;
+        uint256 weight;
+        bool active;
+    }
+    
+    mapping(address => OracleData[]) public tokenOracles;
+    
+    function aggregatePrice(address token) public view returns (uint256) {
+        OracleData[] memory oracles = tokenOracles[token];
+        require(oracles.length > 0, "No oracles configured");
+        
+        uint256 weightedSum = 0;
+        uint256 totalWeight = 0;
+        uint256 validOracles = 0;
+        
+        for (uint i = 0; i < oracles.length; i++) {
+            if (!oracles[i].active) continue;
+            
+            try IOracle(oracles[i].oracleAddress).getPrice(token) returns (
+                uint256 price,
+                uint256 timestamp
+            ) {
+                if (block.timestamp - timestamp < 1 hours && price > 0) {
+                    weightedSum += price * oracles[i].weight;
+                    totalWeight += oracles[i].weight;
+                    validOracles++;
+                }
+            } catch {
+                continue;
+            }
+        }
+        
+        require(validOracles >= 3, "Insufficient valid oracles");
+        return weightedSum / totalWeight;
+    }
+}</code></pre>
+
+            <h2>DeFi Protocol Integration</h2>
+            
+            <h3>Uniswap V3 Integration</h3>
+            <pre><code>// WIA-Uniswap Integration
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+
+contract WIAUniswapIntegration {
+    ISwapRouter public immutable swapRouter;
+    
+    constructor(address _swapRouter) {
+        swapRouter = ISwapRouter(_swapRouter);
+    }
+    
+    function swapExactInputSingle(
+        address tokenIn,
+        address tokenOut,
+        uint24 poolFee,
+        uint256 amountIn,
+        uint256 amountOutMinimum
+    ) external returns (uint256 amountOut) {
+        // Approve router to spend tokens
+        IERC20(tokenIn).approve(address(swapRouter), amountIn);
+        
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
+            tokenIn: tokenIn,
+            tokenOut: tokenOut,
+            fee: poolFee,
+            recipient: msg.sender,
+            deadline: block.timestamp + 300, // 5 minutes
+            amountIn: amountIn,
+            amountOutMinimum: amountOutMinimum,
+            sqrtPriceLimitX96: 0
+        });
+        
+        amountOut = swapRouter.exactInputSingle(params);
+    }
+    
+    function addLiquidity(
+        address token0,
+        address token1,
+        uint24 fee,
+        uint256 amount0,
+        uint256 amount1,
+        int24 tickLower,
+        int24 tickUpper
+    ) external returns (
+        uint256 tokenId,
+        uint128 liquidity,
+        uint256 amount0Used,
+        uint256 amount1Used
+    ) {
+        // Implementation for adding liquidity to V3 pool
+    }
+}</code></pre>
+
+            <h3>Aave Lending Integration</h3>
+            <pre><code>// WIA-Aave Integration
+import "@aave/core-v3/contracts/interfaces/IPool.sol";
+
+contract WIAAaveIntegration {
+    IPool public immutable aavePool;
+    
+    constructor(address _aavePool) {
+        aavePool = IPool(_aavePool);
+    }
+    
+    function supply(
+        address asset,
+        uint256 amount,
+        address onBehalfOf
+    ) external {
+        IERC20(asset).approve(address(aavePool), amount);
+        aavePool.supply(asset, amount, onBehalfOf, 0);
+    }
+    
+    function withdraw(
+        address asset,
+        uint256 amount,
+        address to
+    ) external returns (uint256) {
+        return aavePool.withdraw(asset, amount, to);
+    }
+    
+    function borrow(
+        address asset,
+        uint256 amount,
+        uint256 interestRateMode,
+        address onBehalfOf
+    ) external {
+        aavePool.borrow(asset, amount, interestRateMode, 0, onBehalfOf);
+    }
+    
+    function repay(
+        address asset,
+        uint256 amount,
+        uint256 interestRateMode,
+        address onBehalfOf
+    ) external returns (uint256) {
+        IERC20(asset).approve(address(aavePool), amount);
+        return aavePool.repay(asset, amount, interestRateMode, onBehalfOf);
+    }
+}</code></pre>
+
+            <h2>Cross-Chain Bridges</h2>
+            
+            <h3>LayerZero Integration</h3>
+            <pre><code>// WIA Cross-Chain Token using LayerZero
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@layerzerolabs/solidity-examples/contracts/token/oft/v2/OFTV2.sol";
+
+contract WIACrossChainToken is OFTV2 {
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        uint8 _sharedDecimals,
+        address _lzEndpoint
+    ) OFTV2(_name, _symbol, _sharedDecimals, _lzEndpoint) {}
+    
+    function sendFrom(
+        address _from,
+        uint16 _dstChainId,
+        bytes32 _toAddress,
+        uint _amount,
+        LzCallParams calldata _callParams
+    ) public payable override {
+        _send(_from, _dstChainId, _toAddress, _amount, _callParams.refundAddress, _callParams.zroPaymentAddress, _callParams.adapterParams);
+    }
+    
+    // Estimate cross-chain transfer fee
+    function estimateSendFee(
+        uint16 _dstChainId,
+        bytes32 _toAddress,
+        uint _amount,
+        bool _useZro,
+        bytes calldata _adapterParams
+    ) public view override returns (uint nativeFee, uint zroFee) {
+        return lzEndpoint.estimateFees(_dstChainId, address(this), abi.encode(_toAddress, _amount), _useZro, _adapterParams);
+    }
+}</code></pre>
+
+            <h3>Wormhole Integration</h3>
+            <pre><code>// WIA-Wormhole Bridge Integration
+import "@wormhole-foundation/contracts/interfaces/IWormhole.sol";
+
+contract WIAWormholeBridge {
+    IWormhole public immutable wormhole;
+    
+    mapping(uint16 => bytes32) public trustedRemotes;
+    mapping(bytes32 => bool) public processedMessages;
+    
+    event TokensBridged(
+        address indexed sender,
+        uint16 targetChain,
+        bytes32 recipient,
+        uint256 amount
+    );
+    
+    event TokensReceived(
+        bytes32 indexed sender,
+        address recipient,
+        uint256 amount
+    );
+    
+    constructor(address _wormhole) {
+        wormhole = IWormhole(_wormhole);
+    }
+    
+    function bridgeTokens(
+        uint16 targetChain,
+        bytes32 recipient,
+        uint256 amount
+    ) external payable {
+        require(trustedRemotes[targetChain] != bytes32(0), "Chain not supported");
+        
+        // Lock tokens
+        _burn(msg.sender, amount);
+        
+        // Create payload
+        bytes memory payload = abi.encode(recipient, amount);
+        
+        // Send via Wormhole
+        uint64 sequence = wormhole.publishMessage{value: msg.value}(
+            0, // nonce
+            payload,
+            1 // consistency level
+        );
+        
+        emit TokensBridged(msg.sender, targetChain, recipient, amount);
+    }
+    
+    function receiveTokens(bytes memory encodedVm) external {
+        (IWormhole.VM memory vm, bool valid, string memory reason) = wormhole.parseAndVerifyVM(encodedVm);
+        require(valid, reason);
+        
+        bytes32 messageHash = keccak256(encodedVm);
+        require(!processedMessages[messageHash], "Already processed");
+        
+        require(trustedRemotes[vm.emitterChainId] == vm.emitterAddress, "Invalid emitter");
+        
+        (bytes32 recipient, uint256 amount) = abi.decode(vm.payload, (bytes32, uint256));
+        
+        processedMessages[messageHash] = true;
+        
+        // Mint tokens to recipient
+        address recipientAddress = address(uint160(uint256(recipient)));
+        _mint(recipientAddress, amount);
+        
+        emit TokensReceived(vm.emitterAddress, recipientAddress, amount);
+    }
+}</code></pre>
+
+            <h2>Subgraph Integration</h2>
+            
+            <h3>The Graph Protocol</h3>
+            <pre><code>// WIA Subgraph Schema (schema.graphql)
+type WIAToken @entity {
+  id: ID!
+  name: String!
+  symbol: String!
+  decimals: Int!
+  totalSupply: BigInt!
+  holders: [Holder!]! @derivedFrom(field: "token")
+  transfers: [Transfer!]! @derivedFrom(field: "token")
+}
+
+type Holder @entity {
+  id: ID!
+  token: WIAToken!
+  address: Bytes!
+  balance: BigInt!
+  lastUpdated: BigInt!
+}
+
+type Transfer @entity {
+  id: ID!
+  token: WIAToken!
+  from: Bytes!
+  to: Bytes!
+  value: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+// Query subgraph data
+import { gql, request } from 'graphql-request';
+
+const endpoint = 'https://api.thegraph.com/subgraphs/name/wia/smart-contract';
+
+const query = gql\`
+  query GetTokenData($tokenId: ID!) {
+    wiaToken(id: $tokenId) {
+      name
+      symbol
+      totalSupply
+      holders(first: 100, orderBy: balance, orderDirection: desc) {
+        address
+        balance
+      }
+      transfers(first: 10, orderBy: timestamp, orderDirection: desc) {
+        from
+        to
+        value
+        timestamp
+      }
+    }
+  }
+\`;
+
+const data = await request(endpoint, query, { tokenId: contractAddress.toLowerCase() });
+console.log('Token data:', data.wiaToken);</code></pre>
+
+            <h2>ENS Integration</h2>
+            
+            <h3>Ethereum Name Service</h3>
+            <pre><code>import { WIAENSResolver } from '@wia/ens';
+
+const ensResolver = new WIAENSResolver({
+    provider: ethersProvider,
+    chainId: 1
+});
+
+// Resolve ENS name to address
+const address = await ensResolver.resolve('vitalik.eth');
+console.log('Address:', address);
+
+// Reverse resolve address to ENS name
+const name = await ensResolver.reverseResolve(address);
+console.log('ENS name:', name);
+
+// Get ENS avatar
+const avatar = await ensResolver.getAvatar('vitalik.eth');
+console.log('Avatar URL:', avatar);
+
+// Use ENS in contract interactions
+const contract = new WIASmartContract({
+    address: await ensResolver.resolve('wia-token.eth'),
+    abi: contractABI,
+    provider: ethersProvider
+});
+
+// Send to ENS name
+await contract.transfer(await ensResolver.resolve('recipient.eth'), amount);</code></pre>
+
+            <h2>IPFS Integration</h2>
+            
+            <h3>Decentralized Storage</h3>
+            <pre><code>import { WIAIPFSClient } from '@wia/ipfs';
+
+const ipfs = new WIAIPFSClient({
+    gateway: 'https://ipfs.io',
+    pinningService: 'https://api.pinata.cloud'
+});
+
+// Upload contract metadata to IPFS
+const metadata = {
+    name: 'WIA Secure Token',
+    description: 'A secure ERC-20 token',
+    image: 'https://example.com/logo.png',
+    properties: {
+        totalSupply: '1000000',
+        decimals: 18
+    }
+};
+
+const cid = await ipfs.upload(metadata);
+console.log('IPFS CID:', cid);
+console.log('Gateway URL:', \`https://ipfs.io/ipfs/\${cid}\`);
+
+// Retrieve from IPFS
+const retrievedMetadata = await ipfs.get(cid);
+console.log('Retrieved:', retrievedMetadata);</code></pre>
+
+            <h2>Analytics and Monitoring</h2>
+            
+            <h3>Dune Analytics Integration</h3>
+            <pre><code>// Query Dune Analytics for contract metrics
+import { WIADuneClient } from '@wia/analytics';
+
+const dune = new WIADuneClient({
+    apiKey: process.env.DUNE_API_KEY
+});
+
+const metrics = await dune.query({
+    queryId: 1234567,
+    parameters: {
+        contract_address: contractAddress
+    }
+});
+
+console.log('Total transfers:', metrics.total_transfers);
+console.log('Unique holders:', metrics.unique_holders);
+console.log('24h volume:', metrics.volume_24h);</code></pre>
+
+            <p>Phase 4 Integration completes the WIA-FIN-007 standard by enabling seamless connectivity with the entire blockchain ecosystem. Next, we'll explore implementation and certification in Chapter 8.</p>
+        </div>
+        </div>
+</body>
+</html>

@@ -1,241 +1,275 @@
-# WIA-physical-enhancement PHASE 1 — DATA-FORMAT Specification
+# WIA-physical-enhancement PHASE 1 — Data Format Specification
 
 **Standard:** WIA-physical-enhancement
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-physical-enhancement (Physical Enhancement).
+This PHASE defines the canonical data format for human
+physical-enhancement records covering powered exoskeletons
+and orthoses, prosthetic limb augmentation, performance-
+oriented pharmacology, gene-doping detection assays,
+sport-medicine therapeutic-use exemptions (TUEs), and
+adaptive-sport classification. Records bind every
+intervention to its regulatory framework (medical
+device, medicinal product, or sport-governance rule),
+to the subject's informed consent and ethics approval
+where applicable, and to the chain of evidence that
+distinguishes therapeutic indication from sport-context
+prohibited use.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- World Anti-Doping Code (WADA) and the International Standard for the Prohibited List
+- WADA International Standard for Therapeutic Use Exemptions (ISTUE)
+- WADA International Standard for Laboratories (ISL)
+- WADA Athlete Biological Passport — Operating Guidelines
+- IPC Athlete Classification Code (Paralympic classification)
+- ISO 13482:2014 — Robots and robotic devices — Safety for personal-care robots (exoskeletons)
+- ISO 14971:2019 — Risk management for medical devices
+- ISO 14155:2020 — Clinical investigation of medical devices
+- ISO/IEC TR 63272 — Wearable assistive devices framework
+- IEC 60601-1, IEC 60601-2 family — medical electrical equipment safety
+- IEC 62366-1:2015 — Usability engineering for medical devices
+- IEEE 11073-10101 / IEEE 11073-10406 — personal-health-device nomenclature
+- HL7 FHIR R5 — Procedure, MedicationStatement, DeviceUseStatement, Observation, ResearchSubject
+- ICH E2A / E2B (R3) — pharmacovigilance (when intervention is a medicinal product)
+- ICH E6 (R3) — Good Clinical Practice
+- Declaration of Helsinki (2013, 2024 revision)
+- 45 CFR 46 Common Rule — protection of human subjects (US)
+- IETF RFC 8259 (JSON), RFC 4122 (UUID), RFC 7515 (JWS), RFC 8785 (JCS)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-physical-enhancement
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to interventions intended to restore,
+maintain, or augment human locomotion, strength,
+endurance, or fine-motor performance in three distinct
+contexts:
 
-## §2 Manifest
+1. **clinical** — therapy-led interventions for persons
+   with mobility impairment, post-stroke rehabilitation,
+   amputees, or chronic neuromuscular disease;
+2. **occupational** — supervised use in industrial,
+   military, or emergency-response settings;
+3. **sport / competition** — under sport-governance
+   rules including the WADA Code, IPC Athlete
+   Classification Code, and federation-specific
+   technical regulations.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "physical-enhancement"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+In scope: subject record, intervention record, session
+record, biomarker / sample record, performance-
+measurement record, consent record, ethics-approval
+record, sport-governance binding record, adverse-event
+record, and device-binding record. Out of scope:
+recreational consumer fitness products that make no
+medical or sport-governed claim (handled by general
+consumer-product standards).
 
-## §3 Conformance Tiers
+## §2 Subject record
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `subjectRef`         | UUID (RFC 4122) opaque identifier               |
+| `pseudonymRef`       | study-local code; never the legal name          |
+| `birthYear`          | year only                                       |
+| `sex`                | ISO/IEC 5218 (1=male, 2=female, 9=N/A)          |
+| `consentRef`         | active consent record (this PHASE §6)           |
+| `ethicsApprovalRef`  | for clinical / research interventions           |
+| `sportContextRef`    | IPC / IF-specific identifier when sport-bound   |
+| `clinicalStatus`     | ICD-11 MMS code (e.g. 8B20 stroke, 8B26 spinal- |
+|                      | cord injury, FA00.Z osteoarthritis)             |
+| `enrolmentDate`      | ISO 8601                                        |
+| `eligibilityFlag`    | `meets-protocol`, `screen-fail`, `withdrawn`    |
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Sport contexts carry a separate identifier issued by the
+relevant International Federation or WADA-recognised
+National Anti-Doping Organisation; it is never reused
+for clinical identification.
 
-## §4 Discovery
+## §3 Intervention record
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/physical-enhancement`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `interventionRef`    | URI                                             |
+| `kind`               | `exoskeleton`, `orthosis`, `prosthesis-augment`,|
+|                      | `pharmacological`, `gene-therapy`, `gene-doping`|
+|                      | (detection only; never authoring), `nutrition`, |
+|                      | `training-protocol`                             |
+| `productRef`         | for drugs: SPL set-id (DailyMed) / EMA dossier; |
+|                      | for devices: UDI-DI (IMDRF UDI WG)              |
+| `regulatoryClass`    | FDA Class I / II / III; EU MDR I / IIa / IIb /  |
+|                      | III; for drugs ATC code; for sport-governed:    |
+|                      | WADA prohibited / restricted / permitted        |
+| `protocolRef`        | ClinicalTrials.gov NCT, EudraCT, KCT,           |
+|                      | jRCT identifier                                 |
+| `armRef`             | active / sham / placebo / open-label / control  |
+| `doseSchedule`       | for drugs: ATC + dose schedule (per WHOCC);     |
+|                      | for devices: setpoint, control mode, training   |
+|                      | volume, session frequency                       |
+| `targetCapability`   | gait, grip, lift, endurance, balance, posture,  |
+|                      | sprint, fine-motor                              |
+| `riskClassification` | per ISO 14971 — low / medium / high / critical  |
 
-## §5 Time and Identity
+A single subject may carry multiple intervention
+records concurrently (e.g. orthosis + training-protocol
++ adjunct medicinal product).
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Session record
 
-## §6 Versioning and Deprecation
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `sessionRef`         | UUID                                            |
+| `subjectRef`         | §2                                              |
+| `interventionRef`    | §3                                              |
+| `startTime`          | ISO 8601 with timezone                          |
+| `endTime`            | ISO 8601 with timezone                          |
+| `siteRef`            | facility code, ISO 3166-2 region                |
+| `operatorRef`        | credentialed clinician / coach / PT             |
+| `deliveredDose`      | actual dose, repetitions, joint torque          |
+|                      | profile, energy-per-stride, training volume     |
+| `physiologicalLog`   | URI to per-session telemetry (BIDS-aligned for  |
+|                      | EMG / IMU / EEG; CSV / Parquet for kinematics)  |
+| `aeRef[]`            | adverse-event records this session triggered    |
+| `deviationRef`       | protocol-deviation record, if any               |
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Performance-measurement record
 
-## §7 Privacy and Security
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `measurementRef`     | UUID                                            |
+| `sessionRef`         | §4                                              |
+| `instrument`         | 6-Minute Walk Test, Timed Up-and-Go, FMA,       |
+|                      | BBS, ARAT, Box-and-Block, isokinetic            |
+|                      | dynamometer, gait-analysis (Vicon, Xsens),      |
+|                      | force-plate (AMTI, Kistler), VO₂max protocol    |
+| `instrumentVersion`  | publisher / firmware version + language         |
+| `rawScore`           | numeric raw                                     |
+| `standardisedScore`  | z-score against reference population            |
+| `assessor`           | rater UUID (independent of operator)            |
+| `assessmentTime`     | ISO 8601                                        |
+| `interpretation`     | improved / stable / declined / non-eval         |
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Consent record
 
-## §8 Open Governance
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `consentRef`         | UUID                                            |
+| `subjectRef`         | §2                                              |
+| `protocolVersion`    | the version the subject consented to            |
+| `documentRef`        | SHA-256 of the IRB-approved consent document    |
+| `language`           | BCP 47 tag                                      |
+| `signatureMethod`    | `wet-ink-scan`, `qualified-electronic`,         |
+|                      | `advanced-electronic`, `verbal-witnessed`       |
+| `signedAt`           | ISO 8601                                        |
+| `withdrawnAt`        | optional ISO 8601                               |
+| `proxyRef`           | for legally-authorised representative           |
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `physical-enhancement` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+For sport contexts the consent record additionally
+covers anti-doping testing under the WADA Code and the
+TUE-application data-handling regime.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Sport-governance binding
 
+For interventions running in or adjacent to competition:
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `governingBody`      | International Federation (IF) / NADO            |
+| `applicableRules`    | WADA Code year, IPC Classification rules,       |
+|                      | IF technical regulations                        |
+| `tueRef`             | Therapeutic Use Exemption identifier (where     |
+|                      | the intervention is otherwise prohibited)       |
+| `tueDecisionDate`    | ISO 8601                                        |
+| `tueExpiryDate`      | ISO 8601                                        |
+| `classRef`           | for adaptive sport: IPC class, sport-specific   |
+|                      | class                                           |
+| `whereaboutsBinding` | for elite testing-pool athletes                 |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+The TUE record links to the WADA ADAMS submission so an
+inspector can verify the TUE is current.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Adverse-event record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `aeRef`              | UUID                                            |
+| `sessionRef`         | §4                                              |
+| `subjectRef`         | §2                                              |
+| `onsetTime`          | ISO 8601                                        |
+| `meddraTerm`         | MedDRA LLT + Preferred Term                     |
+| `severity`           | mild / moderate / severe / life-threatening /   |
+|                      | death                                           |
+| `causality`          | unrelated / unlikely / possible / probable /    |
+|                      | definite (per ICH E2A)                          |
+| `serious`            | boolean per ICH E2A SAE definition              |
+| `outcome`            | recovered / recovering / not-recovered /        |
+|                      | recovered-with-sequelae / fatal                 |
+| `expedited`          | boolean — expedited reporting required          |
 
-## Annex F — Adoption Roadmap
+Device-related events propagate to the device-vigilance
+pipeline (PHASE 4 §3); medicinal-product events
+propagate to the pharmacovigilance pipeline (PHASE 4 §4).
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Device-binding record
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `deviceRef`          | UUID                                            |
+| `udiDi`              | UDI-DI (IMDRF UDI WG)                           |
+| `udiPi`              | production identifier                           |
+| `riskClass`          | FDA / EU MDR class                              |
+| `safetyProfile`      | ISO 13482 personal-care robot annex + IEC       |
+|                      | 60601-2-78 powered orthosis profile (where      |
+|                      | applicable)                                     |
+| `lastCalibration`    | ISO 8601                                        |
+| `softwareVersion`    | for SaMD components                             |
+| `firmwareVersion`    | for embedded controllers                        |
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Cross-domain references (informative)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+- WIA-rehabilitation-device — for orthosis / prosthetic
+  cross-binding
+- WIA-medical-data-privacy — special-category data
+- WIA-emotion-ai — for affective-state correlated training
+- WIA-medical-iot — for telemetry pipeline
+- WIA-emergency-medical-data — for AE escalation
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex A — Worked exoskeleton session record (informative)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```json
+{
+  "sessionRef": "9af3c1c8-...",
+  "subjectRef": "PE-A07",
+  "interventionRef": "wia-pe://intervention/exo-stride-assist-200N",
+  "startTime": "2026-04-12T10:00:00+09:00",
+  "endTime":   "2026-04-12T10:42:00+09:00",
+  "deliveredDose": {"steps": 1860, "assist_peak_N": 200, "duty_pct": 38},
+  "performanceRef": "performance:6MWT:+62m"
+}
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex B — Reference populations
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+Standardised performance instruments require a reference
+population for z-scoring. Reference populations include
+NHANES (US), ENNS (France), KNHANES (Korea). The
+reference URI is recorded on the measurement record.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex C — Conformance disclosure
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Implementations declare the JSON-Schema URIs they serve,
+the sport-governance bodies whose rules they encode,
+and the FHIR Bulk Data profile version.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex D — Versioning
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Field additions are minor; semantic redefinition or
+removal is major.
 
-## Annex I — Interoperability Profiles
+## Annex E — Conformance level
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+"Core" (subject + intervention + session + performance +
+consent + ethics + AE) and "Full" (adds sport-governance
+binding for sport-context standards or device-binding
+for device interventions).

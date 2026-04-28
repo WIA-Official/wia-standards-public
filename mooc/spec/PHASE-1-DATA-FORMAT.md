@@ -1,241 +1,284 @@
-# WIA-mooc PHASE 1 — DATA-FORMAT Specification
+# WIA-mooc PHASE 1 — Data Format Specification
 
 **Standard:** WIA-mooc
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-mooc (Mooc).
+This PHASE defines the canonical data format for
+massive-open-online-course (MOOC) operations covering
+course / cohort / module / lesson / activity records,
+learner records, learning-event capture, assessment
+items and attempts, peer-assessment artefacts,
+discussion records, video / interactive content
+manifests, and progress / completion records. The
+format aligns with 1EdTech (formerly IMS Global)
+Caliper Analytics, ADL xAPI, IMS LTI 1.3, IMS Common
+Cartridge, and the W3C accessibility specifications so
+content authored once exchanges across MOOC platforms,
+learning-record stores, and downstream credentialing.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- 1EdTech Caliper Analytics 1.2 — learning-event payload
+- ADL xAPI 2.0 — Tin Can / Experience API
+- 1EdTech LTI 1.3 — Learning Tools Interoperability
+- 1EdTech LTI Advantage — Names and Role Provisioning, Assignment and Grade Services, Deep Linking
+- 1EdTech Common Cartridge 1.3 — content packaging
+- 1EdTech QTI 3.0 — Question and Test Interoperability
+- 1EdTech CASE 1.1 — Competency and Academic Standards Exchange
+- ISO/IEC 19796-1 — IT for learning, education, and training: quality management
+- W3C WCAG 2.2; EN 301 549 v3.2.1; Section 508 (US)
+- W3C Web Annotation Data Model (where annotations bind)
+- ISO/IEC 23053 — framework for AI systems (where adaptive learning binds AI)
+- IETF RFC 8259 (JSON), RFC 8785 (JCS), RFC 4122 (UUID), RFC 7515 (JWS)
+- HTML Living Standard; ECMAScript (ECMA-262 latest); WebVTT (W3C)
+- W3C Verifiable Credentials Data Model 2.0 (where micro-credentials issue)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-mooc
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to MOOC platforms that publish
+courses to wide audiences, support per-cohort or
+self-paced enrolment, capture learning events, run
+assessments, assign credentials or course-completion
+attestations, and report on learner outcomes.
 
-## §2 Manifest
+In scope: course, cohort, module, lesson, activity,
+content-asset, learner, enrolment, learning-event,
+assessment-item, attempt, response, peer-assessment,
+discussion, progress, completion, accessibility-
+assertion, and credential-binding records, plus
+cross-references binding course outcomes to credentials.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "mooc"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Out of scope: pure broadcast video without learning-
+event capture (handled by streaming-media standards)
+and full-degree academic transcripts spanning
+multiple courses (handled by academic-credential
+standards).
 
-## §3 Conformance Tiers
+## §2 Course record
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `courseRef`          | UUID (RFC 4122)                                 |
+| `title`              | localised label (BCP 47)                        |
+| `summary`            | localised text                                  |
+| `language`           | BCP 47 primary delivery language                 |
+| `subjectArea`        | ISCED-F 2013 code                                |
+| `levelCode`          | EQF / ISCED level (where bound)                  |
+| `competencyMap`      | CASE 1.1 framework reference + competency list  |
+| `prerequisites[]`    | upstream `courseRef` or external requirement     |
+| `pacing`             | self-paced / cohort-based / hybrid                |
+| `notionalLearning`   | hours estimated                                  |
+| `creditValue`        | ECTS / national equivalent (where awardable)    |
+| `accessibilityRef`   | accessibility assertion record (this PHASE §11) |
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Cohort record
 
-## §4 Discovery
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `cohortRef`          | UUID                                            |
+| `courseRef`          | §2                                              |
+| `cohortLabel`        | human-readable identifier (e.g. "2026-Q2")      |
+| `enrolmentOpen`      | ISO 8601                                        |
+| `enrolmentClose`     | ISO 8601                                        |
+| `startsAt`           | ISO 8601                                        |
+| `endsAt`             | ISO 8601                                        |
+| `instructorRefs[]`   | identities of facilitators                       |
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/mooc`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Module / lesson / activity records
 
-## §5 Time and Identity
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `moduleRef`          | UUID                                            |
+| `courseRef`          | §2                                              |
+| `position`           | integer ordering                                |
+| `learningOutcomes[]` | per-module learning outcomes (Bloom verbs)      |
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `lessonRef`          | UUID                                            |
+| `moduleRef`          | §4                                              |
+| `kind`               | `video`, `reading`, `quiz`, `interactive`,      |
+|                      | `discussion`, `peer-review`, `code-lab`,        |
+|                      | `live-session`                                  |
+| `contentRef`         | content-asset reference (see §10)                |
+| `position`           | integer                                         |
 
-## §6 Versioning and Deprecation
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `activityRef`        | UUID                                            |
+| `lessonRef`          | §4                                              |
+| `kind`               | `view`, `submit`, `respond`, `peer-grade`,      |
+|                      | `attempt`, `bookmark`, `note`                   |
+| `weight`             | numeric — towards course pass / completion      |
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Learner record
 
-## §7 Privacy and Security
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `learnerRef`         | UUID                                            |
+| `pseudonymRef`       | platform-local pseudonym                         |
+| `country`            | ISO 3166-1 alpha-3 (self-declared, optional)    |
+| `language`           | BCP 47 preferred language                        |
+| `accessibilityNeeds` | per W3C Personalization Semantics taxonomy       |
+|                      | (where the learner discloses)                   |
+| `consentRef`         | data-processing consent reference                |
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Personally-identifying attributes live in the
+sponsor's identity vault; the learner record carries
+opaque references.
 
-## §8 Open Governance
+## §6 Enrolment record
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `mooc` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `enrolmentRef`       | UUID                                            |
+| `learnerRef`         | §5                                              |
+| `cohortRef`          | §3                                              |
+| `enrolledAt`         | ISO 8601                                        |
+| `track`              | `audit`, `verified`, `paid`, `scholarship`,     |
+|                      | `enterprise`                                    |
+| `verificationRef`    | identity-verification reference (where track    |
+|                      | implies verified attestation)                    |
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Learning-event record (Caliper / xAPI)
 
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `eventRef`           | UUID                                            |
+| `actor`              | learner reference                                |
+| `verb`               | Caliper action / xAPI verb (e.g. `Started`,     |
+|                      | `Submitted`, `Graded`, `Resumed`, `Paused`,     |
+|                      | `Bookmarked`, `Annotated`)                      |
+| `object`             | activity / lesson / item reference               |
+| `context`            | course / cohort / session / app references       |
+| `eventTime`          | ISO 8601                                        |
+| `extensions`         | per-platform extensions (versioned)              |
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+Learning events emit as Caliper envelopes (preferred)
+or xAPI statements (where ADL xAPI is the authoritative
+record store). Both forms are supported for
+multilateral interoperability.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## §8 Assessment-item and attempt records
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `itemRef`            | UUID                                            |
+| `kind`               | `multiple-choice`, `multi-select`, `match`,     |
+|                      | `numeric`, `short-answer`, `essay`, `code`,     |
+|                      | `peer-assessed`, `oral`                         |
+| `qti`                | QTI 3.0 payload reference                        |
+| `competencyRef[]`    | CASE 1.1 competencies covered                    |
+| `difficulty`         | calibrated difficulty (per IRT, where computed) |
+| `discrimination`     | calibrated discrimination                        |
+| `accessibilityRef`   | item-level accessibility assertion               |
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `attemptRef`         | UUID                                            |
+| `learnerRef`         | §5                                              |
+| `itemRef`            | as above                                        |
+| `response`           | learner response payload (QTI 3.0)               |
+| `score`              | numeric (signed normalised)                      |
+| `judgement`          | `correct`, `partial`, `incorrect`, `pending`    |
+| `attemptTime`        | ISO 8601                                        |
+| `proctoringRef`      | proctoring artefact (where applicable)           |
 
-## Annex F — Adoption Roadmap
+## §9 Peer-assessment and discussion records
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `peerAssessmentRef`  | UUID                                            |
+| `submittedBy`        | learner ref                                     |
+| `assessedBy`         | learner ref (anonymous to author)                |
+| `rubricRef`          | rubric reference                                 |
+| `score`              | per-criterion score                              |
+| `narrative`          | feedback text (BCP 47)                          |
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `discussionRef`      | UUID                                            |
+| `parentRef`          | thread parent                                    |
+| `author`             | learner ref                                     |
+| `body`               | text + media (Web Annotation Data Model)         |
+| `moderationFlags`    | per moderation policy                            |
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Content-asset record
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `assetRef`           | UUID                                            |
+| `kind`               | `video`, `audio`, `pdf`, `html`, `epub`,        |
+|                      | `interactive-html`, `simulation`, `dataset`     |
+| `mediaUri`           | content-addressed URI                            |
+| `mimeType`           | per IANA registry                               |
+| `durationSeconds`    | for video / audio                                |
+| `transcriptRef`      | WebVTT / SRT / SMI (transcript / caption)        |
+| `signLanguageVideo`  | for accessibility (KSL / ASL / etc track)        |
+| `audioDescription`   | descriptive-audio track                          |
+| `bitrateLadder`      | for adaptive streaming (HLS / DASH)              |
+| `licence`            | SPDX licence identifier                          |
 
-## Annex G — Test Vectors and Conformance Evidence
+## §11 Accessibility-assertion record
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Per WCAG 2.2 / EN 301 549 conformance:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `accessibilityRef`   | UUID                                            |
+| `wcagLevel`          | `A`, `AA`, `AAA`                                |
+| `wcagCriteria`       | conformance per criterion (1.1.1 — 4.1.3)        |
+| `en301549Annex`      | per Annex A items                                |
+| `auditorRef`         | accessibility auditor identity                   |
+| `auditDate`          | ISO 8601                                        |
+| `remediationPlan`    | per-failure tracking                             |
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+## §12 Progress / completion record
 
-## Annex H — Versioning and Deprecation Policy
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `progressRef`        | UUID                                            |
+| `learnerRef`         | §5                                              |
+| `cohortRef`          | §3                                              |
+| `completionPct`      | per-activity-weighted                            |
+| `assessmentScore`    | course-level score                               |
+| `passed`             | boolean per pass policy                          |
+| `completedAt`        | ISO 8601                                        |
+| `credentialRef`      | bound micro-credential issuance                  |
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §13 Cross-domain references (informative)
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+- WIA-micro-credential — for completion-credential issuance
+- WIA-virtual-classroom — for live-session integration
+- WIA-learning-analytics — for cohort-level analyses
+- WIA-content-ai — for AI-generated assessment items
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## Annex A — Worked Caliper event (informative)
 
-## Annex I — Interoperability Profiles
+```json
+{
+  "@context": "http://purl.imsglobal.org/ctx/caliper/v1p2",
+  "id": "urn:uuid:7c0d9b0f-...",
+  "type": "AssessmentEvent",
+  "actor": {"id":"https://platform.example/users/learner-007","type":"Person"},
+  "action": "Submitted",
+  "object": {"id":"https://platform.example/items/quiz-101","type":"AssessmentItem"},
+  "eventTime": "2026-04-12T09:14:00Z"
+}
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## Annex B — Conformance disclosure
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Implementations declare the Caliper / xAPI versions
+served, the LTI 1.3 services supported (NRPS / AGS /
+Deep Linking), the QTI revision, the WCAG / EN 301 549
+audit results, and the credential-binding profiles
+(W3C VC / Open Badges 3.0).
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex C — Versioning
+
+Field additions are minor; semantic redefinition is
+major.

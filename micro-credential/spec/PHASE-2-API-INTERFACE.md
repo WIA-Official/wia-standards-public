@@ -1,241 +1,295 @@
-# WIA-micro-credential PHASE 2 — API-INTERFACE Specification
+# WIA-micro-credential PHASE 2 — API Interface Specification
 
 **Standard:** WIA-micro-credential
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-micro-credential (Micro Credential).
+This PHASE defines the resource-oriented API surface
+for micro-credential operations: issuer registration
+and key publication, recipient binding and wallet
+exchange, credential-class catalogue, issuance, evidence
+storage, endorsement, framework-mapping retrieval,
+revocation publication, presentation acceptance, and
+verification. The API is shaped so a wallet, an issuer
+platform, and a verifier (employer / regulator) can
+exchange credentials without bilateral agreements
+beyond DID resolution and trust-list selection.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9110 (HTTP), RFC 9112 (HTTP/1.1), RFC 9113 (HTTP/2)
+- IETF RFC 9457 (Problem Details for HTTP APIs)
+- IETF RFC 8259 (JSON), RFC 8785 (JCS), RFC 4122 (UUID), RFC 9530 (Content-Digest)
+- IETF RFC 6749, RFC 7636 (PKCE), RFC 8414 (OAuth Authorization Server Metadata)
+- W3C VC Data Model 2.0; W3C Data Integrity 1.0; W3C VC JOSE 1.0
+- W3C DID Core 1.0; DID Resolution; DID Web; DID Key
+- 1EdTech Open Badges 3.0 — Service / API specifications
+- 1EdTech CLR 2.0 — Comprehensive Learner Record API
+- W3C Status List 2021
+- OpenID for Verifiable Credentials Issuance (OID4VCI), OpenID for Verifiable Presentations (OID4VP)
 
 ---
 
-## §1 Scope
+## §1 Endpoint root
 
-This PHASE document is one of four that together define the WIA-micro-credential
-standard. It addresses the api-interface layer of the standard.
+API root is implementation-controlled. All endpoints
+are TLS 1.3 (RFC 8446). Issuance endpoints participate
+in the OID4VCI flow; presentation endpoints participate
+in OID4VP. Wallet-to-issuer exchange tolerates push and
+pre-authorised models.
 
-## §2 Manifest
+## §2 Issuer endpoints
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "micro-credential"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET    /v1/issuers/.well-known/openid-credential-issuer  metadata (OID4VCI)
+GET    /v1/issuers/.well-known/jwks.json                public keys
+GET    /v1/issuers/{issuerRef}                          issuer profile
+POST   /v1/issuers/{issuerRef}/keys                      key rotation
+GET    /v1/issuers/{issuerRef}/policy                   issuance policy
+```
 
-## §3 Conformance Tiers
+Issuer metadata includes the supported credential
+formats (W3C VC, OB 3.0, mDoc), the supported proof
+types, the status-list URL, and the OID4VCI grant
+types accepted (`pre-authorized_code`, `authorization_
+code`).
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Credential-class endpoints
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+GET    /v1/credential-classes                           list catalogue
+POST   /v1/credential-classes                           publish new class
+GET    /v1/credential-classes/{ref}                     retrieve
+PATCH  /v1/credential-classes/{ref}                     amend (admin)
+GET    /v1/credential-classes/{ref}/framework-mappings  EQF/NQF/ESCO mappings
+```
 
-## §4 Discovery
+Catalogue listings expose ESCO skill / occupation
+references, EQF level, ISCED / ISCED-F codes, and
+notional-learning hours so an external skills-matching
+system can match a job posting to a credential class.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/micro-credential`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Issuance endpoints (OID4VCI)
 
-## §5 Time and Identity
+```
+POST   /v1/issuance/offer                               create credential offer
+POST   /v1/issuance/credential                          issuer credential endpoint
+POST   /v1/issuance/batch-credential                    batch issuance
+POST   /v1/issuance/deferred-credential                 deferred issuance retrieval
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+`offer` returns a credential offer object (OID4VCI)
+with the supported flows; the wallet completes either
+a pre-authorised flow with a transaction code or an
+authorisation_code flow with PKCE. Issuance endpoints
+require a fresh proof of possession (DPoP / cnf claim)
+binding the credential to the holder's controller key.
 
-## §6 Versioning and Deprecation
+## §5 Recipient / wallet endpoints
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+GET    /v1/recipients/{recipientRef}                    public profile
+POST   /v1/recipients/{recipientRef}/credentials        wallet ingestion (push)
+GET    /v1/recipients/{recipientRef}/credentials        list recipient credentials
+DELETE /v1/recipients/{recipientRef}/credentials/{c}    wallet removal (logical)
+```
 
-## §7 Privacy and Security
+Push delivery is supported for issuers that pre-
+authenticate the recipient (e.g. a learning-platform
+account with a verified DID).
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Evidence endpoints
 
-## §8 Open Governance
+```
+POST   /v1/evidence                                     register evidence record
+GET    /v1/evidence/{ref}                               retrieve (gated)
+POST   /v1/evidence/{ref}/upload                        chunked upload (Range)
+GET    /v1/evidence/{ref}/audit                         evidence audit trail
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `micro-credential` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Evidence retrieval is gated by the issuance's
+disclosure scopes; verifiers receive only the evidence
+the recipient explicitly disclosed in the presentation.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Endorsement endpoints
 
+```
+POST   /v1/endorsements                                 publish endorsement
+GET    /v1/endorsements/{ref}                           retrieve
+GET    /v1/endorsements?issuer=&class=                  list per issuer / class
+```
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+## §8 Revocation and status-list endpoints
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+```
+GET    /v1/status-lists/{listRef}                       W3C Status List 2021 list
+POST   /v1/issuance/{issuanceRef}/revoke                revocation action
+POST   /v1/issuance/{issuanceRef}/suspend               suspension action
+POST   /v1/issuance/{issuanceRef}/reinstate             un-suspension
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Status-list responses are statically cached at the
+edge with cache-control headers per the W3C Status
+List recommendation.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §9 Presentation endpoints (OID4VP)
 
-## Annex F — Adoption Roadmap
+```
+POST   /v1/presentations/request                        verifier creates request
+GET    /v1/presentations/{ref}                          retrieve (gated)
+POST   /v1/presentations/{ref}/submit                   wallet submits VP
+POST   /v1/presentations/{ref}/verify                   verifier-side verify
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Presentation requests follow OID4VP `presentation_
+definition`; the wallet matches credentials against the
+input descriptors and constructs a VP with selective
+disclosure.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §10 Verification endpoints
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+POST   /v1/verifications                                run verification
+GET    /v1/verifications/{ref}                          retrieve outcome
+GET    /v1/verifications?subject=&since=                list / filter
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Verification consumes a presentation, resolves the
+issuer DID, fetches the active status list, evaluates
+the issuance's revocation bit, validates proof, and
+records the outcome.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §11 Error model (RFC 9457)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```json
+{
+  "type":   "urn:wia:mc:problem:credential-revoked",
+  "title":  "Credential is revoked",
+  "status": 410,
+  "detail": "Issuance i-2026-04-12-007 is revoked per status list bit 3142",
+  "instance": "/v1/verifications"
+}
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Common type URIs:
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+| Type URI suffix              | HTTP | Meaning                                       |
+|------------------------------|-----:|-----------------------------------------------|
+| `credential-revoked`         | 410  | issuance has been revoked                     |
+| `credential-suspended`       | 423  | issuance temporarily suspended                |
+| `proof-invalid`              | 401  | proof verification failed                     |
+| `issuer-untrusted`           | 401  | issuer DID not on verifier's trust list       |
+| `did-resolution-failed`      | 502  | could not resolve issuer DID                  |
+| `status-list-unavailable`    | 503  | status-list endpoint unreachable              |
+| `presentation-mismatch`      | 422  | VP does not match presentation_definition     |
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Bulk export
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+```
+GET  /v1/$export?_type=Issuance,Endorsement,Verification
+GET  /v1/$status/{exportId}
+GET  /v1/$result/{exportId}/{file}
+```
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+NDJSON output, one record per line. Exports support
+issuer-side compliance reporting and recipient data-
+portability rights.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Audit headers
 
-## Annex I — Interoperability Profiles
+| Header                  | Meaning                                       |
+|-------------------------|-----------------------------------------------|
+| `X-Request-Id`          | client-set, echoed                            |
+| `X-Audit-Event-Id`      | server-set, links to PHASE 3 audit chain      |
+| `X-Trace-Id`            | W3C Trace Context                             |
+| `Content-Digest`        | RFC 9530 SHA-256 of the response body         |
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Versioning
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Resource paths are version-prefixed (`/v1/...`).
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex A — OpenAPI reference
+
+A canonical OpenAPI 3.1 description is published at
+`api/openapi-3.1.yaml`.
+
+## Annex B — Worked verification (informative)
+
+```http
+POST /v1/verifications HTTP/1.1
+Authorization: Bearer ...
+Content-Type: application/json
+
+{
+  "presentation": "eyJhbGciOiJFZERTQSIs...",
+  "policy": "wia-mc://policy/employer-2026"
+}
+```
+
+Response 200:
+
+```json
+{
+  "verificationRef": "v-2026-04-12-001",
+  "outcome": "valid",
+  "issuerRef": "did:web:issuer.example",
+  "credentialClassRef": "https://issuer.example/classes/sql-101",
+  "claims": {"name": "Introduction to SQL", "level": "EQF-4"}
+}
+```
+
+## Annex C — Webhook surface
+
+Implementations expose webhooks for `issuance-
+created`, `revocation-published`, `endorsement-
+added`, and `verification-completed` events. Payloads
+sign with RFC 7515 JWS; receivers verify against
+`/.well-known/wia-mc-keys.json`. Delivery is at-least-
+once; receivers are expected to be idempotent on
+`eventId`.
+
+## Annex D — Conformance disclosure
+
+Implementations declare the OID4VCI / OID4VP profiles
+supported, the W3C VC formats accepted (jwt_vc_json,
+ldp_vc, mso_mdoc), the status-list scheme, and the
+trust-framework bindings (eIDAS / EBSI / KISA / etc).
+
+## Annex E — Issuer key-rotation flow
+
+```
+draft-key → published-to-DID → active → retired-key
+                                  │
+                                  └→ compromised → emergency-rotation
+```
+
+Active keys rotate on a sponsor-policy clock (annual
+default). Compromised keys move directly to
+emergency-rotation; the issuer re-signs outstanding
+issuances with the replacement key and emits a key-
+rotation event on the audit chain. Verifiers honour
+the rotation through DID-Document key-history walks.
+
+## Annex F — Trust-list publication
+
+Issuers, regulators, and accreditation bodies publish
+trust lists at content-addressed URIs:
+
+| Authority           | Trust-list URI pattern                          |
+|---------------------|-------------------------------------------------|
+| EBSI                | EBSI Issuer Registry / Accreditation Registry   |
+| EU member state     | per-state CSCA trust list                       |
+| Sponsor / employer  | sponsor-issued list (signed)                    |
+| KR DTAB             | KISA-published list                             |
+
+Trust-list updates emit audit events; verifiers refresh
+on a clock or on event-driven webhook delivery.
+
+## Annex G — Operational headers for wallet flows
+
+| Header                      | Meaning                                      |
+|-----------------------------|----------------------------------------------|
+| `WIA-MC-Wallet-Implementation`| wallet implementation identifier            |
+| `WIA-MC-Holder-Binding-Type`| `dpop`, `cnf`, `did-binding`                  |
+| `WIA-MC-Disclosure-Profile` | `sd-jwt`, `bbs+`, `salted-hash`               |
+| `WIA-MC-Trust-List`         | trust-list URI consumed for this verification |

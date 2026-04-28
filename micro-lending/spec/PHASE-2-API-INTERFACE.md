@@ -1,241 +1,277 @@
-# WIA-micro-lending PHASE 2 — API-INTERFACE Specification
+# WIA-micro-lending PHASE 2 — API Interface Specification
 
 **Standard:** WIA-micro-lending
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-micro-lending (Micro Lending).
+This PHASE defines the resource-oriented API surface
+for micro-lending operations: customer onboarding and
+KYC, group registration, loan-product catalogue,
+application intake and decisioning, disbursement,
+repayment, restructuring, write-off, customer-
+protection disclosure, regulatory reporting, and
+agent-network operations. The API is engineered to
+operate over both bank-rail (ISO 20022) and mobile-
+money rails (operator-specific) with a unified record
+shape.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9110 (HTTP), RFC 9112 (HTTP/1.1), RFC 9113 (HTTP/2)
+- IETF RFC 9457 (Problem Details for HTTP APIs)
+- IETF RFC 8259 (JSON), RFC 8785 (JCS), RFC 4122 (UUID), RFC 9530 (Content-Digest)
+- IETF RFC 6749, RFC 7636 (PKCE), RFC 8414 (OAuth Authorization Server Metadata)
+- ISO 20022 — payment messages (pacs.008, pain.001, camt.054)
+- BIS — payment-systems oversight principles
+- FATF Recommendation 16 — wire transfers
+- ITU-T X.1216 — security framework for digital financial services
+- US Reg E (12 CFR 1005), Reg Z (12 CFR 1026); EU PSD2 (2015/2366)
+- Open Banking (UK / EU NextGenPSD2) for sponsor-bank rails
 
 ---
 
-## §1 Scope
+## §1 Endpoint root
 
-This PHASE document is one of four that together define the WIA-micro-lending
-standard. It addresses the api-interface layer of the standard.
+API root is implementation-controlled. All endpoints
+are TLS 1.3 (RFC 8446). Sponsor-to-sponsor flows use
+mutual TLS; agent-network and field-officer flows use
+device-attested OAuth 2 with sponsor-issued client
+certificates.
 
-## §2 Manifest
+## §2 Customer endpoints
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "micro-lending"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+POST   /v1/customers                     register customer
+GET    /v1/customers/{ref}               retrieve
+PATCH  /v1/customers/{ref}               amend non-identity fields
+POST   /v1/customers/{ref}/kyc           append KYC verification event
+POST   /v1/customers/{ref}/screen        run sanctions / PEP screen
+GET    /v1/customers?status=&risk=       list / filter
+DELETE /v1/customers/{ref}               soft delete (closed account chain)
+```
 
-## §3 Conformance Tiers
+KYC verification events sign with the verifying
+operator's key; screen events record outcome and the
+list version (sanctions-list reference) consulted.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Group endpoints
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+POST   /v1/groups                        register group
+GET    /v1/groups/{ref}                  retrieve
+PATCH  /v1/groups/{ref}/members          add / remove members
+POST   /v1/groups/{ref}/meetings         record meeting event (attendance,
+                                         decisions, savings-deposit)
+GET    /v1/groups/{ref}/loans            outstanding group-bound loans
+```
 
-## §4 Discovery
+Meeting records bind to the group's collective
+guarantee chain so an inspector can reconstruct
+attendance and decisions.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/micro-lending`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Product endpoints
 
-## §5 Time and Identity
+```
+GET    /v1/products                      list catalogue
+POST   /v1/products                      publish new product
+GET    /v1/products/{ref}                retrieve
+PATCH  /v1/products/{ref}                amend (versioned)
+GET    /v1/products/{ref}/disclosure     associated disclosure templates
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Pricing changes trigger a new product version and a
+fresh disclosure template; outstanding loans operate
+on the product version they originated under.
 
-## §6 Versioning and Deprecation
+## §5 Application endpoints
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+POST   /v1/applications                  intake application
+POST   /v1/applications/{ref}/score      run credit-scoring
+POST   /v1/applications/{ref}/decide     record decision
+GET    /v1/applications/{ref}            retrieve
+GET    /v1/applications?status=&channel= list / filter
+```
 
-## §7 Privacy and Security
+Score requests pin the model version; the scoring
+output is recorded with per-feature contribution where
+the model is explainable (PHASE 3 §5).
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Disbursement endpoints
 
-## §8 Open Governance
+```
+POST   /v1/disbursements                 instruct disbursement
+GET    /v1/disbursements/{ref}           retrieve
+GET    /v1/disbursements?account=&date=  list / filter
+POST   /v1/disbursements/{ref}/cancel    pre-execution cancellation
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `micro-lending` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Instructions emit the appropriate rail message (ISO
+20022 pacs.008 for bank rail; mobile-money operator
+B2C messages for mobile rail). The implementation
+records the rail-side identifier returned by the
+operator.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Repayment endpoints
 
+```
+POST   /v1/repayments                    record repayment
+GET    /v1/repayments/{ref}              retrieve
+GET    /v1/repayments?account=&date=     list / filter
+POST   /v1/repayments/$reconcile         end-of-day reconciliation
+```
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+Reconciliation matches operator-side message reports
+(camt.054 / mobile-money daily statement) with the
+sponsor's ledger; mismatches open stewardship tasks.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## §8 Restructuring and write-off endpoints
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+POST   /v1/restructurings                propose restructuring
+POST   /v1/restructurings/{ref}/approve  internal approval
+GET    /v1/restructurings/{ref}          retrieve
+POST   /v1/write-offs                    record write-off
+POST   /v1/recoveries                    record post-write-off recovery
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Approvals are role-segregated (originator ≠ approver)
+per BIS Core Principles risk-management requirements.
 
-## Annex F — Adoption Roadmap
+## §9 Customer-protection disclosure endpoints
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+POST   /v1/disclosures                   issue disclosure to customer
+POST   /v1/disclosures/{ref}/accept      record acceptance
+GET    /v1/disclosures/{ref}             retrieve (gated by customer consent)
+GET    /v1/customers/{ref}/disclosures   list per customer
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Acceptance events sign with the customer's
+authentication factor (PIN / OTP / biometric / wet-
+ink-scan-with-witness) per the loan-agreement
+disclosure.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Regulatory-report endpoints
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```
+POST   /v1/reports                       generate report (PAR / STR / CTR / etc)
+GET    /v1/reports/{ref}                 retrieve
+POST   /v1/reports/{ref}/submit          file with regulator gateway
+GET    /v1/reports?type=&period=         list / filter
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+Submissions emit gateway-specific messages (e.g. FIU
+goAML for STRs, central-bank reporting endpoints for
+PAR / large-exposure reports).
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Agent-network endpoints
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+```
+POST   /v1/agents                        register agent
+POST   /v1/agents/{ref}/till             open / close till session
+POST   /v1/agents/{ref}/transactions     transaction list (cash-in / cash-out)
+GET    /v1/agents/{ref}                  retrieve agent profile
+```
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Agent operations are audited per the rail-operator's
+agent-management requirements (e.g. M-PESA / Airtel
+Money agent SOPs).
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Error model (RFC 9457)
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+```json
+{
+  "type":   "urn:wia:ml:problem:disclosure-not-accepted",
+  "title":  "Customer has not accepted the disclosure",
+  "status": 409,
+  "detail": "Customer cu-2026-001 has not accepted disclosure d-2026-001",
+  "instance": "/v1/disbursements"
+}
+```
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Common type URIs:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+| Type URI suffix              | HTTP | Meaning                                       |
+|------------------------------|-----:|-----------------------------------------------|
+| `disclosure-not-accepted`    | 409  | disbursement blocked without acceptance       |
+| `kyc-incomplete`             | 403  | onboarding does not satisfy CDD               |
+| `screening-blocking`         | 403  | sanctions / PEP hit blocking transaction      |
+| `over-indebtedness`          | 422  | customer fails over-indebtedness check        |
+| `dual-control-required`      | 403  | originator attempted approval                 |
+| `rail-operator-error`        | 502  | upstream payment rail returned an error       |
+| `idempotency-conflict`       | 409  | conflicting request under same idempotency key |
 
-## Annex I — Interoperability Profiles
+## §13 Bulk export
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+```
+GET  /v1/$export?_type=Customer,LoanAccount,Repayment,Disclosure
+GET  /v1/$status/{exportId}
+GET  /v1/$result/{exportId}/{file}
+```
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Output is NDJSON.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §14 Audit headers
+
+| Header                  | Meaning                                       |
+|-------------------------|-----------------------------------------------|
+| `X-Request-Id`          | client-set, echoed                            |
+| `X-Audit-Event-Id`      | server-set, links to PHASE 3 audit chain      |
+| `Content-Digest`        | RFC 9530 SHA-256 of the response body         |
+| `Idempotency-Key`       | RFC draft `idempotency-key-header`             |
+
+## Annex A — OpenAPI reference
+
+A canonical OpenAPI 3.1 description is published at
+`api/openapi-3.1.yaml`.
+
+## Annex B — Worked disbursement (informative)
+
+```http
+POST /v1/disbursements HTTP/1.1
+Authorization: Bearer ...
+Content-Type: application/json
+WIA-ML-Schema-Version: 1.0
+Idempotency-Key: 7c0d...
+
+{
+  "loanAccountRef": "la-2026-04-12-007",
+  "amount": 50000,
+  "currency": "KES",
+  "disbursementChannel": "mobile-money",
+  "paymentInstrumentRef": "+254712345678"
+}
+```
+
+Response 201 returns the disbursement record with the
+operator-side rail reference and the queued ISO 20022
+message identifier.
+
+## Annex C — Webhook surface
+
+Implementations expose webhooks for `disbursement-
+settled`, `repayment-received`, `par-bucket-changed`,
+`screening-flag`, and `regulatory-report-submitted`
+events. Payloads sign with RFC 7515 JWS; receivers
+verify against `/.well-known/wia-ml-keys.json`.
+Delivery is at-least-once; receivers are expected to
+be idempotent on `eventId`.
+
+## Annex D — Conformance disclosure
+
+Implementations declare the OpenAPI revision served,
+the ISO 20022 messages supported, the rail-operator
+bindings (M-PESA / Airtel / MTN MoMo / etc), the
+sanctions-list updates honoured, and the FIU
+gateway profile.
+
+## Annex E — Idempotency and replay
+
+The API tolerates client retries through the
+`Idempotency-Key` header. The implementation persists
+the request hash + key for a 24-hour minimum so
+retried requests return the original response without
+side effects. Repayment endpoints are particularly
+sensitive: an operator-rail timeout that retries may
+otherwise post a duplicate payment.

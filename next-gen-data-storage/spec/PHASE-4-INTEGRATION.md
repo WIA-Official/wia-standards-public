@@ -1,241 +1,302 @@
-# WIA-next-gen-data-storage PHASE 4 — INTEGRATION Specification
+# WIA-next-gen-data-storage PHASE 4 — Integration Specification
 
 **Standard:** WIA-next-gen-data-storage
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-next-gen-data-storage (Next Gen Data Storage).
+This PHASE specifies how WIA-next-gen-data-storage
+integrates with adjacent compute, network, security,
+analytics, and regulatory systems: hyperscale and on-
+premises orchestrators (Kubernetes CSI, OpenStack
+Cinder / Manila, VMware vSphere, Hyper-V), cloud-
+native storage operators (CSI 1.x), backup and
+disaster-recovery, key-management services, SIEM /
+audit pipelines, ISO 16363-aligned trustworthy-
+repository archives, AI/ML training pipelines, OCI
+Distribution registries, S3-compatible third-party
+clients, and downstream WIA companion standards.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- DMTF Redfish 2024.x; SNIA Swordfish 1.2.6; SNIA SMI-S 1.8
+- NVM Express Base Specification 2.0; NVMe-MI 1.2; NVMe-oF 1.1
+- CXL Specification 3.1
+- AWS S3 API; OCI Distribution Specification 1.1
+- Kubernetes Container Storage Interface (CSI) 1.x
+- OpenStack Cinder / Manila reference APIs
+- VMware vSphere Storage APIs (sponsor-side integration only)
+- ISO 14721 (OAIS); ISO 16363 (Trustworthy Digital Repositories)
+- ISO/IEC 27040 — storage security; NIST SP 800-88 — media sanitisation
+- NIST SP 800-57 (key-management); NIST FIPS 140-3
+- IETF RFC 9110 (HTTP), RFC 7515 (JWS), RFC 8259 (JSON), RFC 8785 (JCS)
+- W3C Provenance Notation (PROV-N) — for content-addressed lineage
+- CNCF SPIFFE / SPIRE — workload identity (where bound)
 
 ---
 
-## §1 Scope
+## §1 Orchestrator integration
 
-This PHASE document is one of four that together define the WIA-next-gen-data-storage
-standard. It addresses the integration layer of the standard.
+| Orchestrator         | Integration profile                              |
+|----------------------|--------------------------------------------------|
+| Kubernetes (K8s)     | Container Storage Interface (CSI) 1.x driver      |
+| OpenStack            | Cinder (block) + Manila (file) drivers            |
+| VMware vSphere       | vVols / VAAI integration (sponsor-side only)      |
+| Hyper-V              | SMB Direct + storage QoS                         |
+| Bare-metal           | NVMe-oF discovery + multipath                    |
 
-## §2 Manifest
+CSI 1.x volume snapshots, clones, and resize follow
+the upstream CSI spec; per-volume QoS hints publish
+through CSI parameters.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "next-gen-data-storage"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Backup and disaster-recovery integration
 
-## §3 Conformance Tiers
+| Pattern             | Profile                                          |
+|---------------------|--------------------------------------------------|
+| Snapshot + replicate| copy snapshots to a separate fault domain         |
+| Active-active       | dual-site synchronous replication                 |
+| Active-passive      | warm standby; promote on declared disaster        |
+| Air-gapped backup   | physically isolated copy on tape / DNA archive    |
+| Immutable backup    | WORM-locked snapshots (S3 Object Lock parallel)   |
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+DR drills emit audit events; recovery-time and
+recovery-point measurements record so a regulator or
+auditor sees compliance against declared RTO / RPO.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Key-management service (KMS) integration
 
-## §4 Discovery
+| KMS profile         | Use                                              |
+|---------------------|--------------------------------------------------|
+| KMIP 2.x            | enterprise KMS interconnect                       |
+| AWS KMS / Azure Key | cloud KMS                                        |
+| Vault               | sponsor-internal secrets / KEK                    |
+| HSM-attached        | hardware-security-module bound KEK                |
+| FIPS 140-3 module   | NIST-validated module per impact level            |
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/next-gen-data-storage`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The encryption-envelope record (PHASE 1 §7) cites the
+KMS profile in force; KEK rotation events propagate to
+the audit chain.
 
-## §5 Time and Identity
+## §4 SIEM and audit-log integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+storage audit event → RFC 5424 syslog →
+  SIEM ingestion → SOC monitoring
+```
 
-## §6 Versioning and Deprecation
+Storage events of interest to security:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+- authentication failures
+- KEK / DEK access patterns
+- unusual access volume
+- replication lag spikes
+- WORM-policy violations
+- firmware-update events
+- media-sanitisation events
 
-## §7 Privacy and Security
+Events sign with the storage system's audit key so
+the SIEM verifies authenticity.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 OAIS / trustworthy-repository integration
 
-## §8 Open Governance
+For archival workloads:
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `next-gen-data-storage` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+SIP ingestion → AIP storage with replicated copies →
+  scheduled fixity → DIP delivery on access request
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+ISO 16363 certification audits the institution's
+preservation policies, technical infrastructure, and
+governance. The WIA storage records per-AIP
+preservation events back to PHASE 3 §5.
 
+## §6 AI/ML training pipeline integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+| Tier               | Use in pipeline                                    |
+|--------------------|----------------------------------------------------|
+| pmem-tier          | ultra-fast feature cache                           |
+| nvme-tier-0        | active training set                                |
+| nvme-tier-1        | epoch-cycle training set                           |
+| cap-disk           | dataset corpus                                     |
+| object-tier        | dataset versioning + lineage                       |
+| archive            | post-training artefact retention                   |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+Training jobs cite content-addressed dataset digests
+(PHASE 1 §9) so re-runs reproduce. Model checkpoints
+sign with the training-job's attestation key.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §7 OCI Distribution registry integration
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+| OCI client          | Profile                                          |
+|---------------------|--------------------------------------------------|
+| Container runtimes  | OCI Distribution v1.1                              |
+| OCI image clients   | image push / pull                                 |
+| OCI artefact clients| arbitrary content-addressed artefact storage       |
+| Cosign / sigstore   | signature artefact storage (where the sponsor     |
+|                     | uses cosign)                                      |
 
-## Annex F — Adoption Roadmap
+The implementation participates as an OCI
+Distribution origin or as a pull-through cache.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §8 S3-compatible third-party integration
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+| Client                 | Profile                                       |
+|------------------------|-----------------------------------------------|
+| AWS CLI / SDKs         | de-facto S3 contract                           |
+| MinIO mc, rclone       | S3 + multi-cloud awareness                     |
+| Backup software        | per-vendor S3 binding                         |
+| Lakehouse engines      | S3 + Iceberg / Delta / Hudi table format       |
+| CDN origin             | S3 origin with signed URLs                     |
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The implementation honours signed-URL delegation
+(per S3) so end-to-end auth bypasses the storage
+fabric for short-lived access.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §9 Cross-domain WIA bindings
 
-## Annex G — Test Vectors and Conformance Evidence
+| Companion standard           | Binding purpose                                |
+|------------------------------|------------------------------------------------|
+| WIA-data-warehouse           | analytical-tier consumption                    |
+| WIA-data-lake                | object-tier ingestion                           |
+| WIA-edge-ai                  | tiered model serving                            |
+| WIA-quantum                  | post-quantum key management (where bound)       |
+| WIA-data-encryption          | DEK / KEK lifecycle                             |
+| WIA-data-lineage             | artefact lineage                                |
+| WIA-data-portability         | artefact export                                 |
+| WIA-content-ai               | model artefact storage                          |
+| WIA-digital-time-capsule     | deep-cold-archive bridge                        |
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Each binding identifies the consumed PHASE.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §10 Long-term archival
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+| Tier / context           | Retention                                    |
+|--------------------------|----------------------------------------------|
+| Fast online              | sponsor policy                                |
+| Capacity / cap-disk      | sponsor policy                                |
+| Tape archive             | typically ≥ 10 years                          |
+| Optical / holographic    | typically ≥ 30 years                          |
+| DNA / polymer            | per substrate manufacturer warranty (long)    |
+| Audit logs               | per regulator (typ. ≥ 5-7 years)              |
+| Sanitisation certificates| per data-classification (≥ 3 years)            |
 
-## Annex H — Versioning and Deprecation Policy
+## §11 Conformance test suite
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+The reference test suite covers:
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+- CSI 1.x volume create / snapshot / clone / resize
+- Swordfish / Redfish discovery + capability advertisement
+- NVMe-oF discovery and namespace attach
+- ZNS zone-management commands
+- replication-lag measurement under network impairment
+- KMS rotation triggers DEK re-encrypt
+- WORM-policy enforcement on object mutation
+- fixity-check failure → repair-from-replica
+- firmware-update rollback on validation failure
+- NIST SP 800-88 sanitisation event with certificate
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §12 Internationalisation
 
-## Annex I — Interoperability Profiles
+Public-API responses honour `Accept-Language` for
+human-readable error messages; resource identifiers
+(domain / namespace / volume) are language-neutral.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §13 Security and privacy posture
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+- Transport: TLS 1.3 with mutual TLS for orchestrator
+  ↔ storage and storage ↔ KMS exchanges
+- Authentication: SPIFFE / SPIRE workload identity
+  (where bound); client_credentials with key
+  attestation otherwise
+- At-rest: AES-256-GCM (or XTS-AES per IEEE 1619-2018
+  for legacy block); per-volume DEK with KMS-managed
+  KEK
+- Audit: tamper-evident chain (PHASE 3 §9) exportable
+  per ISO/IEC 27037
+- Privacy: data-erasure executes via cryptographic
+  erase (DEK destruction); object-store immutable
+  retention honours WORM policy
+- FIPS 140-3 module bound where regulator requires;
+  module identifier records on the encryption-
+  envelope
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §14 Operational metrics
+
+Sponsors / operators report (informationally) on the
+WIA registry:
+
+- per-tier capacity / utilisation
+- IOPS / throughput / latency vs. target
+- replication lag distribution
+- fixity-failure rate
+- firmware-update success rate
+- DR drill outcomes
+- sanitisation events
+
+## §15 Recovery and continuity
+
+- Storage-domain outage — orchestrator routes around
+  unhealthy domain; replicas serve reads where
+  possible
+- KMS outage — pre-fetched DEKs serve in-flight
+  workload; new writes block until KMS recovers
+- network outage — synchronous replication degrades
+  to async with bounded staleness; alerts emit
+- catastrophic data loss — declared-disaster recovery
+  from replicas / backups / archive per the DR plan
+
+## Annex A — Worked end-to-end example (informative)
+
+A hyperscale operator deploys a 60-petabyte
+disaggregated NVMe pod with CXL.mem-attached SCM tier.
+Kubernetes consumes the array via CSI 1.x; AI/ML
+training pipelines pin feature-cache to the SCM tier
+and corpus to NVMe-tier-0. Encryption envelopes use a
+sponsor-internal KMS with HSM-bound KEKs. Fixity scrub
+runs weekly; a single-drive bit-rot detected on day
+197 repairs from parity within four hours. A model-
+release event publishes the trained checkpoint to the
+OCI Distribution origin with a Sigstore-signed
+manifest. End-of-life decommission of an older pod
+runs NIST SP 800-88 purge with cryptographic erase
+followed by physical degaussing for HDD components;
+a sanitisation certificate records.
+
+## Annex B — Conformance disclosure
+
+Implementations declare the orchestrator integrations
+supported, the KMS profile, the OCI Distribution
+version, the S3 API version honoured, the CSI 1.x
+revision implemented, and the FIPS 140-3 module
+identifiers in service. Disclosure is machine-
+readable at `/.well-known/wia-storage-conformance.
+json`.
+
+## Annex C — Versioning
+
+Adding a new orchestrator integration is minor;
+changing the CSI 1.x revision is major.
+
+## Annex D — Federated-storage federation
+
+Multi-cloud / multi-region storage federations expose
+a federation directory:
+
+| Pattern             | Purpose                                          |
+|---------------------|--------------------------------------------------|
+| Geo-redundant       | replicate across geographic regions               |
+| Multi-cloud         | replicate across cloud providers                  |
+| Hybrid              | on-prem + cloud federation                        |
+| Edge-to-cloud       | edge ingest + cloud archival                      |
+
+Federation events emit to the audit chain so an
+operator sees each replica's location and ingestion
+time.
+
+## Annex E — Cost / billing integration
+
+Cost-allocation tags propagate from the orchestrator
+to the namespace record so a tenant's bill reflects
+actual storage consumption per tier. Egress and
+operations costs follow the cost-policy record (PHASE
+1 Annex E).

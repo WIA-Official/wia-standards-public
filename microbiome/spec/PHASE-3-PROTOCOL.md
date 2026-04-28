@@ -1,241 +1,307 @@
-# WIA-microbiome PHASE 3 — PROTOCOL Specification
+# WIA-microbiome PHASE 3 — Protocol Specification
 
 **Standard:** WIA-microbiome
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-microbiome (Microbiome).
+This PHASE defines the operational protocols binding
+the data records and API surface into auditable
+sequences: specimen lifecycle, library and run lifecycle,
+analysis workflow lifecycle, contamination control,
+batch-effect mitigation, and the audit-event chain.
+The protocols are designed so that an inspector
+following ISO/IEC 17025 or biobanking ISO 20387 can
+reconstruct the provenance of any analytical result
+from the event log.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- ISO 20387:2018 — General requirements for biobanking
+- ISO/IEC 17025:2017 — Testing and calibration laboratories
+- ISO 22174 / ISO 22118 / ISO 20837 — molecular methods for foodborne pathogens
+- ISO/IEC 27037 — guidelines for digital evidence preservation
+- INSDC submission policy — NCBI / ENA / DDBJ
+- GSC MIxS / MIMARKS / MIMS — minimum information packages
+- 21 CFR Part 11 — electronic records and signatures (US)
+- IEEE 11073-10101 — laboratory device nomenclature
+- IETF RFC 5424 (Syslog), RFC 8941 (Structured Field Values), RFC 7515 (JWS)
+- ISO 8601 (date / time), BCP 47 (language)
 
 ---
 
-## §1 Scope
+## §1 Specimen lifecycle
 
-This PHASE document is one of four that together define the WIA-microbiome
-standard. It addresses the protocol layer of the standard.
+```
+collected  →  preserved  →  in-transit  →  received  →  extracted
+                                              │
+                                              └─→ excluded (preservation fail)
+```
 
-## §2 Manifest
+Each transition emits an audit event with actor,
+timestamp, and method (the chain-of-custody event of
+PHASE 1 §2). Excluded specimens cannot be bound to
+new library records; the exclusion event records the
+reason (temperature breach, container compromise,
+pre-analytical TAT exceeded).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "microbiome"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Library and run lifecycle
 
-## §3 Conformance Tiers
+```
+library:    drafted  →  prepped  →  qc-passed  →  loaded  →  released
+                                       │
+                                       └─→ qc-failed → repreparation | discarded
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+run:        opened   →  started  →  finished  →  qc-released
+                                       │
+                                       └─→ run-aborted → instrument-fault
+                                                         flow-cell-fault
+                                                         operator-error
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+QC thresholds for amplicon (read length post-trim,
+median Q30 ≥ 90 %, demultiplex rate ≥ 80 %) and shotgun
+(median Q30 ≥ 85 %, host-fraction declared) are recorded
+on the run record. A run that fails QC blocks downstream
+analysis dispatch.
 
-## §4 Discovery
+## §3 Contamination control
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/microbiome`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Microbiome studies are uniquely sensitive to reagent
+and environmental contamination. The standard requires:
 
-## §5 Time and Identity
+- per extraction batch: at least one extraction-blank
+  sequenced in parallel
+- per library batch: at least one negative PCR control
+  and one mock-community positive control
+- per run: a per-run blank well or known-fingerprint
+  control
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The analysis workflow uses the negative-control reads
+to subtract reagent-contaminant ASVs / OTUs (via
+`decontam` or equivalent) before downstream statistics.
+Studies that omit controls cannot reach `qc-released`
+state.
 
-## §6 Versioning and Deprecation
+## §4 Analysis workflow lifecycle
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+dispatched  →  scheduled  →  running  →  succeeded  →  archived
+                                  │
+                                  └─→ failed   →  retried  |  abandoned
+```
 
-## §7 Privacy and Security
+Each workflow run records: the workflow URI, the
+container image digest, the input manifest digest,
+the parameter set, the resource budget consumed, and
+the output artefact digests. Workflows that fail are
+retried at most three times before requiring operator
+review.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Batch-effect mitigation
 
-## §8 Open Governance
+Studies span sequencing batches. The protocol requires:
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `microbiome` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+- randomised plate layout (subject × condition not
+  confounded with plate position or extraction batch)
+- bridge samples across batches (replicate aliquots of
+  a reference specimen on each plate)
+- batch-effect declaration in the analytical-result
+  record (correction method, software version)
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Bridge samples are flagged in the metadata table so the
+analyst can include them in the batch-effect model
+(e.g. ComBat-Seq, MMUPHin) or use them to validate
+robustness of the result.
 
+## §6 Audit event chain
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Every state change emits one audit event:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+| Field          | Meaning                                                   |
+|----------------|-----------------------------------------------------------|
+| `eventId`      | UUID                                                      |
+| `eventTime`    | ISO 8601 with timezone                                    |
+| `actor`        | identity (technician / operator / pipeline / submission)  |
+| `resourceRef`  | URI of the resource that changed                          |
+| `action`       | created / qc-passed / qc-failed / dispatched / released   |
+| `priorHash`    | SHA-256 of the prior event payload                        |
+| `signature`    | RFC 7515 JWS over the canonical event payload (RFC 8785)  |
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The chain is per-study and exportable to a SIEM via
+RFC 5424 syslog envelopes.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §7 INSDC submission protocol
 
-## Annex F — Adoption Roadmap
+```
+prepared  →  validated  →  submitted  →  suppressed  →  released
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Submission state tracks the upstream archive's view.
+`released` is irrevocable once the public archive has
+honoured the embargo lift; corrections after release
+go through a curated update channel rather than a
+delete.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §8 Reproducibility profile
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A result is "reproducible-strong" when:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+- workflow URI is published
+- container image is content-addressed (digest pinned)
+- input manifest digest is recorded
+- random seeds are fixed in the parameter set
 
-## Annex G — Test Vectors and Conformance Evidence
+A result is "reproducible-weak" when one of the above
+is absent. The analytical-result record discloses the
+reproducibility tier so downstream consumers see the
+level of guarantee.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §9 Privacy posture for human microbiome
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Human microbiome data may carry host genetic signal
+(off-target reads). The standard requires:
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+- explicit host-read removal step (BWA / Bowtie2 against
+  the consented host reference) before public release
+- a fraction-removed metric reported per read-set
+- residual host-fraction threshold below 0.01 % (or
+  per-study lower) for public submission
 
-## Annex H — Versioning and Deprecation Policy
+Where residual host fraction exceeds the threshold a
+re-filter step is mandatory; if technically infeasible
+the dataset is declared controlled-access only.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §10 Pre-analytical lifetime targets (informative)
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+| Matrix       | Time-to-preservation target | Storage             |
+|--------------|-----------------------------|---------------------|
+| Stool        | ≤ 30 min into stabiliser    | -80 °C archive      |
+| Oral / saliva| ≤ 30 min into preservative  | -80 °C archive      |
+| Skin swab    | ≤ 60 min                    | -80 °C archive      |
+| Soil         | ≤ 4 h                       | -80 °C or lyophilised |
+| Water        | ≤ 4 h, on ice               | -80 °C after filter |
+| Food matrix  | per Codex CAC/RCP 1-1969    | per food-process SOP |
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §11 Reagent-lot traceability
 
-## Annex I — Interoperability Profiles
+All extraction kits, indexing primers, master mixes,
+and flow cells carry the manufacturer lot in the library
+record. Lot rotation events are bound to runs so a
+recalled lot can be traced to all affected results.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §12 Out-of-spec handling
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+A library or run that fails QC is retained for at least
+one calendar quarter so root-cause analysis is possible.
+Discarded material moves to a quarantine status before
+deletion; deletion events are recorded in the audit
+chain.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex A — Worked SAE-equivalent example (informative)
+
+An extraction batch processed for a clinical IBD cohort
+shows extraction-blank reads dominated by *Burkholderia*,
+matching a recent reagent-lot recall. The batch is
+retroactively flagged; the analytical-result record
+inherits a `qc-warning:reagent-recall:lot-2026-03-15`.
+Affected libraries return to `qc-failed`; specimens
+remain valid and re-extract on a new reagent lot.
+
+## Annex B — Conformance disclosure
+
+Implementations declare the audit-chain schema version,
+the JWS algorithm registry, the time source (NTP
+stratum-1, NIST, KASI), and the contamination-control
+software (version of `decontam` or equivalent).
+
+## Annex C — Versioning
+
+This PHASE follows the standard's semantic-versioning
+policy. Adding a new contamination-control method is a
+minor revision; changing batch-effect declaration
+semantics is major.
+
+## Annex D — Decision matrix for workflow re-runs
+
+| Trigger                                | Action                              |
+|----------------------------------------|-------------------------------------|
+| Reference-database release             | new analytical-result; prior kept   |
+| Pipeline software update (minor)       | optional re-run; result tagged      |
+| Pipeline software update (major)       | re-run recommended; tier downgraded |
+| Reagent-lot recall                     | mandatory re-evaluation; affected   |
+|                                        | results carry recall flag           |
+| Batch-effect model update              | re-run analytical-result only       |
+| Specimen-level QC re-evaluation        | re-run from library stage           |
+
+The decision is recorded on the new analytical-result
+record's `triggerEvent` field for audit purposes.
+
+## Annex E — Operator-credential binding
+
+The operator on a library-prep, sequencing-run, or
+analysis-dispatch event carries:
+
+| Credential      | Source                                          |
+|-----------------|-------------------------------------------------|
+| ISO/IEC 17025   | accreditation body identifier                   |
+| Lab-internal    | training-record reference                       |
+| ROIS (BCKL/ROIS)| Bioinformatics analyst credential               |
+
+A run cannot release results signed by an operator
+without an active credential. Credential events
+(issued, expired, revoked) propagate to the audit
+chain.
+
+## Annex F — Time-source declaration
+
+Audit-chain timestamps cite the time-source authority
+(NTP stratum-1, NIST, KASI, PTB). For samples spanning
+multiple time zones the local offset is preserved on
+each event; UTC is reconstructed for cross-cohort
+analyses.
+
+## Annex G — Sample-size sufficiency table (informative)
+
+The protocol's sample-size sufficiency depends on the
+intended outcome:
+
+| Outcome target                     | Minimum specimens / arm |
+|------------------------------------|------------------------:|
+| Alpha-diversity comparison         | 30                      |
+| Beta-diversity PERMANOVA           | 50                      |
+| Differential-abundance discovery   | 80                      |
+| Random-forest biomarker training   | 200                     |
+| Strain-level shotgun resolution    | 30 (with deeper depth)  |
+
+Studies declaring outcomes below these thresholds carry
+an underpowered-flag on the analytical-result record
+so downstream consumers see the limitation.
+
+## Annex H — Per-step turnaround targets (informative)
+
+| Step                          | Turnaround target          |
+|-------------------------------|----------------------------|
+| Receive → extracted           | ≤ 7 days                   |
+| Extracted → library prepped   | ≤ 5 days                   |
+| Library prepped → sequenced   | ≤ 14 days                  |
+| Sequenced → primary analysis  | ≤ 7 days                   |
+| Primary analysis → reviewed   | ≤ 14 days                  |
+
+Targets are advisory; protocol-specific SOPs may
+override. Deviations are logged on the audit chain.
+
+## Annex I — Reagent-lot recall escalation
+
+When a reagent-lot is recalled by the manufacturer the
+implementation:
+
+1. queries all libraries that bound the recalled lot
+2. flags the affected runs with `recall-pending`
+3. notifies the principal investigator and study
+   coordinator
+4. schedules a re-evaluation of the affected analytical
+   results using a comparator lot or a re-extracted
+   library aliquot
+5. records the recall outcome on each affected
+   analytical-result record (`recall-cleared` or
+   `result-withdrawn`)

@@ -1,241 +1,274 @@
-# WIA-museum-digital-archive PHASE 1 — DATA-FORMAT Specification
+# WIA-museum-digital-archive PHASE 1 — Data Format Specification
 
 **Standard:** WIA-museum-digital-archive
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-museum-digital-archive (Museum Digital Archive).
+This PHASE defines the canonical data format for
+museum digital-archive operations covering object
+records, accession and provenance histories,
+conservation reports, exhibition and loan events,
+imagery and 3D / multimedia surrogates, multilingual
+descriptive metadata, rights / licence bindings, and
+preservation events. The format aligns with CIDOC-CRM,
+LIDO, Linked Art, Spectrum 5.1 collections-management
+procedures, OAIS / ISO 14721 preservation framework,
+IIIF for image / presentation / search APIs, Europeana
+EDM, and the W3C Web Annotation Data Model.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- CIDOC-CRM (ISO 21127:2014) — A reference ontology for cultural-heritage data
+- ISO 21127 — Information and documentation: a reference ontology
+- LIDO XML 1.1 — Lightweight Information Describing Objects
+- Linked Art (community reference) — Linked-data profile of CIDOC-CRM
+- Dublin Core Metadata Initiative (DCMI Terms 1.1)
+- Europeana EDM 5.2.8 — Europeana Data Model
+- ICOM Code of Ethics for Museums; ICOM Object ID
+- Spectrum 5.1 — Collections-Trust collections-management procedures
+- ISO 14721:2012 — OAIS — Open Archival Information System
+- ISO 16363:2012 — Trustworthy Digital Repositories
+- IIIF Image API 3.0; IIIF Presentation API 3.0; IIIF Auth 2.0; IIIF Search API 1.0
+- W3C Web Annotation Data Model
+- W3C Verifiable Credentials Data Model 2.0 (where loan / endorsement attestations issue)
+- ISO 19115-2:2019 — geographic-information metadata (geo-bound objects)
+- IETF RFC 8259 (JSON), RFC 8785 (JCS), RFC 4122 (UUID), RFC 7515 (JWS)
+- PREMIS 3.0 (preservation metadata; Library of Congress)
+- METS 1.12 (Metadata Encoding and Transmission Standard)
+- TEI Lite (text encoding initiative for transcribed manuscripts / archives)
+- ICOM Red Lists (illicit-trafficking risk categories)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-museum-digital-archive
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to museums, libraries, archives,
+and cultural-heritage institutions managing digital
+records of physical or born-digital objects (artworks,
+artefacts, specimens, documents, manuscripts,
+recordings, photographs, films, performance video, and
+born-digital art).
 
-## §2 Manifest
+In scope: object record, accession record, provenance
+record, conservation record, exhibition record, loan
+record, imagery / surrogate record, descriptive-
+metadata record, multilingual-label record, rights /
+licence record, preservation-event record, and the
+cross-references binding records to public-presentation
+manifests, scholarly catalogues, and external
+authorities. Out of scope: contemporary commercial
+publishing of cultural goods (handled by the
+content-distribution standard) and live-performance
+ticketing (handled by the ticketing-system standard).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "museum-digital-archive"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Object record
 
-## §3 Conformance Tiers
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `objectRef`          | UUID (RFC 4122)                                 |
+| `localIdentifier`    | institution-local accession number (Spectrum)   |
+| `type`               | controlled term (CIDOC-CRM E22 Man-Made-Object, |
+|                      | E20 Biological-Object, E84 Information-Carrier) |
+| `classification`     | per-collection taxonomy (e.g. Getty AAT)         |
+| `culturalContext`    | era / period (Getty TGN / AAT references)        |
+| `materials`          | controlled list (Getty AAT materials)            |
+| `dimensions`         | per-axis with unit (CIDOC-CRM E54)               |
+| `inscriptions`       | text + script + position                          |
+| `creator`            | actor-reference (CIDOC-CRM E21 Person /          |
+|                      | E74 Group); multiple actors allowed              |
+| `dateCreated`        | bound to a CIDOC-CRM E52 Time-Span                |
+| `subject`            | per-collection subject taxonomy (Getty AAT,      |
+|                      | LCSH, Iconclass)                                  |
+| `descriptiveMetadata`| free-text bound to multilingual-label record    |
+| `accessionRef`       | accession event (this PHASE §3)                   |
+| `currentLocationRef` | current physical / digital location              |
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Born-digital objects record the technical-environment
+(file format, software / hardware platform) per the
+PREMIS environment-description.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Accession record
 
-## §4 Discovery
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `accessionRef`       | UUID                                            |
+| `objectRef`          | §2                                              |
+| `mode`               | `purchase`, `gift`, `bequest`, `transfer`,      |
+|                      | `loan`, `find`, `commission`                    |
+| `accessionedAt`      | ISO 8601                                        |
+| `donorRef`           | actor-reference                                  |
+| `legalBasis`         | sale-contract / gift-letter / bequest-record /   |
+|                      | repatriation-treaty                              |
+| `acquisitionPolicyRef`| institution policy applied                      |
+| `dueDiligenceRef`    | provenance / illicit-trade due-diligence record  |
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/museum-digital-archive`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Due-diligence references the ICOM Red Lists and
+relevant national / international cultural-property
+laws (e.g. UNESCO 1970 Convention; UNIDROIT 1995
+Convention).
 
-## §5 Time and Identity
+## §4 Provenance record
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Provenance follows CIDOC-CRM E10 Transfer-of-Custody
+and E8 Acquisition events:
 
-## §6 Versioning and Deprecation
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `provenanceRef`      | UUID                                            |
+| `objectRef`          | §2                                              |
+| `eventKind`          | `creation`, `change-of-ownership`,               |
+|                      | `change-of-custody`, `loss`, `recovery`         |
+| `priorOwnerRef`      | actor-reference                                  |
+| `subsequentOwnerRef` | actor-reference                                  |
+| `place`              | Getty TGN reference                              |
+| `eventTime`          | ISO 8601 / E52 Time-Span                         |
+| `documentRef`        | source-document reference (catalogue, sale       |
+|                      | record, archival ledger)                         |
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Conservation record
 
-## §7 Privacy and Security
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `conservationRef`    | UUID                                            |
+| `objectRef`          | §2                                              |
+| `treatmentKind`      | `examination`, `cleaning`, `consolidation`,     |
+|                      | `restoration`, `reconstruction`, `mount-rebuild`|
+| `conservatorRef`     | conservator identity (with credential)           |
+| `treatmentTime`      | ISO 8601                                        |
+| `materialsUsed`      | per Getty AAT or institution catalogue           |
+| `conditionBefore`    | structured condition assessment                  |
+| `conditionAfter`     | structured condition assessment                  |
+| `imageryRef[]`       | before / during / after surrogates              |
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Conservation entries are append-only; the object's
+condition timeline reconstructs from the chain.
 
-## §8 Open Governance
+## §6 Exhibition / loan record
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `museum-digital-archive` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `exhibitionRef`      | UUID                                            |
+| `title`              | localised label                                  |
+| `venue`              | institution / temporary venue                     |
+| `startsAt`           | ISO 8601                                        |
+| `endsAt`             | ISO 8601                                        |
+| `objects[]`          | object-references displayed                      |
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `loanRef`            | UUID                                            |
+| `objectRef`          | §2                                              |
+| `borrowerRef`        | borrowing institution                             |
+| `loanPurpose`        | exhibition / research / conservation / teaching  |
+| `loanStart`          | ISO 8601                                        |
+| `loanEnd`            | ISO 8601                                        |
+| `insuranceRef`       | bound insurance policy                           |
+| `couriersRef[]`      | courier(s) accompanying the object               |
+| `conditionReports[]` | pre / post loan condition reports                |
 
+## §7 Imagery / surrogate record
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `surrogateRef`       | UUID                                            |
+| `objectRef`          | §2                                              |
+| `kind`               | `still-image`, `video`, `audio`, `3d-mesh`,     |
+|                      | `3d-pointcloud`, `gigapixel-zoom`, `spectral`,  |
+|                      | `xrf`, `multispectral`, `tomography`            |
+| `mediaUri`           | content-addressed URI                            |
+| `iiifManifest`       | IIIF Presentation 3.0 manifest URI               |
+| `mimeType`           | per IANA registry                               |
+| `colorProfile`       | ICC profile reference                            |
+| `dpi`                | for raster                                      |
+| `dimensions`         | pixels / vertices / sample-rate                  |
+| `captureTime`        | ISO 8601                                        |
+| `captureMetadata`    | EXIF + camera / scanner profile                  |
+| `licenceRef`         | rights / licence record (§9)                     |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## §8 Descriptive-metadata and multilingual-label record
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `metadataRef`        | UUID                                            |
+| `objectRef`          | §2                                              |
+| `lidoXml`            | LIDO 1.1 record URI (where bound)                |
+| `linkedArt`          | Linked Art JSON-LD URI                           |
+| `cidocCrmGraph`      | CIDOC-CRM RDF graph URI                          |
+| `dcTerms`            | Dublin Core triples                              |
+| `tei`                | TEI Lite reference (for transcribed text)        |
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `labelRef`           | UUID                                            |
+| `objectRef`          | §2                                              |
+| `language`           | BCP 47 tag                                       |
+| `audience`           | `gallery-public`, `scholarly`, `accessible-easy-|
+|                      | language`, `audio-description`, `sign-language` |
+| `text`               | localised text                                   |
+| `signLanguageMedia`  | sign-language-video reference                    |
 
-## Annex F — Adoption Roadmap
+## §9 Rights / licence record
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `rightsRef`          | UUID                                            |
+| `objectRef`          | §2                                              |
+| `copyrightStatus`    | per Europeana Rights Statements (in-copyright,  |
+|                      | out-of-copyright, no-known-copyright,            |
+|                      | underlying-works-only)                           |
+| `licence`            | SPDX or Europeana RS or local custom URI         |
+| `restrictions`       | per-institution restriction policy               |
+| `traditionalCulturalNotice`| Local Contexts label / notice (where         |
+|                      | indigenous communities engaged)                  |
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+For sensitive material (sacred items, ancestral
+remains, secret-sacred objects per ICOM ethics) the
+restriction policy may limit imagery access or
+imagery distribution.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Preservation-event record (PREMIS)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `preservationEventRef`| UUID                                            |
+| `objectRef`          | §2                                              |
+| `eventType`          | per PREMIS event vocabulary (ingestion,         |
+|                      | fixity-check, migration, normalisation,         |
+|                      | replication, deletion, validation)               |
+| `eventTime`          | ISO 8601                                        |
+| `agentRef`           | preservation system / archivist                  |
+| `outcome`            | `success`, `failure`, `warning`                  |
+| `fixityValueRef`     | content-addressed digest (SHA-256, BLAKE3)       |
 
-## Annex G — Test Vectors and Conformance Evidence
+## §11 Cross-domain references (informative)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+- WIA-cultural-heritage-digitization — source-imaging
+  pipeline
+- WIA-cultural-exchange-data — international exchange
+- WIA-translation-data — multilingual-label MT pipeline
+- WIA-digital-time-capsule — long-term preservation
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex A — Worked Linked-Art binding (informative)
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+```json
+{
+  "@context": "https://linked.art/ns/v1/linked-art.json",
+  "id": "https://museum.example/object/123",
+  "type": "HumanMadeObject",
+  "classified_as": [{"id":"http://vocab.getty.edu/aat/300033973","type":"Type","_label":"painting"}],
+  "made_of": [{"id":"http://vocab.getty.edu/aat/300015012","_label":"oil paint"}],
+  "produced_by": {"type":"Production","carried_out_by":[{"id":"https://museum.example/actor/57","_label":"Artist"}]}
+}
+```
 
-## Annex H — Versioning and Deprecation Policy
+## Annex B — Conformance disclosure
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Implementations declare the LIDO / Linked Art / CIDOC-
+CRM versions served, the IIIF profile (Image / Pres /
+Auth / Search) versions exposed, the PREMIS / METS
+revisions, and the Europeana EDM mapping version.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex C — Versioning
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Field additions are minor; semantic redefinition is
+major.

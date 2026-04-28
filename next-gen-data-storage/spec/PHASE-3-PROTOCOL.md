@@ -1,241 +1,308 @@
-# WIA-next-gen-data-storage PHASE 3 — PROTOCOL Specification
+# WIA-next-gen-data-storage PHASE 3 — Protocol Specification
 
 **Standard:** WIA-next-gen-data-storage
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-next-gen-data-storage (Next Gen Data Storage).
+This PHASE defines the operational protocols binding
+records and API resources into auditable lifecycles:
+domain commissioning and decommissioning, namespace
+lifecycle, replica-and-quorum operation, encryption-
+envelope rotation cadence, durability monitoring with
+scrubbing and fixity, fault recovery and rebuild,
+firmware-update governance, capacity-planning trigger
+chain, and the audit-event chain. The protocols
+ensure that a vendor RMA, a security incident, or a
+capacity-planning audit can reconstruct the storage
+state from the event log.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- SNIA SMI-S 1.8; SNIA Swordfish 1.2.6; DMTF Redfish 2024.x
+- NVM Express Base Specification 2.0; NVMe-MI 1.2; NVMe-oF 1.1
+- NIST SP 800-57 (key-management) Parts 1, 2, and 3
+- NIST FIPS 140-3 — Cryptographic Module Validation
+- NIST SP 800-88 Rev 1 — Media Sanitisation
+- ISO/IEC 27037 — digital evidence preservation
+- ISO/IEC 27040 — storage security
+- IETF RFC 5424 (Syslog), RFC 7515 (JWS), RFC 8785 (JCS)
 
 ---
 
-## §1 Scope
+## §1 Domain commissioning and decommissioning
 
-This PHASE document is one of four that together define the WIA-next-gen-data-storage
-standard. It addresses the protocol layer of the standard.
+```
+ordered → installed → burn-in → certified → production →
+  deprecated → decommissioned → media-sanitised → disposed
+```
 
-## §2 Manifest
+Burn-in covers manufacturer-recommended power-cycle,
+performance, and endurance pre-checks. Certification
+records the controller / firmware versions and the
+performance baseline. Decommissioning runs media-
+sanitisation per NIST SP 800-88 (clear, purge, or
+destroy depending on data classification).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "next-gen-data-storage"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Namespace lifecycle
 
-## §3 Conformance Tiers
+```
+created → in-use → migrated → archived → released
+                       │
+                       └→ frozen (regulatory / forensic hold)
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Frozen namespaces resist deletion until the hold is
+released; the implementation enforces the hold via
+the WORM-locked Problem Details type (PHASE 2 §12).
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Replica-and-quorum operation
 
-## §4 Discovery
+| Mode               | Operation                                       |
+|--------------------|-------------------------------------------------|
+| Synchronous        | every write replicated to all replicas before   |
+|                    | acknowledgement; bounded by a tail-cut timer    |
+| Asynchronous       | primary acknowledges; replica catches up        |
+|                    | within RPO budget                               |
+| Quorum             | write requires majority replica acknowledgement |
+| Chain replication  | head receives writes; chain propagates           |
+| Paxos / Raft       | consensus-bound replicated state machine         |
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/next-gen-data-storage`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Split-brain detection invokes the configured policy
+(majority-quorum / fence / pause) and emits a fault
+event.
 
-## §5 Time and Identity
+## §4 Encryption-envelope rotation cadence
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+| Layer       | Rotation cadence                                       |
+|-------------|--------------------------------------------------------|
+| KEK         | per sponsor policy (typ. annual)                        |
+| DEK         | per object / per volume; on key-compromise emergency    |
+| Tweak       | for XTS: per LBA; never reused across volumes           |
+| KMS audit   | per access; per rotation; per envelope creation         |
 
-## §6 Versioning and Deprecation
+Compromise events trigger immediate rotation; the
+chain-of-custody records the compromise event and the
+re-encryption progress.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Durability monitoring (scrubbing and fixity)
 
-## §7 Privacy and Security
+```
+schedule → read-scrub → checksum-verify → repair-from-replica → record
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Scrubbing cadence is media-aware:
 
-## §8 Open Governance
+| Media type        | Scrub cadence                                      |
+|-------------------|----------------------------------------------------|
+| NVMe SSD          | weekly                                             |
+| HDD               | monthly                                            |
+| Tape archive      | per LTO recommendations (typ. 3-5 year recall test) |
+| DNA / polymer     | per substrate manufacturer guidance                |
+| Optical disc      | annual representative-sample read                   |
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `next-gen-data-storage` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Bit-rot detection triggers repair from replica; if no
+replica passes verification the operator is notified
+(fault: critical) and recovery falls back to the most
+recent good replica.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §6 Fault recovery and rebuild
 
+```
+fault-detected → degraded-mode → rebuild-initiated →
+  rebuild-progressing → rebuild-completed → fault-cleared
+```
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Rebuild bandwidth is capacity-aware to limit
+performance impact on production workloads; sustained
+multi-hour rebuilds emit progress events to the
+audit chain.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## §7 Firmware-update governance
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+update-staged → verified → quiesced → applied → re-validated
+                                  │
+                                  └→ rollback (on failure)
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Updates honour vendor-recommended sequencing (e.g.
+controller firmware before drive firmware); cluster-
+wide rolling updates preserve quorum throughout. A
+failed update triggers an automatic rollback to the
+prior known-good firmware version.
 
-## Annex F — Adoption Roadmap
+## §8 Capacity-planning trigger chain
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+| Threshold           | Action                                          |
+|---------------------|-------------------------------------------------|
+| 70 % capacity       | informational; capacity-planning task            |
+| 85 % capacity       | warning; provisioning request                    |
+| 95 % capacity       | critical; new-write throttling option            |
+| Quota-per-consumer  | per consumer's contractual cap                   |
+| Replica-rebuild     | reserved capacity sized for rebuild + new write  |
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Triggers emit audit events; sponsor-policy decides
+whether new writes throttle or block at the critical
+threshold.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §9 Audit event chain
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+| Field          | Meaning                                                 |
+|----------------|---------------------------------------------------------|
+| `eventId`      | UUID                                                    |
+| `eventTime`    | ISO 8601 with timezone                                  |
+| `actor`        | identity (operator / system / vendor / sponsor)         |
+| `resourceRef`  | URI of the resource that changed                        |
+| `action`       | created / migrated / repaired / rotated / decommissioned|
+| `priorHash`    | SHA-256 of the prior event payload                      |
+| `signature`    | RFC 7515 JWS over the canonical event payload (RFC 8785)|
 
-## Annex G — Test Vectors and Conformance Evidence
+The chain is per-domain.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §10 Media-sanitisation discipline
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Per NIST SP 800-88 the protocol records:
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+| Method     | Description                                       |
+|------------|---------------------------------------------------|
+| `clear`    | logical wipe; sufficient for low-classification    |
+| `purge`    | cryptographic erase + media-specific purge        |
+|            | (overwrite / block-erase / firmware-purge)        |
+| `destroy`  | physical destruction (shred, incinerate, melt)    |
 
-## Annex H — Versioning and Deprecation Policy
+Sanitisation events emit certificates that the storage
+operator preserves per regulator retention.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 Reproducibility
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+A storage configuration is `reproducible-strong` when
+the firmware versions, the policies, the QoS
+profiles, and the encryption envelopes are content-
+addressed; `weak` when any is absent.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §12 Privacy-aware storage
 
-## Annex I — Interoperability Profiles
+Where storage holds personal data, the protocol gates:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- DEK rotation on data-erasure (cryptographic erase)
+- per-object retention policy for legal hold
+- access-log retention
+- regulator-aligned retention budget
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Privacy events bind to the encryption-envelope record
+(PHASE 1 §7) so cryptographic erasure is auditable.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex A — Worked rebuild example (informative)
+
+A 16-drive scale-out NVMe array detects a single-drive
+failure. The scrub schedule recently confirmed the
+remaining drives clean. Rebuild initiates from
+parity-coded redundancy; rebuild bandwidth caps at
+200 MB/s on the affected node to preserve front-end
+performance. Rebuild completes in 11 hours; the
+audit chain records the fault, the rebuild progress,
+and the cleared-fault event.
+
+## Annex B — Conformance disclosure
+
+Implementations declare the audit-chain schema
+version, the JWS algorithm registry, the firmware-
+update governance protocol, the NIST SP 800-88
+sanitisation methods supported, and the QoS classes
+offered.
+
+## Annex C — Versioning
+
+Field additions are minor; semantic redefinition is
+major.
+
+## Annex D — Time-source declaration
+
+Audit-chain timestamps cite the time-source authority
+(NTP stratum-1, NIST, KASI, KRISS, PTB).
+
+## Annex E — Operator-credential binding
+
+| Credential                | Source                               |
+|---------------------------|--------------------------------------|
+| Storage admin             | sponsor + vendor certification        |
+| Cryptographic-key custodian| sponsor + KMS-controller policy       |
+| Firmware-update operator  | sponsor + vendor RMA/firmware policy  |
+| Forensic-hold custodian   | sponsor + legal department             |
+
+A signing event by an operator without an active
+credential rejects.
+
+## Annex F — Vendor RMA chain
+
+Hardware returns to the vendor for warranty / RMA
+handle:
+
+```
+fault-confirmed → media-sanitised → ship-prep →
+  shipped → vendor-received → replacement-staged →
+  installed → certified → fault-cleared
+```
+
+Sanitisation precedes shipment so customer data does
+not leave the sponsor's environment.
+
+## Annex G — Backup-and-DR protocol
+
+```
+schedule → snapshot-create → replicate-to-DR-site →
+  verify-on-DR → confirm-RPO-met → record
+```
+
+Backup snapshots are immutable for the retention
+window; restore-from-DR is a controlled procedure
+recorded in the audit chain. DR drills exercise the
+full chain at a sponsor-policy cadence (typically
+quarterly for critical workloads).
+
+## Annex H — Tiering decision protocol
+
+```
+access-pattern-observed → policy-evaluated →
+  cost-impact-modelled → tier-transition-decided →
+  data-moved → policy-completion-event
+```
+
+Per-object access counters feed the placement engine;
+per-policy decisions consult the cost-policy record
+(PHASE 1 Annex E) so tier-promotion / demotion
+balances performance against cost.
+
+## Annex I — Forensic-hold protocol
+
+```
+hold-requested → namespace-frozen → snapshot-taken →
+  forensic-export-prepared → exported-to-investigator →
+  hold-released-or-extended
+```
+
+Forensic holds preserve content via WORM-locking and
+record the legal authority issuing the hold (court
+order, regulator directive, internal investigation
+mandate).
+
+## Annex J — Performance-regression detection
+
+The protocol records per-operation performance
+distributions so a regression from baseline triggers
+a stewardship task:
+
+| Distribution               | Threshold                          |
+|----------------------------|------------------------------------|
+| p99 latency                | +20 % over baseline → warning;     |
+|                            | +50 % → critical                    |
+| Throughput                 | -15 % below baseline → warning;     |
+|                            | -30 % → critical                    |
+| Tail latency p99.99        | +50 % over baseline → critical      |
+| QoS-class adherence rate   | < 99 % over rolling window →        |
+|                            | warning                             |
+
+Regression events cite the suspect software / firmware
+version and the workload mix. Sponsor SREs review;
+remediation may include rollback, capacity addition,
+or workload-mix change.

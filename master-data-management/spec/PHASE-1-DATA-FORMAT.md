@@ -1,241 +1,272 @@
-# WIA-master-data-management PHASE 1 — DATA-FORMAT Specification
+# WIA-master-data-management PHASE 1 — Data Format Specification
 
 **Standard:** WIA-master-data-management
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-master-data-management (Master Data Management).
+This PHASE defines the canonical data format for an
+enterprise-grade master-data management (MDM) system
+covering party, product, location, asset, financial-
+account, and reference-data records, including their
+golden-record constructions, survivorship rules, change-
+history, stewardship workflow, hierarchies, and
+cross-domain bindings. The format aligns with the ISO
+8000 data-quality series, the DAMA-DMBOK reference,
+the ISO/IEC 11179 metadata-registry framework, and the
+GS1 identifier suites where party / product / location
+binding to commerce is in scope.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- ISO 8000-1 — Data quality, fundamental concepts
+- ISO 8000-110 — Master data: exchange of characteristic data
+- ISO 8000-115 — Master data: exchange of quality identifiers
+- ISO 8000-120 — Master data: exchange of provenance
+- ISO 8000-150 — Data quality management framework
+- ISO/IEC 11179-1 to 11179-7 — Metadata registries (MDR)
+- ISO/IEC 19763 — Information technology — Metamodel framework for interoperability
+- ISO 6166 — ISIN (securities)
+- ISO 4217 — currency code
+- ISO 3166 — country / region code
+- ISO 17442 — Legal Entity Identifier (LEI)
+- LEI ROC / GLEIF — Global LEI System
+- GS1 GTIN, GS1 GLN, GS1 SSCC, GS1 GS1-128, GS1 EPCIS / CBV
+- DUNS — D&B legal-entity directory
+- DAMA-DMBOK — Data Management Body of Knowledge (reference framework)
+- HL7 FHIR R5 — Patient, Practitioner, Organization, Location, Substance
+- W3C SKOS — Simple Knowledge Organization System (controlled vocabularies)
+- W3C SHACL — Shapes Constraint Language
+- IETF RFC 8259 (JSON), RFC 8785 (JCS), RFC 4122 (UUID), RFC 7515 (JWS), RFC 9530 (Content-Digest)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-master-data-management
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to enterprise systems that maintain
+authoritative records for parties (persons, legal
+entities, households), products and services, locations
+(physical, logical, jurisdictional), assets (financial,
+fixed, intellectual property), accounts (financial,
+relationship), and reference-data sets used across
+operational systems.
 
-## §2 Manifest
+In scope: party, product, location, asset, account,
+reference-data, golden-record, source-record,
+match-cluster, hierarchy, change-history, stewardship-
+task, lineage, and quality-rule records, plus the
+cross-references that bind master data to operational
+domains.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "master-data-management"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Out of scope: analytical aggregates that are not the
+authoritative source of master attributes (handled by
+data-warehouse standards) and operational-only data
+that does not survive a system retirement (handled by
+operational-domain standards).
 
-## §3 Conformance Tiers
+## §2 Party record
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `partyRef`           | UUID (RFC 4122) — opaque internal identifier    |
+| `partyKind`          | `person`, `legal-entity`, `household`,          |
+|                      | `government-body`, `legal-arrangement`          |
+| `legalName`          | for legal entities; with language tag (BCP 47)  |
+| `displayName`        | rendering string per locale                     |
+| `lei`                | ISO 17442 Legal Entity Identifier (where issued)|
+| `dunsNumber`         | D&B DUNS (where bound)                          |
+| `taxId`              | per-jurisdiction tax identifier                  |
+| `incorporationCountry`| ISO 3166-1 alpha-3                              |
+| `birthYear`          | for persons; year only                          |
+| `sex`                | ISO/IEC 5218 (where lawful and necessary)       |
+| `parentRef`          | parent legal entity (where relationship exists) |
+| `consentRef[]`       | active consents (privacy / contractual)         |
+| `goldenRecordRef`    | the surviving golden record this party links to |
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Product record
 
-## §4 Discovery
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `productRef`         | UUID                                            |
+| `gtin`               | GS1 GTIN-14 / -13 / -12 / -8                    |
+| `gpc`                | GS1 GPC brick / class / family / segment         |
+| `unspsc`             | UN Standard Products and Services Code           |
+| `manufacturerRef`    | party reference                                  |
+| `brandRef`           | party / brand reference                          |
+| `productName`        | localised label (BCP 47)                        |
+| `unitOfMeasure`      | UN/CEFACT REC 20 unit                           |
+| `dimensions`         | length / width / height / weight (with unit)    |
+| `materialComposition`| controlled list per applicable regulator        |
+| `packagingHierarchy` | each / inner-pack / case / pallet (GS1 GS1-128) |
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/master-data-management`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Location record
 
-## §5 Time and Identity
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `locationRef`        | UUID                                            |
+| `gln`                | GS1 GLN (where assigned)                        |
+| `kind`               | `physical-address`, `logical-site`, `route`,    |
+|                      | `jurisdictional-area`                           |
+| `addressLines`       | array of localised lines                        |
+| `country`            | ISO 3166-1 alpha-3                              |
+| `region`             | ISO 3166-2                                      |
+| `postalCode`         | per-country                                     |
+| `geo`                | OGC Simple Features point or polygon             |
+| `parentLocationRef`  | hierarchy parent (e.g. floor → building → site) |
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 Asset record
 
-## §6 Versioning and Deprecation
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `assetRef`           | UUID                                            |
+| `kind`               | `financial-instrument`, `fixed-asset`,          |
+|                      | `intangible`, `inventory`, `real-property`      |
+| `isin`               | ISO 6166 (financial instruments)                |
+| `cusip`              | CUSIP (where applicable)                        |
+| `figi`               | OpenFIGI (where applicable)                     |
+| `categoryCode`       | per applicable taxonomy                         |
+| `acquisitionDate`    | ISO 8601                                        |
+| `valuationCurrency`  | ISO 4217                                        |
+| `custodianRef`       | party reference                                  |
+| `lifecycleStatus`    | `acquired`, `in-service`, `retired`, `disposed` |
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 Account record
 
-## §7 Privacy and Security
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `accountRef`         | UUID                                            |
+| `kind`               | `customer`, `supplier`, `employee`, `partner`,  |
+|                      | `bank`, `general-ledger`                        |
+| `partyRef`           | counterparty                                    |
+| `accountNumber`      | per-domain account identifier                   |
+| `currency`           | ISO 4217 (where applicable)                     |
+| `legalAgreementRef`  | governing agreement                             |
+| `lifecycleStatus`    | `prospect`, `active`, `dormant`, `closed`       |
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 Reference-data record
 
-## §8 Open Governance
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `referenceSetRef`    | UUID                                            |
+| `code`               | controlled-vocabulary code                       |
+| `term`               | localised label                                 |
+| `taxonomyUri`        | URI of the issuing authority (ISO, GS1, IETF,   |
+|                      | sponsor, regulator)                             |
+| `version`            | release identifier                              |
+| `status`             | `active`, `deprecated`, `retired`               |
+| `mappings`           | cross-walk to other taxonomies (SKOS exact /    |
+|                      | close / broad / narrow / related match)         |
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `master-data-management` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §8 Golden record and source-record records
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `goldenRecordRef`    | UUID                                            |
+| `domain`             | party / product / location / asset / account    |
+| `survivedAttributes` | per-attribute trust score + source provenance   |
+| `clusterRef`         | match-cluster reference                         |
+| `qualityScore`       | per ISO 8000-150 quality dimensions             |
+| `effectiveFrom`      | ISO 8601                                        |
+| `effectiveTo`        | ISO 8601 (open if current)                      |
 
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `sourceRecordRef`    | UUID                                            |
+| `sourceSystemRef`    | upstream operational system identifier          |
+| `sourceKey`          | upstream natural key                            |
+| `payload`            | as-received payload                             |
+| `ingestTime`         | ISO 8601                                        |
+| `lineageRef[]`       | upstream lineage edges                          |
+| `goldenRecordRef`    | the golden record this source contributes to   |
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+## §9 Match-cluster record
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `clusterRef`         | UUID                                            |
+| `matchAlgorithm`     | algorithm + version (deterministic, probabilistic|
+|                      | per Fellegi–Sunter / ML)                       |
+| `pairs`              | per-pair match probability + features           |
+| `decisionThreshold`  | high (auto-merge) / mid (steward-review) /      |
+|                      | low (no-merge)                                  |
+| `stewardActions[]`   | merge / split / re-cluster / hold                |
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §10 Hierarchy record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `hierarchyRef`       | UUID                                            |
+| `kind`               | `legal-entity-tree`, `cost-centre`,              |
+|                      | `sales-territory`, `product-category`,           |
+|                      | `general-ledger`, `regulatory-reporting`         |
+| `version`            | release identifier (effective-dated)             |
+| `nodes`              | per-node parent / child / depth / weight         |
+| `effectiveFrom`      | ISO 8601                                        |
+| `effectiveTo`        | ISO 8601 (open if current)                      |
 
-## Annex F — Adoption Roadmap
+## §11 Change-history record
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Every mutation to a master record emits a change-
+history entry capturing the actor, the timestamp, the
+delta, the reason code, and the JWS signature over the
+canonical payload (RFC 7515 / RFC 8785). The chain is
+per-record and per-domain so reconstruction is
+deterministic.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §12 Stewardship-task record
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `taskRef`            | UUID                                            |
+| `kind`               | `dedup-review`, `quality-fix`, `survivorship-   |
+|                      | exception`, `hierarchy-review`, `provenance-    |
+|                      | dispute`                                        |
+| `priority`           | low / medium / high / critical                   |
+| `assigneeRef`        | data-steward identity                           |
+| `slaDeadline`        | ISO 8601                                        |
+| `status`             | open / in-progress / resolved / abandoned        |
+| `resolution`         | per-resolution rationale                        |
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §13 Quality-rule record
 
-## Annex G — Test Vectors and Conformance Evidence
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `ruleRef`            | UUID                                            |
+| `ruleExpression`     | SHACL shape, JSON-Schema, regex, SQL, or DSL    |
+| `dimension`          | ISO 8000-150 dimension (completeness, accuracy, |
+|                      | timeliness, consistency, uniqueness, validity)  |
+| `severity`           | informational / warning / error / critical      |
+| `coverage`           | per-domain selector                              |
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §14 Cross-domain references (informative)
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- WIA-data-governance — for stewardship-policy linkage
+- WIA-data-lineage — for cross-system lineage edges
+- WIA-data-quality — for monitoring of quality scores
+- WIA-data-catalog — for cataloging of master domains
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+## Annex A — Worked golden party (informative)
 
-## Annex H — Versioning and Deprecation Policy
+```json
+{
+  "goldenRecordRef": "gr-party-2026-04-12-001",
+  "domain": "party",
+  "survivedAttributes": {
+    "legalName": {"value":"Acme Inc.","source":"sap-erp","trust":0.94},
+    "lei":       {"value":"5493001RKR55V4X61F71","source":"gleif","trust":1.0},
+    "incorporationCountry":{"value":"USA","source":"sec-edgar","trust":0.98}
+  },
+  "qualityScore": {"completeness":0.96,"accuracy":0.97,"uniqueness":1.0}
+}
+```
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## Annex B — Conformance disclosure
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Implementations declare the JSON-Schema URIs they
+serve, the SHACL shape catalogue version, the
+canonicalisation form (RFC 8785), and the reference-
+data taxonomy versions indexed.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## Annex C — Versioning
 
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Field additions are minor; semantic redefinition or
+removal is major.

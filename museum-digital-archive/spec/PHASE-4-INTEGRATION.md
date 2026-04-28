@@ -1,241 +1,286 @@
-# WIA-museum-digital-archive PHASE 4 — INTEGRATION Specification
+# WIA-museum-digital-archive PHASE 4 — Integration Specification
 
 **Standard:** WIA-museum-digital-archive
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-museum-digital-archive (Museum Digital Archive).
+This PHASE specifies how WIA-museum-digital-archive
+integrates with adjacent cultural-heritage, scholarly-
+publication, public-discovery, and preservation
+systems: Europeana and national aggregators, Linked
+Art and Linked-Data communities, Wikidata / Wikibase,
+Getty vocabularies (AAT / TGN / ULAN / IA),
+Iconclass, scholarly catalogues raisonnés, the IIIF
+ecosystem, ResourceSync harvesters, OAIS-conformant
+trustworthy-digital-repositories, ICOM Red Lists,
+sponsored / community trust frameworks, and downstream
+analytics consumers. It also specifies the operational
+binding to companion WIA standards.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- Europeana Data Model (EDM) 5.2.8; Europeana Publishing Framework
+- Linked Art (community spec); CIDOC-CRM (ISO 21127)
+- Wikidata data model; Wikibase REST API
+- Getty Research Institute vocabularies — AAT, TGN, ULAN, CONA
+- Iconclass — iconographic classification system
+- IIIF Image / Presentation / Auth / Search APIs
+- ResourceSync (NISO Z39.99-2017)
+- ISO 14721 (OAIS) — Open Archival Information System
+- ISO 16363 — Trustworthy Digital Repositories
+- ICOM Red Lists; ICOM Code of Ethics
+- UNESCO 1970 Convention; UNIDROIT 1995 Convention
+- Local Contexts — TK / BC labels and notices
+- IETF RFC 9110 (HTTP), RFC 7515 (JWS), RFC 8259 (JSON), RFC 8785 (JCS)
 
 ---
 
-## §1 Scope
+## §1 Europeana / national aggregator integration
 
-This PHASE document is one of four that together define the WIA-museum-digital-archive
-standard. It addresses the integration layer of the standard.
+| Aggregator              | Profile                                       |
+|-------------------------|-----------------------------------------------|
+| Europeana               | EDM 5.2.8 + Publishing Framework               |
+| National aggregator (DE)| Deutsche Digitale Bibliothek (DDB)             |
+| National aggregator (FR)| API Pop / Joconde                              |
+| National aggregator (UK)| Art UK                                         |
+| National aggregator (KR)| Cultural Heritage Administration / e-Museum    |
+| National aggregator (NL)| Netwerk Digitaal Erfgoed (NDE)                 |
+| National aggregator (US)| DPLA (Digital Public Library of America)        |
 
-## §2 Manifest
+Aggregator submission uses the institution's chosen
+metadata profile; LIDO and EDM are the most common.
+Submissions emit ResourceSync change-list updates so
+aggregators see incremental changes without polling.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "museum-digital-archive"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Linked-data and Wikidata integration
 
-## §3 Conformance Tiers
+| Target                | Binding                                          |
+|-----------------------|--------------------------------------------------|
+| Wikidata              | object QID + statements with property mapping    |
+| Linked Art bridge     | Linked Art JSON-LD per Linked Art profile        |
+| Linked Open Data Cloud | RDF endpoint at the institution                  |
+| GLAM / Art Linked-Data| federated query via SPARQL                       |
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Wikidata integration honours community editorial
+practices; the institution may publish authoritative
+statements via OpenRefine or the Wikidata API.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Getty Vocabularies and Iconclass integration
 
-## §4 Discovery
+| Authority           | Use                                                |
+|---------------------|----------------------------------------------------|
+| Getty AAT           | concept terms (object types, materials, styles)    |
+| Getty TGN           | place names                                        |
+| Getty ULAN          | actor names                                        |
+| Getty CONA          | cultural-object names                              |
+| Iconclass           | iconographic subjects                               |
+| LCSH / FAST         | subject vocabulary (Library of Congress)            |
+| VIAF                | actor-name authority                               |
+| ISNI                | actor-name authority                               |
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/museum-digital-archive`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Authority bindings emit re-mapping events on
+authority releases; the WIA record cites the
+authority release identifier in force at the binding
+time.
 
-## §5 Time and Identity
+## §4 IIIF ecosystem integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+| Component / consumer  | Profile                                         |
+|-----------------------|-------------------------------------------------|
+| IIIF Image API 3.0    | image-tile and region serving                   |
+| IIIF Presentation 3.0 | manifest-driven viewers (Mirador, Universal     |
+|                       | Viewer, Clover, etc.)                            |
+| IIIF Auth 2.0         | restricted-imagery access tiers                 |
+| IIIF Search 1.0       | search within annotation                        |
+| IIIF Change Discovery | OAI-PMH / ResourceSync alignment                |
 
-## §6 Versioning and Deprecation
+IIIF manifests sign with the institution's key so
+downstream viewers see authentic manifests.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 OAIS-conformant repository integration
 
-## §7 Privacy and Security
+| Target                | Profile                                         |
+|-----------------------|-------------------------------------------------|
+| Trustworthy digital   | ISO 16363 audit                                 |
+| repository (TDR)      |                                                 |
+| Geographic redundancy | replicate AIPs across geographic regions        |
+| Peer-network          | replication to peer institutions                 |
+| Cloud storage         | content-addressed object store                   |
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The implementation submits AIPs to the TDR per OAIS
+SIP / AIP / DIP; the TDR returns an archival
+identifier that the WIA record stores as
+`preservationRef`.
 
-## §8 Open Governance
+## §6 ICOM Red List and law-enforcement integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `museum-digital-archive` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+new accession → ICOM Red List screen → match-found? →
+                                          │
+                                          ├─ yes → law-enforcement
+                                          │         notice + accession hold
+                                          └─ no → proceed to committee review
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+The institution maintains liaison with applicable
+law-enforcement bodies (Interpol Stolen Works of Art
+database, FBI Art Crime Team, Carabinieri TPC,
+national equivalents). Suspicious matches emit a
+restricted-access event on the audit chain pending
+investigation.
 
+## §7 Indigenous-community engagement
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+Where the institution holds material connected to
+indigenous or community-of-origin contexts:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+```
+identification → community-engagement →
+  consultation-events → community-recommendations →
+  classification-update / restitution-pathway
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The Local Contexts label / notice taxonomy publishes
+on the relevant object's rights record; the
+recommendations bind to the access-tier policy.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 Cross-domain WIA bindings
 
-## Annex F — Adoption Roadmap
+| Companion standard          | Binding purpose                                |
+|-----------------------------|------------------------------------------------|
+| WIA-cultural-heritage-      | source-imaging pipeline                         |
+| digitization                |                                                |
+| WIA-cultural-exchange-data  | cross-border lending / exhibition exchange     |
+| WIA-translation-data        | multilingual-label MT pipeline                 |
+| WIA-digital-time-capsule    | long-term preservation                         |
+| WIA-content-ai              | AI-generated descriptive metadata governance   |
+| WIA-data-portability        | metadata export to community repositories      |
+| WIA-master-data-management  | actor / place / concept master                 |
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Each binding identifies the consumed PHASE.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §9 Long-term archival
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+| Authority / context       | Retention                                  |
+|---------------------------|--------------------------------------------|
+| OAIS-conformant TDR       | indefinite (per OAIS designated-community  |
+|                           | preservation policy)                        |
+| Conservation records      | indefinite                                  |
+| Loan / exhibition records | minimum institution-policy retention        |
+| Provenance records        | indefinite                                  |
+| Sensitive imagery         | per community-consent withdrawal            |
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Personal data of donors, lenders, conservators is
+retained per applicable privacy law and contractual
+terms.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §10 Conformance test suite
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+The reference test suite covers:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- LIDO 1.1 round-trip on a representative object
+- Linked Art JSON-LD validation
+- IIIF Image API 3.0 region request
+- IIIF Presentation 3.0 manifest validation
+- IIIF Auth 2.0 probe service for a restricted item
+- OAI-PMH harvest of a metadata-prefix
+- ResourceSync change-list discovery
+- PREMIS fixity-check failure → preservation-event
+- LCSH / Getty AAT authority binding
+- ICOM Red List screening on a synthetic accession
+- restitution event recorded as provenance E10 Transfer-of-Custody
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §11 Internationalisation
 
-## Annex H — Versioning and Deprecation Policy
+Object descriptive labels and exhibition narratives
+carry BCP 47 language tags; institution metadata is
+exposed in the institution's primary language with
+public-API fallback to a configured default. Public
+APIs honour `Accept-Language`.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Security and privacy posture
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+- Transport: TLS 1.3 with mutual TLS for sensitive
+  exchanges (loan documentation, restitution records)
+- Authentication: OAuth 2 with PKCE for staff; IIIF
+  Auth 2.0 for restricted-imagery access
+- At-rest: AES-256-GCM with sponsor-controlled KMS;
+  per-collection key wrapping
+- Audit: tamper-evident chain (PHASE 3 §10) exportable
+  per ISO/IEC 27037 forensic-evidence guidance
+- Privacy: lender / donor / conservator records
+  retained under contractual and privacy-law
+  obligations; community-consent restrictions honoured
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Operational metrics
 
-## Annex I — Interoperability Profiles
+Sponsors / institutions report (informationally) on
+the WIA registry:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- objects published vs. catalogued vs. accessioned
+- provenance-gap rate
+- conservation-task throughput
+- IIIF traffic (pages / unique objects)
+- preservation-fixity-failure rate
+- restitution claims (open / resolved)
+- loan throughput
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §14 Recovery and continuity
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- API outage — public IIIF endpoints remain available
+  via CDN cache; write endpoints retry on reconnect
+- TDR outage — local SIP queue holds pending
+  ingestion; replays on recovery
+- aggregator outage — ResourceSync change-list buffers
+  until aggregator returns
+- KMS outage — sealed back-up keys per sponsor's BCP
+
+## Annex A — Worked end-to-end example (informative)
+
+A regional museum digitises a collection of 4,800
+ethnographic objects. Capture follows the institution's
+SOP; surrogates produce IIIF manifests. Descriptive
+metadata authors in LIDO and Linked Art; authority
+bindings link to Getty AAT and ULAN. Sensitive items
+receive Local Contexts BC and TK labels through
+community engagement. The institution submits to
+Europeana via EDM mapping; ResourceSync change-list
+keeps Europeana current. Two objects identified on the
+ICOM Red List for the region trigger law-enforcement
+notification; one is subsequently restituted, the
+other moves to community-only access. The
+preservation cycle runs weekly fixity checks on
+critical originals and quarterly on standard.
+
+## Annex B — Conformance disclosure
+
+Implementations declare the EDM mapping version, the
+LIDO / Linked Art / CIDOC-CRM versions served, the
+IIIF profiles, the OAI-PMH metadata prefixes, the
+authority bindings (Getty / Iconclass / Wikidata /
+LCSH), and the OAIS / ISO 16363 certification status.
+Disclosure is machine-readable at `/.well-known/wia-
+mu-conformance.json`.
+
+## Annex C — Versioning
+
+Adding a new authority binding is minor; changing
+the canonical metadata profile is major.
+
+## Annex D — Provenance research data sources
+
+| Source                        | Use                                  |
+|-------------------------------|--------------------------------------|
+| Getty Provenance Index        | sales catalogues, dealer stock, etc. |
+| Art Loss Register             | stolen-art due-diligence              |
+| Interpol Stolen Works of Art  | law-enforcement diligence             |
+| FBI National Stolen Art File  | US-context diligence                  |
+| Carabinieri TPC database      | Italian-context diligence             |
+| German Lost Art Foundation    | Nazi-era due-diligence                |
+| Holocaust-era Looted Art      | per institution                      |
+| commissions                   |                                      |
+
+Provenance research events bind the consulted source
+and the search outcome (positive / negative / further
+inquiry); negative outcomes do not by themselves clear
+title but record diligence.

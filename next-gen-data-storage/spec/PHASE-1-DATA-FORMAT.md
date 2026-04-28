@@ -1,241 +1,275 @@
-# WIA-next-gen-data-storage PHASE 1 — DATA-FORMAT Specification
+# WIA-next-gen-data-storage PHASE 1 — Data Format Specification
 
 **Standard:** WIA-next-gen-data-storage
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-next-gen-data-storage (Next Gen Data Storage).
+This PHASE defines the canonical data format for next-
+generation storage systems covering NVMe over Fabrics
+(NVMe-oF), Storage-Class Memory (SCM), Compute Express
+Link memory expansion (CXL.mem), Zoned Namespace SSDs
+(ZNS), DNA / synthetic-polymer archival storage,
+holographic and optical-disc storage, S3-compatible
+object stores, and OCI-distribution image registries.
+Records describe storage capacity, namespace topology,
+write / read performance, durability budgets, fault
+domains, encryption-at-rest envelopes, content-addressed
+artefact catalogues, and the cross-references binding
+storage tiers to higher-level data services.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- SNIA SMI-S 1.8 — Storage Management Initiative Specification
+- SNIA Swordfish (DMTF Redfish-aligned storage extension) 1.2.6
+- DMTF Redfish 2024.x
+- NVM Express Base Specification 2.0; NVMe over Fabrics 1.1
+- NVMe ZNS (TP 4053a) — Zoned Namespace Command Set
+- NVMe-MI (Management Interface) 1.2
+- SNIA Persistent Memory Specification 1.0; SNIA NVM Programming Model 1.2
+- CXL Specification 3.1 (Compute Express Link)
+- IEEE 11073-10101 (medical device nomenclature; where storage binds clinical use)
+- ISO/IEC JTC 1 SC 23 — Digital Recording Media (optical / DNA storage)
+- AES-256-GCM (NIST FIPS 197 + SP 800-38D); ESSIV; XTS-AES per IEEE 1619-2018
+- AWS S3 API (de-facto industry); S3 Multi-Region Access Points (informative)
+- OCI Distribution Specification 1.1 / OCI Image Specification 1.1
+- IETF RFC 8259 (JSON), RFC 8785 (JCS), RFC 4122 (UUID), RFC 7515 (JWS), RFC 9530 (Content-Digest)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-next-gen-data-storage
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to storage systems serving primary
+workload (block / file / object), data-intensive
+analytics (data lakehouse), AI/ML training and serving
+(GPU-attached storage), edge / archival workloads, and
+emerging substrates (DNA / polymer storage, holographic).
 
-## §2 Manifest
+In scope: storage-domain record, namespace record,
+volume / file-system / bucket record, performance
+profile record, durability / availability record,
+encryption-envelope record, replication-topology
+record, content-addressed artefact catalogue, and
+storage-tier classification. Out of scope: per-
+application schema (handled by domain standards) and
+sponsor-internal storage tooling implementation
+(handled by vendor product specifications).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "next-gen-data-storage"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Storage-domain record
 
-## §3 Conformance Tiers
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `domainRef`          | UUID (RFC 4122)                                 |
+| `topology`           | `single-controller`, `dual-controller`,         |
+|                      | `scale-out`, `disaggregated`, `cxl-pod`,        |
+|                      | `composable`                                     |
+| `mediaProfile`       | NAND TLC / QLC / PLC; SCM (3D-XPoint, MRAM,     |
+|                      | ReRAM); SLC-cache; HDD; tape; DNA / polymer;    |
+|                      | holographic; optical-disc                        |
+| `interconnect`       | NVMe-oF (RDMA / TCP), CXL.mem, FC, iSCSI,       |
+|                      | InfiniBand, Ethernet                             |
+| `mgmtProtocol`       | SMI-S / Swordfish / Redfish / S3                  |
+| `vendorRef`          | manufacturer + product + firmware version        |
+| `installedAt`        | ISO 8601                                        |
+| `lifecycleStatus`    | `commissioning`, `production`, `degraded`,      |
+|                      | `retiring`                                       |
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Namespace record
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `namespaceRef`       | UUID                                            |
+| `domainRef`          | §2                                              |
+| `namespaceKind`      | `nvme-namespace`, `zns-namespace`,               |
+|                      | `s3-bucket`, `oci-repository`, `pmem-region`,    |
+|                      | `cxl-region`, `tape-pool`, `dna-pool`            |
+| `capacityBytes`      | numeric                                          |
+| `lbaSize`            | for block: 512 / 4096 / 8192                     |
+| `accessMode`         | read-only / read-write / write-once-read-many    |
+|                      | (WORM)                                            |
+| `featureSet`         | per-namespace feature flags (e.g. NVMe          |
+|                      | NVMe-Set, write-zeroes, copy-namespace)          |
+| `endurancePlan`      | terabytes-written budget over service life       |
 
-## §4 Discovery
+## §4 Volume / file-system / bucket record
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/next-gen-data-storage`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `volumeRef`          | UUID                                            |
+| `namespaceRef`       | §3                                              |
+| `kind`               | `block-volume`, `file-system`, `object-bucket`, |
+|                      | `oci-repo`, `kv-store`, `archive-collection`     |
+| `mountPath`          | for filesystem-style consumers                   |
+| `capacityBytes`      | provisioned                                      |
+| `usedBytes`          | current consumption                              |
+| `quota`              | hard / soft quota per consumer                   |
+| `versioning`         | enabled / disabled (object stores)              |
+| `objectLockMode`     | per-bucket lock mode (S3 Object Lock,           |
+|                      | governance / compliance)                         |
 
-## §5 Time and Identity
+## §5 Performance-profile record
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `performanceRef`     | UUID                                            |
+| `namespaceRef`       | §3                                              |
+| `iopsTarget`         | rated IOPS per IO block size                     |
+| `throughputTarget`   | bytes per second per direction                   |
+| `latencyTarget`      | per-percentile (p50 / p99 / p99.9 / p99.99)      |
+| `qosClass`           | `tier-0`, `tier-1`, `tier-2`, `tier-archive`     |
+| `bandwidthLimit`     | per-consumer bandwidth cap                       |
+| `iopsLimit`          | per-consumer IOPS cap                            |
 
-## §6 Versioning and Deprecation
+Performance profiles bind to QoS controllers for fair-
+share enforcement.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 Durability / availability record
 
-## §7 Privacy and Security
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `durabilityRef`      | UUID                                            |
+| `namespaceRef`       | §3                                              |
+| `replicaCount`       | per-replica-mode integer (e.g. 3 for RF3)        |
+| `replicaTopology`    | `same-node`, `same-rack`, `same-zone`,           |
+|                      | `multi-zone`, `multi-region`, `multi-continent`  |
+| `parityScheme`       | `none`, `RAID-1`, `RAID-5`, `RAID-6`,            |
+|                      | `RAID-Z`, `erasure-coding-{k,m}`                  |
+| `targetDurabilityNines`| informative target (e.g. 11 nines)              |
+| `targetAvailabilityNines`| informative target (e.g. 4 nines)              |
+| `faultDomainTopology`| explicit JSON tree of failure domains            |
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 Encryption-envelope record
 
-## §8 Open Governance
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `envelopeRef`        | UUID                                            |
+| `namespaceRef`       | §3                                              |
+| `kekRef`             | KMS key-encryption-key reference                 |
+| `dekScheme`          | per-volume DEK / per-extent DEK / per-object DEK|
+| `cipher`             | AES-256-GCM (NIST FIPS 197) / XTS-AES (IEEE     |
+|                      | 1619-2018) / ChaCha20-Poly1305 (RFC 8439)       |
+| `tweakScheme`        | for XTS: ESSIV / sequential                      |
+| `wrapAlgorithm`      | NIST KW / KWP / GCM-KW                           |
+| `rotationPolicyRef`  | rotation policy reference                        |
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `next-gen-data-storage` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Envelope bindings are sponsor-controlled; the
+implementation never stores plaintext DEKs at rest.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §8 Replication-topology record
 
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `topologyRef`        | UUID                                            |
+| `mode`               | `synchronous`, `asynchronous`, `quorum`,         |
+|                      | `chain-replication`, `paxos`                     |
+| `members[]`          | participating namespace references               |
+| `consistency`        | `strong`, `bounded-staleness`, `prefix`,         |
+|                      | `eventual`                                       |
+| `recoveryPointObjective`| RPO seconds                                     |
+| `recoveryTimeObjective`| RTO seconds                                     |
+| `splitBrainPolicy`   | quorum policy on partition                       |
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+## §9 Content-addressed artefact catalogue
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+For object / OCI / archive workloads:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `artefactRef`        | UUID                                            |
+| `digestAlgorithm`    | SHA-256 / BLAKE3 / SHA-512                       |
+| `digest`             | hex-encoded                                     |
+| `byteSize`           | numeric                                         |
+| `mimeType`           | per IANA registry                                |
+| `mediaTypeOci`       | per OCI Image / Distribution media types         |
+| `metadata`           | per-artefact metadata (JSON / OCI manifest)      |
+| `licenceRef`         | SPDX licence identifier                          |
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §10 Storage-tier classification
 
-## Annex F — Adoption Roadmap
+| Tier label           | Characteristics                                 |
+|----------------------|-------------------------------------------------|
+| `pmem-tier`          | persistent-memory; ns-latency; CXL.mem profile   |
+| `nvme-tier-0`        | NVMe SSD; <100 µs p99 read                       |
+| `nvme-tier-1`        | NVMe SSD; <500 µs p99 read                       |
+| `cap-disk`           | high-capacity HDD                               |
+| `tape-archive`       | LTO-9 / LTO-10                                   |
+| `optical-archive`    | optical disc, MO, holographic                    |
+| `dna-archive`        | DNA / polymer; cold; very high density           |
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Tier classification is sponsor-policy; per-tier
+performance / durability / cost characteristics are
+recorded so a placement engine can assign workload to
+tier.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §11 Cross-domain references (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+- WIA-data-warehouse — for analytical-tier consumption
+- WIA-data-lake — for object-tier ingestion
+- WIA-edge-ai — for tiered model serving
+- WIA-quantum — for post-quantum key management
+- WIA-data-encryption — for DEK / KEK lifecycle
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## Annex A — Worked CXL.mem region (informative)
 
-## Annex G — Test Vectors and Conformance Evidence
+```json
+{
+  "namespaceRef": "ns-cxl-pod-A-region-1",
+  "namespaceKind": "cxl-region",
+  "capacityBytes": 274877906944,
+  "performanceRef": "perf-cxl-region-1-100ns-p99"
+}
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## Annex B — Conformance disclosure
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Implementations declare the management protocols
+served (SMI-S, Swordfish, Redfish, S3, NVMe-MI, OCI
+Distribution), the encryption ciphers supported, the
+durability tiers offered, the OCI media types
+honoured, and the CXL revision implemented.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+## Annex C — Versioning
 
-## Annex H — Versioning and Deprecation Policy
+Field additions are minor; semantic redefinition is
+major.
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## Annex D — Data placement-policy record
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `placementRef`       | UUID                                            |
+| `policyKind`         | `tier-by-access`, `tier-by-age`, `tier-by-      |
+|                      | classification`, `tier-by-cost`, `manual`        |
+| `triggerThresholds`  | per-rule trigger (e.g. last-access > 30 days)    |
+| `actionMatrix`       | rule → tier transition map                       |
+| `auditCadence`       | how often the policy re-runs                     |
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Placement events emit on the audit chain so an
+operator sees what moved when, why, and to where.
 
-## Annex I — Interoperability Profiles
+## Annex E — Storage-cost policy record
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+| Field                | Source / Binding                                |
+|----------------------|-------------------------------------------------|
+| `costPolicyRef`      | UUID                                            |
+| `tierCostBps`        | per-tier basis-points cost per byte-month        |
+| `egressCostBps`      | egress-cost per byte where applicable            |
+| `breakevenAnalysis`  | tier-promotion breakeven cadence                 |
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Cost policies feed the placement engine so a tier
+promotion / demotion decision balances performance
+vs. cost.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex F — Backwards-compatibility commitments
+
+The data format honours:
+
+- legacy LBA sizes (512 / 4096) for new namespaces on
+  vendor product lines that still ship 512-LBA-only
+  drives
+- S3 v2 signature for legacy clients (deprecated; new
+  clients use SigV4)
+- OCI Image Specification 1.0 for clients that have
+  not migrated to 1.1
+
+Deprecation notices publish on the implementation's
+public deprecation page.

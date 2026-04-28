@@ -1,241 +1,309 @@
-# WIA-micro-lending PHASE 3 — PROTOCOL Specification
+# WIA-micro-lending PHASE 3 — Protocol Specification
 
 **Standard:** WIA-micro-lending
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-micro-lending (Micro Lending).
+This PHASE defines the operational protocols binding
+records and API resources into auditable lifecycles:
+customer onboarding (KYC / CDD), product / disclosure
+lifecycle, application-decisioning workflow, group-
+loan operating rhythm, disbursement and repayment
+flows, restructuring decision discipline, write-off
+governance, regulatory reporting cadence, customer-
+protection enforcement, and the audit-event chain. The
+protocols are designed so a central-bank examiner, an
+FIU compliance officer, an IFC investor's E&S audit,
+or an external SPI4 social-performance audit can
+reconstruct any account from the event log.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- BIS — Basel Core Principles for Effective Banking Supervision
+- BIS — Microfinance activities and the Core Principles
+- FATF Recommendations (most recent revision)
+- FATF Recommendation 16 — wire transfers
+- ITU-T X.1216 — security framework for digital financial services
+- IASB IFRS 9 — Financial Instruments (impairment)
+- US Reg E (12 CFR 1005), Reg Z (12 CFR 1026)
+- EU PSD2 (2015/2366); EU PSD3 (current)
+- SPI4 (CERISE+SPTF) — Universal Standards
+- Client Protection Pathway (CPP) — customer protection principles
+- ISO/IEC 27037 — digital evidence preservation
+- IETF RFC 5424 (Syslog), RFC 7515 (JWS), RFC 8785 (JCS)
 
 ---
 
-## §1 Scope
+## §1 Customer onboarding (KYC / CDD)
 
-This PHASE document is one of four that together define the WIA-micro-lending
-standard. It addresses the protocol layer of the standard.
+```
+draft → identity-collected → screened → verified → enrolled → active
+                                  │
+                                  └→ rejected → re-attempt | refused
+```
 
-## §2 Manifest
+CDD per FATF Recommendation 10 captures: name, date of
+birth, residential address, nationality, occupation,
+identity-document evidence, and (where applicable)
+source of funds. Enhanced Due Diligence (Recommendation
+12) applies to PEPs. Simplified Due Diligence is
+permitted only on regulator-approved low-risk profiles.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "micro-lending"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Product / disclosure lifecycle
 
-## §3 Conformance Tiers
+```
+product-draft → product-approved → product-active → product-superseded
+                                       │
+                                       └→ disclosure-published →
+                                          customer-acceptance →
+                                          loan-eligible-on-product
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Disclosure templates regenerate on price / fee /
+schedule changes; outstanding loans operate on the
+disclosure they consented to.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Application-decisioning
 
-## §4 Discovery
+```
+intake → screened → scored → decided → notified
+              │            │
+              └→ blocked    └→ referred → manual review
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/micro-lending`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Application decisions follow a four-eyes principle
+where the credit limit exceeds the auto-approve
+threshold; approval requires a different operator
+than the originator.
 
-## §5 Time and Identity
+## §4 Group-loan operating rhythm
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+| Step                     | Cadence                                      |
+|--------------------------|----------------------------------------------|
+| Group meeting            | weekly / fortnightly per group constitution  |
+| Repayment collection     | at meeting                                   |
+| Savings deposit          | at meeting                                   |
+| New-loan approval        | at meeting                                   |
+| Default escalation       | at meeting + escalation per policy           |
 
-## §6 Versioning and Deprecation
+The protocol records meeting attendance; missing the
+meeting more than the policy threshold triggers a
+group-level intervention before an individual default
+is recorded.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Credit-scoring governance
 
-## §7 Privacy and Security
+| Concern                  | Contract                                       |
+|--------------------------|------------------------------------------------|
+| Model identity           | semantic version + container digest pinned     |
+| Explainability           | per-feature contribution exposed where bound   |
+| Bias monitoring          | demographic-parity / equal-opportunity         |
+|                          | metrics computed on a hold-out                 |
+| Drift                    | per-week feature-distribution comparison       |
+| Approval rate disparities | reported to the model-governance committee     |
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+A model release without bias-monitoring evidence
+cannot move to production.
 
-## §8 Open Governance
+## §6 Disbursement and repayment flows
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `micro-lending` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+disbursement: instructed → rail-accepted → rail-settled → ledger-posted
+                                  │
+                                  └→ rail-rejected → cancelled
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+repayment:    received → rail-acknowledged → ledger-posted →
+                allocated (principal / interest / fees / late-fee)
+```
 
+ISO 20022 message identifiers map to disbursement /
+repayment events. Ledger postings reconcile end-of-day
+against rail-operator statements; mismatches raise
+stewardship tasks.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §7 Restructuring decision discipline
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+| Trigger                        | Decision protocol                       |
+|--------------------------------|-----------------------------------------|
+| 30-day arrears                 | field-officer follow-up; counsel        |
+| 60-day arrears                 | branch-manager review; restructuring    |
+|                                | proposal optional                        |
+| 90-day arrears                 | restructuring committee; IFRS 9 stage    |
+|                                | 2 / 3 classification review              |
+| Customer-initiated hardship    | hardship-letter + supporting evidence    |
+| Force-majeure (regulator-      | regulator-issued moratorium honoured     |
+| declared event)                | per directive                           |
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Restructuring decisions sign with the approving
+authority's key; restructuring inflates Stage 2 / 3
+provisions per IFRS 9 ECL.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 Write-off governance
 
-## Annex F — Adoption Roadmap
+```
+proposed → reviewed (committee) → approved → posted → recovered (optional)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Write-off does not extinguish the customer's
+obligation; recovery efforts continue per the
+sponsor's collections policy and applicable consumer-
+protection rules. Write-off events emit IFRS 9 Stage 3
+recognition and feed the regulatory PAR report.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §9 Regulatory reporting cadence
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+| Report                       | Cadence              | Authority         |
+|------------------------------|----------------------|-------------------|
+| PAR aging                    | monthly              | central bank       |
+| Large-exposure               | monthly / quarterly  | central bank       |
+| Suspicious-transaction (STR) | event-driven         | FIU                |
+| Cash-transaction (CTR)       | over threshold       | FIU                |
+| Consumer-protection metrics  | annually              | consumer regulator |
+| Social-performance           | annually              | sponsor / investor|
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Submissions sign with the implementation's key and
+record the regulator-gateway acknowledgement
+identifier.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §10 Customer-protection enforcement
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+The protocol enforces the Client Protection Pathway
+principles:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+1. appropriate product design and delivery
+2. prevention of over-indebtedness
+3. transparency
+4. responsible pricing
+5. fair and respectful treatment
+6. privacy of client data
+7. mechanism for complaint resolution
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+Per-loan protocol gates:
 
-## Annex H — Versioning and Deprecation Policy
+- pre-disbursement disclosure with localised APR
+- over-indebtedness check (debt-to-income, repayment
+  capacity)
+- responsible pricing (effective APR within band per
+  product version)
+- collections-conduct policy (no harassment; permitted
+  hours; permitted contacts)
+- complaint-handling SLA
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 Audit event chain
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+| Field          | Meaning                                                 |
+|----------------|---------------------------------------------------------|
+| `eventId`      | UUID                                                    |
+| `eventTime`    | ISO 8601 with timezone                                  |
+| `actor`        | identity (officer / customer / rail / regulator)        |
+| `resourceRef`  | URI of the resource that changed                        |
+| `action`       | created / signed / disbursed / collected / restructured |
+| `priorHash`    | SHA-256 of the prior event payload                      |
+| `signature`    | RFC 7515 JWS over the canonical event payload (RFC 8785)|
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §12 Recipient rights (privacy)
 
-## Annex I — Interoperability Profiles
+Customer-data rights honoured (per applicable law —
+GDPR / K-PIPA / CCPA / LGPD / PIPL):
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- access
+- rectification
+- erasure (subject to regulator-required retention)
+- portability
+- restriction
+- objection (e.g. to direct marketing)
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Rights events emit dedicated audit entries.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §13 Reproducibility
+
+A loan decision is `reproducible-strong` when the
+input payload, the model version, the container
+digest, the feature transformations, and the policy
+gates are all content-addressed; `reproducible-weak`
+when any is absent.
+
+## Annex A — Worked over-indebtedness gate (informative)
+
+A returning customer applies for a top-up loan; their
+current debt-service-to-income ratio is 38 %. The
+policy threshold is 35 %. The application moves to
+`referred` with reason `dso-over-threshold`. A field
+officer requests fresh income evidence; the customer
+declines a smaller loan and the application closes.
+
+## Annex B — Conformance disclosure
+
+Implementations declare the audit-chain schema
+version, the JWS algorithm registry, the model-
+governance evidence available per the implementation's
+scoring stack, and the sanctions-list update cadence.
+
+## Annex C — Versioning
+
+Field additions are minor; semantic redefinition is
+major.
+
+## Annex D — Operator-credential binding
+
+| Credential                | Source                                |
+|---------------------------|---------------------------------------|
+| Field-officer / loan-officer | sponsor training + national rules   |
+| KYC verifier              | sponsor + regulator (where required)  |
+| Restructuring approver    | sponsor; segregation from originator   |
+| FIU compliance officer    | per national appointment              |
+| Customer-protection officer | sponsor / regulator                  |
+
+A signing event without an active credential is rejected.
+
+## Annex E — Time-source declaration
+
+Audit-chain timestamps cite the time-source authority
+(NTP stratum-1, NIST, KASI, KRISS, PTB).
+
+## Annex F — Out-of-band collections conduct
+
+The protocol records:
+
+- contact attempts (channel, time, outcome)
+- contact-frequency caps (per regulator)
+- visit-time limits (e.g. daylight hours per local rule)
+- third-party contact restrictions
+
+Violations of conduct rules log as customer-
+protection incidents and feed the protection-metrics
+report.
+
+## Annex G — Cooling-off and right-to-cancel
+
+Per Reg Z (US), EU Consumer Credit Directive, and
+analogous national rules, customers may carry a
+right-to-cancel within a defined window after
+contract signature:
+
+| Jurisdiction context     | Cooling-off window               |
+|--------------------------|----------------------------------|
+| EU CCD                   | 14 calendar days                 |
+| US Reg Z home-equity     | 3 business days                  |
+| KR consumer credit       | 7 days                           |
+| Sponsor-internal policy  | per-product disclosure           |
+
+Cancellation events emit dedicated audit entries; if
+funds were already disbursed, the customer's
+repayment of principal proceeds; interest / fees waive
+per the disclosure.
+
+## Annex H — Stewardship-task SLA
+
+| Task                          | Acknowledge  | Resolve         |
+|-------------------------------|--------------|-----------------|
+| Sanctions-screening hit       | 1 hour       | 1 business day  |
+| Reconciliation mismatch       | 4 hours      | 2 business days |
+| Customer-protection complaint | 1 business   | per regulator    |
+|                               | day          | (typ. ≤ 30 days) |
+| FIU follow-up                 | per FIU      | per FIU          |
+| Bureau-update mismatch        | 1 business   | 5 business       |
+|                               | day          | days             |
+
+SLAs are sponsor-tunable; the configured table is
+recorded on the stewardship-policy reference record.

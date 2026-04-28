@@ -1,241 +1,314 @@
-# WIA-physical-enhancement PHASE 3 — PROTOCOL Specification
+# WIA-physical-enhancement PHASE 3 — Protocol Specification
 
 **Standard:** WIA-physical-enhancement
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-physical-enhancement (Physical Enhancement).
+This PHASE defines the operational protocols binding
+data records and API surface into auditable longitudinal
+sequences: protocol-version lifecycle, ethics-approval
+lifecycle, informed-consent lifecycle, sport-governance
+binding lifecycle (including TUE workflow), session
+execution, performance capture cadence, adverse-event
+escalation, device-calibration cadence, anti-doping
+testing intersection, and the audit-event chain.
+Protocols are framed so an inspection by a sport-
+governance body, a regulator, or an IRB can reconstruct
+the subject's full timeline from the event log.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- World Anti-Doping Code (WADA) — current edition
+- WADA International Standard for Therapeutic Use Exemptions (ISTUE)
+- WADA International Standard for Laboratories (ISL)
+- WADA International Standard for Testing and Investigations (ISTI)
+- IPC Athlete Classification Code
+- ICH E6 (R3) Good Clinical Practice
+- ICH E2A — clinical safety reporting
+- ICH E2B (R3) — ICSR transmission
+- ISO 14155:2020 — clinical investigation of medical devices
+- ISO 14971:2019 — risk-management lifecycle
+- ISO 13482 — personal-care robots safety
+- IEC 62304 — medical-device software lifecycle
+- 21 CFR Part 11 — electronic records / signatures (US)
+- EU CTR (Regulation 536/2014); EU MDR (2017/745)
+- ISO/IEC 27037 — digital evidence preservation
+- IETF RFC 5424 (Syslog), RFC 7515 (JWS)
 
 ---
 
-## §1 Scope
+## §1 Protocol-version lifecycle
 
-This PHASE document is one of four that together define the WIA-physical-enhancement
-standard. It addresses the protocol layer of the standard.
+```
+draft → submitted → approved → active → superseded
+                              │
+                              └→ suspended → resumed | terminated
+```
 
-## §2 Manifest
+Active is single-version invariant; sessions in flight
+when a version supersedes complete on the prior version.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "physical-enhancement"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Ethics-approval lifecycle
 
-## §3 Conformance Tiers
+```
+pending → approved → expired → re-approved
+          │
+          └→ suspended → withdrawn | resumed
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Expiry is a hard gate; sessions cannot open under an
+expired approval.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Informed-consent lifecycle
 
-## §4 Discovery
+```
+prepared → signed → active → withdrawn
+                    │
+                    └→ re-consent-pending → re-consented
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/physical-enhancement`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Re-consent is required when a protocol amendment
+changes the risk profile, procedure set, or data-
+retention plan; sport-context consents additionally
+re-issue when WADA Code or IF rule changes affect the
+intervention's classification.
 
-## §5 Time and Identity
+## §4 Sport-governance binding lifecycle (TUE)
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+prepared → submitted → reviewed → granted → active → expired
+                                  │
+                                  └→ rejected → appealed → upheld | overturned
+```
 
-## §6 Versioning and Deprecation
+A subject in a sport context running a prohibited
+intervention requires a granted TUE before the session
+opens. The TUE record links to the WADA ADAMS submission
+and to the supporting clinical evidence (PHASE 1 §7).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Session execution
 
-## §7 Privacy and Security
+A session executes in five steps:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+pre-flight → prepare → deliver → observe → close
+```
 
-## §8 Open Governance
+1. **pre-flight** — verify active consent, active ethics
+   approval (clinical / occupational), active TUE
+   (sport-context prohibited interventions), valid
+   device calibration, eligible subject status, and
+   rater independence (where blinded measurement is
+   protocol-required).
+2. **prepare** — randomisation envelope opens (clinical
+   trials); subject identity verified; vital signs and
+   readiness checks captured.
+3. **deliver** — intervention executes; powered-device
+   sessions stream telemetry per second; pharmacological
+   sessions record administered dose with method and
+   route per ATC and WHOCC routes.
+4. **observe** — performance instruments administered
+   by an independent rater; raw and standardised scores
+   recorded.
+5. **close** — session sealed; audit hash chain extends
+   with the session payload signature.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `physical-enhancement` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Sessions cannot be sealed while an open serious AE is
+pending the AE record (§7).
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §6 Performance capture cadence
 
+| Context        | Capture cadence                                         |
+|----------------|---------------------------------------------------------|
+| Clinical       | screening, weekly, milestone (4 / 12 / 24 weeks), end-  |
+|                | of-study, unscheduled AE follow-up                      |
+| Occupational   | pre-shift baseline, post-shift, milestone (monthly),    |
+|                | post-incident                                           |
+| Sport          | per training block (mesocycle), pre-competition,        |
+|                | post-competition, mandatory sample-collection windows   |
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Standardised instruments must be administered in the
+language version the subject consented to and by raters
+trained on the protocol's certification SOP.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## §7 Adverse-event escalation
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+| Severity / kind                | Sponsor clock | Regulator notification    |
+|--------------------------------|---------------|---------------------------|
+| Serious unexpected, fatal /    |        7 days | FDA 3500A / EMA EVDAS /   |
+| life-threatening, related      |               | PMDA / MFDS / Health Canada|
+| Serious unexpected, related    |       15 days | (same)                    |
+| Serious expected, related      |     periodic  | DSUR / PSUR cycle         |
+| Device, public-health          |    immediate  | EU EUDAMED / FDA MedWatch  |
+| Sport-context AE that may      |    immediate  | IF medical commission /    |
+| affect classification or TUE   |               | NADO                       |
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The clock starts at sponsor awareness; the API logs
+both awareness time and notification time.
 
-## Annex F — Adoption Roadmap
+## §8 Device-calibration cadence
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+| Intervention            | Calibration interval                          |
+|-------------------------|-----------------------------------------------|
+| Powered exoskeleton     | 90 days or 200 sessions                       |
+| Orthosis (passive)      | per IEC 60601-2-78 fitting protocol            |
+| Prosthesis-augment      | per IEEE 11073-10406 reference impedance      |
+| Force-plate / dynamometer| ISO 17025 traceable annual                    |
+| Gait-analysis camera    | per-session marker calibration                 |
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Calibration records are immutable and link to the
+operator credential.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §9 Anti-doping testing intersection
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+When a subject is in a registered testing pool (RTP)
+or an out-of-competition testing programme, the
+protocol records:
 
-## Annex G — Test Vectors and Conformance Evidence
+- whereabouts compliance events (filed, missed, late)
+- doping-control sample collection events (in-
+  competition / out-of-competition)
+- ADAMS submission references
+- chain-of-custody for samples submitted to a WADA-
+  accredited laboratory under the ISL
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+A session that is concurrent with a doping-control
+event records the event reference so an inspector can
+correlate intervention timing to sample collection.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §10 Audit event chain
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+| Field          | Meaning                                                   |
+|----------------|-----------------------------------------------------------|
+| `eventId`      | UUID                                                      |
+| `eventTime`    | ISO 8601 with timezone                                    |
+| `actor`        | identity (clinician / operator / coach / sport-body)      |
+| `subjectRef`   | the affected subject record (where applicable)            |
+| `resourceRef`  | URI of the resource that changed                          |
+| `action`       | created / updated / closed / withdrawn / superseded       |
+| `priorHash`    | SHA-256 of the prior event payload                        |
+| `signature`    | RFC 7515 JWS over the canonical event payload (RFC 8785)  |
 
-## Annex H — Versioning and Deprecation Policy
+The chain is per-protocol and per-sport-binding.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 Protocol-deviation handling
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Severity tiers per ICH E6 (R3): minor, major, critical.
+Critical deviations trigger sponsor / IRB / IF
+notification and pause new sessions on the affected arm
+until reviewed.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §12 Re-consent triggers
 
-## Annex I — Interoperability Profiles
+Re-consent is required when:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- protocol amendment changes risk, procedures, or
+  retention
+- new intervention arm added
+- new safety finding emerges
+- subject's legal representative changes
+- WADA Code or IF rule update changes the intervention's
+  permitted / restricted / prohibited classification
+- adaptive-class re-evaluation affects participation
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §13 Source-data integrity
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+All source data is captured at point of generation and
+stored in tamper-evident form. The audit-chain export
+is byte-equivalent to the API exposure of the record.
+
+## Annex A — Worked AE escalation example (informative)
+
+A subject in an exoskeleton trial trips and falls
+during an over-ground session. Operator pauses session,
+escalates to local emergency response, and within the
+2-hour protocol window files an AE through `/v1/
+adverse-events`. The AE classifies as `serious=true,
+expected=false (severity=severe), causality=possible`.
+The 15-day clock opens; sponsor pharmacovigilance
+prepares the ICSR for FDA ESG. The EU MDR vigilance
+notification (EU EUDAMED) is filed in parallel. The IRB
+issues a temporary halt on over-ground sessions pending
+device-design review.
+
+## Annex B — Conformance disclosure
+
+Implementations declare the audit-chain schema version,
+the JWS algorithm registry, the time-source authority,
+and the WADA / IF protocol bindings supported.
+
+## Annex C — Versioning
+
+Field additions are minor; semantic redefinition is
+major.
+
+## Annex D — Operator-credential binding
+
+| Credential                  | Source                                |
+|-----------------------------|---------------------------------------|
+| Physical / occupational therapy | national board (e.g. APTA, KOPTA) |
+| Sports medicine             | FMS / IOC sports medicine diploma     |
+| Strength and conditioning   | NSCA / KSCA / equivalent national     |
+| Anti-doping educator        | WADA-recognised certification         |
+| Adaptive-sport classifier   | IPC trained classifier                |
+
+A session cannot release results signed by an operator
+without an active credential.
+
+## Annex E — Time-source declaration
+
+Audit-chain timestamps cite the time-source authority
+(NTP stratum-1, NIST, KASI, PTB). Sport contexts
+additionally record the in-competition local time per
+the IF rules (some federations use stadium clock as
+the authoritative reference for in-competition events).
+
+## Annex F — Adaptive-class re-evaluation cadence
+
+| Trigger                              | Action                          |
+|--------------------------------------|---------------------------------|
+| Initial international classification | record class + minimum disability |
+|                                      | criteria, schedule review        |
+| Performance-based observation        | classifier review at next-event   |
+| Medical condition change             | mandatory re-evaluation          |
+| Class protest                        | classifier panel review          |
+| Year-cycle review                    | per IF rule (typically 4-year    |
+|                                      | Paralympic cycle)                |
+
+Re-evaluation events bind to the sport-governance
+record so an inspector can verify the active class is
+the one the subject competes under.
+
+## Annex G — Whereabouts compliance recording
+
+For RTP / NRTP athletes the protocol records:
+
+| Event                      | Recorded fields                              |
+|----------------------------|----------------------------------------------|
+| Quarterly filing           | filing date, period covered, content hash    |
+| 60-minute slot declaration | per-day slot, location, alternate slot       |
+| Filing failure             | type (no filing, late filing, incomplete),    |
+|                            | NADO disposition                              |
+| Missed test                | DCO (Doping Control Officer) report digest   |
+| Filing amendment           | submitted-time, reason                       |
+
+Three filing failures or missed tests within 12 months
+result in an Anti-Doping Rule Violation under the WADA
+Code; the protocol's whereabouts events are admissible
+evidence in a results-management proceeding.
+
+## Annex H — Inspector replay payload
+
+For an inspection (regulator, IF, or IRB) the protocol
+exposes a replay payload covering:
+
+- consent records
+- ethics-approval records
+- TUE records (sport context)
+- session records with telemetry digests
+- performance records with rater identity
+- AE records with regulator-clock evidence
+- audit-chain export
+
+The payload signs with the sponsor's audit-chain JWS
+key so the inspector can verify integrity end-to-end.

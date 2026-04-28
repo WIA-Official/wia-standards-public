@@ -1,241 +1,276 @@
-# WIA-pest-detection PHASE 4 — INTEGRATION Specification
+# WIA-pest-detection PHASE 4 — Integration Specification
 
 **Standard:** WIA-pest-detection
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-pest-detection (Pest Detection).
+This PHASE specifies how WIA-pest-detection integrates
+with adjacent regulatory, supply-chain, agricultural-
+operations, and research-data systems: IPPC International
+Phytosanitary Portal and Regional Plant Protection
+Organisations, EPPO PRA / database, NPPO authorities,
+laboratory information management systems (LIMS),
+agricultural-supply-chain traceability, MRL / PHI
+binding to harvest lots, satellite imagery providers
+(ESA Sentinel, USGS Landsat, NASA HLS, Planet, Maxar),
+ISOBUS-equipped tractor / sprayer fleets, AgGateway
+ADAPT, FAO data conventions, weather-service feeds,
+and downstream food-safety pipelines (e.g. RASFF, FDA
+FSIS, MFDS Food Safety Korea). It also specifies the
+operational binding to companion WIA standards.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IPPC International Phytosanitary Portal (IPP) — pest reporting under ISPM 17
+- IPPC ePhyto generic national system / hub
+- EPPO Reporting Service, EPPO Global Database
+- FAO Crop Prospects and Food Situation; FAO IPM
+- Codex Alimentarius MRL portal
+- WHO recommended classification of pesticides by hazard
+- ISO 11783 (ISOBUS); AgGateway ADAPT framework
+- GS1 GTIN / GLN / SSCC; GS1 EPCIS (for harvested-lot binding)
+- HL7 FHIR R5 (where pest-related public-health data emerge, e.g. vector-borne)
+- ISO 19115-2 — geographic-information metadata
+- OGC SensorThings; OGC WMTS / WMS / WCS; OGC GeoTIFF / GeoPackage
+- ESA Copernicus Open Access Hub; USGS Earth Explorer; NASA HLS / GIBS
+- 21 CFR Part 11; EU Reg 2017/625 (official controls); EU Reg 1107/2009 (PPP)
+- ISO 8601, ISO 3166, BCP 47
+- IETF RFC 9110 (HTTP), RFC 7515 (JWS), RFC 8259 (JSON), RFC 8785 (JCS)
 
 ---
 
-## §1 Scope
+## §1 IPPC and RPPO integration
 
-This PHASE document is one of four that together define the WIA-pest-detection
-standard. It addresses the integration layer of the standard.
+NPPO-filed reports propagate to:
 
-## §2 Manifest
+| System / body         | Operator                           |
+|-----------------------|------------------------------------|
+| IPPC IPP              | IPPC Secretariat (FAO)             |
+| EPPO                  | European and Mediterranean PPO     |
+| NAPPO                 | North American PPO                 |
+| COSAVE                | Comité Regional de Sanidad Vegetal |
+| APPPC                 | Asia and Pacific PPC                |
+| IAPSC                 | Inter-African Phytosanitary Council |
+| OIRSA                 | Organismo Internacional Regional   |
+|                       | de Sanidad Agropecuaria             |
+| CPPC                  | Caribbean PPC                       |
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "pest-detection"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Reports cite the IPPC submission identifier; status
+updates (eradication-declared, containment-progress,
+periodic) replicate to the WIA NPPO-report record.
 
-## §3 Conformance Tiers
+## §2 LIMS integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+ISO 17025-accredited diagnostic laboratories integrate
+through:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+| LIMS profile         | Standard / vendor                              |
+|----------------------|------------------------------------------------|
+| HL7 v2.x OUL^R22     | laboratory result message (where the LIMS     |
+|                      | uses HL7)                                     |
+| AgGateway ADAPT      | agricultural lab-result exchange              |
+| Custom REST / SOAP   | per LIMS vendor                                |
 
-## §4 Discovery
+LIMS-emitted diagnostic results sign with the lab's
+JWS key; the WIA diagnostic record stores the
+signature payload and the lab's accreditation body
+reference.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/pest-detection`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Supply-chain traceability
 
-## §5 Time and Identity
+Confirmed pest events on a field unit propagate to:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+| Standard / system           | Binding                                |
+|-----------------------------|----------------------------------------|
+| WIA-agricultural-supply-chain | lot inheritance of pest-event history |
+| WIA-food-traceability       | regulator notification path            |
+| GS1 EPCIS                   | event-based supply-chain trace         |
+| GS1 GTIN / GLN / SSCC       | container / pallet identifier          |
 
-## §6 Versioning and Deprecation
+A harvested lot from a field unit with an unresolved
+pest event carries a `pestEventDigest` summarising the
+event chain so a buyer's QA party can decide on
+acceptance, sampling, or rejection.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 MRL / PHI binding
 
-## §7 Privacy and Security
+Chemical-intervention decisions cite the applicable
+MRL identifier:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+| Authority           | MRL list                                       |
+|---------------------|------------------------------------------------|
+| Codex Alimentarius  | Codex MRLs                                     |
+| EU                  | EU MRL database (Reg 396/2005 + Annexes)       |
+| US                  | EPA MRL / tolerances (40 CFR Part 180)          |
+| Japan               | MHLW Positive List                             |
+| Korea               | MFDS PLS (Positive List System)                |
+| Codex (Korea / JP)  | bilateral / regional alignment as published   |
 
-## §8 Open Governance
+The intervention record's `mrlBinding` resolves through
+the authority's published list at the time of
+application; subsequent MRL changes do not retro-
+actively invalidate prior compliant applications, but
+trigger a review event on lots not yet harvested.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `pest-detection` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Remote-sensing provider integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+| Provider             | Binding                                       |
+|----------------------|-----------------------------------------------|
+| ESA Sentinel-2 / -1  | Copernicus Open Access Hub (S2 MSI L1C, L2A;  |
+|                      | S1 GRD)                                       |
+| USGS Landsat 8 / 9   | Landsat Collection 2 (L1, L2)                  |
+| NASA HLS             | Harmonized Landsat-Sentinel L30 / S30          |
+| PlanetScope          | Planet API                                    |
+| Maxar                | Maxar SecureWatch / GBDX                       |
+| UAV multi-spectral   | local raw + GeoTIFF + AgGateway ADAPT         |
 
+Imagery records cite the provider's tile / scene
+identifier; derived indices (NDVI, NDRE, NDWI, GNDVI)
+record the algorithm and reference equation.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §6 Tractor / sprayer fleet integration (ISOBUS)
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+Variable-rate intervention records exchange with
+ISOBUS-equipped sprayers via Task Controller messages.
+Application records ingest the as-applied data
+(actual rate, application time, weather summary, GPS
+trace) so the audit chain records what was applied
+versus what was prescribed.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §7 Weather-service feed
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Application gating (drift, washout) consumes weather
+data from:
 
-## Annex F — Adoption Roadmap
+| Provider              | Service                                      |
+|-----------------------|----------------------------------------------|
+| WMO member services   | per-country meteorological agency             |
+| ECMWF                 | open / commercial APIs                       |
+| NOAA NWS              | US National Weather Service                  |
+| KMA (Korea)           | open data portal                             |
+| JMA (Japan)           | met agency open data                         |
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Wind-speed, wind-direction, temperature, relative
+humidity, and precipitation forecast / observation
+windows are recorded on the application record.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §8 Cross-domain WIA bindings
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+| Companion standard          | Binding purpose                                |
+|-----------------------------|------------------------------------------------|
+| WIA-precision-agriculture   | variable-rate prescription                     |
+| WIA-agricultural-supply-chain | harvested-lot inheritance                    |
+| WIA-food-traceability       | regulator notification path                    |
+| WIA-agricultural-drone      | UAV survey mission binding                     |
+| WIA-soil-sensor             | soil-borne pest correlation                    |
+| WIA-smart-irrigation        | irrigation event ↔ disease-conducive period   |
+| WIA-yield-prediction        | yield-impact estimate per pest event           |
+| WIA-content-ai              | AI-pest-classification governance              |
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Each binding identifies the consumed PHASE.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §9 Long-term archival
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+| Authority / context | Retention                                       |
+|---------------------|-------------------------------------------------|
+| NPPO                | per national rules; typically ≥ 5 years         |
+| EU (Reg 1107/2009)  | 10 years for pesticide application records     |
+| US EPA              | per state-level rules; FIFRA retention          |
+| KR MFDS PLS         | per national rules; minimum 3 years for PLS    |
+| ISO 17025 lab       | ≥ 5 years post-result for traceability          |
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §10 Conformance test suite
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+The reference test suite covers:
 
-## Annex H — Versioning and Deprecation Policy
+- chain-of-custody completeness on a synthetic sample
+- diagnostic-pathway gate enforcement (NPPO report
+  blocked without lab signature)
+- IPM-hierarchy enforcement on chemical-intervention
+  decisions
+- MRL / PHI gate on pesticide application
+- alert-acknowledgement escalation (unacknowledged
+  critical alert escalates after 2 hours)
+- IPPC submission cross-walk on a confirmed
+  quarantine-pest event
+- ISOBUS task-controller round-trip on a variable-rate
+  spray prescription
+- audit-chain hash continuity
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 Internationalisation
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+User-facing strings (alerts, dashboards, scout app
+forms) carry the BCP 47 language tag. Country-
+specific regulator paths are resolved by the field-
+unit's `region` (ISO 3166-2 sub-national).
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §12 Security and privacy posture
 
-## Annex I — Interoperability Profiles
+- Transport: TLS 1.3 with mutual TLS for NPPO ↔ IPPC
+  exchanges; sponsor-issued mutual TLS for edge devices
+- Authentication: client_credentials with key
+  attestation for sponsor / lab / NPPO integrations
+- At-rest: AES-256-GCM with sponsor-controlled KMS;
+  per-field-unit key wrapping per ISO/IEC 27002 §8.24
+- Audit: tamper-evident chain (PHASE 3 §11) exportable
+  per ISO/IEC 27037 forensic-evidence guidance
+- Privacy: farmer / scout identifiers opaque on cross-
+  border exchange; re-linkage held by sponsor / NPPO
+  under regulator-approved DPIA
+- Connectivity: edge devices operate offline-first;
+  observation, trap, inference, and decision records
+  queue locally and submit on reconnect; queue
+  integrity is hash-chained
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §13 Operational metrics
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Sponsors report (informationally) on the WIA registry:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- field units active vs. fallow
+- observations per field unit per week (proxy for
+  surveillance intensity)
+- diagnostic-pathway TAT (suspect → confirmed)
+- intervention-decision IPM-tier distribution
+- regulator-clock compliance rate (NPPO report timing)
+- alert acknowledgement rate
+
+## §14 Recovery and continuity
+
+- API outage — local edge capture; sync on reconnect
+- IPPC outage — queued NPPO submissions; replay on
+  recovery
+- LIMS outage — diagnostic results held at the lab and
+  signed offline; replay on reconnect
+- imagery-provider outage — local tile mirror with
+  SHA-256 manifest; hot-fail to alternate provider
+
+## Annex A — Worked end-to-end example (informative)
+
+A grape-growing cooperative deploys a network of 60
+pheromone traps for *Lobesia botrana* across 1200 ha.
+Edge-AI inference on weekly orchard imagery posts to
+PHASE 2 §6. A trap network exceeds the action threshold
+in week 18. Sample submits to the ISO 17025 lab; PM
+7/26 is run; result confirms *L. botrana*. The NPPO is
+not engaged (this is an established, regulated-non-
+quarantine pest in the region) but the buyer's QA
+party receives the alert. The decision-record applies a
+biological-tier intervention (mating disruption with
+pheromone dispensers) per the IPM hierarchy. Application
+records bind to the audit chain. End-of-season
+yield-prediction binds the pest-event chain to the
+harvested lot.
+
+## Annex B — Conformance disclosure
+
+Implementations declare the IPPC and RPPO bindings
+supported, the LIMS protocols accepted, the imagery-
+provider integrations enabled, the EPPO Code dictionary
+version, and the ISOBUS task-controller capability.
+Disclosure is machine-readable at `/.well-known/wia-
+pest-conformance.json`.
+
+## Annex C — Versioning
+
+Adding a new RPPO gateway is minor; changing the IPPC
+submission format is major.

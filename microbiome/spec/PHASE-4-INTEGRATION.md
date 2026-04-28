@@ -1,241 +1,283 @@
-# WIA-microbiome PHASE 4 — INTEGRATION Specification
+# WIA-microbiome PHASE 4 — Integration Specification
 
 **Standard:** WIA-microbiome
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-microbiome (Microbiome).
+This PHASE specifies how WIA-microbiome integrates
+with adjacent regulatory, clinical, archival, and
+research-data systems: INSDC public archives, MGnify
+and MGnifyDB, the NIH Common Fund Human Microbiome
+Project data conventions, EU EOSC, GTDB and SILVA
+reference releases, FHIR R5 clinical exchange, food-
+safety regulators, and live-biotherapeutic-product
+sponsors operating under FDA / EMA / MFDS / PMDA. It
+also specifies the operational binding to companion
+WIA standards.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- INSDC — NCBI / ENA / DDBJ submission and exchange
+- MGnify — EMBL-EBI microbiome resource and pipeline reference
+- GTDB — Genome Taxonomy Database release versioning
+- SILVA / Greengenes2 — rRNA reference databases
+- KEGG / MetaCyc / UniProt / EC IUBMB — functional reference databases
+- HL7 FHIR R5 — Specimen, Observation, MolecularSequence, Bulk Data Access
+- HL7 SMART App Launch 2.0
+- Codex Alimentarius CAC/RCP 1-1969 — General Principles of Food Hygiene
+- Codex Alimentarius MRL — maximum residue limits
+- ISO 7218:2024 — Microbiology of food and animal feeding stuffs
+- US FDA BAM (Bacteriological Analytical Manual) chapters on metagenomic methods
+- EU Regulation 178/2002 (general food law), Regulation 2073/2005 (microbiological criteria)
+- US FDA — LBP draft guidance; EMA — Q&A on quality of LBPs
+- 21 CFR Part 11 — electronic records / signatures
+- ISO/IEC 27001:2022, ISO/IEC 27701:2019 (privacy extension)
+- IEEE 11073-10101 — laboratory device nomenclature
+- IETF RFC 9110 (HTTP), RFC 7515 (JWS), RFC 8259 (JSON), RFC 8785 (JCS)
 
 ---
 
-## §1 Scope
+## §1 INSDC archive integration
 
-This PHASE document is one of four that together define the WIA-microbiome
-standard. It addresses the integration layer of the standard.
+Public studies submit to one of the three INSDC nodes:
 
-## §2 Manifest
+| Archive  | Operator       | Submission portal           |
+|----------|----------------|-----------------------------|
+| NCBI SRA / GenBank | NIH NLM | SRA submission portal      |
+| ENA      | EMBL-EBI       | Webin REST submission       |
+| DDBJ DRA | NIG / ROIS     | DDBJ DRA submission         |
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "microbiome"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Per-record cross-walk (PHASE 1 §2 → INSDC):
 
-## §3 Conformance Tiers
+```
+WIA Specimen   →  INSDC BioSample (with MIxS package)
+WIA Library    →  INSDC Experiment
+WIA Run        →  INSDC Run
+WIA Read set   →  INSDC SRA / ENA Run object
+WIA Study      →  INSDC BioProject
+WIA Assembly   →  GenBank / ENA Assembly
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+The `submissionRef` (PHASE 1 §4) records the assigned
+accession; release events update the public visibility
+on the WIA record and replicate to the public sync.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §2 MGnify integration
 
-## §4 Discovery
+Studies that wish to expose results through MGnify's
+analysis catalogue submit per the MGnify pipeline
+inputs (raw read accessions on ENA + a metadata sheet
+following the MIxS package the study selected). The
+MGnify analysis output URI is recorded as a
+`derivedAnalysisRef` on the analytical-result record so
+downstream users can compare WIA-pipeline results to
+MGnify's reference pipeline.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/microbiome`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 FHIR R5 clinical exchange
 
-## §5 Time and Identity
+| WIA record           | FHIR R5 resource                                |
+|----------------------|-------------------------------------------------|
+| Specimen             | Specimen                                        |
+| Library / run        | Procedure (for clinical contexts)               |
+| Read set             | DocumentReference + MolecularSequence           |
+| Taxonomy result      | Observation (LOINC for microbiome panels)        |
+| Functional result    | Observation (LOINC functional panel)             |
+| Biomarker call       | DiagnosticReport (with reviewer credentials)     |
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Clinical microbiome reporting uses the LOINC microbiome
+panel codes (e.g. 88072-1 stool microbiome panel, 99005-
+0 vaginal flora) when a corresponding LOINC term exists.
 
-## §6 Versioning and Deprecation
+## §4 Reference-database lifecycle binding
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Reference databases evolve. The analytical-result record
+pins the reference release used:
 
-## §7 Privacy and Security
+| Database     | Release identifier example       |
+|--------------|----------------------------------|
+| SILVA        | SILVA 138.2                      |
+| Greengenes2  | gg2-2024.09                      |
+| GTDB         | GTDB R220 (2026 release)         |
+| NCBI RefSeq  | RefSeq release number + date     |
+| KEGG         | KEGG version + release date       |
+| CARD         | CARD ontology release             |
+| VFDB         | VFDB release                     |
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Re-running an analysis under a newer reference release
+is a fresh analytical-result; the prior result is not
+mutated.
 
-## §8 Open Governance
+## §5 Food-safety integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `microbiome` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+For food-process microbiome:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- regulator-mandated tests (Salmonella, Listeria
+  monocytogenes, EHEC, Cronobacter) per Codex / Reg
+  2073/2005 / FDA BAM are recorded as analytical-result
+  records with `metric=regulator-pathogen-screen`
+- positive findings transmit through the relevant
+  regulator pathway (RASFF for EU, FoodNet / FDA Safety
+  Reporting Portal for US, MFDS Food Safety Korea, PMDA
+  Japan)
+- recalls reference the affected lot through the food-
+  traceability standard (WIA-food-traceability)
 
+## §6 Live-biotherapeutic-product (LBP) integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+LBP sponsors carry the strain identity, manufacturing
+lot, fermentation parameters, viability metrics, and
+clinical investigation cross-references on the
+intervention record. WIA-microbiome links the LBP
+release-test microbiome characterisation (purity,
+strain authenticity, contamination screen) to the lot.
+Regulatory pathways:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+| Regulator | LBP pathway                                    |
+|-----------|------------------------------------------------|
+| FDA (CBER)| BLA per 21 CFR §601, IND per 21 CFR §312       |
+| EMA       | ATMP regulation (where applicable) or          |
+|           | medicinal-product CTA per Reg 536/2014          |
+| MFDS      | Biological-medicinal-product approval           |
+| PMDA      | Biological-product / regenerative-medicine path |
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §7 Cross-domain WIA bindings
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+| Companion standard          | Binding purpose                                |
+|-----------------------------|------------------------------------------------|
+| WIA-medical-data-privacy    | special-category human samples                  |
+| WIA-medical-research-data   | cohort metadata exchange                        |
+| WIA-food-traceability       | food-process lot binding                        |
+| WIA-food-safety             | regulator pathogen reporting                    |
+| WIA-clinical-decision-support | biomarker call interpretation                |
+| WIA-emergency-medical-data  | foodborne outbreak escalation                   |
+| WIA-content-ai              | AI-assisted taxonomic classification governance |
 
-## Annex F — Adoption Roadmap
+Each binding identifies the consumed PHASE in the
+companion standard.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §8 Long-term archival
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Microbiome archival horizons:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+| Context              | Retention target                            |
+|----------------------|---------------------------------------------|
+| Public INSDC         | indefinite (archive policy)                 |
+| Sponsor-controlled   | minimum protocol clock + regulator clock    |
+| Regulator inspection | minimum 5 years post-study close             |
+| Biobank aliquot      | indefinite or until consent withdrawal      |
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Withdrawal of consent triggers deletion of the
+specimen and read-set raw data; analytical results
+already published in aggregate de-identified form are
+retained per the original consent.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §9 Conformance test suite
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+The reference test suite covers:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- chain-of-custody completeness on a synthetic specimen
+- contamination-control gate enforcement
+- reproducibility tier classification
+- INSDC submission cross-walk (BioSample / Experiment / Run)
+- FHIR R5 export of Specimen + Observation
+- LOINC code resolution on a clinical panel
+- audit-chain hash continuity
+- GDPR-aligned host-read removal verification
+- batch-effect declaration on a multi-batch study
+- regulator-screen positive pathogen escalation
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §10 Internationalisation
 
-## Annex H — Versioning and Deprecation Policy
+User-facing strings (specimen labels, report headings,
+biomarker interpretation) carry the BCP 47 language
+tag. Country-specific regulator paths are resolved by
+the study's primary registry country code (ISO 3166-1
+alpha-3).
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 Security and privacy posture
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+- Transport: TLS 1.3 with mutual TLS for archive
+  submissions; ETSI EN 319 522 registered electronic
+  delivery for jurisdictions that require it
+- Authentication: SMART on FHIR for clinical contexts;
+  client_credentials with key attestation for sponsor /
+  archive integrations
+- At-rest: AES-256-GCM with sponsor-controlled KMS;
+  per-study key-wrapping per ISO/IEC 27002 §8.24
+- Audit: tamper-evident chain (PHASE 3 §6) exportable
+  per ISO/IEC 27037 forensic-evidence guidance
+- Privacy: subject identifiers opaque; host-read
+  fraction reported and verified before public release;
+  re-linkage table held by sponsor under regulator-
+  approved DPIA
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §12 Operational metrics
 
-## Annex I — Interoperability Profiles
+Sponsors report (informationally) on the WIA registry:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- specimens collected vs. submitted
+- run QC pass rate
+- analyses succeeded / failed / abandoned
+- contamination-control pass rate
+- public-release timeliness vs. embargo
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §13 Recovery and continuity
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- API outage — local lab capture; sync on reconnect
+- archive outage — queued submission events; replay on
+  recovery
+- reference-database outage — pin a local mirror with
+  the same release identifier; document mirror integrity
+  via SHA-256 manifest
+
+## Annex A — Worked end-to-end example (informative)
+
+A multicentre study of antibiotic-associated dysbiosis
+runs at four academic medical centres. Specimens (stool,
+preserved in OMNIgene-GUT, shipped on dry ice within
+24 h) are received at the central sequencing facility,
+extracted in batches of 96 with an extraction blank per
+batch, prepared as 16S V3V4 amplicon libraries, and
+sequenced on a NovaSeq SP flow cell. Analyses run on
+nf-core/ampliseq pinned to v2.7 with the SILVA 138.2
+reference. Decontamination uses extraction-blank reads
+to remove reagent ASVs. Results submit to ENA under
+embargo until publication; the analytical-result record
+declares reproducible-strong. Publication releases the
+ENA records and the WIA analytical-result.
+
+## Annex B — Conformance disclosure
+
+Implementations declare the INSDC node they bind to,
+the FHIR profile versions they expose, the reference-
+database releases they support, the LOINC release they
+match against, and the workflow runtimes they accept.
+
+## Annex C — Versioning
+
+PHASE 4 follows the standard's semantic-versioning
+policy. Adding a new regulator gateway is minor;
+changing the FHIR mapping is major.
+
+## Annex D — Submission embargo policy (informative)
+
+Embargo periods reflect the upstream archive policy:
+
+| Archive       | Maximum embargo                              |
+|---------------|----------------------------------------------|
+| NCBI SRA      | 4 years from submission (extendable on case) |
+| ENA           | 2 years (default; extendable per request)    |
+| DDBJ DRA      | 2 years                                      |
+
+Embargo lift events are recorded on the WIA submission
+record so downstream consumers see the expected public
+release date without polling the upstream archive.
+
+## Annex E — Public-summary bridge
+
+Where regulators (e.g. FDA Project Patron, EMA OPEN+)
+require a public-summary alongside the underlying data,
+the standard binds the summary URI to the analytical-
+result record as `publicSummaryRef`. Updates to the
+summary emit audit events linked to the underlying
+result.

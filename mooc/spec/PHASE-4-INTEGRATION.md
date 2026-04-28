@@ -1,241 +1,292 @@
-# WIA-mooc PHASE 4 — INTEGRATION Specification
+# WIA-mooc PHASE 4 — Integration Specification
 
 **Standard:** WIA-mooc
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-mooc (Mooc).
+This PHASE specifies how WIA-mooc integrates with
+adjacent learning, identity, credentialing, content-
+authoring, content-delivery, accessibility, research,
+and regulatory systems: enterprise LMS via LTI 1.3 and
+Common Cartridge, learning-record stores (Caliper
+endpoint / xAPI LRS), corporate skills frameworks
+(ESCO / O*NET-SOC), micro-credential issuers, video-
+streaming and CDN providers, captioning / sign-language
+services, identity-verification providers, proctoring
+services, regulator and accreditation registries, and
+analytics consumers (Caliper Aggregator pattern, data
+warehouse, lakehouse).
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- 1EdTech LTI 1.3 / LTI Advantage; Common Cartridge 1.3; QTI 3.0
+- 1EdTech Caliper Analytics 1.2; ADL xAPI 2.0
+- W3C Verifiable Credentials Data Model 2.0; 1EdTech Open Badges 3.0
+- Europass Credentials specification; European Learning Model (ELM)
+- ESCO classification; O*NET-SOC; ISCO-08
+- ENQA ESG 2015; ISO 21001; ISO/IEC 19796-1
+- W3C WCAG 2.2; EN 301 549; Section 508 (US)
+- W3C Web Annotation Protocol; W3C Activity Streams 2.0
+- HLS / DASH; SCTE 35 (where ad-insertion); SCTE-224 (where ad-policy)
+- WebVTT (W3C); SMI; SRT
+- IETF RFC 9110 (HTTP), RFC 7515 (JWS), RFC 8259 (JSON), RFC 8785 (JCS)
+- ISO 8601, ISO 3166, BCP 47
 
 ---
 
-## §1 Scope
+## §1 Enterprise LMS integration via LTI
 
-This PHASE document is one of four that together define the WIA-mooc
-standard. It addresses the integration layer of the standard.
+| Pattern                 | Profile                                          |
+|-------------------------|--------------------------------------------------|
+| LTI Resource Link       | LTI 1.3 launch into MOOC course / module          |
+| LTI Names and Roles     | NRPS roster sync from LMS to MOOC                 |
+| LTI Assignment & Grade  | AGS grade returns from MOOC to LMS                |
+| LTI Deep Linking 2.0    | tool-catalogue selection of MOOC content          |
+| Common Cartridge        | course content packaged for LMS import            |
 
-## §2 Manifest
+LMS-side configuration records the MOOC platform's
+issuer, deployment-id, and JWKS; tool-platform-config
+records the LMS public keys for inbound launches.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "mooc"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Learning-record store (LRS) integration
 
-## §3 Conformance Tiers
+| LRS profile             | Use                                              |
+|-------------------------|--------------------------------------------------|
+| Caliper Aggregator      | sponsor-internal Caliper consumer                |
+| xAPI LRS                | research / corporate LRS consumer                |
+| Cross-platform analytics | enterprise lakehouse                             |
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Events emit to one or more LRS in a fan-out pattern;
+the implementation tracks per-LRS delivery
+acknowledgement.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Skills-framework integration
 
-## §4 Discovery
+| Framework              | Binding                                          |
+|------------------------|--------------------------------------------------|
+| ESCO                   | course / lesson outcomes map to ESCO skills /     |
+|                        | competences                                      |
+| O*NET-SOC              | US occupation alignment                           |
+| ISCO-08                | ILO occupation classification                     |
+| EQF / NQF              | per-country qualification level                   |
+| CASE 1.1               | competency-framework exchange                     |
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/mooc`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Mappings are versioned; framework changes (ESCO
+release, EQF revision) trigger re-mapping events.
 
-## §5 Time and Identity
+## §4 Micro-credential issuer integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Course / cohort completion binds to WIA-micro-
+credential issuance:
 
-## §6 Versioning and Deprecation
+```
+completion-validated → credential-class-resolved →
+  recipient-DID-resolved → OID4VCI-issuance →
+  status-list-entry-published
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The issuance event emits Caliper / xAPI `Issued`
+verbs so downstream analytics see the credential
+event.
 
-## §7 Privacy and Security
+## §5 Content-delivery and CDN integration
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+| Component               | Integration                                      |
+|-------------------------|--------------------------------------------------|
+| Origin storage          | content-addressed object store                    |
+| CDN                     | per-implementation (Akamai, Cloudflare, AWS      |
+|                         | CloudFront, Fastly, Naver Cloud, etc.)            |
+| Adaptive streaming      | HLS + DASH dual manifest                          |
+| DRM                     | Widevine / FairPlay / PlayReady (where bound)    |
 
-## §8 Open Governance
+CDN cache-control headers honour the manifest's
+content digest so a manifest update propagates
+within the configured TTL.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `mooc` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Accessibility-services integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+| Service                 | Profile                                          |
+|-------------------------|--------------------------------------------------|
+| Captioning              | WebVTT / SRT — automatic + human-reviewed        |
+| Sign-language            | KSL / ASL / BSL / etc. video track                |
+| Audio description       | descriptive-audio track                          |
+| Real-time translation   | UN ESCAP / W3C live-region (where bound)          |
+| Screen-reader testing   | NVDA / JAWS / VoiceOver / TalkBack matrix         |
 
+The accessibility-assertion record cites the services
+used and the auditor's signature.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §7 Identity-verification and proctoring
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+| Service                 | Profile                                          |
+|-------------------------|--------------------------------------------------|
+| Identity verification   | ID document + selfie liveness                     |
+| Live human proctoring   | webcam + audio + screen-share                     |
+| AI-assisted proctoring  | anomaly detection on webcam + screen              |
+| In-person centre        | testing-centre infrastructure                     |
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Proctoring artefacts carry their own provenance hash;
+the assessment-attempt record references the hash so
+recognising parties can request the artefact under
+learner consent.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 Regulator / accreditation registries
 
-## Annex F — Adoption Roadmap
+| Registry                | Use                                              |
+|-------------------------|--------------------------------------------------|
+| National higher-ed      | accreditation status binding                     |
+| accreditation body      |                                                  |
+| EU EBSI                 | European trust framework for credentials          |
+| Industry recognising    | per-industry / sector accreditation               |
+| body                    |                                                  |
+| Sponsor-internal        | corporate L&D recognition                         |
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Accreditation events bind to courses so the
+recognition status is visible to prospective learners.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §9 Cross-domain WIA bindings
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+| Companion standard          | Binding purpose                                |
+|-----------------------------|------------------------------------------------|
+| WIA-micro-credential        | completion-credential issuance                 |
+| WIA-virtual-classroom       | live-session integration                       |
+| WIA-learning-analytics      | cohort-level analyses                          |
+| WIA-content-ai              | AI-generated assessment items                  |
+| WIA-data-portability        | learner export                                  |
+| WIA-content                 | open-content licence binding                    |
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Each binding identifies the consumed PHASE.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §10 Long-term archival
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+| Authority / context         | Retention                                |
+|-----------------------------|------------------------------------------|
+| Issuer (regulated)          | per national rules; typically ≥ 25 years |
+| Issuer (vocational)         | ≥ 10 years                                |
+| LRS                         | sponsor-defined; typically ≥ 5 years      |
+| Accessibility-audit records | per regulator                             |
+| Proctoring artefacts        | per learner consent + regulator           |
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §11 Conformance test suite
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+The reference test suite covers:
 
-## Annex H — Versioning and Deprecation Policy
+- LTI 1.3 launch round-trip with NRPS / AGS
+- Caliper Sensor → Aggregator delivery
+- xAPI v2.0 statement PUT round-trip
+- QTI 3.0 item authoring + attempt scoring
+- WCAG 2.2 Level AA on a representative course
+- HLS + DASH manifest verification with content digest
+- proctored-attempt requires active proctoring
+- peer-assessment minimum-grade enforcement
+- credential issuance through OID4VCI on completion
+- learner data-portability export of events + attempts
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §12 Internationalisation
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Course titles, module / lesson labels, item prompts,
+narrative feedback, and accessibility tracks carry
+BCP 47 language tags. Country-specific accreditation
+paths are resolved by the issuer's primary
+jurisdiction (ISO 3166-1 alpha-3).
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Security and privacy posture
 
-## Annex I — Interoperability Profiles
+- Transport: TLS 1.3 with mutual TLS for LTI Platform
+  ↔ Tool exchanges
+- Authentication: OAuth 2 with PKCE for learners; JWT
+  Bearer assertions for LTI 1.3
+- At-rest: AES-256-GCM with sponsor-controlled KMS;
+  per-cohort key wrapping
+- Audit: tamper-evident chain (PHASE 3 §11) exportable
+  per ISO/IEC 27037 forensic-evidence guidance
+- Privacy: learner identifiers opaque; PII held in
+  identity vault; learner rights honoured per PHASE 3
+  §13
+- Adaptive-learning consent: explicit and revocable
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Operational metrics
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Sponsors report (informationally) on the WIA registry:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- enrolments / completions per cohort
+- pass rate per cohort
+- accessibility-audit conformance level
+- inter-rater reliability per peer-assessment cohort
+- cohort outcome reproducibility tier
+- adaptive-learning opt-out rate
+
+## §15 Recovery and continuity
+
+- API outage — learners' app caches lessons offline;
+  events queue and submit on reconnect
+- LRS outage — events buffer locally; replay on
+  recovery; idempotent on `eventId`
+- CDN outage — origin failover; manifest re-fetch
+- proctoring service outage — attempt rejected if
+  proctoring is required; retried on recovery
+
+## Annex A — Worked end-to-end example (informative)
+
+A higher-education provider hosts a 6-week
+"Introduction to Probability" MOOC. The course is
+LTI 1.3-launchable from partner LMS deployments. The
+content is delivered as HLS / DASH dual manifest with
+WebVTT captions and a KSL sign-language track. Items
+are authored in QTI 3.0; calibration uses cohort-1
+data. Cohort-2 enrolment includes 12,300 learners
+across 27 countries; LTI Resource Links carry per-
+institution roster sync. Cohort-2 completion validates
+under the pass policy; 4,180 learners receive a
+completion credential issued via OID4VCI bound to the
+learner's DID. Caliper events stream to a sponsor-
+internal Aggregator and to a partner LMS-side LRS.
+
+## Annex B — Conformance disclosure
+
+Implementations declare the LTI 1.3 services supported
+(NRPS / AGS / Deep Linking), the Caliper / xAPI
+versions served, the QTI revision, the credential-
+issuance profile (OID4VCI), the WCAG / EN 301 549
+audit results, and the proctoring services integrated.
+Disclosure is machine-readable at `/.well-known/wia-
+mooc-conformance.json`.
+
+## Annex C — Versioning
+
+Adding a new content-delivery integration is minor;
+changing the LTI 1.3 service binding is major.
+
+## Annex D — Open-content licence binding
+
+Course content carries an SPDX licence identifier on
+each content-asset record. Common bindings:
+
+| Licence                | Use case                                       |
+|------------------------|------------------------------------------------|
+| CC0-1.0                | public-domain dedication                       |
+| CC-BY-4.0              | attribution required                           |
+| CC-BY-SA-4.0           | share-alike                                    |
+| CC-BY-NC-4.0           | non-commercial                                 |
+| All-Rights-Reserved    | proprietary; explicit licensing required       |
+
+Open Education Resource (OER) consumers honour the
+licence at re-use; the platform exposes a licence
+filter so OER aggregators discover compatible content.
+
+## Annex E — Research / data-anonymisation export
+
+Research-grade data exports apply k-anonymity (k ≥ 5)
+on quasi-identifier fields and l-diversity on
+sensitive learning-outcome attributes before release.
+Data-use agreements record the IRB approval, the data-
+recipient identity, and the retention window.
+
+## Annex F — Cross-platform learner mobility
+
+Where a learner moves between MOOC platforms (e.g.
+edX → Coursera → FutureLearn) the standard supports
+xAPI / Caliper export of the learner's full event
+history bound to the learner's DID. The receiving
+platform consumes the export and continues without
+loss of progress where the courses align.
