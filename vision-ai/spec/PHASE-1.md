@@ -536,3 +536,7 @@ Website: https://wia-official.org
 
 © 2025 SmileStory Inc. / World Certification Industry Association
 弘益人間 · Benefit All Humanity
+
+## Implementer note — operational lifecycle
+
+Vision-AI models are not static artefacts: they drift, degrade, and require periodic refresh as the world they were trained on shifts. The wire-format discipline (signed model envelopes with chained dataset evidence, per-cohort fairness, drift signals, audit log) is what enables sustainable production operation across multi-year horizons. A model trained for a 2026 production deployment will likely be refreshed quarterly or semi-annually; the standards artefacts let each refresh be evaluated against the same documented thresholds without re-inventing the evaluation harness for each cycle.

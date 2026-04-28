@@ -1,370 +1,241 @@
-# WIA-ozone-layer-protection PHASE 1 — Data Format Specification
+# WIA-ozone-layer-protection PHASE 1 — DATA-FORMAT Specification
 
 **Standard:** WIA-ozone-layer-protection
-**Phase:** 1 — Data Format
+**Phase:** 1 — DATA-FORMAT
 **Version:** 1.0
 **Status:** Stable
 
-This PHASE defines the canonical data format for ozone-layer
-protection operations: ozone-depleting-substance (ODS) and
-HFC inventory records, production / import / export records,
-phase-out schedule declarations, atmospheric-observation
-records, ground-based and satellite ozone-column observations,
-total ozone column records, equivalent-stratospheric-chlorine
-(EESC) tracking, and the cross-references binding party
-reporting to UNEP Ozone Secretariat data flows. The shape
-interoperates with the Montreal Protocol Article 7 reporting
-data tables, the WMO Global Atmosphere Watch (GAW), the
-NASA Total Ozone Mapping Spectrometer (TOMS) / Ozone
-Monitoring Instrument (OMI) / Tropospheric Monitoring
-Instrument (TROPOMI) data formats, and ECMWF Copernicus
-Atmosphere Monitoring Service (CAMS).
+This document defines the canonical DATA-FORMAT layer for WIA-ozone-layer-protection (Ozone Layer Protection).
 
 References (CITATION-POLICY ALLOW only):
-- Vienna Convention for the Protection of the Ozone Layer (1985)
-- Montreal Protocol on Substances that Deplete the Ozone Layer (1987) + Amendments
-  (London 1990, Copenhagen 1992, Montreal 1997, Beijing 1999, Kigali 2016)
-- UNEP Ozone Secretariat Article 7 Reporting Forms
-- UNEP Multilateral Fund — TPMP / HPMP / KIP project reporting
-- WMO Global Atmosphere Watch (GAW) — measurement programme
-- WMO Scientific Assessment of Ozone Depletion (quadrennial reports)
-- ISO/IEC 17025:2017 — laboratory accreditation
-- ISO 14001:2015 — environmental management systems
-- ISO 23161:2018 — petroleum and gas: ozone-depleting refrigerant trace
-- ASHRAE Standard 34 — refrigerant designation and safety classification
-- IPCC AR6 WGI — Annex VII (radiative forcing for ODS / HFC)
-- NetCDF Climate and Forecast (CF) Metadata Conventions v1.10
-- OGC Sensor Observation Service (SOS) 2.0
-- IETF RFC 8259 (JSON), RFC 7515 (JWS), RFC 3339
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
 ## §1 Scope
 
-This PHASE applies to systems that record ozone-layer-protection
-state and activities: party-government reporting systems
-(Article 7 reporting under Montreal Protocol), national ozone
-units (NOUs), refrigerant-management systems, fire-suppression
-inventory systems, atmospheric-observation networks (Dobson,
-Brewer, ozonesondes), and satellite ozone-data processing
-pipelines.
+This PHASE document is one of four that together define the WIA-ozone-layer-protection
+standard. It addresses the data-format layer of the standard.
 
-The standard is regime-aware: deployments declare their
-operating regime — Article 5 party (developing country with
-extended phase-out timelines), non-Article 5 party (developed
-country with earlier timelines), or non-party (with restricted
-trade access). Each regime carries its own phase-out schedule
-and reporting cadence.
+## §2 Manifest
 
-In scope: ODS / HFC substance identity and global-warming-potential
-(GWP) catalogue, production / import / export reporting,
-consumption (defined as production + imports - exports - feedstock /
-process-agent uses), critical-use exemption tracking, illegal-trade
-case records, atmospheric observations, ozone-column metrics,
-EESC trajectory. Out of scope: tropospheric ozone air-quality
-(cross-domain to WIA-air-quality), broader greenhouse-gas accounting
-beyond Kigali HFCs (cross-domain to WIA-greenhouse-gas-accounting).
+Implementations publish a signed manifest containing standardSlug
+(constant value: "ozone-layer-protection"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-## §2 ODS / HFC substance identity
+## §3 Conformance Tiers
 
-Substances are identified by:
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-- `substanceRef` — URN of form `urn:wia:ozone:substance:<scheme>:<id>`
-  where `scheme` is one of {`montreal-annex`, `cas`, `ashrae34`,
-  `gwp-ar6`}
-- `montrealAnnex` — closed enum: `Annex A Group I` (CFC-11,
-  CFC-12, CFC-113, CFC-114, CFC-115), `Annex A Group II`
-  (halons), `Annex B Group I/II/III`, `Annex C Group I` (HCFC),
-  `Annex C Group II/III` (HBFC, BCM), `Annex E` (methyl bromide),
-  `Annex F Group I/II` (HFC under Kigali Amendment)
-- `cas` — CAS Registry Number
-- `ashrae34` — ASHRAE 34 designation (e.g., R-12, R-134a, R-32,
-  R-1234yf)
-- `odp` — Ozone Depletion Potential (per Montreal Protocol
-  reporting tables)
-- `gwp100` — 100-year Global Warming Potential per IPCC AR6
-- `formula` — molecular formula
-- `iupacName`
-- `state` — `gas`, `liquid`, `liquefied-gas` (storage state at
-  STP)
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-The boundary verifies substance references against the
-deployment's substance roster; unrecognised substances are
-rejected. Roster updates align with UNEP Ozone Secretariat's
-published amendments.
+## §4 Discovery
 
-## §3 Production / import / export record
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/ozone-layer-protection`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-Per-party Article 7 data:
+## §5 Time and Identity
 
-- `transactionId` — URN
-- `partyRef` — reporting-party URN (ISO 3166-1 alpha-3 + party
-  status)
-- `reportingYear` — Gregorian year
-- `substanceRef`
-- `transactionKind` — closed enum: `production`,
-  `import`, `export`, `feedstock-use`, `process-agent-use`,
-  `destruction`, `essential-use`, `critical-use`,
-  `quarantine-and-pre-shipment`, `laboratory-and-analytical`
-- `quantityKg` — metric tonnes (Article 7 tables use metric
-  tonnes; this standard normalises to kg for arithmetic)
-- `partyOfOrigin` — for imports: ISO 3166-1 of origin;
-  for exports: ISO 3166-1 of destination
-- `partyStatus` — `party`, `non-party` (trade-restriction
-  context)
-- `verificationRef` — URN of verification evidence (customs
-  declaration, factory production log, etc.)
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-Records are signed by the National Ozone Unit (NOU) and
-audit-chained. Annual aggregates feed the Article 7 submission.
+## §6 Versioning and Deprecation
 
-## §4 Consumption calculation record
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-Consumption = production + imports - exports - feedstock - process-agent
-(per Montreal Protocol Article 1(6)):
+## §7 Privacy and Security
 
-- `consumptionId` — URN
-- `partyRef`
-- `reportingYear`
-- `substanceRef`
-- `productionTonnes` — ODP-weighted metric tonnes
-- `importsTonnes`
-- `exportsTonnes`
-- `feedstockTonnes` — feedstock uses excluded from
-  consumption per Article 1(6)
-- `processAgentTonnes` — process-agent uses excluded
-- `essentialUseTonnes` — exempted under Article 2 essential-use
-  decisions
-- `criticalUseTonnes` — methyl-bromide critical-use
-- `qpsTonnes` — quarantine and pre-shipment
-- `consumptionTonnes` — calculated value
-- `odpWeightedTonnes` — per-substance ODP-weighted
-- `co2eqWeightedTonnes` — per-substance GWP-weighted
-  (Kigali Amendment HFC reporting)
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-Consumption is the headline metric tracked against the
-party's phase-out / phase-down baseline.
+## §8 Open Governance
 
-## §5 Phase-out schedule declaration
-
-Per substance × party-status, the controlling schedule:
-
-- `scheduleId` — URN
-- `substanceClass` — Annex A / B / C / E / F group
-- `partyStatus` — `article-5`, `non-article-5`
-- `baselineYears` — declared baseline years (averages used
-  for the substance's group)
-- `baselineConsumption` — ODP-weighted tonnes
-- `milestones[]` — per-year reduction targets:
-  - Annex A I (CFC) non-Art.5: -50% 1995, -75% 1996, -100% 1996
-  - Annex A I Art.5: -100% 2010 (with later limited
-    exemptions)
-  - Annex C I (HCFC) non-Art.5: freeze 1996, -65% 2004,
-    -75% 2010, -90% 2015, -99.5% 2020, -100% 2030
-  - Annex C I Art.5: freeze 2013, -10% 2015, -35% 2020,
-    -67.5% 2025, -97.5% 2030 (with limited servicing tail)
-  - Annex F (HFC, Kigali) non-Art.5: -10% 2019, -40% 2024,
-    -70% 2029, -80% 2034, -85% 2036
-  - Annex F Art.5 Group 1: freeze 2024, -10% 2029, -30%
-    2035, -50% 2040, -80% 2045
-  - Annex F Art.5 Group 2 (warmer climates): freeze 2028,
-    -10% 2032, -20% 2037, -30% 2042, -85% 2047
-- `currentYearTarget` — the binding consumption ceiling for
-  the current reporting year
-
-The boundary cross-checks each consumption record against
-the schedule; non-compliance flags trigger investigation
-records.
-
-## §6 Atmospheric observation record
-
-Ground-based and satellite ozone observations:
-
-- `observationId` — URN
-- `stationRef` — observation site URN (WMO GAW station ID
-  or satellite-instrument ID)
-- `observationKind` — `total-column-ozone` (Dobson units),
-  `ozone-profile` (mPa per altitude bin from ozonesonde),
-  `surface-ozone` (parts per billion volume),
-  `solar-uv-index`, `tropopause-temperature` (correlate)
-- `instrument` — `dobson-spectrophotometer`, `brewer`,
-  `ozonesonde-ECC`, `OMI`, `TROPOMI`, `OMPS`, `MLS`
-- `observationTimestamp` — RFC 3339 with offset
-- `latitude` / `longitude` / `altitude`
-- `value` + `unit` — units per WMO standards (Dobson units
-  for total column, mPa for vertical profile)
-- `uncertainty` — declared per BIPM JCGM 100 GUM principles
-- `qualityFlag` — closed enum: `nominal`, `provisional`,
-  `processed`, `validated`, `corrected`, `withdrawn`
-- `dataAccessRef` — URN to the data file (NetCDF CF-1.10
-  conventions for satellite, TXT or NDJSON for sondes)
-
-Ground-station observations follow the WMO GAW programme;
-data submitted to the World Ozone and UV Radiation Data
-Centre (WOUDC).
-
-## §7 EESC trajectory record
-
-Equivalent stratospheric chlorine (EESC) — composite metric
-of stratospheric chlorine + bromine weighted by depletion
-efficacy:
-
-- `eescId` — URN
-- `latitudeBand` — `mid-latitude-NH`, `mid-latitude-SH`,
-  `polar-NH`, `polar-SH`, `tropical`
-- `referenceYear`
-- `eescPpt` — parts per trillion (chlorine equivalent)
-- `componentsPpt` — per-substance contribution
-- `methodology` — modelled (chemistry-transport model) vs.
-  reconstructed (from atmospheric observations)
-- `referenceAssessment` — citation to the WMO Scientific
-  Assessment of Ozone Depletion that produced the trajectory
-
-EESC trajectory is the composite signal used to assess
-ozone-layer recovery progress. Pre-1980 levels are the
-recovery target.
-
-## §8 Critical-use exemption record
-
-Methyl-bromide critical-use and HCFC servicing-tail
-exemptions:
-
-- `exemptionId` — URN
-- `partyRef`
-- `substanceRef`
-- `exemptionKind` — `critical-use-MB` (Article 2H),
-  `essential-use` (Article 2A-2I), `feedstock` (Article 1(6)
-  exclusion), `process-agent`, `laboratory-and-analytical`,
-  `qps` (quarantine and pre-shipment)
-- `exemptionYearsAuthorised` — authorised period
-- `quantityAuthorisedTonnes`
-- `actualUseTonnes` — annual use
-- `MOPDecisionRef` — Meeting-of-the-Parties decision URN
-  authorising the exemption (e.g., Decision IX/6 critical-use
-  criteria)
-- `nominationRef` — URN of the technical nomination submitted
-  to MBTOC / TEAP
-
-## §9 Illegal-trade case record
-
-Cross-border illegal-trade incidents:
-
-- `caseId` — URN
-- `partyRef` — reporting party
-- `discoveredAt`
-- `substanceRef`
-- `seizureKg`
-- `seizureLocation` — port / border / inland
-- `caseStatus` — `under-investigation`, `prosecuted-pending`,
-  `prosecuted-convicted`, `closed-no-action`, `referred-to-INTERPOL`
-- `interpolNotice` — INTERPOL reference if applicable
-- `mitigationActions[]` — destruction, return-to-origin,
-  fine, criminal-charge
-
-Cases are reported to UNEP via the iPIC (informal Prior
-Informed Consent) network and INTERPOL Project ENVISEC /
-Operation Smokestack-style coordinated enforcement actions.
-
-## §10 Refrigerant-life-cycle record (technician operations)
-
-For deployments tracking refrigerant handling:
-
-- `serviceEventId` — URN
-- `equipmentRef` — equipment URN
-- `technicianRef` — certified technician URN (per regional
-  certification: US EPA §608, EU F-gas Regulation 517/2014,
-  KR 환경부 냉매 관리 자격)
-- `eventKind` — `installation`, `recharge`, `repair`,
-  `decommissioning`, `recovery`, `recycling`, `destruction`
-- `substanceRef`
-- `quantityKg`
-- `containmentVerificationRef` — URN of leak-test evidence
-- `disposalCertificateRef` — for destruction / recycling
-
-Refrigerant-life-cycle records feed national F-gas reporting
-and serviceable-equipment-bank inventories.
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `ozone-layer-protection` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-## Annex A — Cross-domain references (informative)
 
-| Reference                  | Use site                                                    |
-|----------------------------|-------------------------------------------------------------|
-| WIA-greenhouse-gas-accounting | Kigali HFC accounting alignment                          |
-| WIA-supply-chain           | refrigerant import / export traceability                    |
-| WIA-network-security       | iPIC / INTERPOL data exchange security                       |
-| WIA-pq-crypto              | post-quantum migration phase                                 |
+## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
 
-## Annex B — Conformance disclosure
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
 
-Sections §2, §3, §4, §5 are mandatory for party-government
-reporting deployments. §6, §7 are mandatory for atmospheric-
-observation deployments. §8 is mandatory for parties claiming
-exemptions. §9 is mandatory for parties with enforcement
-operations. §10 is mandatory for refrigerant-management
-deployments.
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-## Annex C — Conformance levels
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-| Level     | Scope                                                        |
-|-----------|--------------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                         |
-| Verified  | annual third-party audit (ISO 14001 + UNEP MOP scrutiny)     |
-| Anchored  | continuous evidence package + UNEP Implementation Committee  |
+## Annex F — Adoption Roadmap
 
-## Annex D — Worked Article 7 submission (informative)
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-```json
-{
-  "transactionId": "urn:wia:ozone:tx:KOR:2026-A-CFC11-import",
-  "partyRef": "urn:wia:ozone:party:KOR",
-  "reportingYear": 2025,
-  "substanceRef": "urn:wia:ozone:substance:montreal-annex:Annex-A-CFC-11",
-  "transactionKind": "import",
-  "quantityKg": 0,
-  "partyOfOrigin": null,
-  "partyStatus": "non-article-5",
-  "verificationRef": "urn:wia:ozone:verify:KOR:2025-A-CFC-customs-summary"
-}
-```
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-For phased-out substances (CFC-11 in 2025), the report
-typically declares zero with a verification reference to the
-customs aggregate showing zero imports.
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-## Annex E — Versioning and deprecation
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-Versioning follows SemVer 2.0.0. Montreal Protocol amendment
-(e.g., new substance scheduled, baseline adjusted) triggers
-minor bumps. The Kigali Amendment introduction (2019) was
-the most recent major schedule extension.
+## Annex G — Test Vectors and Conformance Evidence
 
-## Annex F — EESC recovery target
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-Pre-1980 EESC level (~1.7 ppb mid-latitude) is the recovery
-benchmark. Current trajectory (2026) is in steady decline;
-WMO Scientific Assessment of Ozone Depletion 2022 projected
-mid-latitude recovery around 2040 and Antarctic recovery
-around 2066. Deployments tracking EESC reference the most
-recent WMO assessment.
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-## Annex G — TOMS / OMI / TROPOMI data-format crosswalk
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
+auditor tooling.
 
-Total-column ozone retrieval products (Level-2):
+## Annex H — Versioning and Deprecation Policy
 
-- TOMS (1978-2005): HDF format, 1° × 1.25° resolution
-- OMI (2004-): HDF-EOS5 / NetCDF-4, 13×24 km nadir
-- TROPOMI (2017-): NetCDF-4, 5.5×7 km nadir (post-2018)
-- OMPS (Suomi-NPP, NOAA-20, NOAA-21): NetCDF-4
+This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
 
-The boundary's ingestion adapters convert each to the
-canonical PHASE 1 §6 observation envelope.
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
 
-## Annex H — Cross-coalition data sharing
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
 
-Some atmospheric observations are shared cross-coalition
-(WMO GAW, Network for the Detection of Atmospheric
-Composition Change — NDACC) under FAIR data principles.
-The sharing record carries the FAIR conformance metadata
-(findable, accessible, interoperable, reusable) per the
-GO FAIR initiative.
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

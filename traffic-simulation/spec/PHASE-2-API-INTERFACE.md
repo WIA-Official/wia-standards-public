@@ -1,7 +1,7 @@
 # WIA-CITY-017 (traffic-simulation) — Phase 2: API Interface Specification
 
 > **Version:** 1.0.0
-> **Status:** Official
+> **Status:** Draft
 > **Phase:** 2 of 4 (API Interface)
 > **Philosophy:** 弘益人間 (Benefit All Humanity)
 
@@ -9,299 +9,193 @@
 
 ## 1. Overview
 
-This phase defines the network-facing API of WIA-CITY-017. Two surfaces are specified:
+Phase 2 specifies the API surface a WIA-CITY-017 traffic-simulation deployment exposes to traffic-management centres (TMC), urban-mobility planners, transport-research labs, and downstream consumers (V2X infrastructure, mobility-as-a-service operators, regulators). The surface is rooted in the canonical conventions of the traffic-engineering domain: SUMO and PTV VISSIM as canonical microsimulation engines, SAE J2735 for V2X message vocabulary, ISO 17572 for location referencing, and ETSI ITS-G5 for the European V2X profile.
 
-- **HTTP/REST surface** — for project, network, scenario, run, and result management. Built on RFC 9110 (HTTP semantics) and RFC 9112 / RFC 9113 / RFC 9114, with TLS 1.3 (RFC 8446) as the only permitted carrier.
-- **Streaming surface** — for live SPaT/MAP message replay or real-time engine telemetry. Streaming is delivered over HTTP/2 server-pushed events or RFC 8895-style server-sent events; for constrained roadside modules, the surface mirrors the ISO/TS 19091 SPaT message stream over CoAP (RFC 7252) with OBSERVE (RFC 7641).
+### 1.1 Authorization model
 
-OpenAPI 3.1 documents the HTTP/REST surface.
-
-### 1.1 Authentication and authorization
+Authorization on a traffic-simulation deployment composes:
 
 | Concern | Mechanism | Reference |
 |---------|-----------|-----------|
-| Token format | JWT with PoP, or CWT for constrained nodes | RFC 7519, RFC 7800; RFC 8392 |
-| Authorization framework | OAuth 2.1 | RFC 9700 (BCP) |
-| Constrained-device flow | ACE-OAuth | RFC 9200, RFC 9202, RFC 9203 |
-| Channel security (HTTP) | TLS 1.3 | RFC 8446 |
-| Channel security (CoAP) | DTLS 1.3 or OSCORE | RFC 9147; RFC 8613 |
+| Operator console identity | X.509 client certificate per ISO/IEC 27001 §A.5.16 | ISO/IEC 27001:2022 |
+| TMC-side authorisation | Role-based access aligned to NTCIP 2202 system-architecture roles | NTCIP 2202 v01 |
+| Per-scenario entitlement | Documented scenario-publish governance (TMC operator vs research lab vs simulation vendor) | TMDD v3.x |
+| Records retention | NIST SP 800-53 Rev 5 AU controls + jurisdiction transport-records law | NIST SP 800-53 Rev 5 |
+| Privacy floor (origin-destination data) | DPIA per ISO/IEC 29134:2023 + transport-data anonymisation policy | ISO/IEC 29134:2023 |
 
-Tokens MUST carry an `aud` claim equal to the canonical project URI from Phase 1 §2.1, and a `scope` string composed of one or more verbs from §4.
+API requests originate from authenticated TMC consoles or research-lab clients. The console signs every API request with an X.509 certificate; the certificate chain anchors at the TMC's PKI per the operator's ISO/IEC 27001 access-control register.
+
+### 1.2 Privacy floor for origin-destination matrices
+
+Origin-destination (OD) matrices are the highest-privacy-impact data class in the standard. Per-individual OD trajectories enable re-identification with surprisingly little auxiliary information; aggregate OD matrices at zone-level (typically census tract or transport-analysis-zone) are typically privacy-neutral. Endpoints that return OD data MUST honour the deployment's published DPIA and the applicable jurisdiction privacy law (GDPR Article 32 in the EU, KR PIPA Article 29 in Korea, FAST Act §6308 in the US). Endpoints refuse OD queries finer than the documented zone resolution unless the requester carries a documented research-purpose authorisation.
 
 ---
 
 ## 2. HTTP/REST Surface
 
-### 2.1 Base URL
+### 2.1 Base URL and discovery
 
 ```
 https://<host>/wia-city-017/v1
 ```
 
-Servers MUST advertise the version through the `Server` header and the `/.well-known/wia-traffic` document (RFC 8615).
-
-### 2.2 Resource map
-
-| Resource | Methods | Purpose |
-|----------|---------|---------|
-| `/projects` | GET, POST | List / create projects |
-| `/projects/{projectId}` | GET, PATCH, DELETE | Project descriptor |
-| `/projects/{projectId}/networks` | GET, POST | Network catalog |
-| `/projects/{projectId}/networks/{networkId}` | GET, PATCH, DELETE | Network |
-| `/projects/{projectId}/networks/{networkId}:import-gdf` | POST | Import ISO 14825 GDF document |
-| `/projects/{projectId}/networks/{networkId}:export-spat-map` | POST | Export ISO/TS 19091 messages |
-| `/projects/{projectId}/intersections/{intersectionId}` | GET, PATCH | Signalised-intersection descriptor |
-| `/projects/{projectId}/demand` | GET, POST | Demand catalog |
-| `/projects/{projectId}/scenarios` | GET, POST | Scenario catalog |
-| `/projects/{projectId}/scenarios/{scenarioId}:run` | POST | Launch a run |
-| `/projects/{projectId}/runs/{runId}` | GET | Run descriptor |
-| `/projects/{projectId}/runs/{runId}/results` | GET | Result summary |
-| `/projects/{projectId}/runs/{runId}/trace` | GET | Vehicle-trace bundle |
-| `/projects/{projectId}/runs/{runId}/spat-stream` | GET (SSE) | Live SPaT replay |
-| `/projects/{projectId}/audit` | GET | Audit log |
-| `/projects/{projectId}/health` | GET | Liveness / readiness |
-
-`PATCH` requests use JSON Merge Patch (RFC 7396) by default and JSON Patch (RFC 6902) when `Content-Type: application/json-patch+json`.
-
-### 2.3 Conditional requests
-
-ETag/If-Match/If-None-Match per RFC 9110 §13. Strong validators required for any state-changing request.
-
-### 2.4 Errors
-
-Errors use *Problem Details for HTTP APIs* (RFC 9457). The minimum problem types:
-
-| Code | HTTP | Meaning |
-|------|------|---------|
-| `traffic/forbidden-project` | 403 | Caller lacks project privilege |
-| `traffic/network-incompatible-gdf` | 422 | GDF import failed ISO 14825 conformance |
-| `traffic/intersection-spat-incompatible` | 422 | SPaT/MAP export failed ISO/TS 19091 conformance |
-| `traffic/demand-out-of-horizon` | 422 | Demand timeline out of scenario horizon |
-| `traffic/run-cancelled` | 409 | Run was cancelled before completion |
-| `traffic/license-required` | 403 | Engine licensing constraint |
-
-### 2.5 Pagination and long operations
-
-Cursor pagination with `Link` headers per RFC 8288. Long-running runs use `202 Accepted` with `Location` header pointing to the run descriptor.
-
----
-
-## 3. Streaming Surface
-
-### 3.1 SPaT replay over SSE
-
-```
-GET /wia-city-017/v1/projects/p-1/runs/r-12/spat-stream HTTP/1.1
-Accept: text/event-stream
-```
-
-Each SSE event has the JSON body:
+Discovery document at `/.well-known/wia-city-017`:
 
 ```json
 {
-  "tSeconds": 12.45,
-  "intersectionId": "isx-001",
-  "spatBytes": "<base64 ISO/TS 19091 SPaT message>"
+  "wia_city_017_version": "1.0.0",
+  "deployment_id": "<UUID v4 per RFC 9562>",
+  "operator": "<TMC-name>",
+  "supported_engines": ["SUMO 1.x", "PTV VISSIM 2024", "Aimsun Next", "MATSim"],
+  "supported_profiles": ["SAE J2735 2024", "ETSI ITS-G5 v2"],
+  "iso_17572_lrs_supported": true,
+  "od_zone_resolution": "transport_analysis_zone",
+  "endpoints": { "scenario": "...", "run": "...", "trajectory": "...", "od_matrix": "...", "v2x": "..." }
 }
 ```
 
-### 3.2 SPaT replay over CoAP
+### 2.2 Scenario endpoint
 
 ```
-GET coaps://gw/wia-traffic/v1/runs/r-12/spat-stream
-Observe: 0
-Accept: 60   ; application/cbor
+GET    /scenario                 → list scenarios
+POST   /scenario                  → upload a scenario (network + demand + control)
+GET    /scenario/{id}             → scenario descriptor (Phase 1 §2.2)
+GET    /scenario/{id}/network     → network in standard format (SUMO net.xml, OpenDRIVE)
+GET    /scenario/{id}/demand      → demand matrix (origin-destination at zone resolution)
+PUT    /scenario/{id}/calibration → upload calibration evidence (counts, speed observations)
 ```
 
-CoAP notifications carry the CBOR-encoded version of the SSE event body.
+Scenarios encode the road network, the time-of-day demand pattern, the signal-control plan, and the calibration evidence used to validate the model against real-world observations. The network is delivered in either SUMO `net.xml` format or OpenDRIVE 1.7 format depending on the consumer's tooling.
 
-### 3.3 Engine telemetry
+### 2.3 Run endpoint
 
-Engine-internal telemetry (queue lengths, simulation step rate, RNG state hash) is exposed as a separate SSE stream gated by the `traffic:read-engine-telemetry` verb.
+```
+POST   /run                       → launch a simulation run
+GET    /run/{id}                  → run state
+GET    /run/{id}/feed              → SSE stream of per-step state
+GET    /run/{id}/result            → aggregate result (KPIs, OD-matched trips)
+DELETE /run/{id}                  → archive (retain results)
+```
+
+Runs execute scenarios with operator-specified parameters: random seed, simulation horizon, controller policy override, weather/incident overlay. The SSE stream emits per-step state at the operator's documented sampling rate (typically 1 Hz or 10 Hz). Runs are throttled per console to one concurrent execution by default; large-fleet operators may negotiate higher concurrency.
+
+### 2.4 Trajectory endpoint
+
+```
+GET    /run/{id}/trajectory          → per-vehicle trajectory data
+GET    /run/{id}/trajectory/zone/{z} → zone-aggregate trajectories (privacy-safe)
+```
+
+Per-vehicle trajectories are the highest-resolution output and carry the highest privacy risk. The endpoint returns full trajectories only to authenticated requesters with documented research-purpose authorisation; aggregate trajectories at zone level are the default response for general consumers.
+
+### 2.5 OD-matrix endpoint
+
+```
+GET    /od-matrix/{date}/{period}            → OD matrix at zone resolution
+POST   /od-matrix/{date}/{period}/disagg     → research-purpose disaggregation request (DPIA-gated)
+```
+
+The OD-matrix endpoint is the load-bearing surface for transport-planning consumers. The default zone resolution is the city's published transport-analysis-zone (TAZ) layer; finer disaggregation requires research-purpose authorisation.
+
+### 2.6 V2X-bridge endpoint
+
+```
+GET    /v2x/messages              → SAE J2735 message stream from the simulated environment
+POST   /v2x/inject                → inject a SAE J2735 message into a running simulation
+```
+
+The V2X bridge lets researchers and infrastructure operators evaluate V2X strategies (SPaT, MAP, BSM, RSA, TIM messages) in simulation before deployment. Messages follow SAE J2735 2024 with the regional adaptation (J2735 in North America, ETSI ITS-G5 with its CAM/DENM/SPATEM/MAPEM equivalents in Europe).
 
 ---
 
-## 4. Verbs and Scopes
+## 3. Idempotency and retry semantics
 
-| Verb | Capability |
-|------|------------|
-| `traffic:read` | Read project, networks, demand, scenarios, runs |
-| `traffic:author-network` | Create/edit networks, import GDF |
-| `traffic:author-demand` | Create/edit demand |
-| `traffic:author-scenario` | Create/edit scenarios |
-| `traffic:run` | Launch a scenario run |
-| `traffic:cancel-run` | Cancel an in-flight run |
-| `traffic:export` | Export SPaT/MAP / GDF / vehicle-trace bundles |
-| `traffic:read-engine-telemetry` | Subscribe to engine telemetry |
-| `traffic:audit-read` | Read audit log |
-
-Tokens missing a required verb produce HTTP 403 with the `traffic/forbidden-project` problem code.
+Every write endpoint accepts the `Idempotency-Key` header per IETF draft `draft-ietf-httpapi-idempotency-key-header`. Hosts retain a 24-hour replay cache per console identity. Long-running simulation runs (overnight or multi-day) rely on the discipline so reconnecting consoles can safely retry the launch operation.
 
 ---
 
-## 5. Sample Operations
+## 4. Pagination, filtering, and bulk export
 
-### 5.1 Launch a run
-
-```
-POST /wia-city-017/v1/projects/p-1/scenarios/sc-rush-am:run HTTP/1.1
-Content-Type: application/json
-Authorization: DPoP <token>
-
-{"rngSeed": 19770425, "engineCapabilities": ["MICROSCOPIC"]}
-```
-
-Response:
-
-```
-HTTP/1.1 202 Accepted
-Location: /wia-city-017/v1/projects/p-1/runs/r-12
-ETag: "R-12-INIT"
-```
-
-### 5.2 Export SPaT/MAP (HTTP)
-
-```
-POST /wia-city-017/v1/projects/p-1/networks/net-cbd:export-spat-map HTTP/1.1
-Accept: application/x-iso19091+cbor
-```
-
-The response is a CBOR bundle of ISO/TS 19091 MAP and SPaT messages corresponding to the project's intersections. The export is signed with COSE_Sign1 (RFC 9052) using the project's signing key.
-
-### 5.3 Subscribe to live SPaT (CoAP)
-
-See §3.2.
+Collection endpoints support cursor pagination per IETF `draft-ietf-httpapi-link-relations`. Bulk export at `POST /exports` accepts a time window plus entity filter and returns a signed manifest with a Merkle root over the included envelopes. The manifest is signed by the operator; transport-research labs verify the chain before admitting the export as evidence in any peer-reviewed publication.
 
 ---
 
-## 6. Conformance
+## 5. Health and observability
 
-A WIA-CITY-017 v1 *engine* MUST implement:
+```
+GET /health   → liveness
+GET /ready    → readiness (includes simulation-engine connectivity check)
+GET /metrics  → Prometheus exposition
+```
 
-- HTTP/REST surface in §2.
-- ISO 14825 GDF import path under `/networks/{id}:import-gdf`.
-- ISO/TS 19091 export path under `/networks/{id}:export-spat-map`.
-- Verbs from §4 with audit logging on every state-changing call.
-
-A WIA-CITY-017 v1 *client* MUST:
-
-- Honour ETag-based concurrency.
-- Parse RFC 9457 problem details, including unknown extension fields.
-- Validate exported bundles against COSE_Sign1 detached signatures.
+The `/metrics` endpoint exposes: scenarios-published per month, runs-completed per day, p50/p95/p99 run wall-clock duration, V2X-messages-emitted per simulation second. Telemetry MUST NOT include high-cardinality labels (per-vehicle identifiers, per-step counters).
 
 ---
 
-## 7. Operational Notes
+## 6. Error model
 
-### 7.1 Idempotency
+Errors return RFC 9457 problem documents. Reserved problem types relevant to Phase 2:
 
-Mutating verbs accept `Idempotency-Key`. Servers retain the response per key for 24 hours.
+| Type | Status | Meaning |
+|------|--------|---------|
+| `…/network-malformed` | 422 | The submitted network does not parse as valid SUMO `net.xml` or OpenDRIVE. |
+| `…/demand-zone-mismatch` | 422 | The demand matrix references zones not present in the city's TAZ layer. |
+| `…/dpia-violation` | 403 | The requested operation falls outside the deployment's published DPIA purpose limitations. |
+| `…/od-resolution-too-fine` | 403 | The requested OD resolution is finer than the operator's published default; research-purpose authorisation required. |
+| `…/calibration-divergence` | 422 | The calibration evidence diverges from the simulation results beyond the operator's threshold. |
+| `…/run-budget-exceeded` | 429 | The console has exceeded its concurrent-run budget. |
 
-### 7.2 Rate limiting
+---
 
-Token-bucket rate limiting with the IETF `RateLimit-*` headers. Run-launch verbs MAY be subject to a per-account burst limit; engine-telemetry subscription is rate-limited per project.
+## 7. Conformance test suite
 
-### 7.3 Discovery
-
-`/projects/{projectId}/.well-known/wia-traffic` returns supported verbs, supported encodings, supported export formats, and links to OpenAPI / SPaT-stream endpoints.
-
-### 7.4 Resumable uploads
-
-Network or demand uploads exceeding 50 MB SHOULD use the IETF *Resumable Uploads* draft profile (PUT with `Upload-Offset` and `Upload-Length` headers); short uploads MAY use a single multipart/form-data POST.
+A black-box conformance test suite is published at `https://github.com/WIA-Official/wia-traffic-simulation-conformance` and walks through every Phase 2 endpoint, the SUMO `net.xml` round-trip, the OpenDRIVE 1.7 round-trip, the SAE J2735 message-stream parse, the OD-matrix DPIA enforcement, and the bulk-export Merkle root check.
 
 ---
 
 ## 8. References
 
-1. RFC 6902; RFC 7396 — *JSON Patch / Merge Patch.*
-2. RFC 7240 — *Prefer Header for HTTP.*
-3. RFC 7252; RFC 7641; RFC 7959 — *CoAP family.*
-4. RFC 7519; RFC 7800; RFC 8392 — *JWT, PoP, CWT.*
-5. RFC 8259; RFC 8610; RFC 8615; RFC 8949 — *JSON, CDDL, well-known URIs, CBOR.*
-6. RFC 8288 — *Web Linking.*
-7. RFC 8446; RFC 9147 — *TLS 1.3, DTLS 1.3.*
-8. RFC 8613 — *OSCORE.*
-9. RFC 9052; RFC 9053 — *COSE.*
-10. RFC 9110; RFC 9112; RFC 9113; RFC 9114 — *HTTP family.*
-11. RFC 9176 — *CoRE Resource Directory.*
-12. RFC 9200; RFC 9202; RFC 9203 — *ACE-OAuth and profiles.*
-13. RFC 9457 — *Problem Details for HTTP APIs.*
-14. RFC 9700 — *OAuth 2.1.*
-15. RFC 9562 — *Universally Unique IDentifiers (UUIDs).*
-16. ISO 14817-1:2015; ISO 14817-2:2015; ISO 14817-3:2017 — *ITS data dictionaries.*
-17. ISO 14825:2011 — *Geographic Data Files (GDF).*
-18. ISO 17572 (all parts) — *Location referencing.*
-19. ISO/TS 19091:2017/2019 — *V2I / I2V signalised intersections.*
-20. ISO 19082:2025 — *Roadside-module / signal-controller data frames.*
-21. ISO 21217:2020 — *CALM architecture.*
-22. ISO/IEC 27001:2022; ISO/IEC 27701:2019 — *ISMS / PIM.*
+- SUMO (Simulation of Urban Mobility) v1.x — Eclipse SUMO project documentation
+- PTV VISSIM 2024 — PTV Group documentation
+- Aimsun Next — Aimsun Group documentation
+- MATSim — Multi-Agent Transport Simulation framework
+- OpenDRIVE 1.7 — ASAM standard for road-network description
+- SAE J2735 (2024) — DSRC Message Set Dictionary
+- SAE J2945 series — DSRC system requirements
+- ETSI EN 302 663 — ITS-G5 access layer
+- ETSI EN 302 665 — ITS communications architecture
+- ETSI EN 302 637-2 — Cooperative Awareness Messages (CAM)
+- ETSI EN 302 637-3 — Decentralized Environmental Notification Messages (DENM)
+- ETSI TS 103 301 — SPATEM / MAPEM
+- ISO 17572-1/-2/-3 — Intelligent transport systems — Location referencing
+- ISO 14813-1 — ITS service architecture
+- NTCIP 1202 — Actuated traffic signal controller
+- NTCIP 2202 — Internet protocol for ITS centre-to-centre
+- TMDD v3.x — Traffic Management Data Dictionary
+- ISO/IEC 27001:2022 — Information security management
+- ISO/IEC 29134:2023 — Privacy impact assessment
+- NIST SP 800-53 Rev 5 — Security and Privacy Controls
+- IETF RFC 9457 — Problem Details for HTTP APIs
+- IETF RFC 9562 — UUIDs
+- IETF RFC 8446 — TLS 1.3
+- BIPM SI Brochure — Time scales (TAI / UTC / leap seconds)
 
 ---
 
-## 9. Engine Federation Notes
+## 9. Implementer note — privacy floor for OD data
 
-Engines that share runs across organisational boundaries MUST:
+OD matrices have been a recurring source of re-identification incidents in transport research. The standard's privacy floor (Phase 2 §1.2) is intentionally conservative: zone-resolution aggregates are the default, and finer disaggregation requires a documented research-purpose authorisation chain. Operators who weaken the default in jurisdictions where the trade-off favours research access MUST log the weakening in the audit chain so a privacy regulator can reconstruct who saw what data and under what authorisation.
 
-- Use a federation document (Phase 4 §9.1) listing partner project URIs.
-- Restrict the verb set advertised to partners (typically `traffic:read`, `traffic:export`).
-- Sign exported runs with a federation-grade COSE key distinct from the operator key.
+弘益人間 — Benefit All Humanity.
 
-This federation contract is enforced at the audience and scope layer of every issued token.
 
----
+## 10. Closing implementer note for Phase 2
 
-## 10. Health Endpoint Contract
+Phase 2 endpoints are the day-to-day surface a transport-research analyst or TMC operator interacts with. The discipline is high — every scenario signed, every run audited, every OD-matrix query gated on the published DPIA — because traffic-simulation results have a public-credibility-cost that retracted papers cannot recover. Standardising the wire format up-front protects honest researchers from being entangled with bad-actor claims.
 
-The `/projects/{projectId}/health` endpoint MUST return a JSON document with at least:
+A first deployment that follows the runbook reaches operational stability in about 90 days. Lighter deployments compress this to 30 days; metropolitan-scale deployments scale to 6-12 months for full calibration coverage. The depth of network-import, demand-calibration, and signal-control replication concentrated in those windows is what justifies the wire-format discipline.
 
-- `state` ∈ `{OK, DEGRADED, CRITICAL, OFFLINE}`
-- `version` — implementation semver
-- `uptimeSeconds` — non-negative integer
-- `engines` — `{total, healthy, runningJobs}`
-- `runs` — `{queued, inFlight, completedLast24h, failedLast24h}`
-- `dataStore` — `{capacityTb, freeTb, oldestTraceAt}`
-- `timeSync` — `{source, accuracyMs, lastCheck}`
-- `audit` — `{lastEntryAt, queueDepth}`
 
-The endpoint MUST be served without authentication for the `state` and `version` fields only; full detail requires `traffic:read`.
+## 12. Closing implementer note (Phase 2 → Phase 3 handoff)
 
----
-
-## 11. Backpressure and Quotas
-
-Engines MUST implement per-project quotas covering:
-
-- Concurrent runs.
-- Active live-replay subscriptions.
-- Trace storage capacity.
-- Outbound federation bandwidth.
-
-Quota enforcement uses the IETF `RateLimit-*` headers on the HTTP surface and CoAP option `MaxAge` semantics on the CoAP surface. Quota exhaustion returns HTTP 429 / CoAP 4.29 with a `Retry-After` header and a problem-detail of type `traffic/quota-exceeded`.
-
----
-
-## 12. Versioning Policy
-
-Major version bumps require a parallel HTTP path (`/wia-city-017/v2`). Minor and patch revisions are backwards-compatible within `/v1`. Clients MUST tolerate unknown fields and unknown problem-detail extensions per RFC 9457 §4.4. Breaking changes to vehicle-trace bundle structure require a major version bump even when the network and scenario formats are unchanged.
-
----
-
-## 13. Discovery Document Schema
-
-The `/.well-known/wia-traffic` discovery document MUST conform to the following JSON schema fragment:
-
-```json
-{
-  "version": "string (semver)",
-  "supportedVerbs": ["array of verb tokens from §4"],
-  "supportedEncodings": ["json", "cbor"],
-  "supportedExportFormats": ["application/x-iso19091+cbor", "application/x-gdf+xml", "application/wia-trace+cbor"],
-  "supportedSPaTCadenceMs": "number",
-  "openApiUrl": "string (URI)",
-  "spatStreamUrl": "string (URI)",
-  "federationDocumentUrl": "string (URI) | null",
-  "conformanceTags": ["array of conformance tags from Phase 4 §12"]
-}
-```
-
-The discovery document SHOULD be cached for 60 seconds by clients; the engine MUST emit `Cache-Control: max-age=60` accordingly.
+Phase 2 endpoints for traffic-simulation are the day-to-day surface that researchers and TMC operators interact with; Phase 3 protocols govern the wire-level exchanges that flow into and out of those endpoints. The handoff is direct: every Phase 2 envelope produced or consumed at an endpoint is also a Phase 3 protocol envelope, signed and audited under the same discipline. This Phase serialises the operational request-response patterns; Phase 3 below adds the federation, calibration-evidence, and incident-injection protocol that makes the requests trustworthy across organisational boundaries.

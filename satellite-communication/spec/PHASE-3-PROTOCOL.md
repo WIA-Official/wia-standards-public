@@ -1,7 +1,7 @@
 # WIA-SPACE-003 (satellite-communication) — Phase 3: Protocol Specification
 
 > **Version:** 1.0.0
-> **Status:** Official
+> **Status:** Draft
 > **Phase:** 3 of 4 (Protocol)
 > **Philosophy:** 弘益人間 (Benefit All Humanity)
 
@@ -9,267 +9,217 @@
 
 ## 1. Overview
 
-Phase 3 specifies the wire protocols by which WIA-SPACE-003 deployments exchange data between **spacecraft**, **ground stations**, **user terminals**, **gateways**, and the **management plane**. The objective is to give a deterministic mapping of every Phase-2 verb to the relevant transport, and to fix the operational interoperability points between the deployment, the IETF *Delay-Tolerant Networking* family, and the OSI reference model that organises the entire stack.
+Phase 3 specifies the on-the-wire protocols by which WIA-SPACE-003 deployments coordinate across trust boundaries — between an operator and its mission partners, between an operator and its regulator, between an operator and a downstream science archive. The protocols are layered above the CCSDS framing of Phase 2 (TM and TC frames, SDLS, BPv7) and inherit the CCSDS conventions for time, identity, and audit.
 
-### 1.1 Protocol stack
+### 1.1 Time discipline
+
+All Phase 3 protocol exchanges carry timestamps in **TAI** per BIPM SI Brochure conventions, encoded in CCSDS Unsegmented Code (CUC) per **CCSDS 301.0-B-4** for binary contexts and in RFC 3339 with explicit TAI offset for textual contexts. Leap-second jumps in UTC do not affect protocol replay defence; the canonical TAI representation is monotonic.
+
+### 1.2 Replay defence bounds
+
+Every protocol envelope carries a 96-bit nonce and a TAI timestamp. Receivers reject envelopes with skew greater than ±300 seconds and maintain a 600-second seen-nonce cache. The cache is persistent across ground-segment console restarts so a power cycle does not re-open the window for a previously-blocked replay. Spacecraft-side replay defence is delegated to the SDLS Anti-Replay Counter per CCSDS 355.0-B-2 §5.3, which provides equivalent protection at the data-link layer.
+
+---
+
+## 2. Cross-support handshake (CCSDS 902.0-B)
+
+When two agencies cooperate on a mission (e.g., NASA Deep Space Network providing tracking for an ESA spacecraft, or KARI ground station providing downlink for a JAXA satellite during contingency), the cross-support handshake is the canonical protocol. It is a thin wrapper over CCSDS 902.0-B and CCSDS 921.1-B (SLE Service Management).
+
+### 2.1 Handshake state machine
 
 ```
-+---------------------------------------------------+
-| WIA-SPACE-003 application semantics (Phase 1+2)   |
-+---------------------------------------------------+
-| Mediation: gateway, bundle agent, link planner    |
-+---------------------------------------------------+
-| Transport (one of):                               |
-|   RFC 9171 BPv7 over TCPCL / UDPCL / LTPCL        |
-|   CoAP/UDP/IP                                     |
-|   HTTP/TCP/IP                                     |
-|   TLS / DTLS                                      |
-+---------------------------------------------------+
-| Physical: RF (L–Q bands) / optical / waveguide    |
-+---------------------------------------------------+
+IDLE    → BIND-REQUEST     : prime agency requests service binding
+BIND    → BIND-CONFIRM     : remote agency accepts, returns service ID
+BOUND   → SCHEDULE         : prime agency submits per-pass schedule
+ACTIVE  → SLE forward/return : actual SLE service traffic flows
+ACTIVE  → UNBIND-REQUEST   : prime agency releases binding
+UNBOUND → audit envelopes signed by both agencies
 ```
 
-The OSI layering of ISO/IEC 7498-1:1994 is preserved; each WIA artefact is associated with one or more OSI layers as documented in §6.
+The handshake reuses the WIA-SOCIAL Phase 3 §5 receipt shape so that vendor implementations across multiple WIA-family standards share their federation library; the addition is the CCSDS-specific service identifier (forward CLTU per CCSDS 911.1-B vs return all frames per CCSDS 911.2-B vs return online frames per CCSDS 911.5-B).
+
+### 2.2 Handshake envelope schema
+
+```json
+{
+  "wia_space_003_version": "1.0.0",
+  "type": "cross_support_handshake",
+  "handshake_id": "cs_01HX...",
+  "prime_agency": "did:wia:agency:nasa-dsn",
+  "remote_agency": "did:wia:agency:esa-estrack",
+  "spacecraft_id": "did:wia:spacecraft:bepicolombo",
+  "sle_service": "rcf" | "raf" | "cltu" | "rocf",
+  "service_window_start_tai": "RFC 3339 + TAI offset",
+  "service_window_end_tai": "RFC 3339 + TAI offset",
+  "ccsds_902_agreement_uri": "<URI>",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+```
+
+The `ccsds_902_agreement_uri` points at the signed bilateral agreement under CCSDS 902.0-B. The handshake envelope refers to the agreement; it does not replicate it. Auditors fetch the agreement separately when they need the full terms.
 
 ---
 
-## 2. Bundle Protocol (RFC 9171)
+## 3. Conjunction-warning protocol
 
-### 2.1 Bundles as first-class objects
+LEO and MEO operators publish conjunction-warning envelopes (predicted close approaches between two space objects) through this protocol. The data source is the operator's flight-dynamics system or a third-party provider (CSpOC / 18 SDS for the US, EU SST for Europe, KARI 우주환경 감시센터 for Korea); the wire format is uniform regardless of source.
 
-Bundles are first-class objects on the WIA-SPACE-003 wire. A bundle is a sequence of CBOR-encoded blocks per RFC 9171 §4.1. The primary block carries:
+### 3.1 Conjunction envelope schema
 
-- Bundle Protocol version (= 7).
-- Bundle processing flags.
-- Source, destination, report-to EIDs.
-- Creation timestamp.
-- Lifetime.
+```json
+{
+  "wia_space_003_version": "1.0.0",
+  "type": "conjunction_warning",
+  "warning_id": "cw_01HX...",
+  "primary_object": { "norad_id": 12345, "name": "...", "operator": "did:wia:operator:..." },
+  "secondary_object": { "norad_id": 67890, "name": "...", "operator": "did:wia:operator:..." },
+  "tca_tai": "<closest-approach time>",
+  "miss_distance_m": 740,
+  "miss_distance_uncertainty_m": 380,
+  "probability_of_collision": 1.4e-5,
+  "issuing_authority": "did:wia:cspoc",
+  "issued_at_tai": "<TAI timestamp>",
+  "expires_at_tai": "<TAI timestamp>",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+```
 
-Implementations MUST support the IPN URI scheme (RFC 9171 §4.2.5.2). Implementations MAY support the `dtn:` scheme.
+### 3.2 Operational discipline
 
-### 2.2 Convergence layers
+Conjunction warnings are the highest-priority traffic class on the deployment. Hosts MUST: deliver every warning to the affected operator within 60 seconds of issuance; emit a warning envelope to operations when delivery latency exceeds the threshold; and persist every warning to the audit log for at least 10 years (the typical regulator-archive horizon for orbital safety records).
 
-The following convergence layers are recognised:
-
-| Convergence | Reference | Use |
-|-------------|-----------|-----|
-| TCPCL | IETF DTN WG TCP convergence-layer specification | Reliable inter-gateway transfer over TCP |
-| UDPCL | IETF DTN WG UDP convergence-layer specification | Lossy / lower-latency transfer |
-| LTPCL | IETF DTN WG LTP convergence-layer specification | Very-long-delay deep-space |
-
-Each convergence layer's wire format defers to its IETF specification; the WIA descriptor ties a bundle-session to a chosen convergence layer.
-
-### 2.3 Default security context
-
-Bundle authenticity and confidentiality follow RFC 9173 *Default Security Context for the Bundle Protocol*. The deployment MUST use the BIB (Bundle Integrity Block) and BCB (Bundle Confidentiality Block) when the bundle traverses any untrusted segment.
-
-### 2.4 Custody and reports
-
-Custody transfer (where supported by the operator) and status reports (delivery, forward, acknowledgement) follow the RFC 9171 control-flow rules. The Phase-1 *BundleSession* descriptor records the custody-transfer policy chosen for the session.
-
-### 2.5 Lifetime
-
-The bundle lifetime field is honoured strictly. Expired bundles MUST raise the `space/bundle-lifetime-expired` problem on the management plane and MUST trigger an audit entry.
+Operators receiving a conjunction warning evaluate manoeuvre options under their flight-dynamics system; the standard does not adjudicate manoeuvre vs no-manoeuvre. It does require the operator to publish a `conjunction_response` envelope so the chain of decision is auditable downstream.
 
 ---
 
-## 3. Telemetry and Tele-command Sessions
+## 4. Frequency-coordination protocol
 
-### 3.1 Frame profile
+Spectrum coordination across operators flows through this protocol. The data source is ITU-R BR (Radiocommunication Bureau) for primary-jurisdiction allocations, and the operator's national administration for the operator's filed records (FCC IBFS in the US, Ofcom satellite licensing register in the UK, MSIT 무선국 데이터베이스 in Korea, MIC 周波数管理 system in Japan).
 
-Telemetry and tele-command sessions ride on operator-chosen telemetry frames. The Phase-1 *TelemetrySession* descriptor records the frame profile name and version. The wire frame format itself is owned by the operator's space-link tooling and is not redefined by WIA-SPACE-003.
+### 4.1 Coordination envelope schema
 
-### 3.2 Encryption at transport
+```json
+{
+  "wia_space_003_version": "1.0.0",
+  "type": "coordination_request",
+  "request_id": "fc_01HX...",
+  "filing_administration": "USA" | "GBR" | "KOR" | "JPN" | ...,
+  "filing_record_id": "<ITU-R notification ID>",
+  "frequency_band_mhz": [ 14000.0, 14500.0 ],
+  "polarization": "RHCP" | "LHCP" | "linear",
+  "service_area_iso6709": [ "+37.5665+126.9780/", ... ],
+  "service_window_start_tai": "<TAI>",
+  "service_window_end_tai": "<TAI>",
+  "interference_budget_dbW": -160,
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+```
 
-When `encryptionAtTransport.algorithm ≠ NONE`, the operator-chosen encryption MUST use AES-256-GCM or AES-128-GCM with a key managed under ISO 11770-2 (symmetric) or ISO 11770-3 (asymmetric).
-
-### 3.3 Tele-command authorisation
-
-Tele-commands carry an additional authorisation envelope: a COSE_Sign1 signature (RFC 9052) over the canonical command bytes, produced by a privileged operator key. Spacecraft MUST verify the signature before acting on the command.
-
-### 3.4 Replay protection
-
-Tele-commands include a strictly monotonic sequence number tied to the spacecraft's command counter. Replays are rejected at the spacecraft; the gateway MUST ensure that sequence numbers are not reused.
-
----
-
-## 4. Identity, Time, and Cryptography
-
-### 4.1 Identity
-
-- **Spacecraft, ground stations, user terminals**: X.509 v3 certificates (RFC 5280) issued by the deployment PKI.
-- **Operators**: federated identity over OAuth 2.1 (RFC 9700) and OIDC.
-
-### 4.2 Time
-
-Real-time operations MUST be slaved to NTPv4 with NTS (RFC 5905, RFC 8915). Spacecraft on-board time is reconciled against ground reference at every tracking pass.
-
-### 4.3 Cryptographic algorithms
-
-| Layer | Algorithm | Reference |
-|-------|-----------|-----------|
-| TLS / HTTP | TLS 1.3 cipher suites | RFC 8446 |
-| DTLS | DTLS 1.3 | RFC 9147 |
-| OSCORE | AES-CCM-16-64-128 | RFC 8613 §12 |
-| COSE signature | ES256, EdDSA | RFC 9053 |
-| BPv7 BIB / BCB | per RFC 9173 default security context | RFC 9173 |
-| At-rest storage | AES-256-GCM | ISO/IEC 18033-3, FIPS 197 |
-
-Implementations MUST refuse cipher suites whose IETF status is "not recommended" for new deployments.
+The `interference_budget_dbW` is the maximum interference power the operator is willing to accept from peer transmissions before triggering a coordination dispute. Disputes flow through the operator's national administration to ITU-R BR per Article 22 dispute-resolution conventions; the protocol envelope is the wire format for dispute correspondence.
 
 ---
 
-## 5. Failure Handling
+## 5. Mission-event protocol
 
-### 5.1 Loss of contact
+Operationally significant events (apogee burn, deorbit burn, payload deployment, attitude anomaly, propulsion-system stress) flow through this protocol so that mission partners and regulators have a uniform feed.
 
-Loss of contact between a spacecraft and a ground station for more than the configured no-contact timeout MUST raise an alarm on the management plane. The bundle agent MUST hold queued bundles within their lifetime budget and MUST refuse new bundles whose lifetime would exceed the resumed-contact horizon by an unsafe margin.
+### 5.1 Mission-event envelope schema
 
-### 5.2 Cryptographic failure
+```json
+{
+  "wia_space_003_version": "1.0.0",
+  "type": "mission_event",
+  "event_id": "me_01HX...",
+  "spacecraft_id": "did:wia:spacecraft:...",
+  "event_class": "manoeuvre" | "anomaly" | "deployment" | "ground_safety_incident" | "spectrum_event",
+  "event_subclass": "<short token>",
+  "occurred_at_tai": "<TAI>",
+  "operator_summary": "<short prose>",
+  "telemetry_evidence_uri": "<URI of TM session reference>",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+```
 
-Failed BIB or BCB verification, expired certificate, or OCSP "revoked" status MUST cause the offending bundle to be discarded with an audit entry.
-
-### 5.3 Tele-command rejection
-
-Tele-commands that fail signature verification, sequence checks, or operator-policy gates MUST be rejected at both the gateway and the spacecraft. The audit log MUST record the rejection reason.
-
-### 5.4 Gateway crash
-
-Gateway crashes MUST flush in-flight session state to durable storage before exiting where possible. On restart, the gateway MUST refuse to silently resume sessions; instead, sessions MUST be re-established under explicit operator action.
-
----
-
-## 6. OSI Mapping
-
-| OSI layer | WIA-SPACE-003 artefact | Notes |
-|-----------|------------------------|-------|
-| 1 (Physical) | RF or optical waveform | Owner: operator + national radio regulation |
-| 2 (Data Link) | Frame profile of TM/TC sessions | §3.1 |
-| 3 (Network) | BPv7 EIDs and routing | RFC 9171 |
-| 4 (Transport) | Convergence layer (TCPCL, UDPCL, LTPCL) | §2.2 |
-| 5 (Session) | BundleSession (Phase 1 §2.6) | — |
-| 6 (Presentation) | CBOR / JSON, COSE | RFC 8949 / 9052 |
-| 7 (Application) | Phase-2 verbs | §4 of Phase 2 |
-
-The OSI mapping is informative for human readers and normative for the conformance checklist of Phase 4 §6.
+Mission-event envelopes feed the operator's incident-response workflow and (when the event class is `ground_safety_incident`) the operator's national administration for required reporting. The standard does not replace the formal incident-report process; it provides the wire format that survives translation between the operator's tooling and the regulator's intake portal.
 
 ---
 
-## 7. Conformance Profiles
+## 6. Cross-orbit handover protocol
 
-### 7.1 Baseline profile (P-B)
+When a service spans multiple orbits (e.g., a LEO downlink rolling over to a GEO downlink during gap-filling), the cross-orbit handover protocol coordinates the source and destination ground-segment elements.
 
-A P-B gateway MUST:
+### 6.1 Handover state machine
 
-- Implement HTTP/REST surface (Phase 2 §2).
-- Implement BPv7 (RFC 9171) ingress and egress when the deployment uses bundle convergence.
-- Implement RFC 9173 default security context.
-- Issue COSE_Sign1 audit-log digests per Phase 4 §3.
+```
+PENDING   : prime ground segment requests handover; predicted handover time emitted
+COMMITTED : both source and destination acknowledge; service migration scheduled
+EXECUTED  : service migration completed; latency-of-handover measured
+RECONCILED: audit envelopes from both sides written to the audit log
+```
 
-### 7.2 Constrained-terminal profile (P-CT)
+Handover envelopes carry the per-orbit link descriptors (Phase 2 §2.3), the predicted glass-to-glass latency delta, and the customer notification chain so that customer applications can adapt their buffer strategies during the transition.
 
-A P-CT gateway MUST additionally:
+### 6.2 Handover failure modes
 
-- Implement CoAP surface (Phase 2 §3).
-- Implement OSCORE (RFC 8613) for end-to-end protection.
-- Implement CoRE Resource Directory registration (RFC 9176).
-
-### 7.3 Deep-space profile (P-DS)
-
-A P-DS gateway MUST additionally:
-
-- Implement LTPCL convergence layer.
-- Carry per-spacecraft mission time-base reconciliation.
-- Carry custody-transfer policy in BundleSession descriptors.
+| Failure | Detection | Operator response |
+|---------|-----------|-------------------|
+| Source link fade exceeds threshold mid-handover | Link-budget telemetry | Abort handover; restore source link if possible; otherwise emit service-interruption envelope |
+| Destination cannot accept (capacity exhausted) | Destination ack carries refusal reason | Try alternate destination; failing that, accept service interruption |
+| SDLS key rollover during handover window | Key-management envelope | Coordinate key rollover before handover; fall back to encrypted-only fail-safe |
+| Cross-support agreement does not cover destination | CCSDS 902.0-B agreement check | Refuse handover; propose alternate destination with covered agreement |
 
 ---
 
-## 8. Conformance Vectors
+## 7. Audit log discipline
 
-The conformance suite includes:
-
-- **BPv7 bundle round-trip** vectors per RFC 9171 §11.
-- **BIB / BCB protection** vectors per RFC 9173 §10.
-- **CoAP OBSERVE** vectors per RFC 7641 §6.
-- **TLS 1.3 cipher inventory** test against the RFC 8446 mandatory profile.
-- **NTS time-sync** test against an RFC 8915 reference server.
-- **Tele-command replay** test that intentionally replays a command and asserts rejection.
-
-A conformant gateway MUST pass every vector in the suite for its declared profile set.
+Every Phase 3 protocol envelope is written to an append-only log replicated across at least two storage backends. Retention is sized to the longest applicable regulatory window: 10 years for orbital-safety records, 7 years for spectrum-coordination records, 5 years for general operational records. The audit log is exposed via a federated query endpoint at `GET /audit?from=…&to=…&type=…` so an auditor reconstructing an incident can verify the chain without trusting the operator's current state.
 
 ---
 
-## 9. Latency and Reliability Budgets
+## 8. Cross-standard composition
 
-Operators MUST publish, per service plan, the following budgets:
+Phase 3 composes with: WIA-OMNI-API for operator and console identity, WIA-AIR-SHIELD for runtime trust list, WIA-SOCIAL Phase 3 §5 for the federation receipt shape, and WIA-INTENT for declaring the highest-level mission intent. The composition lets a single satellite-communication operator running multiple WIA-family standards reuse one identity, signature, audit, and federation machinery rather than maintaining separate parallel implementations.
 
-- 95th-percentile end-to-end latency for management-plane HTTP calls.
-- 95th-percentile end-to-end latency for bundle delivery (per orbital regime).
-- Per-month availability commitment.
-- Per-day bundle delivery commitment.
+---
 
-These budgets are recorded in the Phase-1 *ServicePlan* descriptor and surfaced through the discovery document.
+## 9. Conformance test coverage
+
+The Phase 3 conformance suite walks through: cross-support handshake against a mock partner agency, conjunction-warning round-trip with mock CSpOC data, frequency-coordination request-and-response, mission-event publication with audit-log assertion, cross-orbit handover happy path, and every failure mode in §6.2.
 
 ---
 
 ## 10. References
 
-1. ISO/IEC 7498-1:1994 — *OSI Basic Reference Model.*
-2. ISO/IEC 18033-3:2010 — *Block ciphers.*
-3. ISO/IEC 27001:2022; ISO/IEC 27037:2012.
-4. ISO 11770-2; ISO 11770-3 — *Key management.*
-5. IEC 62443-3-3:2013.
-6. RFC 4838 — *DTN Architecture.*
-7. RFC 5280 — *X.509 PKI Certificate and CRL Profile.*
-8. RFC 5905; RFC 8915 — *NTPv4, NTS.*
-9. RFC 7252; RFC 7641; RFC 7959 — *CoAP family.*
-10. RFC 8446; RFC 9147 — *TLS 1.3, DTLS 1.3.*
-11. RFC 8613 — *OSCORE.*
-12. RFC 8949 — *CBOR.*
-13. RFC 9052; RFC 9053 — *COSE.*
-14. RFC 9110; RFC 9457 — *HTTP semantics, problem details.*
-15. RFC 9171; RFC 9173 — *BPv7 and default security context.*
-16. RFC 9176 — *CoRE Resource Directory.*
-17. RFC 9700 — *OAuth 2.1.*
-18. FIPS 180-4 — *Secure Hash Standard.*
-19. FIPS 197 — *Advanced Encryption Standard.*
+- CCSDS 301.0-B-4 — Time Code Formats
+- CCSDS 355.0-B-2 — Space Data Link Security Protocol (SDLS)
+- CCSDS 902.0-B — Cross-Support Concept and Reference Architecture
+- CCSDS 911.1-B — SLE Forward CLTU Service
+- CCSDS 911.2-B — SLE Return All Frames Service
+- CCSDS 911.5-B — SLE Return Online Frames Service
+- CCSDS 921.1-B — SLE Service Management
+- ITU-R Radio Regulations Article 22 — Space services
+- ITU-R Recommendation S.1503 — Functional description of software for assessing non-GSO interference
+- ISO 24113 — Space systems — Space debris mitigation requirements
+- ISO/IEC 27001:2022 — Information security management
+- IEC 62443-3-3:2013 — System security requirements and security levels
+- BIPM SI Brochure — Time scales (TAI / UTC / leap seconds)
 
 ---
 
-## 11. Detailed Conformance Tests
+弘益人間 — Benefit All Humanity.
 
-### 11.1 BPv7 round-trip
 
-The conformance suite includes canonical bundles built with each combination of convergence layer (TCPCL, UDPCL, LTPCL) and security context (RFC 9173 BIB only, BIB+BCB, neither). The gateway MUST round-trip every combination without payload corruption.
+## Implementer note — operational lifecycle
 
-### 11.2 BIB / BCB protection vectors
+Satellite-communication implementations have a longer operational
+lifecycle than most software systems: a spacecraft launched today
+remains in service for 15-25 years on average, and the ground
+segment that operates it must continue to honour the protocol
+contracts of this Phase across that horizon. The backwards-
+compatibility promise (§Phase 4 — within the 1.x line, no Phase
+field shape, no endpoint, no protocol exchange will be removed)
+is therefore mandatory rather than aspirational; operators rely
+on it for capital-allocation decisions on hardware that has
+already left the gravitational well.
 
-Test vectors derived from RFC 9173 §10 test the gateway's handling of the *Default Security Context for the Bundle Protocol*. The gateway MUST reproduce expected canonical bytes for the BIB and BCB on each test bundle.
-
-### 11.3 CoAP OBSERVE
-
-A long-running CoAP OBSERVE subscription on a synthetic telemetry resource MUST be sustained for 24 hours without false re-registration; observers MUST receive notifications with monotonically increasing 24-bit Observe values.
-
-### 11.4 Tele-command replay
-
-The conformance suite intentionally replays a canonical tele-command. The gateway MUST reject the replay with the `space/forbidden-zone` problem code or an equivalent vendor-specific code, and MUST emit an audit entry that surfaces the replay reason.
-
-### 11.5 NTS time-sync
-
-The gateway MUST sustain ≤ 50 ms time deviation against a reference NTS-protected NTPv4 server over a 24-hour run while subjected to a network jitter profile of 10 ms 95th-percentile.
-
-### 11.6 OSI mapping audit
-
-For each artefact in the deployment, the gateway MUST emit a discovery hint binding the artefact to its OSI layer per Phase 3 §6. The hint surfaces under `/.well-known/wia-space-osi-mapping` and is validated by the conformance suite.
-
----
-
-## 12. Profile Selection Guidance
-
-Operators choose a conformance profile based on the deployment's role:
-
-- **Off-line catalog management (P-B)** — catalog, contact-window planning, link-budget calculations; no real-time traffic.
-- **IoT-class user terminals (P-CT)** — constrained-terminal profile; CoAP and OSCORE on the user side.
-- **Deep-space missions (P-DS)** — long-delay support; LTP convergence layer; mission time-base reconciliation.
-
-A deployment MAY combine profiles. Combined profiles MUST surface every constituent tag in Phase 4 §10.
+弘益人間 — Benefit All Humanity.

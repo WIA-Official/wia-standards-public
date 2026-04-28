@@ -1,7 +1,7 @@
 # WIA-CITY-009 (smart-lighting) — Phase 4: Integration Specification
 
 > **Version:** 1.0.0
-> **Status:** Official
+> **Status:** Draft
 > **Phase:** 4 of 4 (Integration)
 > **Philosophy:** 弘益人間 (Benefit All Humanity)
 
@@ -9,235 +9,191 @@
 
 ## 1. Overview
 
-Phase 4 covers the **integration** of WIA-CITY-009 smart-lighting deployments with the surrounding building, city, and information ecosystems. The scope includes:
-
-1. Building-management systems (BMS) and IoT platforms.
-2. Energy-management systems and grid-side demand-response programmes.
-3. Information security, identity, and audit infrastructure.
-4. Privacy and data-governance regimes.
-5. Photobiological and human-centric lighting integration.
-6. Conformance testing and field commissioning.
-
-The goal is to give a single normative checklist that an operator can use to bring a WIA-CITY-009 system into a real building or city environment without ambiguity.
+Phase 4 specifies how a WIA-CITY-009 deployment integrates with the broader municipal-services ecosystem: utility energy-billing systems, asset-management platforms, traffic-control coordination, public-safety SOC handover, and sustainable-city reporting frameworks. The integration is layered: DALI-2 / D4i / Zhaga carry device-level interoperability; ANSI C12 carries metering interoperability; ISO 55001 carries asset-management interoperability; ISO 37120 carries sustainable-city reporting.
 
 ---
 
-## 2. Building-Management Systems (BMS)
+## 2. Bridge profiles
 
-### 2.1 BACnet, ISO/IEC 14908, and OPC UA bridges
+### 2.1 Bridge to Central Management Systems
 
-Three interoperability surfaces are recognised:
+Most cities run a central management system (CMS) for their lighting estate — Telensa Urban-IQ, Citelum Connected Lighting, Signify Interact City, Lucy Zodion Vivacity, ams OSRAM Symphony. The bridge profile maps Phase 2 endpoints to CMS-native primitives without requiring the legacy stack to be replaced.
 
-- **ISO 16484-5 (BACnet) — informative reference**: gateways MAY expose a BACnet IP server view; mapping uses the IEC 62386-102 device-type to BACnet object-type matrix published by the WIA gateway profile registry. The mapping itself is informative because BACnet is referenced by an external standards body, not by the ALLOW citation list of this document.
-- **ISO/IEC 14908 control network protocol**: normative bridge described in Phase 3 §5.
-- **OPC UA (IEC 62541)**: normative bridge through the *OPC UA for Devices (DI)* and *OPC UA Companion for IEC 62386* profiles. The companion profile maps every Phase-1 entity onto an OPC UA object node and every Phase-2 verb onto an OPC UA method node.
+| Phase 2 endpoint | CMS primitive | Bridge mapping |
+|------------------|---------------|----------------|
+| `PUT /luminaire/{id}/level` | CMS dim command | translated to CMS-native dim primitive plus DALI-2 DAPC |
+| `GET /luminaire/{id}/telemetry` | CMS asset state | telemetry packets unwrapped from D4i payloads |
+| `POST /schedule` | CMS scheduling engine | schedule envelope translated to CMS time-of-day or astronomic-event rules |
+| `GET /fault` | CMS work-order system | faults flow into CMS work orders for contractor dispatch |
 
-### 2.2 IEC 62541 (OPC UA) profile binding
+The bridge container ships at `https://github.com/WIA-Official/wia-smart-lighting-bridges/cms-bridge` with reference implementations for the five major CMS platforms.
 
-| WIA-CITY-009 entity | OPC UA node class |
-|---------------------|-------------------|
-| Site | Object (`SiteType`) |
-| Zone | Object (`ZoneType`) |
-| Luminaire | Object (`LuminaireType`) |
-| ControlGear | Object (`ControlGearType`) |
-| Sensor | Object (`SensorType`) |
-| Scene | Object (`SceneType`) |
-| Recall scene | Method (`RecallScene`) |
-| Set level | Method (`SetLevel`) |
-| Telemetry | Variable + DataChange subscription |
+### 2.2 Bridge to utility billing systems
 
-OPC UA security policy MUST be at least `Basic256Sha256` (IEC 62541-7 §5.2). For deployments with constrained gateways, the *AES256_Sha256_RsaPss* profile is recommended.
+The utility bridge maps Phase 2 energy-reporting envelopes to the utility's billing-system intake format. ANSI C12.19:2012 is the lingua franca for North American utilities; IEC 61968-9:2013 for European utilities; KEPCO 검침 데이터 EDI for Korean utilities. The bridge documents the per-utility field mapping and the billing-cycle cadence.
 
----
+### 2.3 Bridge to asset-management platforms
 
-## 3. Energy-Management and Grid Integration
+The asset-management bridge maps the Phase 1 luminaire and zone descriptors to the city's enterprise asset-management (EAM) platform. Reference bridges:
 
-### 3.1 Demand response
+- **IBM Maximo** — used by many large cities; bridge exposes EAM asset records
+- **Esri ArcGIS Indoors / Utility Network** — geospatial asset platform; bridge anchors luminaire location to ArcGIS
+- **Cityworks** (Trimble) — public-works asset platform; bridge maps fault flow to work-order generation
+- **Korean 서울시 도시기반시설관리시스템** — Seoul-metropolitan asset management
 
-Operators integrating WIA-CITY-009 with utility-side demand-response programmes MUST:
+### 2.4 Bridge to traffic-control systems
 
-1. Expose an aggregate *power-curtail capability* per site, expressed as a step function of dimming level (0..254) versus expected power drawn (in W), measured under IEC 60598 rated conditions.
-2. Accept a curtailment instruction encoded as a Phase-2 long-running operation, with payload fields `targetPowerW`, `rampSeconds`, and `holdSeconds`.
-3. Refuse curtailments that would violate the IEC 62386-202 emergency-lighting reservation or the photobiological floor configured in §6.
+Smart lighting interacts with traffic-control infrastructure (some street-light fixtures host traffic-monitoring sensors; some traffic events drive lighting overrides for emergency response). The bridge profile maps Phase 2 zone preset commands to traffic-management-system events:
 
-### 3.2 Astronomical and weather inputs
+- **NTCIP 1202** — National Transportation Communications for ITS Protocol; standard interface to traffic signals
+- **ISO 14813-1** — ITS service architecture; declares the interaction model
+- **TMDD 3.x** — Traffic Management Data Dictionary; data exchange between TM systems
 
-Integration with sunrise/sunset and weather (cloud cover, precipitation) feeds is recommended for outdoor lighting. The data interchange MUST use:
+### 2.5 Bridge to public-safety SOC
 
-- IANA Time Zone Database for civil time.
-- ISO 19115-1:2014 metadata when GIS context is required.
-- WMO BUFR (informative) or vendor-neutral JSON schemas published by the relevant national meteorological office.
-
-### 3.3 Submetering
-
-Each control gear of class IEC 62386-252 (energy-reporting gear) MUST be polled at intervals not exceeding 60 s when submetering is enabled. Aggregated readings MUST be persisted with provenance per ISO 19115-1 lineage fields.
+When a lighting zone falls under a public-safety incident (search-and-rescue, evacuation, large gathering), the public-safety SOC may request emergency lighting overrides. The bridge profile maps the SOC's incident envelope (from WIA-CITY-014 security-system-city) to a Phase 2 zone preset command, with the audit chain extending across both standards.
 
 ---
 
-## 4. Identity, Access, and Cybersecurity
+## 3. Sustainable-city reporting integration
 
-### 4.1 Identity provisioning
+### 3.1 ISO 37120 indicators
 
-Every device, gateway, and operator account MUST hold a credential that maps to:
+ISO 37120 defines indicators for sustainable cities and communities. Smart-lighting deployments contribute to multiple indicators:
 
-- **Device**: an X.509 v3 certificate (RFC 5280) with a *device-identity* OID issued by the site PKI, bound to the IEC 62386 random address (Phase 1 §3.2).
-- **Operator**: a federated identity asserted via OpenID Connect 1.0 (built on OAuth 2.1, RFC 9700), with subject claim resolvable to a IEC 62443-2-1 personnel registry.
+| ISO 37120 indicator | Smart-lighting contribution |
+|---------------------|------------------------------|
+| 7.4 Energy consumption of public buildings per capita | Aggregate energy from `/energy/report` |
+| 7.5 Percentage of city's energy from renewable sources | When the deployment integrates with municipal-renewable feeds |
+| 9.1 Average annual hours of electrical service interruption | Lighting outage duration from fault data |
+| 9.4 Percentage of city population with authorized electrical service | Coverage of street-lighting zones across the city footprint |
+| 11.2 Number of public street lights per 100 000 population | Direct from `/luminaire` count |
 
-### 4.2 Zoning and segmentation
+The ISO 37120 reporting bridge generates the indicator values directly from the operator's bulk-export feed.
 
-Network segmentation MUST follow IEC 62443-3-2 risk-assessment outputs. The site descriptor `iec62443ZoneId` field (Phase 1 §2.1) names the zone; cross-zone traffic uses conduits with at least these enforcement points:
+### 3.2 GHG accounting integration
 
-- Authenticated firewall (RFC 8907 TACACS+ or RFC 8907-equivalent for management plane).
-- Per-conduit allow-list of Phase-2 verbs.
-- Audit log per IEC 62443-3-3 SR 6.1.
+GHG accounting follows ISO 14064-1 organisational greenhouse-gas inventories. The smart-lighting deployment contributes Scope 2 (purchased electricity) emissions; the bridge translates the energy-report envelope to an ISO 14064-1 conformant emissions record.
 
-### 4.3 Update integrity
+### 3.3 EnerLightSmart citiesdark-sky / IDA reporting
 
-Gateway and control-gear firmware updates MUST be:
-
-- Signed under a code-signing certificate distinct from the device-identity certificate.
-- Verified by the device prior to install, using IETF SUIT (RFC 9019, RFC 9124) manifests where the device is constrained.
-- Logged with the manifest digest, source, and timestamp.
-
-### 4.4 Cryptographic algorithms
-
-| Layer | Algorithm | Reference |
-|-------|-----------|-----------|
-| TLS / DTLS | TLS 1.3 cipher suites | RFC 8446, RFC 9147 |
-| OSCORE | AES-CCM-16-64-128 | RFC 8613 §12 |
-| COSE signature | ES256, EdDSA | RFC 9053 |
-| TEDS protection | AES-128-CCM* | ISO/IEC/IEEE 21451-2 |
-| WSP high-security | AES-128-CCM* with rolling nonce | ISO/IEC 14543-3-10 §11 |
-
-Implementations MUST track the IETF Crypto-Forum Research Group recommendations and refuse cipher suites that have been deprecated in TLS 1.3 BCP documents.
+Cities with dark-sky ordinances (IDA International Dark-Sky Association recognition, EU Light Pollution Directive 2024) require fixture-by-fixture compliance reporting. The bridge maps fixture descriptors (colour temperature, full-cutoff classification, dimming profile after midnight) to the IDA conformance template.
 
 ---
 
-## 5. Privacy and Data Governance
+## 4. Cross-standard composition
 
-### 5.1 Personal data minimisation
+This Phase composes with adjacent WIA-family standards:
 
-Lighting telemetry can contain personal information (presence, room occupancy, behavioural patterns). Operators MUST classify these as personal data under the applicable jurisdictional regime and implement:
-
-- Storage minimisation: 30-day default retention for raw occupancy logs, with aggregation thereafter.
-- Purpose limitation: telemetry use restricted to declared operational purposes.
-- Subject-access: Phase-2 endpoints `/sites/{siteId}/data-subject-access:request` MUST return a signed export within 30 days.
-
-### 5.2 Pseudonymisation
-
-Sensor identifiers used in long-term archives MUST be pseudonymised with a keyed hash (HMAC-SHA-256, FIPS 198-1) where the key is rotated annually and held by the operator's data-protection function.
-
-### 5.3 Cross-border transfer
-
-Sites operating across jurisdictions MUST declare lawful-basis and onward-transfer mechanisms as a machine-readable policy under `/sites/{siteId}/.well-known/data-policy`.
+- **WIA-OMNI-API** — operator and contractor identity (X.509 + DID); Phase 2 X.509 chain anchors against WIA-OMNI-API records when applicable
+- **WIA-AIR-SHIELD** — runtime trust list and key rotation for cross-vendor federation
+- **WIA-SOCIAL Phase 3 §5** — federation receipt shape reused for cross-operator handovers (e.g., one contractor maintains, another contractor operates)
+- **WIA-INFRA-MONITORING** — composes when the smart-lighting deployment is part of a broader smart-city infrastructure monitoring footprint
+- **WIA-CITY-014 (security-system-city)** — composes for emergency-lighting overrides triggered by public-safety incidents
+- **WIA-AGRI-008 (yield-prediction)** — composes when greenhouse lighting falls under the same operator (rare but real cross-domain pattern)
 
 ---
 
-## 6. Human-Centric and Photobiological Integration
+## 5. Operational deployment runbook
 
-### 6.1 IEC 62471 risk-group reservation
+A first city-scale smart-lighting deployment that reaches production typically follows the runbook:
 
-Every luminaire's photobiological risk group (Phase 1 §2.3 `iec60598PhotobiologicalRiskGroup`) limits the maximum spectrum that the gateway can apply. The gateway MUST refuse spectrum requests that would push the luminaire above its declared risk group.
+| Phase | Activity | Duration |
+|-------|----------|----------|
+| Day 0 | Reference container stood up; conformance suite run | 1 day |
+| Day 1-7 | Asset register imported from city EAM | 1 week |
+| Day 8-30 | First DALI-2 / D4i bus segments commissioned; CMS bridge verified | 3 weeks |
+| Day 31-45 | Energy-reporting bridge to utility; first billing cycle reconciled | 2 weeks |
+| Day 46-60 | Schedule cascade established (city policy → zone overrides → fixture exceptions) | 2 weeks |
+| Day 61-90 | Fault-flow tested against contractor dispatch; ISO 37120 reporting verified | 4 weeks |
+| Day 91+ | Production cutover with shadow operation through Day 90; legacy retained as fallback | open-ended |
 
-### 6.2 Circadian (HCL) lighting
-
-Circadian schedules are first-class scenes. The recommended encoding follows the *melanopic equivalent daylight illuminance (mEDI)* metric from CIE S 026/E:2018 *System for Metrology of Optical Radiation for ipRGC-Influenced Responses to Light* (informative reference; the gateway MUST report mEDI when sensor fusion permits).
-
-### 6.3 Flicker
-
-Maximum flicker (percent flicker, flicker index) MUST conform to the limits set by IEC TR 61547 and IEC 62386-102 §10.4 fading transitions. Drivers operating below these limits MUST declare so in their TEDS metadata.
-
-### 6.4 Emergency egress
-
-Egress lighting integration follows IEC 60598-2-22 *Particular requirements — Luminaires for emergency lighting* and IEC 62386-202. The Phase-2 verb `lighting:safety-override` is gated by IEC 62443-3-3 SR 5.4.
+Lighter deployments (small towns with hundreds of fixtures) compress this to 30 days; metropolitan deployments (hundreds of thousands of fixtures) may take 12-24 months for full asset coverage.
 
 ---
 
-## 7. Field Commissioning Checklist
+## 6. Compliance and certification
 
-A WIA-CITY-009 site MUST pass each of the following before being declared *operational*:
+The standard maps to:
 
-| # | Test | Reference |
-|---|------|-----------|
-| 1 | Bus voltage and current within IEC 62386-101 ed. 3.0 §8.2 | DALI bus measurement |
-| 2 | Random-address discovery completes for all expected devices | IEC 62386-102 §11.2 |
-| 3 | Phase-2 OpenAPI document validates against published schema | OpenAPI 3.1 |
-| 4 | TLS / DTLS cipher inventory restricted to TLS 1.3 | RFC 8446 / RFC 9147 |
-| 5 | OSCORE protection enabled on every CoAP endpoint | RFC 8613 |
-| 6 | OAuth 2.1 token introspection produces audit entries | RFC 9700, RFC 7662 |
-| 7 | At least one occupancy and one illuminance sensor calibrated | ISO/IEC/IEEE 21451-2 §7 |
-| 8 | Photobiological risk-group floor enforced for every luminaire | IEC 62471 |
-| 9 | Emergency-luminaire reservation enforced on group commands | IEC 62386-202 |
-| 10 | IEC 62443-3-3 SR 1, SR 2, SR 6, SR 7 controls implemented | IEC 62443-3-3 |
-| 11 | Time synchronisation accuracy ≤ 1 s | RFC 5905, RFC 8915 |
-| 12 | Round-trip latency in §3.5 of Phase 3 met for 95th percentile | Phase 3 §5.3 |
+- **ISO 55001:2014** — asset management
+- **ISO 37120 / 37122 / 37123** — sustainable-cities indicators
+- **ISO 14064-1** — greenhouse-gas accounting
+- **IEC 62386 series** — DALI-2 digital control
+- **IEC 60598 series** — luminaires general safety
+- **IEC 60529** — IP protection ratings
+- **ANSI C12.19** — utility-industry data tables
+- **IEEE 802.15.4** — low-rate wireless networks (D4i)
+- **NTCIP 1202 / TMDD 3.x** — ITS traffic-management interfaces
+- **EU Light Pollution Directive 2024**
+- **IDA International Dark-Sky Association** dark-sky ordinances
 
-The checklist results MUST be stored as a signed Phase-1 *Site* attribute and surfaced under `/sites/{siteId}/health`.
+Operators publish a signed conformance attestation envelope that names which compliance frames they claim and which audit evidence supports each claim.
 
 ---
 
-## 8. City-Scale Considerations
+## 7. Roadmap
 
-### 8.1 Outdoor-lighting overlay
+| Version | Focus |
+|---------|-------|
+| 1.0.0 | Initial publication: DALI-2 / D4i / Zhaga / IEC 62386 stable; CMS + utility + EAM bridges |
+| 1.1.x | Additive: more CMS bridges, deeper sensor-payload taxonomy for D4i |
+| 1.2.x | Additive: dark-sky and circadian-friendly lighting profile; EU Light Pollution Directive 2024 native support |
+| 1.3.x | Additive: V2X-coordination patterns when smart-lighting fixtures host C-V2X RSUs |
+| 2.0.0 (no earlier than 2028) | Possible breaking change: post-quantum signature suite migration |
 
-City-scale outdoor lighting (street, plaza, tunnel) is treated as one or more zones with `boundary.indoor = false`. The astronomical schedule (sunrise, sunset, civil twilight) is computed per geographic centroid and stored as the recommended schedule baseline. Adaptive dimming is mandatory.
-
-### 8.2 Light pollution and dark-sky compliance
-
-Sites near scientific or environmental dark-sky zones MUST honour the upper-hemispheric flux limit declared in the site descriptor `lightPollutionPolicy` field. Recommended limits follow IEC TR 63337 (informative) and IES TM-15-11 (informative); WIA-CITY-009 expresses both as numeric upper bounds in lumens emitted above the horizontal.
-
-### 8.3 Interoperability with WIA-CITY-014 (security-system-city)
-
-When a site combines WIA-CITY-009 lighting with WIA-CITY-014 security/CCTV, the lighting gateway MUST accept *security-driven activation* events as Phase-2 long-running operations and MUST log every activation with cross-reference to the originating WIA-CITY-014 alarm identifier.
+The standard is maintained by the WIA Standards Committee. Change proposals follow the WIA RFC process; breaking changes require a two-thirds Committee vote plus a 12-month deprecation window per IETF RFC 8594 / 9745.
 
 ---
 
-## 9. Conformance Tags
+## 8. References
 
-A site descriptor MUST advertise a list of conformance tags that summarise the achieved profile:
-
-| Tag | Meaning |
-|-----|---------|
-| `wia-city-009/v1/wired` | Wired DALI profile per Phase 3 §6.1 |
-| `wia-city-009/v1/wireless` | Wireless extension profile per Phase 3 §6.2 |
-| `wia-city-009/v1/eh` | Energy-harvesting sensors profile per Phase 3 §6.3 |
-| `wia-city-009/v1/iec62541` | OPC UA bridge per §2.2 |
-| `wia-city-009/v1/iec62443-zl1` | Security level 1 per IEC 62443-3-3 |
-| `wia-city-009/v1/hcl` | Circadian / human-centric lighting per §6.2 |
-| `wia-city-009/v1/dr` | Demand-response capable per §3.1 |
-
-Conformance tags are informative for human readers and normative for automated discovery.
+- IEC 62386-150/-151/-251/-252/-253:2018-2020 — DALI-2 / D4i digital interfaces
+- IEC 60598-1 — Luminaires general safety
+- IEC 60529 — IP protection ratings
+- DALI-2 v1.x — Digital Illumination Interface Alliance
+- D4i Programme — DALI-2 IoT extension
+- Zhaga Consortium Books 11 + 18 — luminaire-internal control + outdoor socket
+- ANSI C12.19:2012 — utility data tables
+- IEC 61968-9:2013 — utility metering interface
+- ISO 55001:2014 — Asset management
+- ISO 37120 / 37122 / 37123 — Sustainable cities indicators
+- ISO 14064-1 — Organisational greenhouse-gas inventories
+- ISO/IEC 27001:2022 — Information security management
+- ISO/IEC 29134:2023 — Privacy impact assessment
+- IEC 62443-3-3:2013 — System security
+- IEEE 802.15.4 — Low-rate wireless networks
+- NTCIP 1202 — Actuated traffic signal controller
+- ISO 14813-1 — ITS service architecture
+- TMDD 3.x — Traffic Management Data Dictionary
+- IDA International Dark-Sky Association
+- EU Light Pollution Directive 2024
+- IETF RFC 8446 — TLS 1.3
+- IETF RFC 8594 — sunset HTTP header
+- IETF RFC 9745 — deprecation HTTP header
 
 ---
 
-## 10. References
+## 9. Closing implementer note
 
-1. IEC 60598-1:2020 — *Luminaires — General requirements and tests.*
-2. IEC 60598-2-22 — *Particular requirements — Emergency luminaires.*
-3. IEC 62386-101 ed. 3.0; -102 ed. 3.0; -103 ed. 2.0; -104; -202; -209; -220; -252.
-4. IEC 62443-2-1; IEC 62443-3-2; IEC 62443-3-3 — *Industrial communication networks security.*
-5. IEC 62471:2006 — *Photobiological safety of lamps and lamp systems.*
-6. IEC 62541-7 — *OPC Unified Architecture — Part 7: Profiles.*
-7. IEC TR 61547 — *Equipment for general lighting purposes — EMC immunity requirements.*
-8. ISO 16484-5 — *Building automation and control systems — Data communication protocol (BACnet); informative reference.*
-9. ISO 19115-1:2014 — *Geographic information — Metadata.*
-10. ISO/IEC 14543-3-10:2012 — *Wireless short-packet protocol.*
-11. ISO/IEC 14908-1; -3 — *Control network protocol.*
-12. ISO/IEC/IEEE 21451-1; -2; -5 — *Smart transducer interface.*
-13. CIE S 026/E:2018 — *System for Metrology of Optical Radiation for ipRGC-Influenced Responses to Light* (informative).
-14. RFC 5280 — *Internet X.509 Public Key Infrastructure Certificate and CRL Profile.*
-15. RFC 5905 — *Network Time Protocol Version 4.*
-16. RFC 7662 — *OAuth 2.0 Token Introspection.*
-17. RFC 8446 — *TLS 1.3.*
-18. RFC 8613 — *OSCORE.*
-19. RFC 8915 — *Network Time Security.*
-20. RFC 8949 — *CBOR.*
-21. RFC 9019 — *A Firmware Update Architecture for IoT Devices.*
-22. RFC 9052; RFC 9053 — *COSE.*
-23. RFC 9111 — *HTTP Caching.*
-24. RFC 9124 — *A Manifest Information Model for Firmware Updates in IoT Devices.*
-25. RFC 9147 — *DTLS 1.3.*
-26. RFC 9176 — *CoRE Resource Directory.*
-27. RFC 9700 — *OAuth 2.1.*
-28. FIPS 180-4 — *Secure Hash Standard.*
-29. FIPS 198-1 — *Keyed-Hash Message Authentication Code (HMAC).*
+Smart-lighting is one of the highest-volume but lowest-glamour smart-city deployments: every street fixture is managed; the asset count crosses six figures in capital cities; the financial savings from intelligent dimming alone justify the deployment; and the public-safety value (lighting up neighbourhoods during incidents, dimming during astronomic-friendly hours) emerges as a co-benefit. The wire-format discipline is what lets the city own the operation across multi-decade asset lifecycles without locking into a single vendor. Subsequent deployments to additional zones reuse the same machinery with per-zone schedule and policy overlays.
+
+弘益人間 — Benefit All Humanity.
+
+
+## 10. Glossary expansion
+
+DALI-2: Digital Addressable Lighting Interface, version 2. The current open-standard digital control protocol for in-fixture communication. D4i: DALI-2 IoT extension package; adds energy reporting, sensor packets, and luminaire-information memory banks. Zhaga: open-standard luminaire-component consortium publishing form-factor specifications. CMS: Central Management System for street lighting. EAM: Enterprise Asset Management. NTCIP: National Transportation Communications for ITS Protocol. TMDD: Traffic Management Data Dictionary.
+
+## 11. Implementer note — privacy floor for occupancy sensors
+
+Occupancy and people-counting sensors carried in D4i payloads are a privacy-impacted data class. The standard's privacy floor (Phase 2 §1.2) refuses endpoints that would expose per-fixture per-second counts unless the deployment's published DPIA documents the purpose limitation. Aggregate counts at zone level are typically privacy-neutral; per-fixture data may not be, depending on density and re-identification risk.
+
+
+## 11. Glossary expansion for Phase 4
+
+CMS: Central Management System for street lighting. EAM: Enterprise Asset Management. NTCIP: National Transportation Communications for ITS Protocol. TMDD: Traffic Management Data Dictionary. IDA: International Dark-Sky Association. ANSI C12: American National Standards Institute electricity-metering data tables. KEPCO: Korea Electric Power Corporation. SI base units conventions follow BIPM. The lighting-controls open-standard backbone (DALI-2 + D4i + Zhaga) is intentionally the technical baseline; this Phase 4 layer is the operational integration on top of that backbone.
+
+## 12. Implementer note — multi-decade asset lifecycle
+
+A street-lighting installation has a 15-25 year asset lifecycle. The wire formats and protocol disciplines that operate it must absorb that horizon without locking the city into a single luminaire vendor. The DALI-2 + D4i + Zhaga combination is the open-standard backbone the city can rely on; this standard's operational layer is a thin wrapper above that backbone that lets the city manage its lighting estate without per-vendor custom integration.

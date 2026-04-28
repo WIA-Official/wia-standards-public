@@ -1,7 +1,7 @@
 # WIA-SPACE-003 (satellite-communication) — Phase 2: API Interface Specification
 
 > **Version:** 1.0.0
-> **Status:** Official
+> **Status:** Draft
 > **Phase:** 2 of 4 (API Interface)
 > **Philosophy:** 弘益人間 (Benefit All Humanity)
 
@@ -9,291 +9,197 @@
 
 ## 1. Overview
 
-This phase defines the network-facing API of WIA-SPACE-003. Two complementary surfaces are specified:
+Phase 2 specifies the API surface a WIA-SPACE-003 deployment exposes to ground-segment operators, mission-control consoles, and downstream consumers (regulators, broadcasters, science archives). The surface is intentionally narrow: every endpoint maps to a Phase 1 entity (Phase 1 §2). Cryptographic identity, authorization, and audit logging are pinned to the canonical space-domain conventions of CCSDS rather than terrestrial enterprise conventions.
 
-- **HTTP/REST** — for management plane operations (catalog, contact-window planning, link-budget queries, service-plan administration), built on RFC 9110 (HTTP semantics) and RFC 9112 / RFC 9113 / RFC 9114, with TLS 1.3 (RFC 8446) as the only permitted carrier.
-- **CoAP** — for constrained user terminals (IoT-class VSATs, hand-held terminals), built on RFC 7252 with OBSERVE (RFC 7641), block transfer (RFC 7959), and DTLS 1.3 (RFC 9147) or OSCORE (RFC 8613) for security.
+### 1.1 Authorization model
 
-OpenAPI 3.1 documents the HTTP/REST surface. The CoAP surface uses a CoRE Resource Directory descriptor (RFC 9176).
-
-### 1.1 Authentication and authorization
+Authorization on a satellite-communication deployment is rooted in **CCSDS 355.0-B-2 — Space Data Link Security Protocol (SDLS)**. SDLS provides authentication, integrity, and (optionally) confidentiality at the data-link layer for both telemetry (downlink) and telecommand (uplink) frames; the protocol's Security Header and Security Trailer are the canonical anchor for all Phase 2 access decisions, not bearer tokens at the application layer.
 
 | Concern | Mechanism | Reference |
 |---------|-----------|-----------|
-| Token format | JWT with PoP, or CWT for constrained nodes | RFC 7519, RFC 7800; RFC 8392 |
-| Authorization framework | OAuth 2.1 | RFC 9700 (BCP) |
-| Constrained-device flow | ACE-OAuth | RFC 9200, RFC 9202 (DTLS), RFC 9203 (OSCORE) |
-| Channel security (HTTP) | TLS 1.3 | RFC 8446 |
-| Channel security (CoAP) | DTLS 1.3 or OSCORE | RFC 9147; RFC 8613 |
-| At-rest token integrity | COSE_Sign1 | RFC 9052 |
+| Telecommand authentication | SDLS Authentication Service over CCSDS 232.0-B-4 TC frames | CCSDS 355.0-B-2 §5.2; CCSDS 232.0-B-4 |
+| Telecommand confidentiality | SDLS Encryption Service (AES-256-GCM under SDLS framing) | CCSDS 355.0-B-2 §5.4; FIPS 197; NIST SP 800-38D |
+| Telemetry authentication | SDLS Authentication Service over CCSDS 132.0-B TM frames | CCSDS 355.0-B-2 §5.2; CCSDS 132.0-B |
+| Key management | CCSDS 354.0-M-2 Space Mission Key Management | CCSDS 354.0-M-2 |
+| Ground-segment console access | ISO/IEC 27001 §A.5–A.18 controls + IEC 62443-3-3 SR.1.1 | ISO/IEC 27001:2022; IEC 62443-3-3:2013 |
+| Inter-agency cross-support | CCSDS 902.0-B Cross-Support Concept | CCSDS 902.0-B |
 
-Tokens MUST carry an `aud` claim equal to the canonical deployment URI from Phase 1 §2.1, and a `scope` string composed of one or more verbs from §4 below.
+API requests originate from authenticated ground-segment consoles whose human-user identity is bound to an ISO/IEC 27001 access-control register; the console signs every API request with an X.509 certificate per IEC 62443-3-3 control SR 1.5 (authenticator management). The certificate chain anchors at the operator's PKI, not at a public CA, because operational satellite-comm trust does not reduce to public-web trust.
+
+### 1.2 Frequency-coordination compliance
+
+Every Phase 2 endpoint that touches an active link MUST honour the operator's filing record under **ITU-R Radio Regulations Article 22 (Space services)** and the operator's national administration filings (FCC Part 25 in the US, Ofcom satellite licensing in the UK, MIC告示 in Japan, MSIT 무선국 허가 in Korea). The deployment's `regulatoryFilings` field (Phase 1 §2.1.1) is the authoritative list; endpoints refuse operations that would violate a filed coordination record.
 
 ---
 
 ## 2. HTTP/REST Surface
 
-### 2.1 Base URL
+### 2.1 Base URL and discovery
 
 ```
 https://<host>/wia-space-003/v1
 ```
 
-Servers MUST advertise version 1 of this specification through the `Server` header and the `/.well-known/wia-space` document (RFC 8615 Well-Known URIs).
+Discovery document at `/.well-known/wia-space-003`:
 
-### 2.2 Resource map
+```json
+{
+  "wia_space_003_version": "1.0.0",
+  "deployment_id": "<UUID>",
+  "operator": "<operator-name>",
+  "supported_orbits": ["GEO", "MEO", "LEO", "HEO"],
+  "supported_bundles": ["RFC 9171 BPv7"],
+  "ccsds_profiles": {
+    "tm": "CCSDS 132.0-B",
+    "tc": "CCSDS 232.0-B-4",
+    "sdls": "CCSDS 355.0-B-2",
+    "key_mgmt": "CCSDS 354.0-M-2"
+  },
+  "itu_filings_uri": "<URI>",
+  "endpoints": { "spacecraft": "...", "link": "...", "bundle_session": "...", "telemetry_session": "..." }
+}
+```
 
-| Resource | Methods | Purpose |
-|----------|---------|---------|
-| `/deployments` | GET | List deployments visible to caller |
-| `/deployments/{id}` | GET, PATCH | Deployment descriptor |
-| `/deployments/{id}/spacecraft` | GET, POST | Spacecraft catalog |
-| `/deployments/{id}/spacecraft/{scId}` | GET, PATCH, DELETE | Spacecraft descriptor |
-| `/deployments/{id}/spacecraft/{scId}/orbit` | GET, PATCH | Orbit elements |
-| `/deployments/{id}/spacecraft/{scId}/contact-windows` | GET | Future contact windows for a station |
-| `/deployments/{id}/ground-stations` | GET, POST | Ground-station catalog |
-| `/deployments/{id}/ground-stations/{gsId}` | GET, PATCH, DELETE | Ground-station descriptor |
-| `/deployments/{id}/user-terminals` | GET, POST | User-terminal catalog |
-| `/deployments/{id}/links` | GET, POST | Link catalog |
-| `/deployments/{id}/links/{linkId}/budget` | GET, POST | Link-budget calculation |
-| `/deployments/{id}/bundle-sessions` | GET, POST | Bundle sessions |
-| `/deployments/{id}/bundle-sessions/{bsId}/bundles` | GET, POST | Bundle traffic |
-| `/deployments/{id}/telemetry-sessions` | GET, POST | Telemetry / tele-command sessions |
-| `/deployments/{id}/service-plans` | GET, POST | Service plans |
-| `/deployments/{id}/audit` | GET | Audit log |
-| `/deployments/{id}/health` | GET | Liveness / readiness |
+### 2.2 Spacecraft endpoint
 
-`PATCH` requests use JSON Merge Patch (RFC 7396) by default and JSON Patch (RFC 6902) when `Content-Type: application/json-patch+json`.
+```
+GET    /spacecraft                 → list of Spacecraft
+GET    /spacecraft/{id}            → single Spacecraft
+PUT    /spacecraft/{id}            → register / update
+GET    /spacecraft/{id}/state      → current operational state
+```
 
-### 2.3 Conditional requests
+The `state` sub-resource carries the latest TT&C session result (Phase 1 §2.5) plus the spacecraft's current attitude solution per the operator's flight-dynamics system. The endpoint is throttled to one request per second per console; sustained polling at higher rates triggers a `429 Too Many Requests` with `Retry-After`.
 
-ETag/If-Match/If-None-Match per RFC 9110 §13. Strong validators required for any state-changing request.
+### 2.3 Link endpoint
 
-### 2.4 Errors
+```
+GET    /link/{id}                  → link descriptor
+GET    /link/{id}/budget           → live link-budget telemetry
+POST   /link/{id}/handover         → request a handover
+```
 
-Errors use *Problem Details for HTTP APIs* (RFC 9457). The minimum problem types:
+The link descriptor carries: spacecraft and ground-station / user-terminal endpoints, frequency band, polarisation, modulation (8PSK / QPSK / 16APSK / DVB-S2X), FEC profile (DVB-S2X LDPC + BCH), nominal EIRP, nominal G/T, and the rain-fade margin used for the budget. The budget endpoint returns the live computed numbers and the predicted-degradation envelope for the next 30 minutes.
 
-| Code | HTTP | Meaning |
-|------|------|---------|
-| `space/forbidden-zone` | 403 | Caller lacks IEC 62443 zone privilege |
-| `space/spacecraft-out-of-coverage` | 409 | No contact window in the requested horizon |
-| `space/link-budget-infeasible` | 422 | Operator policy threshold not met |
-| `space/regulatory-filing-missing` | 422 | Required regulatory record absent |
-| `space/service-plan-quota-exceeded` | 429 | Tenant exceeded contracted plan |
-| `space/bundle-lifetime-expired` | 410 | Bundle expired before delivery |
+### 2.4 Bundle session endpoint
 
-### 2.5 Pagination
+```
+POST   /bundle-session              → open a BPv7 session (RFC 9171)
+GET    /bundle-session/{id}         → session state
+POST   /bundle-session/{id}/bundle  → submit a bundle
+GET    /bundle-session/{id}/feed    → SSE stream of incoming bundles
+DELETE /bundle-session/{id}         → close session
+```
 
-Cursor-based pagination is mandatory. Servers return `Link` headers per RFC 8288 with `rel="next"` and `rel="prev"`.
+Bundles are framed per RFC 9171 BPv7 with the `bcb-cose` security context per RFC 9173 (Bundle Protocol Security). The Phase 2 endpoint validates the BPv7 primary block, dispatches to the ground-segment routing engine, and returns receipts for accepted bundles. Bundles whose security context fails verification produce an RFC 9457 problem document of type `https://wiastandards.com/space/problem/bundle-bpsec-failed`.
 
-### 2.6 Long-running operations
+### 2.5 Telemetry session endpoint
 
-Bulk imports, link-budget Monte Carlo runs, and large contact-window scans are long-running. They follow `202 Accepted` + status-URI pattern, with optional `Prefer: respond-async` (RFC 7240).
+```
+POST   /telemetry-session           → open a TM session over CCSDS 132.0-B
+GET    /telemetry-session/{id}      → session state + last-frame summary
+GET    /telemetry-session/{id}/feed → SSE stream of TM frames (decoded)
+```
+
+Frames are decoded per CCSDS 132.0-B. The decoded payload arrives on the SSE stream as binary CBOR (RFC 8949) with a per-frame timestamp expressed in TAI per BIPM conventions to avoid leap-second ambiguity in operational reconstruction. Hosts MUST NOT expose raw SDLS-protected frame contents on this endpoint without explicit authorisation; the SDLS protection survives application-layer access control.
+
+### 2.6 Service plan endpoint
+
+```
+GET    /service-plan                → list active service plans
+POST   /service-plan                → create a plan (operator only)
+GET    /service-plan/{id}           → plan detail
+```
+
+Service plans encode the per-customer entitlement (which links, which orbits, which bandwidth, which jurisdictions). They map to the operator's billing system and to the ITU-R filing record so that a customer's traffic is always coordinated with its filed allocation.
 
 ---
 
-## 3. CoAP Surface
+## 3. Idempotency and retry semantics
 
-### 3.1 URI scheme
-
-```
-coaps://<gateway-host>/wia-space/v1/{path}
-```
-
-Resource paths mirror the HTTP surface but elide `deployments/{id}` because each gateway is bound to a single deployment.
-
-### 3.2 Methods and options
-
-CoAP methods (RFC 7252 §5.8) map directly: GET, POST, PUT, DELETE. Resource representations use CBOR (RFC 8949) with COSE_Sign1 / COSE_Encrypt0 wrappers (RFC 9052 / 9053) when end-to-end protection is required.
-
-OBSERVE (RFC 7641) MUST be supported for telemetry resources:
-
-```
-GET coaps://gw/wia-space/v1/spacecraft/sc-001/state
-Observe: 0
-```
-
-Block-wise transfers (RFC 7959) MUST be supported for any payload exceeding 1024 bytes.
-
-### 3.3 Resource Directory
-
-Gateways MUST register their resource set with a CoRE Resource Directory (RFC 9176). Resource types:
-
-- `rt="wia.s.spacecraft"` — spacecraft endpoint
-- `rt="wia.s.terminal"` — user-terminal endpoint
-- `rt="wia.s.link"` — link endpoint
-- `if="wia.s.observe"` — telemetry observe interface
+Every write endpoint accepts the `Idempotency-Key` header per IETF draft `draft-ietf-httpapi-idempotency-key-header`. Hosts retain a 24-hour replay cache of accepted keys per console identity. Repeated requests with the same key produce the same response without re-executing the side effect. The retention is sized so that a console reconnecting after a 12-hour ground-segment outage can safely retry every queued write without producing duplicate spacecraft commands.
 
 ---
 
-## 4. Verbs and Scopes
+## 4. Pagination, filtering, and bulk export
 
-| Verb | Capability | Surface(s) |
-|------|------------|------------|
-| `space:read` | Read catalog | HTTP, CoAP |
-| `space:author-spacecraft` | Add/edit spacecraft | HTTP |
-| `space:author-ground-station` | Add/edit ground stations | HTTP |
-| `space:author-user-terminal` | Add/edit user terminals | HTTP |
-| `space:plan-contact` | Compute contact windows | HTTP |
-| `space:author-link-budget` | Compute / persist link budgets | HTTP |
-| `space:bundle-send` | Submit bundles for transmission | HTTP, CoAP |
-| `space:bundle-receive` | Receive bundles | HTTP, CoAP |
-| `space:tc-send` | Send tele-commands | HTTP |
-| `space:tm-receive` | Receive telemetry | HTTP, CoAP |
-| `space:audit-read` | Read audit log | HTTP |
-| `space:plan-administration` | Manage service plans | HTTP |
-
-Each verb MUST be enforced at every surface. Tokens missing a required verb produce HTTP 403 / CoAP 4.03 with the `space/forbidden-zone` problem code.
+Collection endpoints support cursor pagination (`?cursor=…&limit=…`) per IETF `draft-ietf-httpapi-link-relations`. Filters use `?filter=…` with a small expression grammar documented in the discovery document. Bulk export at `POST /exports` accepts a time window plus an entity-type filter and returns a signed manifest with a Merkle root over the included envelopes per the standards bulk-export discipline; the manifest is signed by the operator and counter-signed by the auditor when the export is for regulatory inspection.
 
 ---
 
-## 5. Sample Operations
-
-### 5.1 Compute a link budget (HTTP)
+## 5. Health and observability
 
 ```
-POST /wia-space-003/v1/deployments/dp-1/links/lk-12/budget HTTP/1.1
-Host: gateway.example.org
-Authorization: DPoP <token>
-Content-Type: application/json
-
-{"weather":"CLEAR","atmosphericLossDb":1.2,"rainAttenuationDb":0.0}
+GET /health   → liveness
+GET /ready    → readiness (includes ground-segment connectivity check)
+GET /metrics  → Prometheus exposition
 ```
 
-Response:
-
-```
-HTTP/1.1 200 OK
-ETag: "BUD-2026-0432"
-Content-Type: application/json
-
-{"cnrDb": 12.3, "marginDb": 4.7, "feasible": true}
-```
-
-### 5.2 Compute contact windows
-
-```
-POST /wia-space-003/v1/deployments/dp-1/spacecraft/sc-001/contact-windows:compute HTTP/1.1
-Content-Type: application/json
-
-{"groundStationId":"gs-seoul-1","horizon":{"from":"2026-04-26T00:00Z","to":"2026-04-27T00:00Z"},"minElevationDeg":10}
-```
-
-### 5.3 Submit a bundle (HTTP)
-
-```
-POST /wia-space-003/v1/deployments/dp-1/bundle-sessions/bs-7/bundles HTTP/1.1
-Content-Type: application/cbor
-```
-
-The body is a CBOR representation of an RFC 9171 BPv7 bundle. The response carries an audit reference and the eventual transmission window.
+Health endpoints do not require authentication and do not count against the operator's rate limits. The `/metrics` endpoint exposes operator-actionable counters: bundles accepted/rejected per minute, TM frame loss rate per spacecraft, link-budget margin distribution per orbit, and SDLS verification failure count per console. Telemetry MUST NOT include high-cardinality labels (per-frame identifiers, per-customer identifiers); these would explode the time-series database without operational benefit.
 
 ---
 
-## 6. Conformance
+## 6. Error model
 
-A WIA-SPACE-003 v1 *gateway* MUST implement:
+Errors return RFC 9457 problem documents. Reserved problem types relevant to Phase 2:
 
-- HTTP/REST surface in §2 with TLS 1.3.
-- Verbs from §4 with audit logging on every state-changing call.
-- Problem details from §2.4.
-- BPv7 (RFC 9171) ingress and egress when the deployment uses bundle convergence.
-
-A WIA-SPACE-003 v1 *client* MUST:
-
-- Honour ETag-based concurrency.
-- Tolerate unknown problem-detail codes per RFC 9457 §4.4.
-- Handle CoAP block-wise transfers (RFC 7959) for any payload exceeding 1024 bytes.
+| Type | Status | Meaning |
+|------|--------|---------|
+| `…/itu-filing-violation` | 403 | The requested operation would violate a filed ITU-R Article 22 coordination record. |
+| `…/sdls-auth-failed` | 401 | SDLS authentication did not verify against the configured key catalogue. |
+| `…/bundle-bpsec-failed` | 422 | RFC 9173 BPSec verification failed for the submitted bundle. |
+| `…/link-fade-overshoot` | 503 | The link fade margin has exceeded the operator's threshold; no new traffic accepted on this link until it recovers. |
+| `…/ccsds-frame-malformed` | 422 | A submitted TC frame violates CCSDS 232.0-B-4 framing rules. |
+| `…/cross-support-denied` | 403 | The cross-support agreement (CCSDS 902.0-B) does not cover the requested operation. |
+| `…/key-rollover-required` | 412 | The session's SDLS key has reached its rollover threshold; the console MUST request a new key per CCSDS 354.0-M-2 before retrying. |
 
 ---
 
-## 7. Operational Notes
+## 7. Conformance test suite
 
-### 7.1 Idempotency
-
-Mutating verbs accept `Idempotency-Key`. Servers retain the response per key for 24 hours.
-
-### 7.2 Rate limiting
-
-Token-bucket rate limiting with the IETF `RateLimit-*` headers. Tele-command rate limits MUST be configured per spacecraft and per operator policy; the surface MUST refuse tele-commands that would exceed the spacecraft's safe-rate envelope.
-
-### 7.3 Discovery
-
-`/deployments/{id}/.well-known/wia-space` returns supported verbs, supported encodings, supported convergence layers, and links to OpenAPI / CoAP-RD endpoints.
-
-### 7.4 Health endpoint
-
-`/deployments/{id}/health` MUST return `{state, version, uptimeSeconds, spacecraft:{total,reachable}, links:{active,faulted}, bundles:{queued,inFlight,deliveredLast24h}, audit:{lastEntryAt,queueDepth}}`. The `state` and `version` fields MUST be served unauthenticated; full detail requires `space:read`.
+A black-box conformance test suite is published at `https://github.com/WIA-Official/wia-satellite-communication-conformance` and walks through every Phase 2 endpoint, every problem-document path, the SDLS authentication flow, the BPv7 bundle round-trip, the CCSDS 132.0-B TM-decode path, and the bulk-export Merkle root check. Hosts publishing `bridge_profile=Full` SHOULD additionally pass the suite's CCSDS 902.0-B Cross-Support extension tests against a mock partner agency.
 
 ---
 
 ## 8. References
 
-1. RFC 6902; RFC 7396 — *JSON Patch / Merge Patch.*
-2. RFC 7240 — *Prefer Header for HTTP.*
-3. RFC 7252; RFC 7641; RFC 7959 — *CoAP family.*
-4. RFC 7519; RFC 7800; RFC 8392 — *JWT, PoP, CWT.*
-5. RFC 8259; RFC 8610; RFC 8615; RFC 8949 — *JSON, CDDL, well-known URIs, CBOR.*
-6. RFC 8288 — *Web Linking.*
-7. RFC 8446; RFC 9147 — *TLS 1.3, DTLS 1.3.*
-8. RFC 8613 — *OSCORE.*
-9. RFC 9052; RFC 9053 — *COSE.*
-10. RFC 9110; RFC 9112; RFC 9113; RFC 9114 — *HTTP family.*
-11. RFC 9171; RFC 9173 — *BPv7, BPv7 default security context.*
-12. RFC 9176 — *CoRE Resource Directory.*
-13. RFC 9200; RFC 9202; RFC 9203 — *ACE-OAuth and profiles.*
-14. RFC 9457 — *Problem Details for HTTP APIs.*
-15. RFC 9700 — *OAuth 2.1.*
-16. ISO/IEC 27001:2022; ISO/IEC 27002:2022.
-17. IEC 62443-3-3:2013.
+- CCSDS 132.0-B-3 — TM Space Data Link Protocol
+- CCSDS 232.0-B-4 — TC Space Data Link Protocol
+- CCSDS 355.0-B-2 — Space Data Link Security Protocol (SDLS)
+- CCSDS 354.0-M-2 — Space Mission Key Management Concept
+- CCSDS 401.0-B — Radio Frequency and Modulation Systems
+- CCSDS 902.0-B — Cross-Support Concept and Reference Architecture
+- CCSDS 911.1-B — SLE Forward CLTU Service
+- CCSDS 911.2-B — SLE Return All Frames Service
+- ITU-R Radio Regulations Article 22 — Space services
+- IETF RFC 9171 — Bundle Protocol Version 7
+- IETF RFC 9172 — Bundle Protocol Security
+- IETF RFC 9173 — Default Security Contexts for Bundle Protocol Security
+- IETF RFC 9457 — Problem Details for HTTP APIs
+- IETF RFC 8949 — Concise Binary Object Representation (CBOR)
+- IETF RFC 9562 — Universally Unique IDentifiers (UUIDs)
+- ISO/IEC 27001:2022 — Information security management
+- IEC 62443-3-3:2013 — System security requirements and security levels
+- FIPS 197 — Advanced Encryption Standard (AES)
+- NIST SP 800-38D — GCM mode of operation
+- BIPM SI Brochure — Time scales (TAI / UTC / leap seconds)
 
 ---
 
-## 9. Discovery Document Schema
+弘益人間 — Benefit All Humanity.
 
-The `/.well-known/wia-space` discovery document MUST conform to the following JSON schema fragment:
 
-```json
-{
-  "version": "string (semver)",
-  "supportedVerbs": ["array of verb tokens from §4"],
-  "supportedEncodings": ["json", "cbor"],
-  "supportedConvergenceLayers": ["TCPCL", "UDPCL", "LTPCL"],
-  "supportedBands": ["array of band labels from Phase 1 §7"],
-  "openApiUrl": "string (URI)",
-  "coreResourceDirectoryUrl": "string (URI) | null",
-  "bundleProtocolVersion": 7,
-  "conformanceTags": ["array of conformance tags from Phase 4 §10"]
-}
-```
+## Implementer note — operational lifecycle
 
-The discovery document SHOULD be cached for 60 seconds by clients; the engine MUST emit `Cache-Control: max-age=60`.
+Satellite-communication implementations have a longer operational
+lifecycle than most software systems: a spacecraft launched today
+remains in service for 15-25 years on average, and the ground
+segment that operates it must continue to honour the protocol
+contracts of this Phase across that horizon. The backwards-
+compatibility promise (§Phase 4 — within the 1.x line, no Phase
+field shape, no endpoint, no protocol exchange will be removed)
+is therefore mandatory rather than aspirational; operators rely
+on it for capital-allocation decisions on hardware that has
+already left the gravitational well.
 
----
-
-## 10. Resumable Uploads and Downloads
-
-Bundle traffic and large telemetry archives use resumable uploads and downloads:
-
-- Uploads: PUT with `Upload-Offset` and `Upload-Length` headers per the IETF *Resumable Uploads* draft profile. Servers MAY also accept a single multipart/form-data POST when the body is small.
-- Downloads: GET with `Range` headers per RFC 9110 §14. Servers MUST advertise `Accept-Ranges: bytes`.
-
-Both directions support the IANA *Tus protocol* values where the server has registered them; the surface itself is media-type-agnostic.
-
----
-
-## 11. Versioning Policy
-
-Major version bumps require a parallel HTTP path (`/wia-space-003/v2`). Minor and patch revisions are backwards-compatible within `/v1`. Clients MUST tolerate unknown fields and unknown problem-detail extensions per RFC 9457 §4.4. Breaking changes to bundle ingress / egress formats require a major version bump even when the catalog formats are unchanged.
-
----
-
-## 12. Backpressure Profile
-
-Servers MUST publish a backpressure profile describing how the surface behaves under load:
-
-- Audit queue depth threshold (HTTP 503 + `Retry-After`).
-- Bundle queue depth threshold per session (HTTP 429 + `Retry-After`).
-- Tele-command rate limit per spacecraft (HTTP 429 + `Retry-After`).
-
-The profile lives at `/.well-known/wia-space-backpressure` and MUST be observable by tenants for capacity planning.
+弘益人間 — Benefit All Humanity.

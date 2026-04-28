@@ -1,343 +1,241 @@
-# WIA-ozone-layer-protection PHASE 3 — Protocol Specification
+# WIA-ozone-layer-protection PHASE 3 — PROTOCOL Specification
 
 **Standard:** WIA-ozone-layer-protection
-**Phase:** 3 — Protocol
+**Phase:** 3 — PROTOCOL
 **Version:** 1.0
 **Status:** Stable
 
-This PHASE specifies the protocols binding the data format
-(PHASE 1) to the API surface (PHASE 2): authentication of
-NOU officers, customs officers, GAW station operators,
-certified technicians, and Ozone Secretariat staff;
-substance-roster snapshotting; phase-out compliance scoring
-discipline; atmospheric-observation calibration linkage;
-illegal-trade information exchange via iPIC; Article 7
-submission workflow; audit-chain construction; time discipline.
+This document defines the canonical PROTOCOL layer for WIA-ozone-layer-protection (Ozone Layer Protection).
 
 References (CITATION-POLICY ALLOW only):
-- Vienna Convention + Montreal Protocol — protocol references
-- iPIC (informal Prior Informed Consent) Network operating procedures
-- BIPM JCGM 100:2008 GUM — measurement uncertainty
-- ISO/IEC 17025:2017 — laboratory accreditation
-- IETF RFC 8446 (TLS 1.3), RFC 7515 (JWS), RFC 7517 (JWK), RFC 9162 (CT 2.0)
-- WIA-pq-crypto PHASE 3 — for ML-KEM/ML-DSA migration
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## §1 Authentication
+## §1 Scope
 
-NOU officers, customs officers, GAW station operators,
-certified technicians, and Ozone Secretariat staff
-authenticate using JWS-signed JWTs issued by the deployment's
-identity authority. Token claims:
+This PHASE document is one of four that together define the WIA-ozone-layer-protection
+standard. It addresses the protocol layer of the standard.
 
-| Claim         | Source                                                 |
-|---------------|--------------------------------------------------------|
-| `iss`         | identity-provider URL                                  |
-| `aud`         | the boundary URL                                       |
-| `sub`         | principal URN                                          |
-| `iat` / `exp` | per RFC 7519                                           |
-| `wia.role`    | `nou-officer`, `customs-officer`, `gaw-station-operator`, `certified-technician`, `secretariat-officer`, `auditor` |
-| `wia.partyRef` | for party-bound roles                                  |
-| `wia.scope`   | operation-class scopes                                 |
-| `wia.certificationRef` | for certified-technician roles                  |
+## §2 Manifest
 
-Secretariat tokens require mTLS binding to the UNEP-issued
-certificate hierarchy.
+Implementations publish a signed manifest containing standardSlug
+(constant value: "ozone-layer-protection"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-## §2 Substance-roster snapshotting
+## §3 Conformance Tiers
 
-The deployment's substance roster is versioned:
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-- `rosterId` — URN
-- `effectiveFrom` — RFC 3339
-- `montrealAmendmentRef` — most recent amendment incorporated
-  (Vienna 1985, Montreal 1987, London 1990, Copenhagen 1992,
-  Montreal 1997, Beijing 1999, Kigali 2016, future amendments)
-- `signature` — JWS by the deployment's roster curator
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-Each transaction record references the roster ID active at
-publication time. Substance reclassification (e.g., a
-substance moved between annexes) is rare but tracked in
-the roster's chain.
+## §4 Discovery
 
-## §3 Phase-out compliance scoring
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/ozone-layer-protection`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-Compliance scoring runs against the schedule active at the
-reporting year:
+## §5 Time and Identity
 
-1. Aggregate per-substance × party × year consumption
-2. Look up the schedule for substance × party-status × year
-3. Compute headroom or excess
-4. Emit per-substance compliance verdict:
-   - `compliant` (consumption ≤ target)
-   - `over-target-with-exemption` (excess covered by
-     authorised exemption)
-   - `over-target-without-exemption` (excess not covered;
-     non-compliance flag raised)
-   - `report-incomplete` (insufficient transaction data)
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-Compliance scoring is recomputable; corrections to underlying
-transactions trigger re-scoring with audit-chain entries
-documenting the recomputation.
+## §6 Versioning and Deprecation
 
-## §4 Atmospheric-observation calibration linkage
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-Each observation record's `qualityFlag` reflects calibration
-state:
+## §7 Privacy and Security
 
-- `nominal` — instrument operating within calibration; data
-  emitted in real-time
-- `provisional` — recently corrected for known bias; may
-  change post final processing
-- `processed` — Level-2 product computed
-- `validated` — cross-validated against secondary instrument
-  or co-located comparison
-- `corrected` — re-released after post-publication correction
-- `withdrawn` — superseded by a corrected version
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-For Dobson / Brewer instruments, the calibration linkage
-references the World Meteorological Organisation's Calibration
-Centre (WCC-Brewer at Toronto, WCC-Dobson at Hohenpeissenberg)
-and the most recent intercomparison. For ozonesondes, the
-SHADOZ network operating procedure is referenced.
+## §8 Open Governance
 
-## §5 Illegal-trade information exchange (iPIC)
-
-iPIC consultations follow a documented sequence:
-
-1. Discovering party's NOU posts the case via PHASE 2 §7
-2. Boundary forwards the case to the importing/exporting
-   party's NOU (per case context) via the iPIC exchange
-   channel
-3. Receiving NOU acknowledges receipt
-4. Receiving NOU posts response (`legal-import`,
-   `unauthorised-export`, `under-investigation`,
-   `no-record-found`)
-5. Both parties update the case state with the response
-   and any subsequent enforcement actions
-6. UNEP Ozone Secretariat notified for aggregate iPIC
-   reporting
-
-Each step emits an audit-chain entry signed by the
-responsible NOU.
-
-## §6 Article 7 submission workflow
-
-Annual Article 7 submission follows:
-
-1. Reporting deadline: 30 September of the year following
-   the reporting year (per Article 7 paragraph 3)
-2. NOU compiles transactions per substance per party per
-   year
-3. Submission package signed by the NOU and forwarded to
-   UNEP via PHASE 2 §9
-4. UNEP Ozone Secretariat acknowledges receipt
-5. Secretariat aggregation publishes summary tables
-6. Implementation Committee reviews any flagged
-   non-compliance
-
-Late submissions are accepted but flagged; the
-Implementation Committee under the Procedure for
-Non-Compliance reviews persistent late filers.
-
-## §7 Audit chain
-
-Every state transition emits an AuditEvent appended to a
-Merkle audit log:
-
-`kind` enum:
-- `substance-roster-published` / `substance-amended`
-- `transaction-published` / `transaction-corrected`
-- `consumption-computed` / `consumption-recomputed`
-- `exemption-published` / `exemption-state-changed`
-- `observation-published` / `observation-validated` /
-  `observation-corrected` / `observation-withdrawn`
-- `eesc-trajectory-updated`
-- `illegal-trade-case-opened` / `case-state-changed` /
-  `ipic-consultation-sent` / `ipic-response-received`
-- `service-event-published`
-- `a7-submission-compiled` / `a7-submission-sent` /
-  `a7-acknowledged`
-- `compliance-flag-raised` / `compliance-flag-resolved`
-
-Anchored deployments (national NOUs serving as authoritative
-reporting boundaries) mirror the audit chain to UNEP Ozone
-Secretariat as a witness on the agreed cadence.
-
-## §8 Time discipline
-
-Boundary clock: NTPv4 stratum-2. Atmospheric observations
-carry their own time-tagging discipline (GPS-disciplined
-for ground stations, satellite ephemeris for orbit-based).
-Transaction timestamps reference customs-clearance
-timestamps where applicable; the boundary records both
-the customs-claimed and the boundary-receipt timestamps
-for cross-validation.
-
-## §9 Cryptographic-suite registry
-
-| Concern                  | Default                            | Notes                                |
-|--------------------------|------------------------------------|--------------------------------------|
-| Token signing            | ES256                              | mTLS-bound for Secretariat           |
-| TLS                      | 1.3 (RFC 8446)                     | hybrid groups via WIA-pq-crypto      |
-| Audit-chain hash         | SHA-256                            |                                      |
-| NOU submission signature | ES256 by NOU                       |                                      |
-| Roster signature         | ES384 by roster curator            |                                      |
-| Observation file integrity | SHA-256 + JWS                    | for NetCDF / TXT files               |
-
-Post-quantum migration follows WIA-pq-crypto PHASE 3 phase
-declarations.
-
-## §10 Failure modes
-
-| Failure                                  | Behaviour                                      |
-|------------------------------------------|------------------------------------------------|
-| Identity-provider JWKS unreachable        | Cached keys honoured                           |
-| Secretariat exchange channel unreachable | Submission queued + retry per backoff          |
-| iPIC exchange channel unreachable        | Local case-state advance; cross-party share queued |
-| Audit-chain write failure                 | Operation rejected (consistency)               |
-| Atmospheric-observation upstream feed lost | Boundary surfaces freshness warning            |
-| Roster source unreachable                 | Continue serving last-good roster              |
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `ozone-layer-protection` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-## Annex A — Worked authentication sequence (informative)
 
-For NOU officers:
+## Annex E — Implementation Notes for PHASE-3-PROTOCOL
 
-1. Officer authenticates via national-government IdP
-   (per regional authentication discipline, e.g., KR
-   행정전자서명 + GPKI for Korean officers)
-2. IdP issues access token with `wia.role=nou-officer`
-   and `wia.partyRef=urn:wia:ozone:party:KOR`
-3. Officer calls boundary; boundary validates token + role
-4. Operations scoped to officer's party only
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-3-PROTOCOL.
 
-For Secretariat staff:
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-1. Secretariat staff authenticates via UNEP IdP
-2. IdP issues mTLS-bound access token with
-   `wia.role=secretariat-officer`
-3. Operations span all party submissions; per-Annex viewing
-   privileges per the Secretariat's internal RBAC
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-## Annex B — Worked iPIC consultation (informative)
+## Annex F — Adoption Roadmap
 
-```
-1. Korea customs seizes 200 kg of suspected unauthorised
-   HCFC-22 at Busan port
-2. KR NOU posts illegal-trade case (PHASE 2 §7) with
-   substance + quantity + seizure context
-3. Boundary forwards to JP NOU (declared origin party)
-   via iPIC exchange channel
-4. JP NOU acknowledges within 48h
-5. JP NOU investigates: confirms exporter is unlicensed
-6. JP NOU responds `unauthorised-export`
-7. Both parties record the response; KR proceeds with
-   destruction; JP initiates investigation against exporter
-8. UNEP Ozone Secretariat notified for aggregate iPIC
-   tracking
-```
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-The audit chain captures every step.
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-## Annex C — Compliance scoring worked example (informative)
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-Korea HCFC reporting 2025 (Article 5 party):
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-```
-Schedule (Annex C-I, Article-5):
-  baseline (avg 2009-2010): 100,000 ODP-tonnes (illustrative)
-  2013 freeze:               100,000 (100% of baseline)
-  2015:                       65,000 (-35%)
-  2020:                       32,500 (-67.5%)
-  2025:                        2,500 (-97.5%)
+## Annex G — Test Vectors and Conformance Evidence
 
-Reported 2025 transactions:
-  production:            0 (HCFC production phased out in KR earlier)
-  imports:           1,800 ODP-tonnes
-  exports:               0
-  feedstock-use:         0
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-Consumption = 1,800 ODP-tonnes
-2025 target: 2,500 ODP-tonnes
-Verdict: compliant
-```
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-3-PROTOCOL with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-## Annex D — Conformance levels
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
+auditor tooling.
 
-| Level     | Scope                                                                  |
-|-----------|------------------------------------------------------------------------|
-| Surface   | structural conformance to PHASEs 1–3                                  |
-| Verified  | annual third-party audit + UNEP MOP scrutiny                          |
-| Anchored  | continuous evidence package + Implementation Committee witness        |
+## Annex H — Versioning and Deprecation Policy
 
-## Annex E — Roster snapshot manifest (informative)
+This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
 
-```json
-{
-  "rosterId": "urn:wia:ozone:roster:kr-nou:r-2026-01",
-  "effectiveFrom": "2026-01-01T00:00:00+09:00",
-  "montrealAmendmentRef": "Kigali Amendment (2016) entered into force 2019-01-01; locally adopted 2017",
-  "substanceCount": 96,
-  "scheduleCount": 12,
-  "signature": "<jws-detached>"
-}
-```
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
 
-## Annex F — Cross-coalition data sharing protocol
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
 
-For atmospheric observations shared with the World Ozone
-and UV Radiation Data Centre (WOUDC) and NDACC:
+## Annex I — Interoperability Profiles
 
-1. Station operator generates the observation per PHASE 1 §6
-2. Boundary forwards to WOUDC submission queue
-3. WOUDC validates format; acknowledges or refuses
-4. Validated data published to the WOUDC archive
-5. Cross-references stored on both sides for replay
+This annex describes how implementations declare interoperability profiles
+for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
 
-Sharing follows the GO FAIR initiative's FAIR principles
-(findable, accessible, interoperable, reusable).
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
 
-## Annex G — Calibration-traceability worked example
-
-A Dobson spectrophotometer at GAW station Boulder:
-
-```json
-{
-  "stationRef": "urn:wia:ozone:station:gaw:BLD-Dobson",
-  "instrumentSerial": "Dobson-83",
-  "lastCalibration": "2025-09-15T00:00:00+00:00",
-  "calibrationCentre": "WCC-Dobson Hohenpeissenberg",
-  "intercomparisonResult": "within ±1.0% of WCC reference (2025 IODC campaign)",
-  "nextDueAt": "2027-09-15"
-}
-```
-
-The boundary marks observations with `qualityFlag=nominal`
-while calibration is current; observations after the due
-date are flagged for review.
-
-## Annex H — Late-filer escalation
-
-Per Procedure for Non-Compliance:
-
-1. Submission deadline missed
-2. Secretariat sends reminder
-3. Implementation Committee considers the case
-4. Recommendations to MOP per Annex IV of the Procedure
-
-The deployment's audit chain captures the escalation
-timeline so non-compliance histories are reconstructable.
-
-## Annex I — Refrigerant-bank tracking interlinkage
-
-Per Article 4B of the Montreal Protocol, parties licence
-import / export of controlled substances. Refrigerant-bank
-data (PHASE 1 §10) feeds the licence-system check: an
-import licence applicant's annual quota is decremented at
-each customs-cleared import.
-
-The licence-system integration is per-party; the boundary
-emits licence-quota events to the licence system's webhook.
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

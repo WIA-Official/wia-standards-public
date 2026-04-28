@@ -318,3 +318,19 @@ The following heuristics describe how an operator typically chooses a BPv7 conve
 ## 9. Service-Plan Tier Conventions
 
 WIA-SPACE-003 defines four canonical tier labels for service plans: BEST-EFFORT, STANDARD, PRIORITY, EMERGENCY. Operators MAY add a vendor-specific suffix (e.g. `PRIORITY-GOLD`) but MUST preserve the canonical prefix so that downstream tooling can compare tiers across operators. Emergency tier service plans MUST be available only to government or treaty-organised disaster-response tenants and MUST be subject to the operator's emergency-traffic policy.
+
+
+## Implementer note — operational lifecycle
+
+Satellite-communication implementations have a longer operational
+lifecycle than most software systems: a spacecraft launched today
+remains in service for 15-25 years on average, and the ground
+segment that operates it must continue to honour the protocol
+contracts of this Phase across that horizon. The backwards-
+compatibility promise (§Phase 4 — within the 1.x line, no Phase
+field shape, no endpoint, no protocol exchange will be removed)
+is therefore mandatory rather than aspirational; operators rely
+on it for capital-allocation decisions on hardware that has
+already left the gravitational well.
+
+弘益人間 — Benefit All Humanity.

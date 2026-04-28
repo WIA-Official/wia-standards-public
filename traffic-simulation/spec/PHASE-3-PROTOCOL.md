@@ -1,7 +1,7 @@
 # WIA-CITY-017 (traffic-simulation) — Phase 3: Protocol Specification
 
 > **Version:** 1.0.0
-> **Status:** Official
+> **Status:** Draft
 > **Phase:** 3 of 4 (Protocol)
 > **Philosophy:** 弘益人間 (Benefit All Humanity)
 
@@ -9,274 +9,176 @@
 
 ## 1. Overview
 
-Phase 3 specifies the wire protocols by which WIA-CITY-017 engines exchange data with **roadside infrastructure**, **traffic-management centres**, **vehicles or driving simulators**, and **other simulation engines** participating in a federated study.
+Phase 3 specifies the on-the-wire protocols by which a WIA-CITY-017 deployment coordinates across trust boundaries — between TMC and research partners, between TMC and V2X infrastructure, between TMC and neighbouring jurisdictions, between TMC and the regulator. The protocols are layered above the Phase 2 API surface and inherit ISO 14813-1 ITS service architecture conventions, NTCIP 2202 centre-to-centre protocols, and TMDD v3.x data-dictionary conventions.
 
-The objective is to give a deterministic mapping of simulation events and outputs to the relevant ISO ITS message families and to fix the operational interoperability points where a simulation can be replayed against a real-world deployment.
+### 1.1 Time discipline
 
-### 1.1 Protocol stack
+All Phase 3 protocol exchanges carry timestamps in **TAI** per BIPM SI Brochure conventions (RFC 3339 with explicit TAI offset). Simulation steps are timestamped relative to scenario start; real-world coordination uses absolute TAI. Microsimulation typically runs at 0.1 s steps; the standard preserves sub-second resolution throughout the protocol stack.
+
+### 1.2 Replay defence bounds
+
+Every protocol envelope carries a 96-bit nonce and a TAI timestamp. Receivers reject envelopes with skew greater than ±300 seconds and maintain a 600-second seen-nonce cache. The cache is persistent across console restarts so a power cycle does not re-open the window for a previously-blocked replay.
+
+---
+
+## 2. SAE J2735 V2X message protocol
+
+The V2X bridge (Phase 2 §2.6) injects and receives SAE J2735 messages. Phase 3 specifies the canonical encoding and the simulation-time-to-real-time mapping.
+
+### 2.1 Supported message types
+
+| Message | SAE J2735 PSID | Encoding | Use in simulation |
+|---------|----------------|----------|-------------------|
+| BSM (Basic Safety Message) | 0x20 | UPER per ASN.1 | per-vehicle state at 10 Hz |
+| MAP (intersection geometry) | 0x82 | UPER per ASN.1 | static infrastructure description |
+| SPaT (signal phase and timing) | 0x82 | UPER per ASN.1 | signal-controller state, 10 Hz |
+| RSA (road safety alert) | 0x83 | UPER per ASN.1 | incident-injection in scenario |
+| TIM (traveler information message) | 0x8003 | UPER per ASN.1 | dynamic traveller information |
+| PSM (personal safety message) | 0x27 | UPER per ASN.1 | vulnerable road user representation |
+
+### 2.2 ETSI ITS-G5 regional adaptation
+
+European deployments use ETSI ITS-G5 with semantically-equivalent messages: CAM (Cooperative Awareness Message) for BSM-equivalent state; DENM (Decentralized Environmental Notification Message) for incident reporting; SPATEM for signal phase and timing; MAPEM for intersection geometry. The protocol envelope wraps the regional encoding and declares the region in a `regional_profile` field so consumers can dispatch correctly.
+
+### 2.3 ASN.1 module compatibility
+
+The standard does not invent ASN.1 modules; it consumes the published SAE J2735 and ETSI ITS-G5 modules verbatim. Bridge implementations validate against the canonical modules at `https://github.com/WIA-Official/wia-traffic-simulation-asn1` which mirror the SAE and ETSI publications.
+
+---
+
+## 3. NTCIP 2202 centre-to-centre protocol
+
+When the TMC running the simulation cooperates with a neighbouring TMC (e.g., a regional traffic-management partnership), the centre-to-centre protocol follows NTCIP 2202.
+
+### 3.1 Inter-centre handshake
 
 ```
-+---------------------------------------------------+
-| WIA-CITY-017 application semantics (Phase 1+2)    |
-+---------------------------------------------------+
-| Mediation: engine, GDF mapper, SPaT/MAP encoder   |
-+---------------------------------------------------+
-| Transport (one of):                               |
-|   ISO/TS 19091 (V2I / I2V)                        |
-|   ISO 19082 (roadside module ↔ signal controller) |
-|   ISO 14825 (GDF import / export)                 |
-|   CoAP/UDP/IP    | HTTP/TCP/IP    | TLS / DTLS    |
-+---------------------------------------------------+
-| Physical: PoE-Ethernet / fibre / cellular / 5.9GHz|
-+---------------------------------------------------+
+IDLE     → TS-2 BIND-REQUEST    : prime TMC requests centre-to-centre session
+BIND     → TS-2 BIND-CONFIRM    : remote TMC accepts; trust-list entry exchanged
+BOUND    → DATA-EXCHANGE        : TMDD-formatted envelopes flow both directions
+ACTIVE   → SUSPEND / RESUME     : either side temporarily pauses (e.g., maintenance window)
+ACTIVE   → UNBIND-REQUEST       : either side terminates the session
+UNBOUND  → audit envelopes signed by both
 ```
 
----
+### 3.2 TMDD message profile
 
-## 2. ISO 14825 GDF Bridge
+The protocol carries TMDD v3.x message types: signal-control plans, incident reports, lane-closure announcements, congestion-event notifications. The TMDD message is wrapped in the standards envelope for signature, replay defence, and audit; the TMDD payload is preserved verbatim so legacy consumers continue to consume it directly.
 
-### 2.1 Import
+### 3.3 Operational latency budget
 
-Engines MUST accept ISO 14825 GDF 5.0 import documents over the Phase-2 endpoint `/networks/{id}:import-gdf`. The import process:
-
-1. Validates the GDF schema and feature catalog version.
-2. Maps GDF feature types to WIA-CITY-017 *Network* node and link types.
-3. Preserves the GDF feature identifier on every produced node and link.
-4. Reports unmapped feature types as informative warnings without aborting the import.
-
-### 2.2 Export
-
-Engines MUST emit ISO 14825 GDF 5.0 export documents over the Phase-2 endpoint `/networks/{id}:export-gdf`. The export carries:
-
-- The complete topology (nodes, links, lanes).
-- The complement of attributes that survive round-trip.
-- A header identifying the engine version and the WIA-CITY-017 schema version.
-
-### 2.3 Round-trip fidelity
-
-Round-trip fidelity is measured by re-import of an exported GDF. Engines MUST achieve fidelity ≥ 99% on the canonical conformance suite published with this specification.
+Inter-centre data exchange targets 5-second end-to-end latency for incident reports and 30-second latency for routine traffic-state updates. Hosts emit a `latency_breach` envelope when delivery exceeds the budget so operations can investigate.
 
 ---
 
-## 3. ISO/TS 19091 V2I / I2V Bridge
+## 4. Calibration-evidence protocol
 
-### 3.1 MAP messages
+The calibration evidence chain is the most rigorous part of the protocol layer because simulation results have been a recurring source of policy-debate disputes. The standard requires every published simulation result to include a calibration-evidence envelope linking to real-world observations (loop-detector counts, Bluetooth-MAC trajectory matches, INRIX/HERE probe-vehicle aggregates) plus a documented goodness-of-fit metric (typically GEH < 5 for >85% of count locations per UK Highways Agency conventions).
 
-The *MAP* message (ISO/TS 19091 §6.1) describes the geometry and topology of a signalised intersection. WIA-CITY-017 engines MUST emit MAP messages that:
+### 4.1 Calibration envelope schema
 
-- Match the canonical Phase-1 *Intersection* descriptor's `nodeId`.
-- Encode every *Movement* and *AllowedManeuver* in the MAP message body.
-- Pass the ISO/TS 19091 conformance test vectors when bytewise compared.
+```json
+{
+  "wia_city_017_version": "1.0.0",
+  "type": "calibration_evidence",
+  "scenario_id": "scn_01HX...",
+  "observation_period_start_tai": "<TAI>",
+  "observation_period_end_tai": "<TAI>",
+  "observation_sources": [
+    { "kind": "loop_detector", "operator": "...", "count_locations": 142 },
+    { "kind": "bluetooth_mac", "operator": "...", "match_locations": 38 },
+    { "kind": "probe_vehicle", "operator": "INRIX", "segment_count": 8742 }
+  ],
+  "goodness_of_fit": { "metric": "GEH", "threshold": 5, "fraction_below_threshold": 0.91 },
+  "operator_summary": "Calibration meets UK Highways Agency convention for forecast-grade microsimulation.",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+```
 
-### 3.2 SPaT messages
+### 4.2 Calibration disputes
 
-The *SPaT* (Signal Phase and Timing) message (ISO/TS 19091 §6.2) describes the current and predicted state of every signal phase at an intersection. WIA-CITY-017 engines MUST emit SPaT messages every 100 ms during a real-time replay, or at the scenario step rate (typically 1 Hz) during a non-real-time export.
-
-### 3.3 Replay binding
-
-When an engine is bound to a real-world deployment for hardware-in-the-loop testing, the SPaT stream replaces the live SPaT feed of the affected intersection. The deployment MUST maintain a privileged channel that re-asserts the live SPaT in case of engine disconnection within 1 s.
-
----
-
-## 4. ISO 19082 Roadside Module Bridge
-
-### 4.1 Data frames
-
-ISO 19082:2025 specifies the data elements and data frames between roadside modules (RSM) and signal controllers (SC). WIA-CITY-017 engines MUST emit data frames for:
-
-- *Operational state* (running, faulted, manual override).
-- *Detector inputs* (presence detectors, induction loops, video detection).
-- *Phase requests* (preemption, priority, demand).
-
-### 4.2 Mapping to engine state
-
-| WIA-CITY-017 entity | ISO 19082 element |
-|---------------------|-------------------|
-| `Intersection.phases[].id` | Phase identifier |
-| `Vehicle trace at stop bar` | Detector input frame |
-| `Emergency vehicle preemption` | Priority request frame |
-| `Bus priority request` | Priority request frame |
-| `Faulted lamp / detector` | Operational-state frame |
-
-### 4.3 Latency budgets
-
-End-to-end latency from engine event to ISO 19082 frame emission MUST not exceed 50 ms 95th percentile during a real-time replay.
+When a downstream consumer disputes the calibration claim, the audit log carries every calibration envelope ever published for the scenario. The consumer can re-run the goodness-of-fit calculation against the same observation sources without trusting the publisher's current claim. The dispute-resolution process is human (typically through transport-research peer review or regulator inquiry); the standard provides the auditable wire format.
 
 ---
 
-## 5. Vehicle Trace Streaming
+## 5. Incident-injection protocol
 
-### 5.1 Push semantics
+Researchers and operators inject incidents into running simulations to evaluate response strategies (signal-timing adjustments, dynamic traveller information, V2X message broadcast). The incident-injection protocol formalises the wire format for these operations.
 
-Vehicle traces are streamed to subscribers either as bulk bundles (Phase 1 §3.3) or as live frames over RFC 8895-style server-sent events. Live frames are CBOR records with the structure of a single state record from the trace bundle, prefixed with the vehicle identifier and step time.
+### 5.1 Incident envelope schema
 
-### 5.2 Pull semantics
+```json
+{
+  "wia_city_017_version": "1.0.0",
+  "type": "incident_injection",
+  "run_id": "run_01HX...",
+  "incident_id": "inc_01HX...",
+  "kind": "lane_closure" | "vehicle_breakdown" | "weather_event" | "special_event",
+  "location_iso17572": "<ISO 17572 location reference>",
+  "start_simulation_time": 3600,
+  "end_simulation_time": 7200,
+  "severity": "minor" | "moderate" | "severe",
+  "expected_response_strategy": "signal_retiming + RSA broadcast",
+  "issued_at_tai": "<TAI>",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+```
 
-Bulk bundles are downloaded over HTTP/2 or HTTP/3 with `Range` header support per RFC 9110 §14. Implementations SHOULD support resumable downloads.
+### 5.2 Multi-jurisdiction injection
 
-### 5.3 Privacy
-
-When the trace originates from a real-world deployment, the privacy controls of Phase 1 §5 apply at every step of the streaming pipeline. The stream MUST refuse to advertise `vehicleId` values that would re-identify a subject under the operator's privacy policy.
-
----
-
-## 6. Engine Federation Protocol
-
-### 6.1 Discovery
-
-A federation root document is a JSON object served at the project's `/.well-known/wia-traffic-federation` endpoint. The document lists partner project URIs, supported export formats, and the federation key (COSE_Sign1 verifying key).
-
-### 6.2 Token exchange
-
-Tokens issued for federation MUST use the OAuth 2.1 token-exchange grant (RFC 8693). The exchanged token's audience is the partner project URI; its scope is restricted to the partner-allowed verb set.
-
-### 6.3 Run synchronisation
-
-Federated runs synchronise via:
-
-- A *master* engine that holds the canonical RNG seed.
-- Periodic *checkpoint* messages carrying the engine state hash.
-- A *catch-up* protocol that uses HTTP range requests to reconcile diverged engines.
-
-### 6.4 Result aggregation
-
-Each engine in a federation produces a Phase-1 *Result* object. The federation aggregator computes the project-level metrics from the union of *Result* objects.
+Incidents that span jurisdictions (a freeway crossing two TMC boundaries) require coordinated injection; the protocol uses the §3 inter-centre handshake to coordinate and emits a federated audit chain across both TMCs.
 
 ---
 
-## 7. Identity, Time, and Cryptography
+## 6. Audit log discipline
 
-### 7.1 Identity
-
-- **Engines and roadside modules**: X.509 v3 certificates (RFC 5280) issued by the project PKI.
-- **Operators**: federated identity over OAuth 2.1 (RFC 9700) and OpenID Connect.
-
-### 7.2 Time
-
-Real-time replay against deployed infrastructure MUST use NTPv4 with NTS (RFC 5905, RFC 8915). Discrepancies > 100 ms MUST raise an audit event.
-
-### 7.3 Cryptography
-
-| Layer | Algorithm | Reference |
-|-------|-----------|-----------|
-| TLS / RTSPS | TLS 1.3 cipher suites | RFC 8446 |
-| DTLS | DTLS 1.3 | RFC 9147 |
-| OSCORE | AES-CCM-16-64-128 | RFC 8613 §12 |
-| COSE signature | ES256, EdDSA | RFC 9053 |
-| Trace encryption | AES-256-GCM | ISO/IEC 18033-3 |
+Every Phase 3 protocol envelope is written to an append-only log replicated across at least two storage backends. Retention is sized to the longest applicable regulatory window: typically 5 years for transport-planning records, 10 years for safety-related calibration evidence, and per-incident retention extending to the close of any active investigation.
 
 ---
 
-## 8. Failure Handling
+## 7. Cross-standard composition
 
-### 8.1 GDF import failure
-
-A GDF import that fails ISO 14825 schema validation MUST raise the `traffic/network-incompatible-gdf` problem and MUST NOT partially commit any node or link.
-
-### 8.2 SPaT/MAP export failure
-
-An export that fails ISO/TS 19091 conformance MUST raise the `traffic/intersection-spat-incompatible` problem with the offending intersection identifier and a list of failing fields.
-
-### 8.3 Engine crash mid-run
-
-Engine crashes MUST flush the current step's vehicle traces to durable storage before exiting where possible. On restart, the engine MUST refuse to resume a partially completed run; instead, it MUST advertise the run as `state=ABORTED` and require a fresh launch.
-
-### 8.4 Network partition during federation
-
-A federation partition exceeding the configured *catch-up* timeout MUST escalate to the federation arbiter. The arbiter chooses one of: rejoin (if the lagging engine can catch up within a bounded window), checkpoint-rollback, or run termination.
+Phase 3 composes with: WIA-OMNI-API for TMC-operator and research-partner identity, WIA-AIR-SHIELD for runtime trust list and key rotation, WIA-SOCIAL Phase 3 §5 for the federation receipt shape, and WIA V2X (companion standard) when the simulation drives real-world V2X infrastructure rather than only modelling it.
 
 ---
 
-## 9. Conformance Profiles
+## 8. Conformance test coverage
 
-### 9.1 Baseline profile (P-B)
-
-A P-B engine MUST:
-
-- Implement Phase-2 HTTP/REST surface.
-- Pass GDF round-trip fidelity ≥ 99%.
-- Pass ISO/TS 19091 MAP and SPaT export against the canonical conformance vectors.
-- Emit COSE-signed result bundles.
-
-### 9.2 Real-time profile (P-RT)
-
-A P-RT engine MUST additionally:
-
-- Sustain the §3.2 SPaT 100 ms emission cadence.
-- Sustain the §4.3 ISO 19082 50 ms emission cadence.
-- Maintain time-sync ≤ 50 ms vs. the reference clock.
-
-### 9.3 Federated profile (P-F)
-
-A P-F engine MUST additionally:
-
-- Implement §6 federation protocol.
-- Implement OAuth 2.1 token exchange (RFC 8693).
-- Maintain checkpoint cadence ≤ 10 s during federated runs.
+The Phase 3 conformance suite walks through: SAE J2735 message-injection round-trip with mock vehicle stack, NTCIP 2202 inter-centre handshake against mock partner TMC, calibration-evidence publication with goodness-of-fit re-computation, incident-injection with multi-jurisdiction federation, and the audit-log replication invariant.
 
 ---
 
-## 10. References
+## 9. References
 
-1. RFC 5280 — *X.509 PKI Certificate and CRL Profile.*
-2. RFC 5905; RFC 8915 — *NTPv4, NTS.*
-3. RFC 7252; RFC 7641 — *CoAP, OBSERVE.*
-4. RFC 8446; RFC 9147 — *TLS 1.3, DTLS 1.3.*
-5. RFC 8613 — *OSCORE.*
-6. RFC 8693 — *OAuth 2.0 Token Exchange.*
-7. RFC 8949 — *CBOR.*
-8. RFC 9052; RFC 9053 — *COSE.*
-9. RFC 9110; RFC 9457 — *HTTP semantics, problem details.*
-10. RFC 9700 — *OAuth 2.1 (BCP).*
-11. ISO 14817-1:2015; ISO 14817-2:2015; ISO 14817-3:2017.
-12. ISO 14825:2011.
-13. ISO 17572 (all parts).
-14. ISO 19082:2025.
-15. ISO/TS 19091:2017/2019.
-16. ISO 21217:2020.
-17. ISO/IEC 18033-3:2010.
-18. FIPS 180-4; FIPS 197.
+- SAE J2735 (2024) — DSRC Message Set Dictionary
+- SAE J2945 series — DSRC system requirements
+- ETSI EN 302 663 — ITS-G5 access layer
+- ETSI EN 302 637-2 / -3 — CAM / DENM
+- ETSI TS 103 301 — SPATEM / MAPEM
+- ISO 14813-1 — ITS service architecture
+- ISO 17572-1/-2/-3 — Location referencing
+- NTCIP 2202 — Internet protocol for ITS centre-to-centre
+- NTCIP 1202 — Actuated traffic signal controller
+- TMDD v3.x — Traffic Management Data Dictionary
+- UK Highways Agency Design Manual for Roads and Bridges (DMRB) — modelling conventions including GEH metric
+- ISO/IEC 27001:2022 — Information security management
+- BIPM SI Brochure — Time scales (TAI / UTC / leap seconds)
+- IETF RFC 8446 — TLS 1.3
 
 ---
 
-## 11. Detailed Conformance Tests
+弘益人間 — Benefit All Humanity.
 
-### 11.1 GDF round-trip test
 
-The conformance test suite includes a canonical GDF 5.0 document with ~5,000 features. The engine MUST:
+## 10. Glossary expansion
 
-1. Import the document.
-2. Emit a Phase-1 *Network* descriptor.
-3. Re-export the network as GDF.
-4. Compare the re-exported GDF against the original; the matching ratio MUST be ≥ 99% on a per-feature basis.
+Microsimulation: per-vehicle simulation at sub-second resolution, typically driven by a car-following model and a lane-changing model. Mesosimulation: per-platoon simulation at second resolution, trading detail for speed. Macrosimulation: per-link aggregate simulation at minute resolution, suitable for regional transport models. OD matrix: origin-destination matrix listing trips between zones. TAZ: Traffic Analysis Zone, the planning-grade spatial unit. GEH: Geoffrey E. Havers statistic, a goodness-of-fit metric standard in traffic engineering. SPaT/MAP: Signal Phase and Timing / intersection map V2X message pair. CAM/DENM: ETSI ITS-G5 Cooperative Awareness Message / Decentralized Environmental Notification Message.
 
-Reportable mismatches are tracked under three categories: *topology* (node/link count, connectivity), *attributes* (lane count, speed limit, permitted classes), and *geometry* (vertex count, vertex displacement). The 99% threshold applies to the combined score across categories.
+## 11. Implementer note — calibration discipline
 
-### 11.2 SPaT/MAP byte-wise vector test
+The calibration-evidence chain (§4) is the single most-asked-for artefact in traffic-simulation policy debates. A simulation result without published calibration evidence has no traction in regulator review or peer review; the standard makes calibration-evidence publication mandatory rather than optional, and the goodness-of-fit threshold (typically GEH < 5 for >85% of count locations per UK Highways Agency conventions) is the bright line between forecast-grade simulation and uncalibrated speculation.
 
-A canonical set of intersections (small, mid-size, complex) is published with byte-wise expected MAP and SPaT message outputs. The engine MUST emit byte-equivalent messages for each intersection at each phase transition over a 60-second simulated run.
 
-### 11.3 ISO 19082 frame test
+## 12. Closing protocol note for traffic-simulation
 
-The engine emits a 30-second sequence of ISO 19082 data frames against a virtual signal controller. The frames MUST match a canonical reference sequence under a tolerated timing skew of ±10 ms.
-
-### 11.4 NTS time-sync test
-
-The engine MUST sustain ≤ 50 ms time deviation against a reference NTS-protected NTPv4 server over a 1-hour run while subjected to a network jitter profile of 10 ms 95th-percentile.
-
-### 11.5 Federation token-exchange test
-
-The engine MUST successfully obtain a federation-scoped token via RFC 8693 token exchange, exercise an export against a partner project, and verify the returned bundle's COSE_Sign1 signature against the federation key listed in the partner project's federation document.
-
----
-
-## 12. Profile Selection Guidance
-
-Operators choose a conformance profile based on the deployment's role:
-
-- **Off-line study (P-B)** — calibration, scenario exploration, what-if analyses; latency budgets relaxed.
-- **Real-time replay (P-RT)** — TMC dashboarding, observatory; strict latency budgets, no controller binding.
-- **Hardware-bound (P-RT + HiL)** — bound to a real controller; same latency as P-RT plus the §3.3 fallback assertion.
-- **Federated (P-F)** — multi-engine studies; checkpoint cadence and federation token discipline.
-
-A deployment MAY combine profiles (e.g. P-RT + P-F). Combined profiles MUST surface every constituent tag in Phase 4 §12.
+The Phase 3 protocol layer for traffic-simulation balances policy-laboratory rigour against operational responsiveness. Microsimulation runs that feed signal-retiming decisions need calibration-grade evidence; V2X-injection runs that feed RSU-deployment decisions need ETSI ITS-G5 / SAE J2735 fidelity; cross-jurisdiction runs that span TMC boundaries need the federation handshake. Each protocol exchange in this Phase is signed, audited, and replay-defended so the simulation results survive the political cycles that commission them.

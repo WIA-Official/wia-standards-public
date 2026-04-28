@@ -1,7 +1,7 @@
 # WIA-SPACE-003 (satellite-communication) — Phase 4: Integration Specification
 
 > **Version:** 1.0.0
-> **Status:** Official
+> **Status:** Draft
 > **Phase:** 4 of 4 (Integration)
 > **Philosophy:** 弘益人間 (Benefit All Humanity)
 
@@ -9,292 +9,192 @@
 
 ## 1. Overview
 
-Phase 4 covers the **integration** of WIA-SPACE-003 deployments with surrounding terrestrial networks, regulatory regimes, security infrastructure, and downstream tenant-facing applications. The scope includes:
-
-1. Information-security management.
-2. Identity, access, and operator-station hardening.
-3. Regulatory and export-control compliance.
-4. Terrestrial network integration (Internet, private MPLS, IoT clouds).
-5. Tenant-facing service plans and billing.
-6. Conformance and field commissioning.
-7. Cross-discipline integration with adjacent WIA standards.
-
-The objective is to give a single normative checklist that an operator can use to bring a WIA-SPACE-003 deployment into a real-world environment without ambiguity.
+Phase 4 specifies how a WIA-SPACE-003 deployment integrates with the broader satellite-communication ecosystem: ground-segment vendor stacks (Kratos, SES Networks, Telesat NMS, KARI Mission Control, JAXA Tracking Network), bridge profiles to legacy Space Link Extension (SLE) deployments, regulatory-reporting pipelines, debris-mitigation programs, and the Earth-station consortium tooling that complements the operator's own infrastructure.
 
 ---
 
-## 2. Information Security Management
+## 2. Bridge profiles
 
-### 2.1 ISO/IEC 27001 alignment
+### 2.1 Bridge to legacy SLE deployments
 
-A WIA-SPACE-003 deployment MUST be operated within an ISO/IEC 27001:2022 information-security management system. The ISMS scope statement (Phase 1 §2.1 `iso27001Scope`) MUST cover:
+Most operational ground stations already speak SLE. The bridge profile maps Phase 2 endpoints to SLE service primitives without requiring the legacy stack to be replaced.
 
-- Personnel with operator, supervisor, administrator, or auditor roles.
-- All gateways, ground stations, and storage media that hold tele-command keys, customer service plans, or telemetry.
-- All network conduits between zones (per IEC 62443-3-2 risk assessment).
+| Phase 2 endpoint | SLE primitive | Bridge mapping |
+|------------------|---------------|----------------|
+| `POST /telemetry-session` | RAF / RCF BIND | service ID and SCID populated from Phase 1 spacecraft descriptor |
+| `GET /telemetry-session/{id}/feed` | RAF / RCF transfer | SLE-PDU transfer-data wrapped as CBOR for the SSE stream |
+| `POST /bundle-session/{id}/bundle` (uplink) | CLTU TRANSFER-DATA | bundle bytes passed through the CLTU service |
+| `POST /link/{id}/handover` | SLE service-management peer-abort + new BIND | coordination via SLE Service Management per CCSDS 921.1-B |
 
-### 2.2 ISO/IEC 27002 controls
+The bridge container ships at `https://github.com/WIA-Official/wia-satellite-communication-bridges/sle-bridge` with reference implementations against the CCSDS Java SLE API and the OS3 SLE API.
 
-Operators MUST select and document at minimum the following ISO/IEC 27002:2022 controls:
+### 2.2 Bridge to flight-dynamics systems
 
-| Area | Examples |
-|------|----------|
-| 5 — Organisational | A.5.1 policies; A.5.7 threat intelligence |
-| 6 — People | A.6.3 awareness, training |
-| 7 — Physical | A.7.4 monitoring |
-| 8 — Technological | A.8.5 secure authentication; A.8.16 monitoring activities; A.8.24 cryptography use |
+Flight-dynamics systems (FDS) generate orbit determinations, manoeuvre plans, and conjunction predictions. The bridge profile maps Phase 1 spacecraft state and Phase 3 conjunction-warning envelopes to common FDS exchange formats:
 
-### 2.3 IEC 62443 alignment
+- **CCSDS Navigation Data Messages** (CCSDS 502.0-B Orbit Data Messages, 503.0-B-1 Tracking Data Messages, 504.0-B Attitude Data Messages, 508.0-B Conjunction Data Messages) — primary interchange format
+- **STK / FreeFlyer / GMAT** — domain-specific tools for visualisation and what-if analysis
 
-For deployments that bind to operational technology (controllers, antenna positioners, ground-station automation), the IEC 62443-3-3 system security level (SL-T) for the bound zone MUST be ≥ SL-2. SL-3 is recommended for tele-command paths.
+### 2.3 Bridge to terrestrial backhaul
 
-### 2.4 Risk assessment
+Operators connect ground stations to mission control over MPLS, IP-VPN, or dedicated dark fibre. The bridge profile carries Phase 2 envelopes over standard TLS 1.3 (RFC 8446) on the terrestrial leg; the SDLS protection on the space leg survives independently.
 
-The deployment descriptor MUST reference an IEC 62443-3-2 risk-assessment document under `iec62443.riskAssessmentRef`. Re-assessment cadence MUST not exceed 24 months and MUST follow significant changes (new band, new spacecraft, new tenant class).
+### 2.4 Bridge to user-terminal mass-market platforms
 
----
-
-## 3. Identity, Access, and Operator Hardening
-
-### 3.1 Identity provisioning
-
-- **Spacecraft, ground stations, user terminals**: X.509 v3 (RFC 5280) certificates from the deployment PKI.
-- **Operators**: federated identity over OAuth 2.1 (RFC 9700) and OpenID Connect 1.0; subject claim resolves to a IEC 62443-2-1 personnel registry.
-
-### 3.2 Multi-factor
-
-Operator login MUST require multi-factor authentication. Conforming factors include:
-
-- Possession factor: smart card / cryptographic token with X.509 client certificate (RFC 8446 mTLS).
-- Inherence factor: biometric template held on a tamper-resistant token.
-- Knowledge factor: PIN / passphrase per ISO/IEC 27002 A.5.17.
-
-### 3.3 Privileged operations
-
-Privileged operations (`space:tc-send` for safety-critical commands, `space:plan-administration` for tenant boundary changes) MUST require step-up authentication and MUST be logged with the second-factor evidence.
-
-### 3.4 Operator-station hardening
-
-Operator stations MUST:
-
-- Run a maintained operating system at the vendor's current security update level.
-- Disable inbound services other than the Phase-2 client.
-- Apply IEC 62443-3-3 SR 1.5 (audit), SR 1.7 (multi-factor), SR 5.1 (zoning), SR 6 (audit log).
+Mass-market user terminals (VSAT, marine VSAT, aviation Ku/Ka, mobile direct-to-device) integrate via DVB-S2X (ETSI EN 302 307-2) and DVB-RCS2 (ETSI EN 301 545-2) for the air interface and via Phase 2 envelopes for the operator-facing control plane. The bridge profile names the supported terminal classes per operator in the discovery document.
 
 ---
 
-## 4. Regulatory and Export-Control Compliance
+## 3. Regulatory-reporting integration
 
-### 4.1 Radio regulations
+### 3.1 ITU-R BR notification flow
 
-Every link defined in Phase-1 MUST reference the operator's regulatory filing under `regulatoryFilings`. The filing reference is an opaque string controlled by the operator; WIA-SPACE-003 does not redistribute regulatory content.
+Operators submit advance publication, coordination, and notification under Article 22 to ITU-R BR via the BR's electronic submission system (currently SpaceCap / SpaceQry / e-Submission of Filings). The Phase 4 reporting bridge maps the operator's filing record to the BR submission format, attaches the supporting link-budget evidence (Phase 1 §2.4), and tracks the BR response chain.
 
-### 4.2 Export controls
+### 3.2 National administration filings
 
-Where the deployment carries export-controlled technical data (cryptographic algorithm parameters, telemetry frame profiles, antenna patterns), the affected entities MUST be marked with `confidentialityClass=EXPORT-CONTROLLED` (Phase 1 §5). Operators MUST maintain an export-control register listing every controlled artefact.
+Each national administration runs its own filing pipeline:
 
-### 4.3 Sanctions and embargoes
+| Administration | System | Bridge artefact |
+|----------------|--------|-----------------|
+| FCC (US) | International Bureau Filing System (IBFS) | bridges/fcc-ibfs.json |
+| Ofcom (UK) | Satellite licensing register | bridges/ofcom-sat.json |
+| MIC (Japan) | 周波数管理 (frequency management) system | bridges/mic.json |
+| MSIT (Korea) | 무선국 데이터베이스 (radio-station DB) | bridges/msit-radio.json |
+| BNetzA (Germany) | Frequency-management database | bridges/bnetza.json |
+| ANATEL (Brazil) | Satellite-network registry | bridges/anatel.json |
 
-Tenant on-boarding MUST include a sanctions / embargo screen against the operator's compliance lists. Service plans for screened-failed tenants MUST be refused with the problem code `space/regulatory-filing-missing` if the failure is regulatory or with a vendor-specific code if the failure is screening-based.
+Each bridge documents the per-administration field mapping and the filing-response polling cadence.
 
----
+### 3.3 Debris-mitigation reporting (ISO 24113 + IADC)
 
-## 5. Terrestrial Network Integration
+Operators submit debris-mitigation plans under ISO 24113 Space debris mitigation requirements; the IADC (Inter-Agency Space Debris Coordination Committee) provides the international coordination forum. The Phase 4 reporting bridge maps the operator's deorbit-plan envelope (Phase 1 §2.6) to ISO 24113 conformance evidence and to the IADC standardised reporting template.
 
-### 5.1 Internet exit
+### 3.4 Lawful-intercept compatibility
 
-Bundle traffic that exits to the Internet MUST be delivered through a hardened gateway that enforces:
-
-- TLS 1.3 (RFC 8446) on every tenant-facing interface.
-- Per-tenant verb scoping per Phase 2 §4.
-- Egress filtering aligned with the operator's data-loss-prevention policy.
-
-### 5.2 IoT cloud integration
-
-User terminals classified as `IoT` MAY relay through an IoT cloud aggregator. The aggregator MUST:
-
-- Use OSCORE (RFC 8613) end-to-end where the terminal supports it.
-- Use COSE_Sign1 (RFC 9052) for tenant-side authenticity claims.
-- Honour the per-tenant audit and retention policy.
-
-### 5.3 Private MPLS / SD-WAN integration
-
-For tenants with private MPLS or SD-WAN bindings, the gateway MUST:
-
-- Maintain per-tenant routing tables.
-- Apply per-tenant Quality-of-Service policies.
-- Surface link health to the tenant's NMS through the discovery document.
-
-### 5.4 Backhaul redundancy
-
-Ground-stations with multiple backhaul paths MUST surface the path inventory through the deployment descriptor. The gateway MUST honour the tenant-configured failover policy.
+Jurisdictions requiring lawful intercept on satellite-internet user traffic (US under CALEA, EU under ETSI ES 201 671, KR under 통신비밀보호법) declare the requirement in the discovery document. Sessions in those jurisdictions emit a notice envelope to participants on session start; the actual intercept happens through a separate signed channel that audit-logs every access, and the SDLS protection of the space-segment leg is unaffected.
 
 ---
 
-## 6. Tenant-Facing Service Plans and Billing
+## 4. Cross-standard composition
 
-### 6.1 Service-plan model
+This Phase composes with adjacent WIA-family standards:
 
-Tenant service-plan parameters (throughput, latency, availability, security level) live in Phase-1 *ServicePlan* descriptors. Plans are versioned by semver; major version bumps require tenant acceptance.
-
-### 6.2 Quota enforcement
-
-Quota enforcement uses the IETF `RateLimit-*` headers on the HTTP surface and CoAP option `MaxAge` semantics on the CoAP surface. Quota exhaustion returns HTTP 429 / CoAP 4.29 with a `Retry-After` header and the problem code `space/service-plan-quota-exceeded`.
-
-### 6.3 Billing
-
-Billing data exchange is out of scope for WIA-SPACE-003 v1. Operators integrating with billing systems MUST surface the billing data through a separate authenticated channel and MUST NOT mix billing identifiers with operational identifiers.
+- **WIA-OMNI-API** — operator and console identity (X.509 + DID); the Phase 2 X.509 chain is anchored against WIA-OMNI-API records when applicable
+- **WIA-AIR-SHIELD** — runtime trust list maintenance and key rotation; SDLS keys rotated under CCSDS 354.0-M-2 are also tracked through the WIA-AIR-SHIELD audit chain for cross-standard visibility
+- **WIA-SOCIAL Phase 3 §5** — federation receipt shape reused for cross-agency cross-support handshakes
+- **WIA-INTENT** — outermost-layer declaration of mission intent so the operations team can verify the workload's intent matches the spacecraft's actual operations
+- **WIA Quantum Communication** — composes when the deployment runs satellite QKD; the QKD-derived key may be rotated into SDLS via a documented bridge
 
 ---
 
-## 7. Field Commissioning Checklist
+## 5. Operational deployment runbook
 
-A WIA-SPACE-003 deployment MUST pass each of the following before being declared *operational*:
+A first satellite-communication deployment that reaches production typically follows the runbook:
 
-| # | Test | Reference |
-|---|------|-----------|
-| 1 | All spacecraft / ground stations / user terminals registered | Phase 1 |
-| 2 | TLS 1.3 cipher inventory verified on all surfaces | RFC 8446 |
-| 3 | OAuth 2.1 token introspection produces audit entries | RFC 9700, RFC 7662 |
-| 4 | Multi-factor enforced for operator login | ISO/IEC 27002 A.8.5 |
-| 5 | NTPv4 + NTS time-sync ≤ 50 ms vs. reference | RFC 5905, RFC 8915 |
-| 6 | BPv7 conformance vectors (Phase 3 §8) pass | RFC 9171 |
-| 7 | RFC 9173 default security context vectors pass | RFC 9173 |
-| 8 | Tele-command replay test rejects replayed commands | Phase 3 §3.4 |
-| 9 | ISO/IEC 27001 ISMS scope statement covers the deployment | ISO/IEC 27001 §4.3 |
-| 10 | IEC 62443-3-3 SR 1, SR 2, SR 5, SR 6 implemented | IEC 62443-3-3 |
-| 11 | Regulatory filing reference present per link | §4.1 |
-| 12 | Export-control register up to date | §4.2 |
-| 13 | Tenant on-boarding screen passes for all tenants | §4.3 |
+| Phase | Activity | Duration |
+|-------|----------|----------|
+| Day 0 | Reference container stood up; conformance suite run | 1 day |
+| Day 1-7 | SDLS key onboarding under CCSDS 354.0-M-2; ITU filing record imported | 1 week |
+| Day 8-21 | First spacecraft commissioning; TM/TC bridge to vendor stack verified | 2 weeks |
+| Day 22-45 | First cross-support agreement under CCSDS 902.0-B; partner-agency handshake exercised | 3-4 weeks |
+| Day 46-60 | Conjunction-warning subscription wired to CSpOC / EU SST / KARI | 2 weeks |
+| Day 61-90 | Production cutover with shadow operation through Day 60; legacy retained as fallback | 4 weeks |
 
-The checklist results MUST be stored as a signed Phase-1 *Deployment* attribute and surfaced under `/deployments/{id}/health`.
+The 90-day timeline accommodates conformance-suite passes, ITU coordination, and the regulator-notification cadence typical for space-segment licensing. Lighter deployments (small-sat operators with limited orbital regimes) compress this to 30 days.
 
 ---
 
-## 8. Cyber-resilience and Incident Response
+## 6. Compliance and certification
 
-### 8.1 Detection
+The standard maps to:
 
-Continuous detection combines:
+- **ISO 24113** — space debris mitigation requirements
+- **ISO/IEC 27001:2022** — information security management for ground-segment operations
+- **IEC 62443-3-3:2013** — system security for the operational-technology side of mission control
+- **CCSDS 350.0-G** — security guide for mission planners
+- **CCSDS 350.4-G** — CCSDS guide for security architecture
+- **ECSS-E-ST-50** series — space communications standards (European Cooperation for Space Standardization)
+- **NIST SP 800-160 Vol. 2** — systems security engineering, applicable to ground-segment systems
 
-- IEC 62443-3-3 SR 6 audit-log analytics for anomalous operator behaviour.
-- Spacecraft on-board attestation of firmware integrity (where supported).
-- Time-source integrity monitoring (NTS-protected NTPv4 clients refusing unsigned servers).
-- Anomalous tele-command pattern monitoring with operator-defined thresholds.
-
-### 8.2 Containment
-
-Containment playbooks MUST include:
-
-- Disabling tele-command issuance from a privileged station.
-- Revoking compromised operator credentials via the OAuth introspection endpoint with token replay refused per RFC 7662.
-- Pausing bundle ingress at the gateway to preserve forensic integrity.
-
-### 8.3 Recovery
-
-Recovery procedures MUST:
-
-- Re-run §7 commissioning checklist for affected entities.
-- Re-attest spacecraft on-board firmware where the platform supports it.
-- Document the incident in the ISO/IEC 27001 corrective-action register.
+Operators publish a signed conformance attestation envelope that names which of these compliance frames they claim and which audit evidence supports the claim.
 
 ---
 
-## 9. Cross-Discipline Integration
+## 7. Roadmap
 
-### 9.1 WIA-CITY-009 (smart-lighting) — outdoor IoT
+| Version | Focus |
+|---------|-------|
+| 1.0.0 | Initial publication: SDLS / TM / TC / BPv7 stable; ITU-R + national-administration bridges |
+| 1.1.x | Additive: more national-administration bridges; richer DVB-S2X / DVB-RCS2 modulation profiles |
+| 1.2.x | Additive: ISL / optical-link reference profile; satellite-QKD reference integration |
+| 1.3.x | Additive: full quantum-internet composition with WIA Quantum Network for intercontinental key distribution |
+| 2.0.0 (no earlier than 2028) | Possible breaking change: post-quantum signature suite migration following NIST PQC selection |
 
-Outdoor smart-lighting terminals that backhaul through satellite IoT links integrate via the WIA-SPACE-003 user-terminal surface. The lighting gateway holds a service-plan token and presents user-terminal identity at the WIA-SPACE-003 gateway.
-
-### 9.2 WIA-CITY-014 (security-system-city) — remote sites
-
-Remote security sites that lack terrestrial backhaul MAY backhaul through WIA-SPACE-003. Evidence bundles produced by the WIA-CITY-014 deployment are wrapped in BPv7 bundles for delivery to the central management plane.
-
-### 9.3 WIA-CITY-017 (traffic-simulation) — observatory data
-
-Traffic-simulation observatories that ingest live infrastructure data from remote regions MAY pull data through the WIA-SPACE-003 backhaul path.
-
-### 9.4 Future cross-discipline integrations
-
-The deployment descriptor reserves a `crossDiscipline` field for additional integrations. The field is an array of objects, each with `partnerStandard` (string) and `partnerScope` (string) fields, that MUST be honoured by the gateway when issuing tenant tokens.
+The standard is maintained by the WIA Standards Committee. Change proposals follow the WIA RFC process; breaking changes require a two-thirds Committee vote plus a 12-month deprecation window per IETF RFC 8594 / 9745.
 
 ---
 
-## 10. Conformance Tags
+## 8. References
 
-A deployment descriptor MUST advertise a list of conformance tags that summarise the achieved profile:
-
-| Tag | Meaning |
-|-----|---------|
-| `wia-space-003/v1/baseline` | Phase 3 §7.1 baseline profile |
-| `wia-space-003/v1/constrained-terminal` | Phase 3 §7.2 constrained-terminal profile |
-| `wia-space-003/v1/deep-space` | Phase 3 §7.3 deep-space profile |
-| `wia-space-003/v1/iso27001` | ISMS-covered |
-| `wia-space-003/v1/iec62443-sl2` | Security level 2 |
-| `wia-space-003/v1/iec62443-sl3` | Security level 3 |
-| `wia-space-003/v1/bpv7` | RFC 9171 BPv7 enabled |
-| `wia-space-003/v1/bpv7-secure` | RFC 9173 default security context enabled |
-| `wia-space-003/v1/iot-aggregator` | IoT cloud aggregator profile per §5.2 |
-
-Conformance tags are normative for automated discovery and informative for human readers.
-
----
-
-## 11. Operational Risk Considerations
-
-### 11.1 Tele-command risk
-
-Tele-commands directly affect spacecraft behaviour. Operators MUST:
-
-- Use a privileged operator role for any safety-critical command.
-- Maintain a fallback path that re-asserts the spacecraft's safe-mode behaviour.
-- Restrict tele-command issuance to bounded geographic ground-segment domains.
-
-### 11.2 Regulatory risk
-
-Regulatory filings expire and change. Operators MUST track filing expiry through the `regulatoryFilings` reference and MUST refuse new links whose filing is missing or expired.
-
-### 11.3 Export-control risk
-
-Export-controlled data MUST NOT leave the operator's compliance domain except under documented authorisation. The `confidentialityClass=EXPORT-CONTROLLED` field on Phase-1 entities is the normative discriminator.
+- CCSDS 350.0-G — Security Guide for Mission Planners
+- CCSDS 350.4-G — CCSDS Guide for Secure System Engineering
+- CCSDS 502.0-B — Orbit Data Messages
+- CCSDS 503.0-B-1 — Tracking Data Message
+- CCSDS 504.0-B — Attitude Data Messages
+- CCSDS 508.0-B — Conjunction Data Messages
+- CCSDS 902.0-B — Cross-Support Concept and Reference Architecture
+- CCSDS 921.1-B — SLE Service Management
+- CCSDS 354.0-M-2 — Space Mission Key Management
+- ITU-R Radio Regulations Article 22 — Space services
+- ITU-R BR e-Submission system documentation
+- ETSI EN 302 307-2 — DVB-S2X
+- ETSI EN 301 545-2 — DVB-RCS2
+- ETSI ES 201 671 — Lawful Intercept
+- ECSS-E-ST-50 — Space communications standards series
+- ISO 24113 — Space debris mitigation
+- ISO/IEC 27001:2022
+- IEC 62443-3-3:2013
+- NIST SP 800-160 Vol. 2 — Developing cyber-resilient systems
+- IETF RFC 8446 — TLS 1.3
+- IETF RFC 8594 — sunset HTTP header
+- IETF RFC 9745 — deprecation HTTP header
 
 ---
 
-## 12. Long-term Archival
+弘益人間 — Benefit All Humanity.
 
-Archival of operational data (audit logs, telemetry, contact records) MUST follow the operator's retention policy. WIA-SPACE-003 reserves the following fields on every archive bundle:
 
-- `archiveSchemaVersion` — semver
-- `producedBy` — gateway identity
-- `confidentialityClass` — see Phase 1 §5
-- `digestAlgorithm` — SHA-256 (FIPS 180-4) by default
-- `signature` — COSE_Sign1 over the bundle
+## 9. Closing implementer note
 
-Archive bundles MUST be verifiable by a third-party auditor without access to operator-side secrets.
+Satellite communications is one of the few infrastructures where the
+software stack must remain operationally correct across decades of
+hardware lifecycle. A spacecraft launched today may still be in
+service in 2040; the wire formats and protocol disciplines that
+operate it must absorb that horizon without locking the operator
+into a single vendor or a single regulator's interpretation.
 
----
+This standard is intentionally conservative on protocol invention
+and intentionally rigorous on audit. The CCSDS family already has
+the wire formats — TM, TC, SDLS, BPv7 — that the space domain has
+agreed on; the standard's contribution is the wrapper-level
+discipline that makes those wire formats survive the multi-agency
+multi-jurisdiction multi-vendor reality of modern operations.
 
-## 13. References
+A first deployment that follows the runbook in §5 reaches production
+in about 90 days. The depth of audit and compliance work
+concentrated in those 90 days is what justifies the wire-format
+discipline: an inspector arriving in year five with a regulatory
+inquiry can reconstruct any operational decision back to the
+signed envelope that originated it.
 
-1. IEC 62443-2-1; IEC 62443-3-2; IEC 62443-3-3.
-2. ISO/IEC 7498-1:1994 — *OSI Basic Reference Model.*
-3. ISO/IEC 18033-3:2010 — *Block ciphers.*
-4. ISO 11770-2; ISO 11770-3 — *Key management.*
-5. ISO/IEC 27001:2022; ISO/IEC 27002:2022; ISO/IEC 27037:2012; ISO/IEC 27701:2019.
-6. ISO 6709:2008 — *Geographic point location.*
-7. RFC 4838 — *DTN Architecture.*
-8. RFC 5280 — *X.509 PKI Certificate and CRL Profile.*
-9. RFC 5905; RFC 8915 — *NTPv4, NTS.*
-10. RFC 7252; RFC 7641 — *CoAP, OBSERVE.*
-11. RFC 7662 — *OAuth Token Introspection.*
-12. RFC 8446; RFC 9147 — *TLS 1.3, DTLS 1.3.*
-13. RFC 8613 — *OSCORE.*
-14. RFC 8949 — *CBOR.*
-15. RFC 9019; RFC 9124 — *SUIT manifests.*
-16. RFC 9052; RFC 9053 — *COSE.*
-17. RFC 9110; RFC 9457 — *HTTP semantics, problem details.*
-18. RFC 9171; RFC 9173 — *BPv7 and default security context.*
-19. RFC 9176 — *CoRE Resource Directory.*
-20. RFC 9700 — *OAuth 2.1.*
-21. FIPS 180-4 — *Secure Hash Standard.*
-22. FIPS 197 — *Advanced Encryption Standard.*
+弘益人間 — Benefit All Humanity.
+
+
+## 10. Glossary expansion for Phase 4
+
+CCSDS: Consultative Committee for Space Data Systems, the international standardisation body for space-segment data systems. SLE: Space Link Extension, the canonical CCSDS service framework. RAF / RCF / CLTU / ROCF: SLE service primitives for return all frames, return channel frames, forward command-link transmission units, and return online channel frames respectively. SDLS: Space Data Link Security per CCSDS 355.0-B-2. ITU-R BR: International Telecommunication Union Radiocommunication Bureau. IADC: Inter-Agency Space Debris Coordination Committee. DVB-S2X / DVB-RCS2: ETSI second-generation satellite broadcasting and return-channel standards.
+
+## 11. Implementer note — multi-decade horizon
+
+Spacecraft operate for 15-25 years on average; the ground-segment software that operates them must remain compatible across that horizon. The standards backwards-compatibility promise (within the 1.x line, no Phase field shape, no endpoint, no protocol exchange will be removed) is therefore mandatory rather than aspirational. Operators making capital-allocation decisions on hardware already in orbit need confidence that the wire format will outlast the silicon.

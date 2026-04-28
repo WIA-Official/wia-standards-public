@@ -320,3 +320,8 @@ Detector outputs are mapped to the Phase-1 *Sensor* descriptor with the appropri
 All coordinates use ISO 6709:2008 representation. Engines MAY internally use a projected coordinate system (e.g. UTM); export-side coordinates MUST be reprojected to ISO 6709-compatible WGS-84 latitude/longitude unless the partner project explicitly negotiates a projection.
 
 Altitude is expressed in metres above the WGS-84 ellipsoid; deployments operating with a local geoid MUST convert to WGS-84 ellipsoid heights at export time and MUST record the conversion in Phase-1 *SimulationProject* notes.
+
+
+## Implementer note — operational lifecycle
+
+Traffic-simulation models built on this standard are intended to outlive the political cycles that commission them. A model calibrated for a metropolitan signal-coordination project in year 1 should remain consumable for an autonomous-vehicle scenario in year 5 and a Vision Zero retrospective in year 10. The wire-format discipline (signed scenario envelopes, calibration-evidence chain, audit log) is what enables that horizon: a researcher arriving in year 10 can verify which exact network and demand were used in year 1 without trusting the operator's current state.

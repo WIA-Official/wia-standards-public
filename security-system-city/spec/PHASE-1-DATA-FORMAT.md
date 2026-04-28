@@ -345,3 +345,15 @@ The `version` field uses semver 2.0.0. Phase 1 v1.x payloads are backwards-compa
 19. ISO/IEC 27037:2012 — *Guidelines for identification, collection, acquisition and preservation of digital evidence.*
 20. ISO/IEC 27701:2019 — *Privacy information management systems.*
 21. RFC 3339; RFC 5905; RFC 8259; RFC 8610; RFC 8915; RFC 8949; RFC 9052; RFC 9053; RFC 9562.
+
+
+## Implementer note — operational lifecycle
+
+Municipal physical-security infrastructure has a 20-30 year asset
+lifecycle. The wire-format discipline must absorb that horizon
+without locking the city into a single vendor or single regulator
+interpretation. The Phase-level backwards-compatibility promise
+is therefore mandatory rather than aspirational; cities make
+capital-allocation decisions on hardware that will outlast many
+political cycles, and the standard has to remain trustworthy
+through those transitions.

@@ -1,7 +1,7 @@
 # WIA-CITY-014 (security-system-city) — Phase 4: Integration Specification
 
 > **Version:** 1.0.0
-> **Status:** Official
+> **Status:** Draft
 > **Phase:** 4 of 4 (Integration)
 > **Philosophy:** 弘益人間 (Benefit All Humanity)
 
@@ -9,300 +9,200 @@
 
 ## 1. Overview
 
-Phase 4 covers the **integration** of WIA-CITY-014 deployments with surrounding building, city, and information ecosystems. The scope includes:
-
-1. Information-security management (ISO/IEC 27000-family) and risk treatment.
-2. Identity, access, and operator-station hardening.
-3. Privacy and data-governance regimes (ISO/IEC 27701).
-4. Building-management and command-centre interoperability.
-5. Public-sector emergency, fire, and life-safety integration.
-6. Conformance and field commissioning.
-7. City-scale federation, edge-AI, and cross-discipline integration with WIA-CITY-009 (smart-lighting), WIA-CITY-017 (traffic-simulation), and beyond.
-
-The objective is to give a single normative checklist that an operator can use to bring a WIA-CITY-014 system into a real city environment without ambiguity.
+Phase 4 specifies how a city-scale physical-security deployment integrates with the broader municipal-services ecosystem: emergency-management platforms (CAD systems, dispatch radios, EMS), forensic-lab pipelines, cross-agency coordination tooling, and regulatory-reporting flows. The integration is layered: ONVIF and IEC 62676 carry the device-level interoperability; ISO 22320 carries the emergency-management coordination; ISO/IEC 27001 carries the information-security baseline; the city's privacy law carries the consent and purpose-limitation floor.
 
 ---
 
-## 2. Information Security Management
+## 2. Bridge profiles
 
-### 2.1 ISO/IEC 27001 alignment
+### 2.1 Bridge to legacy NVR / VMS deployments
 
-A WIA-CITY-014 deployment MUST be operated within a documented ISO/IEC 27001:2022 information-security management system (ISMS). The ISMS scope statement (Phase 1 §2.1 `iso27001Scope`) MUST cover:
+Most city deployments already run a video-management system (VMS) — Genetec Security Center, Milestone XProtect, Avigilon Control Center, Hanwha Wisenet WAVE, Bosch BVMS. The bridge profile maps Phase 2 endpoints to VMS-native primitives without requiring the legacy stack to be replaced.
 
-- Personnel with operator, supervisor, administrator, or auditor roles.
-- All gateways, recorders, and storage media that hold video or biometric data.
-- All network conduits between zones (per IEC 62443-3-2 risk assessment).
+| Phase 2 endpoint | VMS primitive | Bridge mapping |
+|------------------|---------------|----------------|
+| `GET /camera/{id}/stream` | VMS RTSP/SRTP feed | direct passthrough; ONVIF Profile T metadata preserved |
+| `GET /camera/{id}/event-feed` | VMS analytics API | ONVIF Profile T analytics events translated to standard envelope |
+| `POST /access-point/{id}/event` | VMS access-control bridge | ONVIF Profile A events translated; legacy proprietary protocols (HID OSDP, OSDP v2.2) wrapped in the bridge |
+| `POST /incident` | VMS bookmark + investigation case | bridge creates VMS investigation case with Phase 1 incident envelope as evidence |
 
-### 2.2 ISO/IEC 27002 controls
+The bridge container ships at `https://github.com/WIA-Official/wia-security-system-city-bridges/vms-bridge` with reference implementations for the five major VMS platforms.
 
-Operators MUST select and document at minimum the following ISO/IEC 27002:2022 controls:
+### 2.2 Bridge to CAD (Computer-Aided Dispatch) systems
 
-| Control area | Examples |
-|--------------|----------|
-| 5 — Organisational | A.5.1 policies; A.5.7 threat intelligence; A.5.34 privacy |
-| 6 — People | A.6.1 screening; A.6.3 awareness, training |
-| 7 — Physical | A.7.4 monitoring; A.7.5 environmental threats |
-| 8 — Technological | A.8.5 secure authentication; A.8.16 monitoring activities; A.8.24 cryptography use |
+The CAD bridge maps Phase 2 incident envelopes to the dispatch system's native call format. Reference bridges:
 
-### 2.3 IEC 62443 alignment
+- **CentralSquare Public Safety CAD** — used by ~40% of US municipal dispatch operations
+- **Hexagon Intergraph CAD** — used by ~25% of US municipal dispatch + many international deployments
+- **Tyler Technologies New World CAD** — used by ~15% of US municipal dispatch
+- **Korean 119 통합신고시스템** — Korea National Fire Agency unified emergency reporting
+- **Japan 高度道路交通システム** — Japan ITS-integrated emergency dispatch
 
-For deployments that are part of an industrial control system or operational-technology environment, the IEC 62443-3-3 system security level (SL-T) for the security-services zone MUST be ≥ SL-2. SL-3 is recommended for sites holding biometric data.
+### 2.3 Bridge to forensic-lab pipelines
 
-### 2.4 Risk assessment
+Forensic labs consume IEC 62676-2-31 evidence-grade encoded clips with the chain-of-custody envelope from Phase 3 §3. The bridge maps the incident-dossier exchange to the lab's case-management system (typically a vendor-specific system with documented intake API).
 
-The site descriptor MUST reference an IEC 62443-3-2 risk-assessment document under `iec62443.riskAssessmentRef`. Re-assessment cadence MUST not exceed 24 months and MUST follow significant change events (new zone, new credential modality, new federation).
+### 2.4 Bridge to access-control vendors
 
----
+Access-control hardware vendors (HID, ASSA ABLOY, Suprema, ZKTeco, Hanwha) speak proprietary or semi-open protocols. The bridge profile maps Phase 2 access-point endpoints to:
 
-## 3. Identity, Access, and Operator Hardening
-
-### 3.1 Identity provisioning
-
-- **Devices**: X.509 v3 (RFC 5280), Subject DN with the device-identity OID, Subject Alternative Name carrying the IEC 62676 device-MAC reference.
-- **Operators**: federated identity over OAuth 2.1 (RFC 9700) and OpenID Connect 1.0; subject claim resolves to a IEC 62443-2-1 personnel registry.
-
-### 3.2 Multi-factor
-
-Operator login MUST require multi-factor authentication. Conforming factors include:
-
-- Possession factor: a smart card / cryptographic token with X.509 client certificate (RFC 8446 mTLS).
-- Inherence factor: ISO/IEC 19794-compliant biometric template held on a tamper-resistant token (e.g. ISO/IEC 7816 chip card).
-- Knowledge factor: PIN / passphrase managed per ISO/IEC 27002 A.5.17.
-
-### 3.3 Privileged operations
-
-Privileged operations (`security:lockdown`, `security:clear-alarm` with mass-clear semantics, evidence export with key-export option) MUST require step-up authentication and MUST be logged with the second factor evidence.
-
-### 3.4 Operator-station hardening
-
-Operator stations MUST:
-
-- Run a maintained operating system with the vendor's current security update level.
-- Disable inbound services other than the Phase-2 client.
-- Apply IEC 62443-3-3 SR 1.5 (audit), SR 1.7 (multi-factor), and SR 5.1 (zoning).
+- **OSDP v2.2** (Open Supervised Device Protocol) — open standard; primary target
+- **HID OSDP** — HID-flavoured OSDP with extensions
+- **Wiegand** — legacy 26/34/N-bit protocol; wrapped in OSDP-shaped envelope for uniformity
+- **Mercury Security MS-ICS** — common access-control platform
+- **Suprema BioStar** — biometric access-control with BIOS protocol
 
 ---
 
-## 4. Privacy and Data Governance
+## 3. Privacy and regulatory integration
 
-### 4.1 ISO/IEC 27701
+### 3.1 Jurisdiction mapping
 
-Operators handling personal data through cameras, biometric readers, or behavioural analytics MUST extend the ISMS to ISO/IEC 27701:2019 privacy information management.
+The standard maps to per-jurisdiction privacy and surveillance frameworks:
 
-### 4.2 Data classification
+| Jurisdiction | Privacy law | Surveillance law | Bridge artefact |
+|--------------|-------------|------------------|-----------------|
+| EU | GDPR Article 32 + EU Charter Article 7-8 | EU Member State surveillance law | bridges/eu-gdpr.json |
+| US (federal) | None (sectoral) | 4th Amendment + per-state | bridges/us-federal.json |
+| US (California) | CCPA/CPRA | California state surveillance law | bridges/us-ca.json |
+| Korea | PIPA Article 25 | 통합방위법 + 영상정보처리기기 운영ㆍ관리 가이드라인 | bridges/kr-pipa.json |
+| Japan | APPI | 個人情報保護法 + 警察法 | bridges/jp-appi.json |
+| UK | UK GDPR + DPA 2018 | RIPA 2000 + IPA 2016 | bridges/uk-gdpr.json |
 
-Each Phase-1 entity has an implicit data classification:
+### 3.2 DPIA publication and review cadence
 
-| Entity | Classification |
-|--------|----------------|
-| `Camera` raw video | Personal data |
-| `Camera` privacy-masked video | Personal data (masked) |
-| `AccessPoint` events | Personal data |
-| `Sensor` aggregate counts | Anonymous |
-| `Operator` identifiers | Personal data of personnel |
+Every conformant deployment publishes a Data Protection Impact Assessment (DPIA, ISO/IEC 29134:2023) with documented purpose limitations and risk-mitigation measures. The DPIA is reviewed at least annually and on every material change to the surveillance footprint (new camera zone, new analytics capability, new agency partner).
 
-### 4.3 Retention
+### 3.3 Subject-rights integration
 
-Default retention is 30 days for raw video, 90 days for access-control events, 7 years for audit log (per typical ISO/IEC 27001 audit cycles), and 0 days for biometric templates outside of the live transaction. Operators MAY override retention only with a documented lawful-basis record.
+GDPR Article 15 (right of access), Article 16 (rectification), Article 17 (erasure), Article 18 (restriction), and Article 20 (portability) map to specific Phase 2 endpoints; KR PIPA Article 35 정보주체의 권리 maps to the same set with documented translations. The discovery document declares the operator's enabled subject rights per jurisdiction.
 
-### 4.4 Subject access
+### 3.4 Lawful-intercept compatibility
 
-The Phase-2 endpoint `/sites/{siteId}/data-subject-access:request` MUST return a signed export within 30 days. The export bundles all identified personal data with the same evidence-bundle structure as Phase 3 §6.
-
-### 4.5 Cross-border transfer
-
-Sites operating across jurisdictions MUST declare lawful-basis and onward-transfer mechanisms as a machine-readable policy under `/sites/{siteId}/.well-known/data-policy`.
+Jurisdictions requiring lawful intercept on surveillance feeds declare the requirement in the discovery document. Sessions in those jurisdictions emit a notice envelope on session start; the actual intercept happens through a separate signed channel that audit-logs every access.
 
 ---
 
-## 5. Building-Management and Command Centre Interoperability
+## 4. Cross-standard composition
 
-### 5.1 ISO/IEC 14908 / OPC UA / BACnet bridges
+This Phase composes with adjacent WIA-family standards:
 
-WIA-CITY-014 sites typically integrate with building automation. The recognised surfaces:
-
-- **ISO/IEC 14908-1** control network protocol (normative bridge).
-- **IEC 62541 OPC UA** (normative bridge with OPC UA Companion for IEC 62443).
-- **ISO 16484-5 BACnet** (informative reference, not part of the ALLOW citation list).
-
-### 5.2 OPC UA model
-
-| WIA-CITY-014 entity | OPC UA node class |
-|---------------------|-------------------|
-| Site | Object (`SecuritySiteType`) |
-| Zone | Object (`SecurityZoneType`) |
-| Camera | Object (`CameraType`) |
-| AccessPoint | Object (`AccessPointType`) |
-| Recorder | Object (`RecorderType`) |
-| Alarm | Object + DataChange |
-| Lockdown command | Method (`Lockdown`) |
-
-OPC UA security policy MUST be at least `Basic256Sha256` (IEC 62541-7 §5.2). Hardware-backed key material is recommended.
-
-### 5.3 Integrated command centre
-
-A command-centre console aggregating multiple WIA-CITY-014 sites MUST:
-
-- Maintain a per-site identity context separate from operator credentials.
-- Filter alarms by zone and by Phase-1 *operationalRequirement* per site policy.
-- Surface evidence bundles as detached signed artefacts per Phase 3 §6.
+- **WIA-OMNI-API** — SOC-operator and partner-agency identity (X.509 + DID); the Phase 2 X.509 chain anchors against WIA-OMNI-API records when the city deploys WIA-family identity
+- **WIA-AIR-SHIELD** — runtime trust list and key rotation for cross-agency federation
+- **WIA-SOCIAL Phase 3 §5** — federation receipt shape reused for cross-agency cross-support
+- **WIA-INTENT** — declaration of SOC operational intent so regulators can monitor at intent-level without exposing operational detail
+- **WIA-ACCESSIBILITY** — when the SOC's public-facing tooling (incident-information portals, missing-person announcements) must be accessible per W3C WCAG 2.2 AA
 
 ---
 
-## 6. Emergency, Fire, and Life-Safety Integration
+## 5. Operational deployment runbook
 
-### 6.1 Fire-alarm interface
+A first city-scale physical-security deployment that reaches production typically follows the runbook:
 
-Fire alarms detected by IEC 60839-1-classified sensors MUST cascade to:
+| Phase | Activity | Duration |
+|-------|----------|----------|
+| Day 0 | Reference container stood up; conformance suite run | 1 day |
+| Day 1-14 | Initial DPIA published; legal review with city counsel | 2 weeks |
+| Day 15-30 | First camera-zone bridged from VMS to standard envelopes; ONVIF Profile T verified | 2 weeks |
+| Day 31-60 | First access-control system bridged via OSDP v2.2 | 4 weeks |
+| Day 61-75 | First cross-agency federation handshake with city police; cooperation agreement signed | 2 weeks |
+| Day 76-90 | Mass-event coordination protocol exercised against a planned public event | 2 weeks |
+| Day 91+ | Production cutover with shadow operation through Day 90; legacy retained as fallback | open-ended |
 
-- Unlock all `fireSafetyLink=FAIL-SAFE` access points.
-- Override `security:lockdown` for `doorClass=emergency-egress`.
-- Notify all operator sessions with `severity=CRITICAL`.
-
-### 6.2 Life-safety reservation
-
-Life-safety devices and protocols are **never** subject to the operator HTTP rate-limit nor to the audit-log read-restriction. The system MUST guarantee:
-
-- Latency to door unlock on fire alarm ≤ 1 s for Grade 3, ≤ 0.5 s for Grade 4.
-- Audit entries reach durable storage within 5 s of event (IEC 62443-3-3 SR 6.1).
-
-### 6.3 Public-safety liaison
-
-Sites operating with a regulatory liaison to public-safety services MUST expose a separately authenticated read-only feed of alarm summaries, with privacy-masked video clip references gated by an explicit authorisation record. The interface uses the Phase-2 surface with a dedicated audience claim.
+Lighter deployments (small municipalities with single-zone surveillance) compress this to 30 days; larger deployments (capital cities with multi-thousand-camera networks) may take 6-12 months for full bridge coverage.
 
 ---
 
-## 7. Field Commissioning Checklist
+## 6. Compliance and certification
 
-A WIA-CITY-014 site MUST pass each of the following before being declared *operational*:
+The standard maps to:
 
-| # | Test | Reference |
-|---|------|-----------|
-| 1 | All cameras' achieved IEC 62676-4 category meets zone requirement | IEC 62676-4:2025 |
-| 2 | Recording timestamps slaved to NTPv4 + NTS or equivalent ≤ 50 ms | RFC 5905, RFC 8915 |
-| 3 | RTSPS / TLS 1.3 cipher inventory verified | RFC 8446 |
-| 4 | OAuth 2.1 token introspection produces audit entries | RFC 9700, RFC 7662 |
-| 5 | Multi-factor enforced for operator login | ISO/IEC 27002 A.8.5 |
-| 6 | At least one camera and one access point per zone | site policy |
-| 7 | All access points satisfy IEC 60839-11-1 grade ≥ zone grade | IEC 60839-11-1 |
-| 8 | Tamper alarm latency ≤ 1 s | Phase 3 §4.3 |
-| 9 | Lockdown propagation 99th-percentile ≤ 3 s | Phase 3 §7.3 |
-| 10 | Evidence bundle signing chain validates end-to-end | Phase 3 §6 |
-| 11 | ISO/IEC 27001 ISMS scope statement covers the site | ISO/IEC 27001 §4.3 |
-| 12 | IEC 62443-3-3 SR 1, SR 2, SR 5, SR 6 implemented | IEC 62443-3-3 |
-| 13 | ISO/IEC 27037 chain-of-custody export validates | ISO/IEC 27037 §7 |
-| 14 | Privacy masks applied where required by §4.2 | ISO/IEC 27701 |
-| 15 | Fire-alarm cascade meets §6.2 latency targets | IEC 60839-1 |
+- **ISO/IEC 27001:2022** — information security management
+- **ISO/IEC 27701:2019** — privacy information management (extension of 27001)
+- **ISO 22320:2018** — emergency management
+- **IEC 62676 series** — video surveillance system requirements
+- **IEC 62443-3-3:2013** — system security for the operational-technology side
+- **NIST SP 800-53 Rev 5** — security and privacy controls
+- **NIST SP 800-86** — forensic techniques in incident response
+- **ASIS International POA Standard** — physical-security operations
+- **ASIS International FPSM Standard** — facility physical-security measures
 
-The checklist results MUST be stored as a signed Phase-1 *Site* attribute and surfaced under `/sites/{siteId}/health`.
+Operators publish a signed conformance attestation envelope that names which compliance frames they claim and which audit evidence supports each claim.
 
 ---
 
-## 8. Cyber-resilience and Incident Response
+## 7. Roadmap
 
-### 8.1 Detection
+| Version | Focus |
+|---------|-------|
+| 1.0.0 | Initial publication: ONVIF Profile T/A/C, IEC 62676-2-31 evidence-grade, ISO 22320 emergency-management federation |
+| 1.1.x | Additive: more VMS bridges, more CAD bridges, deeper analytics-event taxonomy |
+| 1.2.x | Additive: mass-event coordination as a first-class envelope class with venue-management vendor bridges |
+| 1.3.x | Additive: subject-rights automation for high-volume jurisdictions (GDPR, PIPA) |
+| 2.0.0 (no earlier than 2028) | Possible breaking change: post-quantum signature suite migration |
 
-The site MUST run continuous detection that combines:
-
-- IEC 62443-3-3 SR 6 audit-log analytics for anomalous operator behaviour.
-- Camera firmware integrity via hardware-rooted attestation (TPM 2.0 or vendor secure-element).
-- Time-source integrity monitoring (NTS-protected NTPv4 clients refusing unsigned servers).
-
-### 8.2 Containment
-
-Containment playbooks MUST include:
-
-- Issuing `security:lockdown` from a privileged station.
-- Revoking compromised operator credentials via the OAuth introspection endpoint with token replay refused per RFC 7662.
-- Pausing recorder export endpoints to preserve forensics integrity until the incident scope is bounded.
-
-### 8.3 Recovery
-
-Recovery procedures MUST:
-
-- Re-run §7 commissioning checklist for affected zones.
-- Re-attest device firmware before re-enabling.
-- Document the incident in the ISO/IEC 27001 corrective-action register.
+The standard is maintained by the WIA Standards Committee. Change proposals follow the WIA RFC process; breaking changes require a two-thirds Committee vote plus a 12-month deprecation window per IETF RFC 8594 / 9745.
 
 ---
 
-## 9. City-Scale Considerations
+## 8. References
 
-### 9.1 Federation
-
-Sites federate through the management plane. A federation document MUST specify:
-
-- The list of partner sites (URIs).
-- The verb-level cross-site authorisation matrix.
-- The privacy-masking and data-handling policies that survive federation.
-
-### 9.2 Cross-discipline integration
-
-WIA-CITY-014 commonly integrates with:
-
-- **WIA-CITY-009 (smart-lighting)** — security-driven lighting activation; fire-alarm-driven lighting overrides.
-- **WIA-CITY-017 (traffic-simulation)** — incident-driven traffic re-routing; emergency-vehicle pre-emption.
-- **WIA-CITY-008 (smart-parking)** — credential-driven gate entry events that double as access-point events.
-- **WIA-CITY-006 (public-transit)** — station-level CCTV integrated with platform alerting.
-
-### 9.3 Edge analytics
-
-Camera-side AI analytics (object detection, attribute extraction) MUST:
-
-- Run on hardware classified at ≥ IEC 62443-4-2 device security level matching the zone.
-- Surface results as Phase-1 *Sensor* events with provenance referencing the model identifier and version.
-- Refuse to emit personal-data attributes (e.g. demographic inference) unless the zone policy explicitly enables them.
-
-### 9.4 Cross-jurisdiction operations
-
-Cities operating WIA-CITY-014 across regulatory regions MUST hold a documented mapping of each region's lawful-basis regime to the system's data-handling levers. Changes to retention, biometric usage, or federated export MUST flow through the change-control process required by ISO/IEC 27001 §8.
+- ISO/IEC 27001:2022 — Information security management
+- ISO/IEC 27002:2022 — Information security controls
+- ISO/IEC 27701:2019 — Privacy information management
+- ISO/IEC 27037:2012 — Digital evidence preservation
+- ISO/IEC 29134:2023 — Privacy impact assessment
+- ISO 22320:2018 — Emergency management
+- IEC 62676-1-1:2020 — Video surveillance system requirements
+- IEC 62676-2-31:2019 — IP interoperability
+- IEC 62676-4:2018 — Application guidelines
+- IEC 62443-3-3:2013 — System security requirements
+- ONVIF Profile T / A / C 2024.06 — IP-video and access-control profiles
+- NIST SP 800-53 Rev 5 — Security and Privacy Controls
+- NIST SP 800-86 — Forensic techniques
+- NIST SP 800-160 Vol. 2 — Cyber-resilient systems
+- ASIS International POA 2018 — Protection of Assets
+- W3C WCAG 2.2 — Web Content Accessibility Guidelines
+- IETF RFC 8446 — TLS 1.3
+- IETF RFC 8594 — sunset HTTP header
+- IETF RFC 9745 — deprecation HTTP header
 
 ---
 
-## 10. Conformance Tags
+## 9. Closing implementer note
 
-A site descriptor MUST advertise a list of conformance tags that summarise the achieved profile:
+City-scale physical security is one of the most politically sensitive infrastructures in the WIA family. The wire-format discipline does not adjudicate the policy questions (how much surveillance is appropriate, what consent model applies, which agencies should cooperate); it provides the auditable wire format that lets the policy decisions be implemented, observed, and corrected over time without locking the city into a single vendor's view of the world.
 
-| Tag | Meaning |
-|-----|---------|
-| `wia-city-014/v1/baseline` | Phase 3 §9.1 baseline profile |
-| `wia-city-014/v1/extended` | Phase 3 §9.2 extended profile |
-| `wia-city-014/v1/city-grade` | Phase 3 §9.3 city-grade profile |
-| `wia-city-014/v1/iso27001` | ISMS-covered |
-| `wia-city-014/v1/iso27701` | PIM-covered |
-| `wia-city-014/v1/iec62443-sl2` | Security level 2 |
-| `wia-city-014/v1/iec62443-sl3` | Security level 3 |
-| `wia-city-014/v1/iec60839-grade-3` | Access-control grade 3 |
-| `wia-city-014/v1/edge-ai` | Edge analytics profile per §9.3 |
+A first deployment that follows the runbook reaches production in about 90 days. The depth of legal, privacy, and operational work concentrated in those 90 days is what justifies the wire-format discipline: an inspector arriving in year five with a regulatory inquiry, or a court reviewing an incident, can reconstruct any operational decision back to the signed envelope that originated it.
 
-Conformance tags are normative for automated discovery and informative for human readers.
+弘益人間 — Benefit All Humanity.
 
----
 
-## 11. References
+## 10. Compliance attestation envelope schema
 
-1. IEC 60529:2013 — *IP Code.*
-2. IEC 60839-1:2014; IEC 60839-5-1; IEC 60839-5-2; IEC 60839-5-3; IEC 60839-7-1; IEC 60839-11-1:2013; IEC 60839-11-2:2014.
-3. IEC 62443-2-1; IEC 62443-3-2; IEC 62443-3-3; IEC 62443-4-2.
-4. IEC 62541-7 — *OPC UA — Profiles.*
-5. IEC 62676-1; -2-1; -2-3; -4:2025; -5-1:2024.
-6. ISO 11770-2; 11770-3 — *Key management.*
-7. ISO 14443; ISO/IEC 7816 — *Identification cards / smart cards.*
-8. ISO/IEC 14908-1 — *Control network protocol.*
-9. ISO/IEC 14496-10; -12; ISO/IEC 23008-2 — *AVC, ISOBMFF, HEVC.*
-10. ISO/IEC 18033-3 — *Block ciphers.*
-11. ISO/IEC 19794 (all parts) — *Biometric data interchange.*
-12. ISO/IEC 27001:2022; ISO/IEC 27002:2022; ISO/IEC 27037:2012; ISO/IEC 27701:2019.
-13. ISO 19115-1:2014 — *Geographic information — Metadata.*
-14. RFC 5280 — *X.509 PKI Certificate and CRL Profile.*
-15. RFC 5905; RFC 8915 — *NTPv4, NTS.*
-16. RFC 7252; RFC 7641 — *CoAP, OBSERVE.*
-17. RFC 7662 — *OAuth Token Introspection.*
-18. RFC 8446; RFC 9147 — *TLS 1.3, DTLS 1.3.*
-19. RFC 8613 — *OSCORE.*
-20. RFC 9019; RFC 9124 — *SUIT manifests.*
-21. RFC 9052; RFC 9053 — *COSE.*
-22. RFC 9111 — *HTTP Caching.*
-23. RFC 9700 — *OAuth 2.1.*
-24. FIPS 180-4 — *SHA family.*
-25. FIPS 197 — *AES.*
+```json
+{
+  "wia_city_014_version": "1.0.0",
+  "type": "compliance_attestation",
+  "deployment_id": "<UUID>",
+  "claimed_compliance_frames": ["ISO/IEC 27001:2022", "ISO/IEC 27701:2019", "ISO 22320:2018", "GDPR Article 32", "KR PIPA Article 29"],
+  "audit_evidence_uris": ["<URI>", "..."],
+  "auditor_identity": "did:wia:auditor:soc-2-firm",
+  "audit_completed_at_tai": "<TAI>",
+  "valid_until_tai": "<TAI>",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+```
+
+The attestation envelope is published on the operator's discovery
+document so a regulator or partner agency can verify the claimed
+compliance frames before federation handshakes proceed.
+
+
+## 11. Glossary expansion for Phase 4
+
+VMS: Video Management System, the central platform for surveillance footage. NVR: Network Video Recorder, the storage tier of a VMS. CAD: Computer-Aided Dispatch system used by emergency-response operations. EAM: Enterprise Asset Management. OSDP: Open Supervised Device Protocol, an open access-control protocol superseding Wiegand. ONVIF: Open Network Video Interface Forum, the open IP-video interoperability consortium. DPIA: Data Protection Impact Assessment per ISO/IEC 29134:2023. RIPA / IPA: UK Regulation of Investigatory Powers Act / Investigatory Powers Act, the UK lawful-intercept regime.
+
+## 12. Implementer note — politically sensitive infrastructure
+
+City-scale physical security is one of the most politically sensitive infrastructures in the WIA family. The wire-format discipline does not adjudicate the policy questions (how much surveillance, what consent, which agencies cooperate); it provides the auditable wire format that lets the policy decisions be implemented, observed, and corrected over time without locking the city into a single vendor's view of the world. The discipline is what distinguishes lawful surveillance with auditable evidence chain from arbitrary surveillance.

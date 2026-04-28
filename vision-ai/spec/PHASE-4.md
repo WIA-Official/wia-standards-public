@@ -1,596 +1,205 @@
-# WIA-AI-021 Vision AI Standard - PHASE 4 Specification
+# WIA-AI-021 Vision AI Standard — PHASE 4 Specification
 
 **Version:** 1.0
-**Status:** Official Standard
-**Date:** 2025-01-15
+**Status:** Draft
+**Date:** 2026-04-28
 **Organization:** World Certification Industry Association (WIA)
 
 ---
 
 ## 弘益人間 (Benefit All Humanity)
 
-Advanced 3D vision and production-ready deployment.
+---
+
+## 1. Overview
+
+Phase 4 specifies how a WIA-AI-021 vision-AI deployment integrates with the broader AI-engineering ecosystem: MLOps platforms, model-registry tooling, dataset-licensing infrastructure, regulatory-reporting pipelines (especially under the EU AI Act), and downstream-application stacks that consume vision inferences. The integration is layered: ONNX / OpenVINO / Triton carry the runtime interoperability; MLflow carries the experiment tracking; ISO/IEC 42001 carries the AI-management baseline; the EU AI Act and equivalent national laws carry the regulatory floor.
 
 ---
 
-## 1. Executive Summary
+## 2. Bridge profiles
 
-Phase 4 represents the pinnacle of WIA-AI-021, introducing 3D vision capabilities, depth estimation, point cloud processing, and comprehensive production deployment guidelines for enterprise-scale systems.
+### 2.1 Bridge to model registries
 
----
+The bridge profile maps Phase 1 model descriptors and Phase 2 model endpoints to common model-registry platforms:
 
-## 2. Depth Estimation
+| Registry | Native artefact | Bridge mapping |
+|----------|----------------|----------------|
+| MLflow | MLflow Model + experiment | ONNX export + Phase 1 model envelope |
+| Hugging Face Hub | model card + repository | model card translated to ISO/IEC 23053 conformant format |
+| Amazon SageMaker Model Registry | SageMaker model package | model package mapped to Phase 1 envelope |
+| Azure ML Model Registry | Azure ML model | similar to above |
+| Vertex AI Model Registry | Vertex model | similar |
+| Korean 네이버 ClovaStudio | ClovaStudio model card | Korean-language model card with Phase 1 envelope wrap |
 
-### 2.1 Monocular Depth Estimation
+Bridge containers ship at `https://github.com/WIA-Official/wia-vision-ai-bridges`.
 
-**Input:** Single RGB image
+### 2.2 Bridge to inference runtimes
 
-**Output:**
-```json
-{
-  "depth_map": {
-    "format": "disparity",
-    "width": 640,
-    "height": 480,
-    "data": "base64_encoded_depth_values",
-    "min_depth_m": 0.5,
-    "max_depth_m": 80.0,
-    "unit": "meters"
-  },
-  "confidence_map": "base64_encoded_confidence",
-  "model": "midas-v3",
-  "processing_time_ms": 150
-}
-```
+The runtime bridge maps Phase 2 inference endpoints to runtime-native invocation:
 
-**Performance:**
-- Absolute Relative Error ≤ 0.15
-- RMSE ≤ 5.0 meters (outdoor scenes)
-- Processing time ≤ 200ms (640x480)
+- **ONNX Runtime** — primary cross-platform runtime; CPU + GPU + ARM
+- **NVIDIA Triton Inference Server** — GPU-optimised; Triton native ensemble support
+- **OpenVINO** — Intel CPU + GPU + VPU; OpenVINO IR format
+- **TensorFlow Serving** — TensorFlow SavedModel format
+- **TorchServe** — PyTorch native serving
+- **NVIDIA TensorRT** — GPU-optimised inference; latency-sensitive deployments
+- **Apple Core ML** — on-device inference for iOS / macOS
+- **Android NN API / TFLite** — on-device inference for Android
 
-### 2.2 Stereo Depth Estimation
+### 2.3 Bridge to MLOps platforms
 
-**Input:** Left and right stereo images
+MLOps platforms (Kubeflow, MLflow Pipelines, Apache Airflow + MLflow, Argo Workflows, Vertex AI Pipelines, Azure ML Pipelines, SageMaker Pipelines, Korean 카카오엔터프라이즈 KAIROS) consume Phase 1 model and dataset envelopes for orchestration. The bridge profile maps the standards artefacts to platform-native pipeline definitions.
 
-**Requirements:**
-- Calibrated stereo cameras
-- Baseline distance: 6-65cm
-- Disparity range: 0-256 pixels
+### 2.4 Bridge to downstream applications
 
-**Performance:**
-- Depth accuracy: ≤ 2% at 10m
-- Bad pixel rate: ≤ 5%
-- Processing time ≤ 100ms
+Downstream applications (manufacturing-defect detection, retail-checkout vision, medical-imaging assist, autonomous-vehicle perception, smart-city CCTV analytics) consume Phase 2 inference endpoints. The bridge profile documents per-application integration patterns and the model-card requirements that gate inferences for sensitive deployments.
 
 ---
 
-## 3. 3D Object Detection
+## 3. Regulatory integration
 
-### 3.1 3D Bounding Boxes
+### 3.1 EU AI Act (Regulation 2024/1689) high-risk-system flow
 
-**Output:**
-```json
-{
-  "detections_3d": [
-    {
-      "object_id": 1,
-      "class": "car",
-      "confidence": 0.92,
-      "bbox_3d": {
-        "center": {"x": 5.2, "y": 0.0, "z": 15.8},
-        "dimensions": {"length": 4.5, "width": 1.8, "height": 1.5},
-        "rotation": {"yaw": 1.57, "pitch": 0.0, "roll": 0.0}
-      },
-      "distance_m": 16.4
-    }
-  ]
-}
-```
+EU AI Act high-risk systems require:
 
-**Performance:**
-- AP@0.7 (IoU 3D) ≥ 60% on KITTI
-- Processing time ≤ 150ms
+- **Article 16** — provider obligations (registration, conformity assessment, CE marking)
+- **Article 17** — quality management system (mapped to ISO/IEC 42001 attestation)
+- **Article 18** — record-keeping (mapped to Phase 3 §8 audit log)
+- **Article 23-29** — distributor / importer / deployer obligations
+- **Article 49-50** — conformity assessment procedure
+- **Article 71** — fundamental-rights impact assessment for public-deployer use
 
----
+The bridge profile maps each Article to specific Phase 1-3 envelopes so a deployer can demonstrate compliance via envelope audit.
 
-## 4. Point Cloud Processing
+### 3.2 NIST AI Risk Management Framework integration
 
-### 4.1 Point Cloud Input
+The NIST AI RMF (AI 100-1) provides a US-centric AI-risk approach. The bridge maps the four NIST RMF functions (Govern, Map, Measure, Manage) to specific Phase 1-3 envelopes:
 
-**Supported Formats:**
-- PLY (ASCII and binary)
-- PCD (Point Cloud Data)
-- LAS/LAZ (LiDAR)
-- XYZ
+| NIST AI RMF function | Phase artefact |
+|----------------------|---------------|
+| Govern | Operator's ISO/IEC 42001 attestation envelope |
+| Map | Dataset evidence + use-case documentation in model card |
+| Measure | Evaluation envelope + per-cohort fairness |
+| Manage | Drift signal envelope + audit log |
 
-**Requirements:**
-- Support colored point clouds (RGB)
-- Support normal vectors
-- Handle large point clouds (> 1M points)
+### 3.3 Korean AI Framework Act (시행 2026) integration
 
-### 4.2 Point Cloud Segmentation
+Korea's AI Framework Act enters into force in 2026 with high-risk-system obligations parallel to the EU AI Act. The bridge profile maps the Korean Framework Act obligations to the same Phase 1-3 envelopes used for EU AI Act compliance, with Korean-language model cards and Korean-jurisdiction privacy floor (KR PIPA Article 23 sensitive-information processing).
 
-**Output:**
-```json
-{
-  "segmentation": {
-    "num_points": 1048576,
-    "num_clusters": 23,
-    "clusters": [
-      {
-        "cluster_id": 0,
-        "class": "ground",
-        "num_points": 524288,
-        "centroid": {"x": 0.0, "y": 0.0, "z": 0.0}
-      }
-    ]
-  }
-}
-```
+### 3.4 Lawful-intercept compatibility
 
-### 4.3 3D Object Recognition
-
-**Requirements:**
-- Classify objects in point clouds
-- Support rotation invariance
-- Handle partial occlusions
-
-**Performance:**
-- Classification accuracy ≥ 85% on ModelNet40
-- Segmentation mIoU ≥ 70% on ShapeNet
+Jurisdictions requiring lawful intercept on biometric inference (rare but real in some surveillance regimes) declare the requirement in the discovery document. Sessions in those jurisdictions emit a notice envelope; the actual intercept happens through a separate signed channel that audit-logs every access.
 
 ---
 
-## 5. SLAM (Simultaneous Localization and Mapping)
+## 4. Cross-standard composition
 
-### 5.1 Visual SLAM
+This Phase composes with adjacent WIA-family standards:
 
-**Requirements:**
-- Build 3D map from video/images
-- Estimate camera trajectory
-- Support loop closure detection
-- Real-time performance (≥ 20 FPS)
-
-**Output:**
-```json
-{
-  "slam_results": {
-    "trajectory": [
-      {
-        "frame_id": 0,
-        "pose": {
-          "position": {"x": 0.0, "y": 0.0, "z": 0.0},
-          "orientation": {"qw": 1.0, "qx": 0.0, "qy": 0.0, "qz": 0.0}
-        },
-        "confidence": 0.95
-      }
-    ],
-    "map_points": "base64_encoded_point_cloud",
-    "num_keyframes": 150
-  }
-}
-```
+- **WIA-OMNI-API** — operator and downstream-application identity
+- **WIA-AIR-SHIELD** — runtime trust list and key rotation for cross-operator federation
+- **WIA-SOCIAL Phase 3 §5** — federation receipt shape reused for cross-operator model-publication chains
+- **WIA-INTENT** — outermost-layer AI-system-intent declaration so deployers can verify intent matches the deployed model
+- **WIA Secure Enclave (WIA-SEC-013)** — composes when models or inference inputs are sensitive (medical imaging, defence, biometric); the Phase 4 confidential-inference profile maps to the Secure Enclave's TEE-attested workload class
+- **WIA Quantum Machine Learning** — composes when the operator deploys quantum-classical hybrid inference workloads
+- **WIA Smart Lighting / Smart City / Sensory Enhancement** — the canonical downstream-application standards that consume Phase 2 inferences
 
 ---
 
-## 6. Neural Rendering
+## 5. Operational deployment runbook
 
-### 6.1 Neural Radiance Fields (NeRF)
+A first vision-AI deployment that reaches production typically follows the runbook:
 
-**Requirements:**
-- Novel view synthesis from multi-view images
-- Support 360-degree rendering
-- High-quality output (PSNR ≥ 30 dB)
+| Phase | Activity | Duration |
+|-------|----------|----------|
+| Day 0 | Reference container stood up; conformance suite run | 1 day |
+| Day 1-7 | Model registry imported from operator's MLflow / SageMaker | 1 week |
+| Day 8-21 | Dataset evidence chain established for at least one production dataset | 2 weeks |
+| Day 22-35 | First model published with full robustness + fairness evaluation | 2 weeks |
+| Day 36-50 | Drift-detection protocol wired to operator's monitoring system | 2 weeks |
+| Day 51-60 | Bulk-export bridge to EU-AI-Act audit pipeline (when applicable) | 1-2 weeks |
+| Day 61+ | Production cutover with shadow inference through Day 60; legacy retained as fallback | open-ended |
 
-**API:**
-```json
-{
-  "input_views": ["view_001.jpg", "view_002.jpg", "...", "view_100.jpg"],
-  "camera_poses": [...],
-  "render_views": [
-    {"position": [0, 0, 5], "direction": [0, 0, -1]}
-  ]
-}
-```
+Lighter deployments (single-model inference services) compress this to 30 days; large deployments (model fleets serving multiple downstream applications) may take 6-12 months for full bridge coverage.
 
 ---
 
-## 7. Production Deployment
+## 6. Compliance and certification
 
-### 7.1 Model Optimization
+The standard maps to:
 
-**Requirements:**
-- Quantization support (INT8, FP16)
-- Model pruning (≥ 30% size reduction)
-- Knowledge distillation
-- ONNX export
-- TensorRT optimization
+- **ISO/IEC 22989:2022** — AI concepts and terminology
+- **ISO/IEC 23053:2022** — ML framework
+- **ISO/IEC 24029-1 / -2** — Neural-network robustness
+- **ISO/IEC TR 24027:2021** — Bias in AI systems
+- **ISO/IEC TR 24368:2022** — Ethical and societal concerns
+- **ISO/IEC 25059:2023** — AI quality model
+- **ISO/IEC 42001:2023** — AI management system
+- **ISO/IEC 27001:2022** — Information security management
+- **ISO/IEC 29134:2023** — Privacy impact assessment
+- **EU AI Act (Regulation 2024/1689)**
+- **Korean AI Framework Act (시행 2026)**
+- **NIST AI Risk Management Framework (AI 100-1)**
+- **NIST AI 600-1** — Generative AI Profile
+- **US BIPA / FRA / consumer-privacy laws** — biometric-data jurisdictions
 
-**Performance Targets:**
-```json
-{
-  "optimization": {
-    "original_size_mb": 250,
-    "optimized_size_mb": 75,
-    "size_reduction": "70%",
-    "latency_reduction": "60%",
-    "accuracy_drop": "<2%"
-  }
-}
-```
-
-### 7.2 Containerization
-
-**Requirements:**
-- Docker support
-- Kubernetes deployment
-- Health checks
-- Graceful shutdown
-- Resource limits
-
-**Dockerfile Example:**
-```dockerfile
-FROM nvidia/cuda:11.8-cudnn8-runtime-ubuntu22.04
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0"]
-```
-
-### 7.3 Monitoring and Observability
-
-**Required Metrics:**
-- Request rate (requests/second)
-- Latency (P50, P95, P99)
-- Error rate
-- GPU utilization
-- Memory usage
-- Model accuracy drift
-
-**Monitoring Stack:**
-- Prometheus (metrics)
-- Grafana (visualization)
-- ELK/Loki (logging)
-- Jaeger/Zipkin (tracing)
-
-### 7.4 A/B Testing
-
-**Requirements:**
-- Traffic splitting by percentage
-- User-based routing
-- Metric comparison
-- Statistical significance testing
+Operators publish a signed conformance attestation envelope that names which compliance frames they claim and which audit evidence supports each claim.
 
 ---
 
-## 8. Scalability and Performance
+## 7. Roadmap
 
-### 8.1 Horizontal Scaling
+| Version | Focus |
+|---------|-------|
+| 1.0.0 | Initial publication: ONNX + OpenVINO + Triton bridges; MLflow registry bridge; EU AI Act + NIST AI RMF compliance |
+| 1.1.x | Additive: more model-registry bridges; deeper VLM (vision-language-model) coverage |
+| 1.2.x | Additive: confidential vision-AI inside TEEs (composes with WIA Secure Enclave) |
+| 1.3.x | Additive: on-device inference reference profiles (Apple Core ML, Android NN API, edge accelerators) |
+| 1.4.x | Additive: synthetic-data provenance integration (composes with C2PA) |
+| 2.0.0 (no earlier than 2028) | Possible breaking change: post-quantum signature suite migration |
 
-**Requirements:**
-- Load balancing across instances
-- Auto-scaling based on metrics
-- Session affinity (if needed)
-- Zero-downtime deployment
-
-### 8.2 Batch Processing
-
-**Requirements:**
-- Process multiple requests in batch
-- Dynamic batching (adaptive batch size)
-- Maximum batch wait time: 100ms
-- Throughput increase: ≥ 5x vs single request
-
-### 8.3 Caching
-
-**Requirements:**
-- Result caching for duplicate requests
-- Cache invalidation strategy
-- Distributed cache (Redis/Memcached)
-- Cache hit rate target: ≥ 30%
+The standard is maintained by the WIA Standards Committee. Change proposals follow the WIA RFC process; breaking changes require a two-thirds Committee vote plus a 12-month deprecation window per IETF RFC 8594 / 9745.
 
 ---
 
-## 9. Security and Compliance
+## 8. References
 
-### 9.1 Model Security
-
-**Requirements:**
-- Protect against adversarial attacks
-- Model encryption at rest
-- Secure model loading
-- Input validation and sanitization
-- Rate limiting per API key
-
-### 9.2 Data Governance
-
-**Requirements:**
-- Data lineage tracking
-- Audit logs (retention: 1 year minimum)
-- GDPR/CCPA compliance
-- Right to deletion
-- Data anonymization
-
-### 9.3 Regulatory Compliance
-
-**Required Certifications:**
-- SOC 2 Type II
-- ISO 27001
-- HIPAA (for healthcare applications)
-- GDPR compliance
+- ONNX — Linux Foundation
+- OpenVINO 2024 — Intel
+- NVIDIA Triton Inference Server 2.x
+- TensorFlow Serving 2.x
+- TorchServe / NVIDIA TensorRT / Apple Core ML / Android NN API / TFLite
+- MLflow — Open-source ML lifecycle (Linux Foundation)
+- MLPerf Inference v4.x — MLCommons
+- NIST FRVT — Face Recognition Vendor Test
+- ISO/IEC 22989 / 23053 / 24029-1 / 24029-2 / TR 24027 / TR 24368 / 25059 / 42001
+- ISO/IEC 27001:2022
+- ISO/IEC 29134:2023
+- EU AI Act (Regulation 2024/1689)
+- Korean AI Framework Act (시행 2026)
+- NIST AI Risk Management Framework (NIST AI 100-1)
+- NIST AI 600-1 — Generative AI Profile
+- C2PA Content Credentials specification
+- IETF RFC 8446 — TLS 1.3
+- IETF RFC 8594 — sunset HTTP header
+- IETF RFC 9745 — deprecation HTTP header
 
 ---
 
-## 10. Edge Deployment
+## 9. Closing implementer note
 
-### 10.1 Supported Platforms
+Vision AI is one of the highest-stakes AI domains in the WIA family: a misclassified medical image causes harm; a biased face-recognition model causes wrongful identification; a drifted manufacturing-defect detector causes recalls. The wire-format discipline is what lets operators, deployers, regulators, and impacted individuals verify the chain from training data through deployed inference without each consumer having to re-implement the trust machinery.
 
-**Hardware:**
-- NVIDIA Jetson (Nano, Xavier, Orin)
-- Google Coral
-- Intel NUC with Movidius
-- Raspberry Pi 4+ with accelerators
-- Mobile devices (iOS, Android)
+A first deployment that follows the runbook reaches production in about 60 days. The depth of dataset-evidence, robustness-assessment, fairness-evaluation, and EU-AI-Act-compliance work concentrated in those 60 days is what justifies the wire-format discipline. Subsequent model refreshes reuse the same machinery with per-refresh evaluation and approval gates.
 
-**Software:**
-- TensorFlow Lite
-- ONNX Runtime
-- PyTorch Mobile
-- Core ML (iOS)
-- NNAPI (Android)
+弘益人間 — Benefit All Humanity.
 
-### 10.2 Model Compression
 
-**Techniques:**
-- Quantization-aware training
-- Pruning (structured and unstructured)
-- Knowledge distillation
-- Neural Architecture Search (NAS)
+## 10. Glossary expansion
 
-**Target Metrics:**
-- Model size ≤ 50MB for mobile
-- Inference time ≤ 200ms on mobile CPU
-- Battery drain ≤ 5% per 100 inferences
+VLM: Vision-Language Model. NMS: Non-Maximum Suppression, the standard post-processing step in object detection. ONNX IR: ONNX Intermediate Representation. OpenVINO IR: OpenVINO Intermediate Representation, Intel's framework-neutral model format. TFLite: TensorFlow Lite, the on-device variant. Triton: NVIDIA Triton Inference Server. MLflow: open-source ML-lifecycle platform. C2PA: Coalition for Content Provenance and Authenticity.
 
----
+## 11. Implementer note — biometric special-category handling
 
-## 11. Multi-Modal Integration
-
-### 11.1 Vision + Language
-
-**Requirements:**
-- Image captioning
-- Visual question answering
-- Text-to-image search
-- Image-text matching
-
-**API:**
-```json
-{
-  "image": "base64_encoded_image",
-  "question": "What color is the car?",
-  "response": {
-    "answer": "red",
-    "confidence": 0.89,
-    "bounding_box": {"x_min": 200, "y_min": 150, "x_max": 450, "y_max": 350}
-  }
-}
-```
-
-### 11.2 Vision + Audio
-
-**Requirements:**
-- Audio-visual event detection
-- Lip reading
-- Sound source localization
-
----
-
-## 12. Continuous Improvement
-
-### 12.1 Model Retraining
-
-**Requirements:**
-- Active learning pipeline
-- Data collection from production
-- Automated retraining triggers
-- Model versioning
-- Gradual rollout of new models
-
-### 12.2 Performance Monitoring
-
-**Track:**
-- Accuracy drift over time
-- Distribution shift detection
-- Edge case identification
-- User feedback integration
-
----
-
-## 13. API Versioning
-
-**Requirements:**
-- Semantic versioning (vX.Y.Z)
-- Backward compatibility for minor versions
-- Deprecation warnings (6 months minimum)
-- API changelog documentation
-- Support multiple API versions simultaneously
-
----
-
-## 14. Disaster Recovery
-
-**Requirements:**
-- Backup frequency: Daily minimum
-- RPO (Recovery Point Objective): ≤ 1 hour
-- RTO (Recovery Time Objective): ≤ 4 hours
-- Multi-region deployment
-- Automated failover
-
----
-
-## 15. Cost Optimization
-
-**Strategies:**
-- Auto-scaling to match demand
-- Spot instances for batch processing
-- Model caching to reduce inference
-- Efficient data storage (compression)
-- CDN for static assets
-
-**Cost Targets:**
-- Inference cost: ≤ $0.001 per request
-- Storage cost: ≤ $0.01 per GB-month
-- Total cost reduction: ≥ 40% year-over-year
-
----
-
-## 16. Certification Requirements
-
-### 16.1 Phase 4 Certification
-
-**Must demonstrate:**
-1. Depth estimation accuracy
-2. 3D object detection capability
-3. Production deployment (containerized)
-4. Monitoring dashboard
-5. Security audit passed
-6. Load testing results (≥ 1000 RPS)
-7. Cost optimization strategy
-8. Disaster recovery plan
-
-### 16.2 Full WIA-AI-021 Certification
-
-**Requires:**
-- Phase 1 certification ✓
-- Phase 2 certification ✓
-- Phase 3 certification ✓
-- Phase 4 certification ✓
-- Ethics review passed
-- Security audit passed
-- Performance benchmarks met
-- Documentation complete
-
----
-
-## 17. Future Roadmap
-
-**Upcoming Features:**
-- Phase 5: Generative vision models
-- Phase 6: Embodied AI and robotics
-- Phase 7: AR/VR integration
-- Phase 8: Quantum-enhanced vision
-
----
-
----
-
-## 18. Standards Alignment (Normative Grounding)
-
-### 18.1 ISO/IEC 42001 AI Management System
-
-A WIA-AI-021 deployment MUST be operated within an AI management system conformant to ISO/IEC 42001:2023. The Phase-4 deployment, monitoring, and continuous-improvement loops constitute the operational pillar of that management system. The management system MUST document:
-
-- The complete model inventory (id, version, weights digest, evaluation report URI).
-- The change-control process for model deployment, retirement, and roll-back.
-- The roles and responsibilities of operators and engineers.
-- The risk-treatment plan for each deployed model.
-
-### 18.2 ISO/IEC TR 24028 Trustworthiness
-
-Trustworthiness practices follow ISO/IEC TR 24028:2020. Operators MUST document, for each deployed model, the trustworthiness pillars in scope (accuracy, robustness, transparency, fairness, privacy, accountability) and the evidence that supports each pillar.
-
-### 18.3 ISO/IEC 23894 AI Risk Management
-
-Risk management for vision-AI systems follows ISO/IEC 23894:2023 *AI risk management*. The risk register MUST cover model-failure modes, data-distribution shift, adversarial attacks, and privacy impact.
-
-### 18.4 ISO/IEC 5259 Data Quality
-
-Training and evaluation data quality is governed by the ISO/IEC 5259 series *Artificial intelligence — Data quality for analytics and machine learning*. The data-quality scope statement covers labelling protocols, inter-annotator agreement, and dataset-level quality metrics.
-
-### 18.5 ISO/IEC 27001 / 27701 Security and Privacy
-
-Phase-4 monitoring controls integrate with the operator's ISO/IEC 27001:2022 ISMS and, where personal data is processed, the ISO/IEC 27701:2019 PIM extension. Audit logs MUST be appended for every state-changing deployment action and MUST be retained per the ISMS schedule.
-
-### 18.6 IEC 62443 Operational Technology
-
-Vision-AI systems bound to operational technology environments (industrial automation, building security) MUST operate at IEC 62443-3-3 SL ≥ 2 in the bound zone. SL-3 is recommended for systems making safety-relevant decisions.
-
-### 18.7 ISO/IEC 30107 Presentation Attack Detection
-
-Models that issue biometric decisions MUST surface presentation-attack detection (PAD) evidence per ISO/IEC 30107-3:2023. Where PAD is delegated to a separate component, the deployment manifest MUST document the integration interface and the conformance evidence of the PAD component.
-
----
-
-## 19. Cryptographic Algorithms (Production)
-
-| Layer | Algorithm | Reference |
-|-------|-----------|-----------|
-| TLS / HTTP/2 / HTTP/3 | TLS 1.3 cipher suites | RFC 8446 |
-| OAuth 2.1 tokens | JWT or CWT, ES256 / EdDSA | RFC 7519, RFC 8392, RFC 9700 |
-| COSE signature | ES256, EdDSA | RFC 9053 |
-| Model-weight integrity | SHA-256 | FIPS 180-4 |
-| Encryption at rest | AES-256-GCM | ISO/IEC 18033-3 |
-| Key management | ISO 11770-2 (sym); ISO 11770-3 (asym) | ISO 11770-2/-3 |
-
-Implementations MUST refuse cipher suites whose IETF status is "not recommended" for new deployments and MUST disable plain-text RTSP / unencrypted HTTP at every surface.
-
----
-
-## 20. Field Commissioning Checklist
-
-A WIA-AI-021 deployment MUST pass each of the following before being declared *operational* in a real-world binding:
-
-| # | Test | Reference |
-|---|------|-----------|
-| 1 | All deployed models registered in the AI management system | ISO/IEC 42001:2023 |
-| 2 | Per-model evaluation report archived with detached COSE signature | ISO/IEC TS 4213 |
-| 3 | TLS 1.3 cipher inventory verified on all surfaces | RFC 8446 |
-| 4 | OAuth 2.1 token introspection produces audit entries | RFC 9700, RFC 7662 |
-| 5 | Multi-factor enforced for operator login | ISO/IEC 27002 A.8.5 |
-| 6 | NTPv4 + NTS time-sync ≤ 50 ms vs. reference | RFC 5905, RFC 8915 |
-| 7 | PAD coverage documented for any biometric-grade model | ISO/IEC 30107-3:2023 |
-| 8 | Risk register updated within last 6 months | ISO/IEC 23894:2023 |
-| 9 | Data-quality report archived for every active dataset | ISO/IEC 5259 |
-| 10 | ISO/IEC 27001 ISMS scope statement covers the deployment | ISO/IEC 27001 §4.3 |
-| 11 | IEC 62443-3-3 SR 1, SR 2, SR 5, SR 6 implemented | IEC 62443-3-3 |
-| 12 | Model-weight digests verified at startup | FIPS 180-4 |
-
-The checklist results MUST be stored as a signed deployment-manifest attribute and surfaced under the discovery document.
-
----
-
-## 21. References
-
-1. ISO/IEC 5259 (all parts) — *AI — Data quality for analytics and machine learning.*
-2. ISO/IEC 14496-10; ISO/IEC 23008-2 — *AVC, HEVC.*
-3. ISO/IEC 18033-3:2010 — *Block ciphers.*
-4. ISO/IEC 19794 (all parts); ISO/IEC 19795-1:2021 — *Biometric formats and performance.*
-5. ISO/IEC 22989:2022; ISO/IEC 23053:2022 — *AI concepts and ML framework.*
-6. ISO/IEC 23894:2023 — *AI risk management.*
-7. ISO/IEC 27001:2022; ISO/IEC 27002:2022; ISO/IEC 27037:2012; ISO/IEC 27701:2019.
-8. ISO/IEC 30107-3:2023 — *Biometric presentation attack detection.*
-9. ISO/IEC 39794 (all parts) — *Extensible biometric formats.*
-10. ISO/IEC 42001:2023 — *AI management system.*
-11. ISO/IEC TR 24028:2020 — *AI trustworthiness.*
-12. ISO/IEC TS 4213:2022 — *ML classification performance.*
-13. ISO 11770-2; ISO 11770-3 — *Key management.*
-14. IEC 62443-3-3:2013 — *System security requirements and security levels.*
-15. RFC 5905; RFC 8915 — *NTPv4, NTS.*
-16. RFC 7252; RFC 7641 — *CoAP, OBSERVE.*
-17. RFC 7519; RFC 8392; RFC 9700 — *JWT, CWT, OAuth 2.1.*
-18. RFC 7662 — *OAuth Token Introspection.*
-19. RFC 8446; RFC 9147 — *TLS 1.3, DTLS 1.3.*
-20. RFC 8613 — *OSCORE.*
-21. RFC 9019; RFC 9124 — *SUIT manifests.*
-22. RFC 9052; RFC 9053 — *COSE.*
-23. RFC 9110; RFC 9457 — *HTTP semantics, problem details.*
-24. FIPS 180-4 — *Secure Hash Standard.*
-25. FIPS 197 — *Advanced Encryption Standard.*
-
----
-
-© 2025 SmileStory Inc. / World Certification Industry Association
-弘益人間 · Benefit All Humanity
+Biometric inference (face recognition, gait recognition, iris recognition, voice biometrics) sits at the intersection of every privacy-law special-category protection: GDPR Article 9, KR PIPA Article 23, EU AI Act Article 5 (prohibited practices) and Annex III (high-risk practices), US BIPA in Illinois, US FRA in California. The standard's biometric-class handling (Phase 2 §1.2) is intentionally conservative: explicit consent, documented legal basis in discovery document, audit log of every biometric inference. Operators that find the discipline cumbersome should consider whether their use case actually requires biometric inference or whether a privacy-preserving alternative (anonymous classification, hashed-identifier matching) would suffice.

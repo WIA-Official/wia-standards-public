@@ -1,7 +1,7 @@
 # WIA-CITY-014 (security-system-city) — Phase 3: Protocol Specification
 
 > **Version:** 1.0.0
-> **Status:** Official
+> **Status:** Draft
 > **Phase:** 3 of 4 (Protocol)
 > **Philosophy:** 弘益人間 (Benefit All Humanity)
 
@@ -9,235 +9,223 @@
 
 ## 1. Overview
 
-Phase 3 specifies the wire protocols used by WIA-CITY-014 between **cameras**, **recorders**, **access controllers**, **sensors**, **gateways**, and the **management plane**. The objective is to give a deterministic mapping of every Phase-2 verb to the relevant transport, and to fix the operational interoperability points required by the IEC 62676 series (video) and IEC 60839 series (alarm and access control).
+Phase 3 specifies the on-the-wire protocols by which a city-scale physical-security deployment coordinates across trust boundaries — between the city's SOC and partner agencies (police, fire, EMS, neighbouring city SOCs), between the SOC and the regulator, between the SOC and downstream forensic labs. The protocols are layered above the Phase 2 API surface and inherit ISO 22320 emergency-management discipline, ISO/IEC 27001 information-security controls, and IEC 62443-3-3 operational-technology security requirements.
 
-### 1.1 Protocol stack
+### 1.1 Time discipline
+
+All Phase 3 protocol exchanges carry timestamps in **TAI** per BIPM SI Brochure conventions (RFC 3339 with explicit TAI offset). Leap-second jumps in UTC do not affect protocol replay defence; the canonical TAI representation is monotonic. Forensic-grade timestamps additionally carry a documented uncertainty per BIPM JCGM 100 (Guide to the Expression of Uncertainty in Measurement) so a court can reason about timestamp reliability.
+
+### 1.2 Replay defence bounds
+
+Every protocol envelope carries a 96-bit nonce and a TAI timestamp. Receivers reject envelopes with skew greater than ±300 seconds and maintain a 600-second seen-nonce cache. The cache is persistent across console restarts so a power cycle does not re-open the window for a previously-blocked replay.
+
+---
+
+## 2. Cross-agency federation handshake
+
+When the SOC cooperates with a partner agency (police, fire, EMS, federal investigator) on an active incident, the federation handshake is the canonical protocol. It composes ISO 22320 emergency-management coordination with the WIA-SOCIAL Phase 3 §5 receipt shape so that vendor implementations across multiple WIA-family standards share their federation library.
+
+### 2.1 Handshake state machine
 
 ```
-+---------------------------------------------------+
-| WIA-CITY-014 application semantics (Phase 1+2)    |
-+---------------------------------------------------+
-| Mediation: gateway, evidence builder, alarm bus   |
-+---------------------------------------------------+
-| Transport (one of):                               |
-|   IEC 62676-2-3 (RTP/RTSP)                        |
-|   IEC 60839-5-x (alarm transmission)              |
-|   IEC 60839-7-x (alarm transmission protocols)    |
-|   CoAP/UDP/IP    | HTTP/TCP/IP   | TLS / DTLS     |
-+---------------------------------------------------+
-| Physical: PoE-Ethernet / fibre / sub-GHz / cellular|
-+---------------------------------------------------+
+IDLE     → BIND-REQUEST   : SOC requests cooperation with partner agency
+BIND     → BIND-CONFIRM   : partner accepts; trust-list entry exchanged
+BOUND    → INCIDENT-SHARE : SOC shares incident dossier under documented purpose
+ACTIVE   → JOINT-OPS      : both sides exchange operational envelopes
+ACTIVE   → UNBIND-REQUEST : either side releases; remaining work transferred
+UNBOUND  → audit envelopes signed by both
 ```
 
----
+### 2.2 Handshake envelope schema
 
-## 2. Video Transmission (IEC 62676-2-3)
+```json
+{
+  "wia_city_014_version": "1.0.0",
+  "type": "cross_agency_handshake",
+  "handshake_id": "ca_01HX...",
+  "soc_agency": "did:wia:soc:seoul-met",
+  "partner_agency": "did:wia:police:seoul-met",
+  "purpose": "incident_response" | "joint_investigation" | "evidence_handover",
+  "scope_uri": "<URI of signed cooperation agreement>",
+  "iso22320_role": "primary" | "supporting" | "coordinating",
+  "valid_until_tai": "<TAI>",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+```
 
-### 2.1 Session control
-
-RTSP 2.0 (RFC 7826) over TLS 1.3 (RFC 8446) — referred to as RTSPS — is the only conforming session-control protocol for new deployments. RTSP 1.0 (RFC 2326) is preserved only for legacy interoperability and MUST be tunnelled over TLS regardless.
-
-### 2.2 Media transport
-
-- **RTP** (RFC 3550) for live and recorded video.
-- **AVC** (ISO/IEC 14496-10) and **HEVC** (ISO/IEC 23008-2) are the two normative codecs. Other codecs MAY be supported but MUST be reported as informative in the stream descriptor.
-- **RTP payload formats** follow IETF specifications: RFC 6184 (H.264/AVC), RFC 7798 (H.265/HEVC).
-- **SRTP** (RFC 3711) MAY be used as the media-plane protection layer; RTSPS already covers session control.
-
-### 2.3 Recording control
-
-Recorder-side recording is controlled through the Phase-2 HTTP surface. The wire format for recorded segment retrieval follows IEC 62676-2-3 export rules; segment containers use ISO/IEC 14496-12 (ISO Base Media File Format).
-
-### 2.4 Operational performance category
-
-Stream descriptors carry the IEC 62676-4 category (Phase 1 §2.3). Mid-stream transitions (e.g. zoom level, tilt) that change the achievable category MUST be reflected by an SDP attribute `a=wia-city-014:category-changed:<NEW>`.
+The `scope_uri` points at the signed bilateral cooperation agreement (under the city's general legal framework or the relevant national emergency-management law, e.g. Korean 재난 및 안전관리 기본법 for Korea). The handshake envelope refers to the agreement; it does not replicate it.
 
 ---
 
-## 3. Access-Control Transmission (IEC 60839-5/-7)
+## 3. Incident-dossier exchange protocol
 
-### 3.1 Wired alarm transmission
+When the SOC shares an incident dossier with a partner agency, the exchange follows a documented protocol that preserves chain-of-custody evidence integrity while honouring the privacy floor of Phase 2 §1.2.
 
-The IEC 60839-5-1 series specifies *alarm transmission system requirements*. Conforming transmission units MUST satisfy:
+### 3.1 Dossier envelope schema
 
-- IEC 60839-5-2 — *Requirements for the transceiver units.*
-- IEC 60839-5-3 — *Requirements for the alarm transmission protocols.*
+```json
+{
+  "wia_city_014_version": "1.0.0",
+  "type": "incident_dossier",
+  "dossier_id": "id_01HX...",
+  "incident_id": "inc_01HX...",
+  "shared_with": "did:wia:police:seoul-met",
+  "shared_at_tai": "<TAI>",
+  "items": [
+    {
+      "item_id": "ev_01HX...",
+      "kind": "video_clip" | "access_event" | "subject_record" | "vca_observation",
+      "content_uri": "<URI of evidence-grade encoded content>",
+      "content_hash_sha384": "0x...",
+      "iec_62676_evidence_grade": true,
+      "redaction_applied": "<redaction-policy reference>",
+      "purpose_limitation": "<purpose-limitation reference>"
+    }
+  ],
+  "chain_of_custody": [
+    { "actor": "did:wia:operator:soc-shift-3", "action": "captured", "at_tai": "..." },
+    { "actor": "did:wia:operator:soc-supervisor", "action": "approved-share", "at_tai": "..." }
+  ],
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+```
 
-WIA-CITY-014 layers these under a common encapsulation document that maps each Phase-1 *Alarm* event to a single IEC 60839-5-3 *primitive* (notification, ack, query, response).
+### 3.2 Operational discipline
 
-### 3.2 IP-based alarm transmission
-
-For IP-native deployments, the gateway translates Phase-1 *Alarm* objects into TLS-protected JSON or CBOR payloads pushed over RFC 9110 HTTP. CoAP push (RFC 7641 OBSERVE) is the constrained-side equivalent. End-to-end protection uses COSE_Sign1 (RFC 9052).
-
-### 3.3 Door command framing
-
-Door commands (`security:control-door`) follow the IEC 60839-11-2 *system performance* response-time bounds:
-
-- Grade 1 / 2: response within 2.0 s.
-- Grade 3: response within 1.0 s.
-- Grade 4: response within 0.5 s.
-
-The gateway MUST measure the round-trip from issuance of the verb to the controller-acknowledged door state change and surface the measurement in the audit log (IEC 62443-3-3 SR 6.1).
-
----
-
-## 4. Sensor Transmission
-
-### 4.1 Wired sensors
-
-Wired sensors follow IEC 60839-1 system topology (loop, branch, addressable). The wire-level framing is implementation-defined, but the gateway MUST normalise sensor events into the Phase-1 *Sensor* descriptor and the Phase-1 *Alarm* descriptor for any condition crossing the alarm threshold.
-
-### 4.2 Wireless sensors
-
-Wireless sensors operate over ISO/IEC 14543-3-10 (energy-harvesting WSP) or IEEE 802.15.4-based mesh stacks. The gateway MUST authenticate every wireless sensor with a credential rooted in the site PKI (RFC 5280).
-
-### 4.3 Tamper handling
-
-Sensor tamper events are first-class alarms with `category=TAMPER`. Tamper alarms MUST be raised within 1 s of detection and MUST NOT be silenceable from the operator HTTP surface; clearing requires a physical confirmation event tied to the sensor's lifecycle record.
-
----
-
-## 5. Identity, Time, and Cryptography
-
-### 5.1 Identity
-
-- **Devices**: X.509 v3 certificates (RFC 5280) issued by the site PKI. Certificate templates carry a *device-identity* OID and bind to the IEC 62676-2-3 device-MAC reference (where present).
-- **Operators**: federated identity over OAuth 2.1 (RFC 9700) and OIDC. Group claims MUST resolve to a IEC 62443-2-1 personnel registry.
-
-### 5.2 Time
-
-Recording timestamps MUST be slaved to a time source with documented accuracy ≤ 50 ms relative to UTC. Conforming sources:
-
-- NTPv4 with NTS — RFC 5905 / RFC 8915.
-- PTP (IEEE 1588 — informative) where the site has a grandmaster.
-
-Time discontinuities (leap seconds, DST changes, manual adjustments) MUST be logged and MUST NOT silently rewrite recorded segment timestamps.
-
-### 5.3 Cryptography
-
-| Layer | Algorithm | Reference |
-|-------|-----------|-----------|
-| TLS / RTSPS | TLS 1.3 cipher suites | RFC 8446 |
-| DTLS | DTLS 1.3 | RFC 9147 |
-| OSCORE | AES-CCM-16-64-128 | RFC 8613 §12 |
-| COSE signature | ES256, EdDSA | RFC 9053 |
-| At-rest video | AES-256-GCM | ISO/IEC 18033-3 |
-| Key management | ISO 11770-2 (symmetric); ISO 11770-3 (asymmetric) | ISO 11770-2/-3 |
-
-Implementations MUST NOT enable cipher suites whose IETF status is "not recommended" for new deployments (e.g. RC4, 3DES) and MUST disable RTSP transport without TLS.
+- **Evidence-grade encoding**: video clips MUST use IEC 62676-2-31 evidence-grade encoding with cryptographic chain. The encoding is the on-the-wire form; downstream forensic labs verify the chain before admitting the clip as evidence.
+- **Redaction**: faces of bystanders unrelated to the incident MUST be redacted per the published redaction policy before sharing outside the SOC. Redaction is logged in chain-of-custody.
+- **Purpose limitation**: every shared item carries a purpose-limitation reference; receivers MUST refuse to use the item outside the limitation.
+- **Retention**: the receiving agency adopts the SOC's retention policy or a more conservative one. The handshake envelope (§2.2) declares the receiver's retention policy at bind time.
 
 ---
 
-## 6. Evidence Bundling (ISO/IEC 27037)
+## 4. Mass-event coordination protocol
 
-### 6.1 Bundle structure
+When the SOC's video-content-analytics layer detects mass-event density approaching a safety threshold, the coordination protocol notifies the on-scene incident commander (who may be a city emergency-management official, a police precinct commander, or a private-venue security director).
 
-An evidence bundle is a ZIP archive (informative container; the structure is normative) with:
+### 4.1 Density-warning envelope schema
 
-- `manifest.json` — Phase-1 *Alarm* + *Camera* + *AccessPoint* references; bundle UUID; creation timestamp; PKI chain pointer.
-- `manifest.cose` — COSE_Sign1 detached signature over `manifest.json`.
-- `clip-<index>.mp4` — video clip(s).
-- `events.jsonl` — newline-delimited Phase-1 events.
-- `tooling.json` — tool versions, gateway firmware hash, IEC 62676-2-3 RTP capture parameters.
+```json
+{
+  "wia_city_014_version": "1.0.0",
+  "type": "density_warning",
+  "warning_id": "dw_01HX...",
+  "venue_id": "venue_01HX...",
+  "zone_id": "zone_01HX...",
+  "density_persons_per_sqm": 4.2,
+  "density_threshold_persons_per_sqm": 4.0,
+  "trend": "rising" | "stable" | "falling",
+  "estimated_time_to_critical_threshold_seconds": 120,
+  "issued_at_tai": "<TAI>",
+  "expires_at_tai": "<TAI>",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+```
 
-### 6.2 Hashing
+### 4.2 Operational latency budget
 
-`manifest.json` references each evidence file by SHA-256 (FIPS 180-4) digest. Verification of any file MUST recompute the digest and compare against the manifest before acceptance.
+The SOC publishes a maximum end-to-end latency budget for density warnings (typically 5 seconds from VCA detection to the on-scene incident commander). Hosts emit a `latency_breach` envelope to operations when delivery exceeds the threshold.
 
-### 6.3 Custody record
+### 4.3 Recommendation rather than command
 
-The custody record tracks acquisition, transport, and chain-of-custody operations per ISO/IEC 27037 §7. Each entry has an actor (operator URI), a time, a device, and a method. The list is append-only; deletions are recorded as new entries with the type `revocation`.
-
----
-
-## 7. Lockdown Propagation
-
-### 7.1 Site lockdown
-
-A site lockdown is a coordinated state change affecting all access points, all live video subscriptions, and the alarm policy. Lockdown propagation MUST:
-
-1. Issue an HTTP `POST /sites/{siteId}:lockdown` command requiring `security:lockdown` verb.
-2. Cascade lock commands to every Phase-1 *AccessPoint* whose `fireSafetyLink=FAIL-SECURE`.
-3. Refuse cascade for any access point with `fireSafetyLink=FAIL-SAFE` or `doorClass=emergency-egress`.
-4. Notify every connected operator session via the event bus.
-5. Record an IEC 62443-3-3 SR 5.4 audit entry.
-
-### 7.2 Lockdown release
-
-Release follows the same pathway in reverse and requires a justification field.
-
-### 7.3 Latency
-
-Lockdown propagation latency MUST not exceed 3.0 s 99th percentile measured from command receipt to last access-point acknowledgement.
+The SOC issues a recommendation envelope; the on-scene incident commander makes the operational decision. The standard does not adjudicate: it provides the wire format that lets the recommendation be issued, received, acted upon (or refused), and audited later.
 
 ---
 
-## 8. Failure Handling
+## 5. Mutual-aid coordination protocol
 
-### 8.1 Lost camera
+When an incident exceeds the SOC's response capacity, mutual-aid coordination invokes neighbouring SOCs or specialised agencies. The protocol follows ISO 22320 mutual-aid conventions and reuses the federation handshake envelope of §2.
 
-Cameras unreachable for > 30 s MUST be marked `state=unreachable` and MUST surface a Phase-1 *Alarm* with `category=CYBER` and `severity=MAJOR` for any zone whose `operationalRequirement` requires that camera.
+### 5.1 Mutual-aid request schema
 
-### 8.2 Lost recorder
+```json
+{
+  "wia_city_014_version": "1.0.0",
+  "type": "mutual_aid_request",
+  "request_id": "ma_01HX...",
+  "requesting_soc": "did:wia:soc:seoul-met",
+  "responding_soc_options": ["did:wia:soc:incheon", "did:wia:soc:gyeonggi"],
+  "requested_capabilities": ["additional_camera_streams", "incident_command_support"],
+  "estimated_duration_minutes": 240,
+  "incident_reference": "inc_01HX...",
+  "issued_at_tai": "<TAI>",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+```
 
-If a recorder loses storage capacity below the IEC 62676-1 §6 reservation (typically 24 h of retention), the gateway MUST raise an alarm with `category=CYBER`, `severity=MAJOR`.
-
-### 8.3 Cryptographic failures
-
-Failed signature verification, expired certificate, OCSP "revoked" status — each is a critical condition that produces an alarm and disables the affected entity until reissued.
-
----
-
-## 9. Conformance Profiles
-
-### 9.1 Baseline profile (P-B)
-
-A P-B gateway MUST:
-
-- Implement RTSPS + RTP/AVC (ISO/IEC 14496-10).
-- Implement HTTP/REST surface (Phase 2 §2).
-- Implement IEC 60839-11-1 access-control bridge with ≥ Grade 2.
-- Implement COSE-signed evidence bundles (§6).
-
-### 9.2 Extended profile (P-E)
-
-A P-E gateway MUST additionally:
-
-- Implement RTP/HEVC (ISO/IEC 23008-2).
-- Implement IEC 62676-4 operational-category attestation.
-- Implement IEC 60839-7 IP-based alarm transmission.
-- Implement IEC 62443-3-3 SR 1, SR 2, SR 5, SR 6 controls.
-
-### 9.3 City-grade profile (P-C)
-
-A P-C gateway MUST additionally:
-
-- Implement Site lockdown propagation with §7.3 latency budget.
-- Implement multi-site federation through the management plane.
-- Implement evidence bundling with hardware-backed COSE keys (TPM 2.0 or HSM).
+Responding SOCs accept or refuse via signed response envelopes. Acceptance establishes a federation handshake (§2) for the duration of the mutual-aid event.
 
 ---
 
-## 10. References
+## 6. Audit log discipline
 
-1. RFC 2326; RFC 7826 — *RTSP 1.0 / 2.0.*
-2. RFC 3550 — *RTP: A Transport Protocol for Real-Time Applications.*
-3. RFC 3711 — *The Secure Real-time Transport Protocol (SRTP).*
-4. RFC 5280 — *Internet X.509 PKI Certificate and CRL Profile.*
-5. RFC 5905; RFC 8915 — *NTPv4 and Network Time Security.*
-6. RFC 6184; RFC 7798 — *RTP payload for H.264 / H.265.*
-7. RFC 7252; RFC 7641; RFC 7959 — *CoAP family.*
-8. RFC 8446; RFC 9147 — *TLS 1.3, DTLS 1.3.*
-9. RFC 8613 — *OSCORE.*
-10. RFC 9052; RFC 9053 — *COSE.*
-11. RFC 9110; RFC 9457 — *HTTP semantics, problem details.*
-12. RFC 9700 — *OAuth 2.1 (BCP).*
-13. IEC 62676-1:2013; IEC 62676-2-1:2013; IEC 62676-2-3:2013; IEC 62676-4:2025; IEC 62676-5-1:2024.
-14. IEC 60839-1:2014; IEC 60839-11-1:2013; IEC 60839-11-2:2014; IEC 60839-5-1; IEC 60839-5-2; IEC 60839-5-3; IEC 60839-7-1.
-15. IEC 62443-2-1; IEC 62443-3-3:2013.
-16. ISO/IEC 14496-10; ISO/IEC 14496-12; ISO/IEC 23008-2.
-17. ISO/IEC 18033-3:2010.
-18. ISO/IEC 27001:2022; ISO/IEC 27037:2012.
-19. ISO 11770-2; ISO 11770-3.
-20. FIPS 180-4 — *Secure Hash Standard.*
-21. FIPS 197 — *Advanced Encryption Standard.*
+Every Phase 3 protocol envelope is written to an append-only log replicated across at least two storage backends. Retention is sized to the longest applicable regulatory window: typically 5-7 years for incident records, 30 days for routine surveillance footage (under GDPR data-minimisation), and per-evidence-item retention extending to the close of any active legal-hold investigation. The audit log is exposed via a federated query endpoint at `GET /audit?from=…&to=…&type=…` so an auditor reconstructing an incident can verify the chain without trusting the SOC's current state.
+
+---
+
+## 7. Cross-standard composition
+
+Phase 3 composes with: WIA-OMNI-API for SOC-operator and partner-agency identity, WIA-AIR-SHIELD for runtime trust list and key rotation, WIA-SOCIAL Phase 3 §5 for the federation receipt shape, and WIA-INTENT for declaring SOC operational intent (which informs the regulator's monitoring without exposing operational detail).
+
+---
+
+## 8. Conformance test coverage
+
+The Phase 3 conformance suite walks through: federation handshake against a mock partner agency, incident-dossier exchange with chain-of-custody assertion, density-warning round-trip with latency-budget assertion, mutual-aid request with multi-responder negotiation, and the audit-log replication invariant.
+
+---
+
+## 9. References
+
+- ISO 22320:2018 — Security and resilience — Emergency management
+- ISO/IEC 27001:2022 — Information security management
+- ISO/IEC 27002:2022 — Information security controls
+- ISO/IEC 27037:2012 — Guidelines for identification, collection, acquisition, and preservation of digital evidence
+- ISO/IEC 27050 series — Electronic discovery
+- ISO/IEC 29134:2023 — Privacy impact assessment
+- IEC 62676-2-31:2019 — Evidence-grade IP interoperability
+- IEC 62443-3-3:2013 — System security requirements
+- NIST SP 800-86 — Guide to integrating forensic techniques into incident response
+- NIST SP 800-160 Vol. 2 — Cyber-resilient systems
+- BIPM JCGM 100 — Guide to the Expression of Uncertainty in Measurement
+- BIPM SI Brochure — Time scales (TAI / UTC / leap seconds)
+- IETF RFC 9562 — UUIDs
+- IETF RFC 8446 — TLS 1.3
+
+---
+
+弘益人間 — Benefit All Humanity.
+
+
+## 10. Operational case studies — typical incident classes
+
+Three incident classes recur in city-scale deployments and shape the
+protocol-layer design:
+
+**Active-shooter / armed-incident class**: highest-priority traffic,
+sub-5-second latency budget for camera feeds to police incident
+commander, automatic invocation of mutual-aid handshakes with
+neighbouring SOCs. Audit retention extends to the close of any
+criminal proceeding (typically 5-15 years).
+
+**Mass-gathering safety class** (concerts, parades, sporting
+events): density-warning protocol (§4) is the load-bearing path,
+with VCA tuning calibrated against the venue's pre-published
+density thresholds. Audit retention is the standard 30-day window
+for public spaces unless an incident occurs.
+
+**Missing-person class**: subject-record federation with
+neighbouring jurisdictions is the load-bearing path, with strict
+purpose limitation (Phase 2 §1.2) and erasure-on-resolution
+discipline. Subject records that cross a national border require
+explicit cross-border data-transfer authorisation per the source
+jurisdiction's privacy law.
+
+## 11. Closing protocol note
+
+The Phase 3 protocol layer balances incident-response responsiveness
+against audit rigour and privacy floor. The default discipline
+favours rigour and privacy; operators can opt out of specific
+defaults in jurisdictions where the trade-off favours responsiveness
+(e.g., active-shooter class), and the opt-out itself is recorded in
+the audit chain.
