@@ -5,270 +5,355 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-air-cargo (Air Cargo).
+This document defines the API contract that an
+air-cargo operator exposes for the records defined in
+PHASE-1. Three complementary surfaces are described:
+the IATA Cargo-IMP / Cargo-XML messaging surface; the
+UN/EDIFACT and WCO Cargo-XML surface for customs
+filing; and the HTTPS / JSON RESTful surface for
+operational visibility, the customer-facing booking
+channel, the regulated-agent / known-consignor
+discipline, and the regulatory examination scope.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IATA Cargo-IMP (FFM, FWB, FHL, FNA, FBL, FRC,
+  FOH, FFA, FZB messages)
+- IATA Cargo-XML (Booking Request, Pouch, Status
+  Update messages)
+- IATA e-AWB Resolution 672 + Multilateral
+  Agreement
+- IATA Cargo iQ Resolution 674 milestone events
+- UN/EDIFACT IFTSTA / IFTMIN / IFTMCS
+- WCO Cargo-XML (Cargo Report, Cargo Response)
+- IETF RFC 9110 (HTTP Semantics), RFC 9111 (HTTP
+  Caching), RFC 9457 (Problem Details), RFC 6901 /
+  6902 (JSON Pointer / Patch), RFC 8288 (Web
+  Linking), RFC 8259 (JSON), RFC 9421 (HTTP Message
+  Signatures)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022
+- W3C Trace Context
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-air-cargo
-standard. It addresses the api-interface layer of the standard.
+The operator exposes:
 
-## §2 Manifest
+- The IATA Cargo-IMP messaging endpoint (Type B over
+  the airline's communication network).
+- The IATA Cargo-XML web-service endpoint over
+  HTTPS.
+- The UN/EDIFACT message endpoints over the EDI
+  network (or via Cargo-XML envelope).
+- The WCO Cargo-XML endpoint for customs filing.
+- The HTTPS / JSON RESTful surface served from a
+  domain published by the operator under `/v1/`.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "air-cargo"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The OpenAPI 3.1 document at `/v1/openapi.json` is
+canonical for the JSON surface; the IATA Cargo-XML
+schema and the WCO Cargo-XML schema are canonical
+for their respective surfaces.
 
-## §3 Conformance Tiers
+## §2 Root Discovery
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+GET /v1/
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```json
+{
+  "standard": "WIA-air-cargo",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":              "/v1/programmes",
+    "parties":                 "/v1/parties",
+    "bookings":                "/v1/bookings",
+    "eAwbs":                   "/v1/e-awbs",
+    "dgDeclarations":          "/v1/dg-declarations",
+    "specialisedHandling":     "/v1/specialised-handling",
+    "securityScreening":       "/v1/security-screening",
+    "customsDeclarations":     "/v1/customs-declarations",
+    "cargoIqEvents":           "/v1/cargo-iq-events",
+    "examination":             "/v1/examination",
+    "openapi":                 "/v1/openapi.json"
+  }
+}
+```
 
-## §4 Discovery
+## §3 IATA Cargo-XML Surface
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/air-cargo`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+POST   /cargo-xml/booking-request    (BookingRequest
+                                      message)
+POST   /cargo-xml/booking-confirmation (Booking
+                                       Confirmation
+                                       message)
+POST   /cargo-xml/pouch-message      (Pouch carrying
+                                      multiple
+                                      shipment
+                                      records)
+POST   /cargo-xml/status-update      (Cargo iQ
+                                      milestone
+                                      update)
+POST   /cargo-xml/awb-message        (e-AWB FWB
+                                      payload)
+```
 
-## §5 Time and Identity
+## §4 IATA Cargo-IMP Surface (Legacy)
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+For airlines and forwarders using the legacy
+SITAtex / ARINC Type B network:
 
-## §6 Versioning and Deprecation
+```
+POST   /cargo-imp/ffm  (Flight Manifest)
+POST   /cargo-imp/fwb  (Master AWB Data)
+POST   /cargo-imp/fhl  (House AWB Data)
+POST   /cargo-imp/foh  (Freight On Hand)
+POST   /cargo-imp/fra  (Allotment Request)
+POST   /cargo-imp/ffa  (Freight Forward
+                        Acknowledgement)
+POST   /cargo-imp/fzb  (Specialised Cargo Service
+                        Confirmation — DGR / PER /
+                        AVI / etc.)
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 UN/EDIFACT Customs Surface
 
-## §7 Privacy and Security
+```
+POST   /edifact/iftsta   (Status Report)
+POST   /edifact/iftmin   (Instruction Message)
+POST   /edifact/iftmcs   (Booking Confirmation)
+POST   /edifact/cuscar   (Customs Cargo Report)
+POST   /edifact/cusdec   (Customs Declaration)
+POST   /edifact/cusrep   (Customs Response)
+POST   /edifact/cusexp   (Customs Express Consignment)
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 WCO Cargo-XML Customs Surface
 
-## §8 Open Governance
+```
+POST   /wco-cargo-xml/cargo-report
+POST   /wco-cargo-xml/cargo-response
+POST   /wco-cargo-xml/declaration
+POST   /wco-cargo-xml/declaration-response
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `air-cargo` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §7 Booking and e-AWB Endpoints
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+GET    /v1/bookings?awb={awbNumber}
+POST   /v1/bookings                  (create a
+                                      booking)
+GET    /v1/bookings/{bookingId}
+GET    /v1/e-awbs?awb={awbNumber}
+POST   /v1/e-awbs                    (issue an e-AWB)
+GET    /v1/e-awbs/{awbId}
+GET    /v1/e-awbs/{awbId}/digest     (canonical
+                                      hash for
+                                      e-AWB
+                                      tamper-
+                                      detection)
+```
 
+## §8 Dangerous-Goods, Specialised, and Security
+       Endpoints
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST   /v1/dg-declarations           (record a DGR
+                                      declaration
+                                      with the IATA
+                                      DGR §9
+                                      acceptance
+                                      checklist)
+GET    /v1/dg-declarations/{declarationId}
+POST   /v1/specialised-handling      (CEIV / LAR /
+                                      PCR / TCR
+                                      record)
+POST   /v1/security-screening        (regulated-
+                                      agent or
+                                      airline
+                                      screening
+                                      event)
+GET    /v1/security-screening?awb={awbNumber}
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## §9 Customs Declaration Endpoints
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+POST   /v1/customs-declarations
+GET    /v1/customs-declarations/{declarationId}
+GET    /v1/customs-declarations/{declarationId}/outcome
+       (release / inspection / hold)
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §10 Cargo-iQ Endpoints
 
-## Annex F — Adoption Roadmap
+```
+GET    /v1/cargo-iq-events?awb={awbNumber}
+POST   /v1/cargo-iq-events
+GET    /v1/cargo-iq-events/srk/{srk}/timeline
+       (full milestone timeline for the shipment-
+        record-key)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §11 Examination Endpoints
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+GET    /v1/examination/programmes
+GET    /v1/examination/dg-declarations
+GET    /v1/examination/security-screening
+GET    /v1/examination/customs-declarations
+GET    /v1/examination/cargo-iq-events
+GET    /v1/examination/audit-events
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The examination scope is read-only and bound to the
+authority's identity (US TSA + CBP + DOT PHMSA for
+US-jurisdiction; EU EASA + Member-State NCA + EU
+Member-State customs for EU-jurisdiction; KR 국토
+교통부 + 관세청 + 항공보안협회 for KR-jurisdiction;
+ICAO USOAP audit teams).
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §12 Authentication and Authorisation
 
-## Annex G — Test Vectors and Conformance Evidence
+Bearer tokens conform to OAuth 2.1 with audiences
+declared per surface. Cargo-IMP / Cargo-XML / EDI
+endpoints use mutual TLS. The DG-declaration and
+security-screening endpoints require elevated scope
+and the four-eyes review on alarm resolution.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §13 HTTP Status Codes
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Standard codes apply (200 / 201 / 202 / 400 / 401 /
+403 / 404 / 409 / 422 / 429 / 503) with Problem
+Details bodies.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §14 Webhook and Event Surface
 
-## Annex H — Versioning and Deprecation Policy
+Lifecycle events:
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+- `booking.confirmed`, `booking.cancelled`
+- `e-awb.issued`, `e-awb.amended`
+- `dg-declaration.accepted`,
+  `dg-declaration.rejected`
+- `security-screening.completed`,
+  `security-screening.alarm-not-resolved`
+- `customs.released`, `customs.held-for-inspection`
+- `cargo-iq.milestone-emitted`
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Webhook signatures use HTTP Message Signatures (RFC
+9421).
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §15 IATA ONE Record API Surface
 
-## Annex I — Interoperability Profiles
+For operators adopting IATA ONE Record:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+```
+GET    /one-record/api/logistics-objects/{id}
+POST   /one-record/api/logistics-objects
+PATCH  /one-record/api/logistics-objects/{id}
+GET    /one-record/api/logistics-events?awb={awbNumber}
+```
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+ONE Record uses JSON-LD over HTTPS with W3C Linked
+Data conventions; logistics-objects (Shipment,
+House Waybill, Master Waybill, Booking, Piece,
+Item) form a graph with linked references. Subscriptions
+to logistics-event streams replace the EDI push
+model.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §16 Bulk-Export and Audit Surface
 
-## Annex J — Reference Implementation Topology
+```
+POST   /v1/bulk-export
+GET    /v1/bulk-export/{exportId}/manifest
+GET    /v1/audit-events?from={iso}&to={iso}
+```
 
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
+Bulk exports support TSA / CBP / EU customs / KR
+관세청 audit data calls and the operator's CASS /
+SIS settlement reconciliation.
 
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-2-API-INTERFACE validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
+## §17 Examination Bulk-Download Surface
 
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+```
+GET    /v1/examination/dg-declarations.csv
+GET    /v1/examination/security-screening.csv
+GET    /v1/examination/customs-declarations.csv
+GET    /v1/examination/cargo-iq-events.csv
+```
+
+The CSV downloads support the supervisory authority's
+trend analysis and the operator's annual security-
+performance report. Per-export digest declarations
+preserve integrity for the receiving authority.
+
+## §18 Real-Time Track-and-Trace Surface
+
+For shippers and consignees:
+
+```
+GET    /portal/v1/track/{awbNumber}
+GET    /portal/v1/track/{awbNumber}/timeline
+       (server-sent events of milestone updates)
+```
+
+The track-and-trace surface respects the operator's
+data-protection regime — the consignee identity is
+verified through the consignee's authentication
+flow before the full timeline is exposed.
+
+## §19 Cargo iQ Performance Reporting Surface
+
+For Cargo iQ members:
+
+```
+GET    /v1/cargo-iq/performance?carrier={code}&period={iso}
+GET    /v1/cargo-iq/performance/lane?origin={loc}&destination={loc}
+GET    /v1/cargo-iq/performance/airline-on-time
+GET    /v1/cargo-iq/performance/forwarder-on-time
+```
+
+The performance-reporting surface aggregates the
+shipment-record-key milestone events into the IATA
+Cargo iQ baseline metrics — On Time Performance
+(OTP), Door-to-Door cycle time, segment-level
+service-level deviations.
+
+## §20 Live-Animal and Perishable Special-Endpoint
+        Surface
+
+```
+POST   /v1/specialised-handling/live-animal/health-cert
+POST   /v1/specialised-handling/perishable/temperature-log
+GET    /v1/specialised-handling/{recordId}/temperature-chart
+GET    /v1/specialised-handling/{recordId}/cites-permit
+       (CITES permit verification for live-animal /
+        plant-product shipments)
+```
+
+The CITES-permit verification endpoint cross-checks
+the shipper's-supplied permit against the issuing
+authority's published CITES register.
+
+## §21 Conformance
+
+Implementations claiming PHASE-2 conformance publish
+the OpenAPI document, expose the IATA Cargo-XML +
+Cargo-IMP messaging surfaces, expose the UN/EDIFACT
++ WCO Cargo-XML customs surfaces, expose the
+regulatory examination surface, and propagate trace-
+context across the booking-to-delivery chain.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-air-cargo
+- **Last Updated:** 2026-04-28

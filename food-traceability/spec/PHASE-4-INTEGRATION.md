@@ -5,237 +5,310 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-food-traceability (Food Traceability).
+This document defines how a food-traceability
+operator integrates with the systems that surround
+the food-supply-chain lifecycle: the GS1 EPCIS 2.0
+event-distribution network across supply-chain
+partners; the GS1 Digital Link and Verified by GS1
+brand-owner registry; the GFSI-recognised
+certification body; the FDA / USDA / EFSA / Member-
+State competent authorities and the KR 식약처 +
+식품의약품안전평가원; the FDA Reportable Food
+Registry (RFR); the EU RASFF (Rapid Alert System
+for Food and Feed); the WHO INFOSAN (International
+Food Safety Authorities Network); the operator's
+laboratory-and-testing partners; the consumer-facing
+SmartLabel and recall-information channels; the
+external auditor and ISO 22000 + ISO/IEC 27001 +
+GFSI-scheme certification body; and the long-term
+archive that preserves food-supply-chain records
+past the active retention horizon.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- Codex Alimentarius CAC/GL 60-2006 + CAC/RCP
+  1-1969
+- ISO 22000:2018, ISO/TS 22002 series, ISO 22005:2007
+- GS1 EPCIS 2.0 + CBV 2.0 + GTS 2.0 + GDM + Digital
+  Link + SmartLabel + Verified by GS1
+- GFSI Benchmarking Requirements + BRCGS Food 9 +
+  IFS Food 8 + FSSC 22000 v6 + SQF v9
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022, ISO/IEC 17021-1:2015, ISO/IEC
+  17065:2012
+- ISO 8601
+- W3C Verifiable Credentials Data Model 2.0
+- US FDA FSMA Section 204 + 21 CFR Part 1 Subpart
+  S + Subpart L FSVP + Subpart J Bioterrorism + 21
+  CFR Part 7 recalls + 21 CFR Part 101 + Part 117
+  preventive controls
+- US FDA RFR + US USDA FSIS + COOL 7 CFR 65 / 60
+- EU Reg (EC) 178/2002 + Reg (EU) 1169/2011 + Reg
+  (EU) 931/2011 + Reg (EU) 2017/625 + Reg (EU)
+  2017/2470
+- WHO INFOSAN
+- EU RASFF (Rapid Alert System for Food and Feed)
+- KR 식약처 (MFDS) + 식품의약품안전평가원 + 식품
+  안전나라 + KR 식품위생법 + 식품안전기본법 + KR
+  RASFF-K
 
 ---
 
-## §1 Scope
+## §1 GS1 EPCIS Event-Distribution Integration
 
-This PHASE document is one of four that together define the WIA-food-traceability
-standard. It addresses the integration layer of the standard.
+The supply-chain-partner integration:
 
-## §2 Manifest
+- Per-partner EPCIS subscription registration —
+  partners subscribe to events matching the
+  GTIN / lot scope they require visibility on.
+- Per-partner authentication via the GS1 EPCIS 2.0
+  OAuth profile with per-event-class scopes.
+- Subscription delivery via webhook (push) or polling
+  (pull) per the partner's preference.
+- Cross-organisation event correlation — the
+  operator's events are correlated with the
+  upstream and downstream events to form the
+  end-to-end traceability graph.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "food-traceability"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 GS1 Digital Link and Verified by GS1
+       Integration
 
-## §3 Conformance Tiers
+For consumer-facing product disclosure:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- Brand owners register the operator's GS1 Digital
+  Link domain with the Verified by GS1 service.
+- Per-GTIN linkType-keyed resolver entries point
+  to product information, recipe, allergen,
+  nutrition, recall information, sustainability,
+  and consumer-engagement assets.
+- The Verified by GS1 service enables consumer
+  apps to verify the brand-owner identity for the
+  scanned GTIN.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 GFSI Certification Body Integration
 
-## §4 Discovery
+The operator's GFSI-recognised-scheme integration:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/food-traceability`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- Per-scheme certification body operating under
+  ISO/IEC 17065 + ISO 22003 (food-safety-management
+  certification bodies).
+- Scheme-specific audit cadence (typically annual
+  with surveillance audits in between).
+- Per-scheme corrective-action workflow integrated
+  with the operator's FSMS record.
 
-## §5 Time and Identity
+## §4 FDA / USDA / EFSA / KR MFDS Integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+For US-jurisdiction operators:
 
-## §6 Versioning and Deprecation
+- US FDA — FSMA Section 204 24-hour records request,
+  FSVP records request, RFR submission, recall
+  coordination through the recall coordinator.
+- US USDA FSIS — for meat / poultry / processed-
+  egg products under the Federal Meat Inspection
+  Act + Poultry Products Inspection Act + Egg
+  Products Inspection Act.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+For EU-jurisdiction operators:
 
-## §7 Privacy and Security
+- EU EFSA + Member-State competent authorities
+  for official-controls (Reg (EU) 2017/625).
+- EU RASFF for cross-Member-State alert
+  distribution.
+- DG SANTE for EU-level food-safety policy.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+For KR-jurisdiction operators:
 
-## §8 Open Governance
+- KR 식약처 (MFDS) + 식품의약품안전평가원 — official
+  controls under 식품위생법.
+- KR 식품안전나라 + RASFF-K — KR-equivalent rapid
+  alert system.
+- KR 농림축산식품부 (MAFRA) — for agricultural and
+  livestock products.
+- KR 해양수산부 (MOF) — for aquatic products.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `food-traceability` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 WHO INFOSAN Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+For international food-safety alerts the operator
+participates in WHO INFOSAN through the Member-State
+focal point — international notification of food-
+safety events, cross-border recall coordination, and
+public-health risk communication.
 
+## §6 EU RASFF and KR RASFF-K Integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+The rapid-alert-system integration:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+- EU RASFF — Member-State CP receives the
+  notification, triages, and forwards to the EC.
+- KR RASFF-K — KR MFDS operates the equivalent
+  channel under 식품안전기본법.
+- Cross-system referrals between RASFF and INFOSAN
+  for international alerts.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §7 Laboratory-and-Testing Partner Integration
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The laboratory integration:
 
-## Annex F — Adoption Roadmap
+- Per-test-sample EPCIS event captured at sample
+  draw.
+- Per-result test report ingested into the
+  operator's FSMS.
+- ISO/IEC 17025 accredited laboratory selection.
+- For UK-jurisdiction Public Analyst services
+  cooperation.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §8 Consumer-Facing Channel Integration
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The consumer integration:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+- GS1 SmartLabel and Powered by GS1 Digital Link
+  resolver for product information, allergen
+  details, nutrition, recipe, and sustainability
+  attestations.
+- Recall notification through the operator's
+  website, retailer channels, mobile-app push, and
+  high-risk media coverage.
+- Allergen-and-dietary-preference search support
+  for consumer-facing apps.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §9 External Audit and Certification
 
-## Annex G — Test Vectors and Conformance Evidence
+The operator's ISMS is certified against ISO/IEC
+27001:2022 with the scope explicitly extending to
+the EPCIS, KDE, and recall-coordination endpoints.
+The food-safety-management system is certified
+against ISO 22000:2018 + the operator's chosen
+GFSI-recognised scheme. The certification body
+operates under ISO/IEC 17021-1; the conformity-
+assessment body for WIA-food-traceability operates
+under ISO/IEC 17065. ISO/IEC 17025 accreditation
+is held by the operator's testing laboratory.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §10 Long-Term Archival Integration
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Records governed by the operator's retention
+horizons (US FDA FSMA 204 two-year retention; US
+Bioterrorism Act one-up-one-down for two years;
+US FDA Part 117 preventive-controls records two-
+year retention; EU Reg 178/2002 traceability
+without specific retention; KR 식품위생법 5-year
+retention) are migrated to the long-term archive
+at the close of the active retention window. The
+archive preserves the GS1 product / location /
+logistic-unit registry, the EPCIS event store, the
+KDE records, the supply-chain-partner records, the
+FSMS records, the recall records, and the audit-
+event trail.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §11 Climate-Disclosure and Sustainability
+        Integration
 
-## Annex H — Versioning and Deprecation Policy
+For ESG-disclosure-subject operators:
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+- Carbon-footprint-of-product calculations per
+  ISO 14067 + Smart Freight Centre GLEC for
+  logistics emissions.
+- WRI / WBCSD GHG Protocol Product Standard for
+  product-level CO2.
+- EU CSRD ESRS E5 (resource use and circular
+  economy) + EU Empowering Consumers (EU)
+  2024/825 for food-product green-claims.
+- Operator's WIA-esg-finance disclosure record
+  integrates the food-supply-chain attribution.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §12 EU Battery Regulation and Packaging Regulation
+        Integration
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+For food-package-and-container operators:
 
-## Annex I — Interoperability Profiles
+- EU PPWR (Packaging and Packaging Waste Regulation,
+  Reg (EU) 2025/40) — packaging traceability
+  obligations.
+- EU Single-Use Plastics Directive (Directive (EU)
+  2019/904).
+- US state-level extended-producer-responsibility
+  (EPR) packaging regimes.
+- KR 자원의 절약과 재활용촉진에 관한 법률 (Resources
+  Recycling Promotion Act).
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §13 Cold-Chain and Logistics Integration
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+For temperature-sensitive food:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- Cold-chain monitoring per ISO 22002-5 + ATP
+  Agreement (Agreement on the International
+  Carriage of Perishable Foodstuffs).
+- Continuous temperature logging captured as EPCIS
+  events with the time-series referenced from the
+  ILMD.
+- Excursion alerts to shipper / consignee for
+  out-of-specification temperature events.
+- Product-specific cold-chain SLAs (frozen,
+  refrigerated, ambient).
+
+## §14 Counterfeit / Anti-Tampering Integration
+
+For brand-protection:
+
+- Per-product authentication via GS1 Verified by
+  GS1 + GS1 Digital Link.
+- Tamper-evident packaging with embedded
+  cryptographic signatures (GS1 Reseller
+  Identifier, EPC + chip-level authentication).
+- Consumer-app verification scan against the
+  brand-owner registry.
+- Coordination with INTERPOL Operation OPSON for
+  counterfeit-food enforcement.
+
+## §15 Animal Health and Veterinary Integration
+
+For meat / poultry / fish / egg products:
+
+- ICVCP (International Committee on Veterinary
+  Certificates and Procedures) certification
+  exchange via TRACES NT.
+- WOAH (World Organisation for Animal Health,
+  formerly OIE) Terrestrial Animal Health Code +
+  Aquatic Animal Health Code compliance.
+- US USDA FSIS export-eligibility list integration.
+- KR 검역본부 + 동물검역검사관 시스템 for KR-
+  jurisdiction animal-product imports / exports.
+
+## §16 Allergen Cross-Contamination Integration
+
+For allergen management across co-manufacturing
+sites:
+
+- Per-line allergen profile recorded; line-
+  changeover sanitation verified before next
+  production.
+- "Contains" / "May contain" / "Free from"
+  declarations cross-referenced with the actual
+  formulation and the supplier-attested allergen
+  status.
+- VITAL (Voluntary Incidental Trace Allergen
+  Labelling) reference levels for "may-contain"
+  decisions.
+
+## §17 Conformance
+
+Implementations claiming PHASE-4 conformance maintain
+the supply-chain-partner EPCIS integration, exercise
+the recall-coordination integration with the
+operating jurisdiction's recall channel, integrate
+with INFOSAN / RASFF / RASFF-K where the operator's
+products travel cross-border, hold the ISO 22000 +
+ISO/IEC 27001 + GFSI-scheme certifications, and
+operate the long-term archival integration described
+above.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-food-traceability
+- **Last Updated:** 2026-04-28

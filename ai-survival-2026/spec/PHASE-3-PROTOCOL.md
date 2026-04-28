@@ -5,258 +5,334 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-ai-survival-2026.
+This document defines the protocols that govern an
+AI-survival operator: the ISO/IEC 42001:2023 AIMS
+discipline; the EU AI Act technical-and-organisational
+discipline (Articles 8 to 17 high-risk + 51-55 GPAI);
+the NIST AI RMF Govern / Map / Measure / Manage
+discipline; the responsible-scaling and frontier-
+preparedness discipline (UK / US AI Safety Institute
+voluntary commitments + AI Action Summit Paris 2025
++ Seoul AI Summit 2024); the workforce-transition
+and human-oversight discipline; the safety-and-
+security testing discipline (red-team rotation,
+capability evaluations, robustness tests); the
+incident-reporting discipline (AI Act Art 73 + US
+EO 14110 + KR AI 기본법); the supply-chain-AI-
+integrity discipline; the dual-use and export-
+control discipline; the international-coordination
+discipline (UN AI Advisory Body + GPAI + OECD +
+UNESCO); and the supervisory cooperation
+discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022 + 38507:2022
+- ISO/IEC 42001:2023 + 22989 + 23053 + 23894 +
+  24029-1/-2 + TR 24027 + TR 24028 + TS 4213
+- IETF RFC 5905 (NTPv4), RFC 9421 (HTTP Message
+  Signatures), RFC 9457 (Problem Details)
+- NIST AI Risk Management Framework 1.0 + AI 600-1
+  GenAI Profile + IR 8332 + IR 8259
+- US EO 14110 + US OMB M-24-10 + US AISI
+  Consortium voluntary commitments + US AISI
+  Pre-Deployment Testing Memorandum of Understanding
+- EU AI Act (Regulation (EU) 2024/1689) Articles
+  5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+  25, 26, 27, 49, 50, 51, 52, 53, 54, 55, 56, 71,
+  72, 73, 74, 86 + Annex III + Annex IV + Annex
+  XI + Annex XIII
+- EU Code of Practice for General-Purpose AI Models
+  (under AI Act Article 56)
+- UN AI Advisory Body Final Report 2024 + UN GA
+  AI Resolution 2024 + UN GDC (Global Digital
+  Compact) AI provisions
+- International AI Safety Report 2025 (chaired by
+  Yoshua Bengio under the AI Action Summit)
+- OECD AI Principles 2019 + 2024 update
+- UNESCO Recommendation on the Ethics of AI 2021
+- ETSI ISG SAI GR/GS series
+- IEC 62443 series (industrial cyber for AI in OT)
+- KR 인공지능 발전 및 신뢰 기반 조성 등에 관한 기본법
+  (KR AI Basic Act) + KR AI 안전연구소 (KAISI)
+  guidance + KR PIPC AI guidance
 
 ---
 
-## §1 Scope
+## §1 ISO/IEC 42001:2023 AIMS Discipline
 
-This PHASE document is one of four that together define the WIA-ai-survival-2026
-standard. Schemas use JSON Schema 2020-12; APIs use OpenAPI 3.1.
+The AIMS discipline operationalises the management-
+system framework:
 
-## §2 Manifest
+- Clause 4 Context — internal and external issues,
+  interested parties, AIMS scope.
+- Clause 5 Leadership — top-management commitment,
+  AI policy, organisational roles.
+- Clause 6 Planning — risks-and-opportunities
+  per Clause 6.1 + Annex B (objectives at
+  organisational and AI-system levels) + AI-system
+  impact-assessment per Clause 6.1.4 + Annex C.
+- Clause 7 Support — resources, competence,
+  awareness, communication, documented information.
+- Clause 8 Operation — AI-system lifecycle, data
+  provenance, AI-system technical documentation.
+- Clause 9 Performance evaluation — monitoring,
+  internal audit, management review.
+- Clause 10 Improvement — non-conformity and
+  corrective action.
 
-Implementations publish a signed manifest containing standardSlug,
-version, implementation (name + build digest + SBOM URL), profile
-(named + version), per-requirement support status, and a Sigstore
-DSSE signature. The manifest is anchored to a Sigstore Rekor entry.
+The AIMS scope is documented and reviewed on the
+operator's published cadence (typically annual).
 
-## §3 Conformance Tiers
+## §2 EU AI Act Technical-and-Organisational
+       Discipline
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+For high-risk AI systems (Art 8-17):
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- Article 9 — risk-management system across the
+  entire lifecycle.
+- Article 10 — data and data-governance covering
+  training, validation, testing data sets.
+- Article 11 — technical documentation per Annex
+  IV.
+- Article 12 — record-keeping (logs).
+- Article 13 — transparency and information to
+  deployers.
+- Article 14 — human oversight.
+- Article 15 — accuracy, robustness, cybersecurity.
+- Article 16 — providers' obligations.
+- Article 17 — quality management system.
+- Article 27 — Fundamental Rights Impact Assessment
+  for deployers in scope.
 
-## §4 Discovery
+For GPAI models (Art 51-55):
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/ai-survival-2026`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key.
+- Article 51 — classification rules + thresholds
+  (Annex XIII compute threshold currently 10²⁵
+  FLOPs).
+- Article 53 — providers' obligations (technical
+  documentation Annex XI, content-summary,
+  copyright respect, deployer-information).
+- Article 55 — additional obligations for GPAI
+  models with systemic risk (model-evaluation,
+  systemic-risk assessment and mitigation, serious
+  incidents tracking, cybersecurity).
+- Article 56 — Code of Practice (the published code
+  is the conformance route until harmonised
+  standards are available).
 
-## §5 Time and Identity
+## §3 NIST AI RMF Discipline (Govern / Map / Measure
+       / Manage)
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better). Time-bound tokens (RFC 9700) are verified against the TLS
-session's exporter value (RFC 8446 §7.5).
+The NIST AI RMF four-function discipline:
 
-## §6 Versioning and Deprecation
+- Govern — organisational AI risk-management
+  policies, accountability structures, and culture.
+- Map — context establishment, system
+  categorisation, risk identification.
+- Measure — AI risk metrics, performance evaluation
+  per ISO/IEC TS 4213, fairness metrics per ISO/IEC
+  TR 24027.
+- Manage — risk-treatment planning, monitoring,
+  documentation, incident response.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version.
-Patch releases are editorial only. Deprecation enters a 12-month
-sunset window during which the registry marks the version as
-Deprecated with a migration note.
+The NIST AI 600-1 GenAI Profile applies the four
+functions to generative-AI risks; the NIST IR 8332
+provides implementation guidance.
 
-## §7 Privacy and Security
+## §4 Responsible-Scaling and Frontier-Preparedness
+       Discipline
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446)
-and at rest (AES-256-GCM or stronger), apply role-based access
-controls, and maintain tamper-evident audit logs (Merkle tree per
-RFC 9162-style transparency log pattern).
+For frontier-AI providers and operators of GPAI
+systems with systemic risk:
 
-## §8 Open Governance
+- Responsible-scaling policy — a published policy
+  declaring the operator's deployment guardrails
+  by capability threshold.
+- Capability elicitation evaluation — the operator
+  exercises capability elicitation across the
+  declared risk dimensions (cyber-offense, CBRN
+  uplift, autonomy, persuasion, financial-crime).
+- Pre-deployment review — pre-deployment evaluation
+  + safety case + override / pause provisions.
+- Voluntary commitments — Seoul AI Summit 2024 /
+  AI Action Summit Paris 2025 voluntary
+  commitments to AI Safety Institute pre-
+  deployment testing.
+- AI Safety Institute MOUs — US AISI / UK AISI /
+  EU AI Office / KAISI memoranda of understanding
+  for pre-deployment red-teaming where in place.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `ai-survival-2026` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle.
+## §5 Workforce-Transition Discipline
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+The workforce-transition discipline:
 
+- Affected-headcount assessment through the
+  operator's HR analytics.
+- Reskilling and upskilling programme delivery
+  (formal training + apprenticeship + work-
+  integrated learning).
+- Redeployment internal — preferential transfer
+  pipelines for incumbent employees to AI-augmented
+  roles.
+- Severance and exit support per the operating
+  jurisdiction's labour law.
+- Sectoral coordination — sectoral training funds,
+  trade-union engagement, public-employment-agency
+  coordination.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §6 Safety-and-Security Testing Discipline
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+The testing discipline:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+- Capability benchmarks — public benchmarks (MMLU,
+  GPQA, SWE-Bench, HumanEval) + operator-published
+  internal benchmarks.
+- Robustness tests per ISO/IEC 24029-1/-2.
+- Fairness tests per ISO/IEC TR 24027.
+- Trustworthiness tests per ISO/IEC TR 24028.
+- Adversarial red-team rotation by an independent
+  internal team and external red-team firms.
+- Cyber tabletop exercises against the operator's
+  AI infrastructure.
+- CBRN uplift evaluation for frontier models.
+- Autonomy and persuasion evaluations.
+- Supply-chain-attack simulation per IEC 62443.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §7 Incident-Reporting Discipline
 
-## Annex F — Adoption Roadmap
+The incident discipline:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- EU AI Act Article 73 serious-incident reporting
+  to the Member-State competent authority — death,
+  serious harm to health, serious harm to property
+  or environment, fundamental-rights infringement,
+  serious cybersecurity breach.
+- US AISI notification under the AISI Consortium
+  voluntary commitments.
+- KR AI 기본법 incident reporting (the KR AI
+  Basic Act incident-reporting discipline once in
+  force on 22 January 2026).
+- Internal incident review with root-cause analysis
+  and corrective-action planning.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §8 Supply-Chain-AI-Integrity Discipline
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The supply-chain-AI-integrity discipline:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+- CycloneDX v1.6 ML profile SBOMs for foundation
+  models, fine-tune adapters, training datasets,
+  evaluation benchmarks, inference runtimes, ML
+  frameworks, hardware accelerators.
+- Provenance attestation through in-toto +
+  Sigstore for the model-and-component supply
+  chain.
+- Model card per HuggingFace Model Card convention
+  + datasheet for datasets per the Datasheets for
+  Datasets convention.
+- Vendor-and-supplier risk assessment for upstream
+  AI components.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §9 Dual-Use and Export-Control Discipline
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+The dual-use discipline:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- EU Dual-Use Reg (EU) 2021/821 — for AI software
+  with cyber-surveillance / dual-use potential.
+- US EAR 15 CFR Part 742 — for export-controlled
+  AI training compute and model weights.
+- US ITAR 22 CFR Parts 120-130 — for AI software
+  on the US Munitions List.
+- Wassenaar Arrangement cyber-tools controls.
+- KR 대외무역법 + 전략물자관리원 controls.
+- Per-shipment / per-licence destination-country
+  sanctions screening (US OFAC + EU + UN + KR).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §10 International-Coordination Discipline
 
-## Annex H — Versioning and Deprecation Policy
+The international-coordination discipline:
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+- UN AI Advisory Body — operator engagement with
+  the Advisory Body's recommendations from the
+  Final Report 2024 (Governing AI for Humanity).
+- GPAI (Global Partnership on AI) — operator
+  participation in the GPAI working groups.
+- OECD AI Network of Experts — operator
+  participation in the OECD AI policy observatory.
+- UNESCO — operator alignment with the UNESCO
+  Recommendation 2021 ethics principles.
+- AI Safety Institute Network — bilateral and
+  multilateral evaluation cooperation (US AISI +
+  UK AISI + EU AI Office + KAISI + Singapore +
+  Japan AISI).
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §11 Identity, Time, and Audit Discipline
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+NTPv4 stratum-2 or better is the operator's clock
+baseline. Audit-events are emitted for every AI-
+system deployment / retirement, AIMS update, safety-
+test completion, incident report, frontier-policy
+amendment, supply-chain-attestation update, dual-
+use-licence-acquisition, and supervisory
+correspondence.
 
-## Annex I — Interoperability Profiles
+## §12 Cybersecurity-and-Adversarial-Robustness
+        Discipline
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+For AI-system cybersecurity:
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+- IEC 62443 zone-and-conduit applied where AI is
+  embedded in OT.
+- ETSI ISG SAI mitigation strategies covering data
+  poisoning, model extraction, evasion attacks,
+  membership inference, model inversion.
+- Adversarial robustness evaluation per ISO/IEC
+  24029 + the ETSI SAI threat-ontology.
+- Prompt-injection and jailbreak mitigation for
+  generative-AI deployments per OWASP LLM Top 10.
+- Supply-chain attack mitigation via SBOM verification
+  + Sigstore attestation chain.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §13 Privacy-Enhancing Technologies (PETs)
+        Discipline
 
-## Annex J — Reference Implementation Topology
+For AI training and inference handling personal
+data:
 
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
+- Differential privacy (DP) — operator's published
+  ε / δ parameters for DP-trained models.
+- Federated learning — operator's federated-learning
+  protocol with secure aggregation.
+- Confidential computing — TEE-backed inference
+  (Intel SGX / TDX, AMD SEV-SNP, NVIDIA
+  Confidential Computing).
+- Synthetic data — operator's synthetic-data
+  generation discipline + membership-inference
+  testing.
+- Per ISO/IEC 27559 (privacy-enhancing data
+  de-identification) where applicable.
 
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-3-PROTOCOL validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
+## §14 Conformance
 
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+Implementations claiming PHASE-3 conformance enforce
+the discipline at every relevant decision point,
+satisfy the ISO/IEC 42001:2023 AIMS + EU AI Act
++ NIST AI RMF baseline, exercise the responsible-
+scaling and frontier-preparedness discipline for
+frontier-AI providers, exercise the workforce-
+transition discipline where the operator's
+deployment displaces incumbent labour, satisfy the
+incident-reporting discipline within the operating
+jurisdiction's window, and exercise the supply-
+chain-integrity + dual-use disciplines.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-ai-survival-2026
+- **Last Updated:** 2026-04-29

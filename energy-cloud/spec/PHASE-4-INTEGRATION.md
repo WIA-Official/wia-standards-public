@@ -5,237 +5,319 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-energy-cloud (Energy Cloud).
+This document defines how an energy-cloud operator
+integrates with the systems that surround the
+utility-cloud lifecycle: the substation-automation
+substrate (IEC 61850 GOOSE / Sampled Values / MMS
+networks); the AMI head-end and meter data-management
+agent (IEC 62056 / ANSI C12); the wholesale-market
+RTO / ISO / KPX; the FERC and Member-State NCA
+supervisory authorities; the DSO and TSO neighbouring
+utilities; the third-party DERMS / DR aggregator
+platform; the customer-bill engine and CIS;
+the building-energy-management ecosystem (Project
+Haystack + ASHRAE BACnet + ISO 16484); the
+cybersecurity supervisor (NERC + CISA + ENISA + KISA);
+the external auditor and ISO/IEC 27001 + 27019
+certification body; and the long-term archive that
+preserves utility-operations records past the active
+retention horizon.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IEC 61968, IEC 61970, IEC 61850, IEC 62325, IEC
+  62351, IEC 62056, IEC 61400-25 series
+- ANSI C12.18 / C12.19 / C12.22 (utility metering)
+- IEEE 1547-2018 + IEEE 2030.5 + IEEE 1815 (DNP3) +
+  IEEE 1815.1 (DNP3 / IEC 61850 mapping)
+- IEEE 1588 PTP, IEEE 1366-2022 reliability indices
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022, ISO/IEC 27019:2024, ISO/IEC
+  17021-1:2015, ISO/IEC 17065:2012, ISO 50001:2018
+- ISO 16484 series (BACnet building-automation
+  systems)
+- ASHRAE Standard 135 (BACnet)
+- W3C Verifiable Credentials Data Model 2.0
+- Project Haystack (semantic-tagging convention)
+- US FERC Order 2222 + Order 2003-D
+- US DOE OE GMI initiatives + DOE C2M2
+- NERC CIP-002 ~ CIP-014 + BAL + IRO + COM + EOP
+- KR 전기사업법 + 전력시장운영규칙 + KPX 운영규정 +
+  KEPIC + KR 정보통신망법 + KISA + KrCERT-CC
+- US OE-417 + EU NIS2 (Directive (EU) 2022/2555)
 
 ---
 
-## §1 Scope
+## §1 Substation-Automation Integration
 
-This PHASE document is one of four that together define the WIA-energy-cloud
-standard. It addresses the integration layer of the standard.
+The operator's energy-cloud integrates with the
+substation-automation substrate:
 
-## §2 Manifest
+- IEC 61850 SCD (Substation Configuration
+  Description) is the canonical substation-engineering
+  document; the operator's cloud-side ingest
+  consumes the SCD for situational awareness.
+- GOOSE and Sampled-Values traffic typically remains
+  on-premise (LAN-class latency); the operator's
+  cloud receives status snapshots via MMS or via
+  IEEE C37.118 synchrophasor streams.
+- Edge gateways translate IEC 61850 / DNP3 / Modbus
+  to the cloud-side IEC 61968 / 61970 envelopes.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "energy-cloud"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 AMI and Meter Data-Management Integration
 
-## §3 Conformance Tiers
+For utility-side metering data:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- IEC 62056 (DLMS / COSEM) and ANSI C12.18 / C12.19
+  / C12.22 are the on-premise meter-protocol
+  baselines.
+- The AMI head-end aggregates meter reads and
+  forwards to the cloud-side MDMS via IEC 61968-9
+  meter-reading messages.
+- The cloud-side VEE process produces validated
+  reads for billing-and-settlement use.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Wholesale-Market Integration
 
-## §4 Discovery
+The wholesale-market integration:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/energy-cloud`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- US-jurisdiction — the operator's market-
+  participation surface integrates with CAISO /
+  PJM / MISO / ERCOT / NYISO / ISO-NE / SPP per
+  the relevant tariff.
+- EU-jurisdiction — the operator's market surface
+  integrates with the relevant TSO and the
+  ENTSO-E + EUPHEMIA day-ahead / intraday markets
+  using IEC 62325 schemas.
+- KR-jurisdiction — the operator integrates with
+  KPX 전력거래소 under 전력시장운영규칙.
 
-## §5 Time and Identity
+## §4 FERC / NERC / Member-State NCA Integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+For US-jurisdiction operators:
 
-## §6 Versioning and Deprecation
+- NERC for CIP audits and self-reports.
+- FERC for Reg SCI-equivalent reliability standards
+  enforcement.
+- US DOE OE-417 reporting for electric emergencies.
+- US CISA for cybersecurity-incident reporting under
+  CIRCIA.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+For EU-jurisdiction operators:
 
-## §7 Privacy and Security
+- The Member-State NCA for energy-sector regulation.
+- ENTSO-E for transmission-system coordination.
+- NIS2 (Directive (EU) 2022/2555) — for essential
+  energy entities the incident-reporting under
+  Article 23 applies.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+For KR-jurisdiction:
 
-## §8 Open Governance
+- KR FSC + 산업통상자원부 for sector-regulatory
+  oversight.
+- KR KEPCO + 한국전력거래소 for wholesale-market
+  coordination.
+- KR KISA + KrCERT-CC for cybersecurity-incident
+  reporting under 정보통신망법.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `energy-cloud` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 DSO and TSO Neighbour Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+The operator's TSO-DSO interface integration:
 
+- Bilateral data-exchange agreements with
+  neighbouring TSOs / DSOs.
+- ENTSO-E Communication and Information Manager
+  (CIM-aligned) for transmission-system data
+  exchange in EU.
+- TSO-DSO data exchange under EU Network Code on
+  System Operation (Reg (EU) 2017/1485) and the
+  Network Code on Demand Connection (Reg (EU)
+  2016/1388).
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §6 Third-Party DERMS / DR Aggregator Integration
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+The operator's catalogue-and-app discipline supports
+third-party platforms:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+- Per-aggregator OAuth client registration with the
+  operator's IdP.
+- Per-aggregator approved-customer-list with bulk-
+  customer-consent capture under the operating
+  jurisdiction's data-protection regime.
+- Bilateral data-exchange agreements covering
+  customer-data scope, settlement processes, and
+  liability allocation.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §7 Customer-Bill Engine and CIS Integration
 
-## Annex F — Adoption Roadmap
+The operator's billing and customer-information-
+system integration:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- Per-tenancy meter reads, program-enrolment, and
+  rate-tier assignments are forwarded to the CIS
+  for bill production.
+- Energy efficiency program credits, demand-response
+  program payments, and net-metering credits flow
+  through the CIS.
+- Bill-print and electronic-bill delivery are
+  managed at the CIS.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §8 Building-Energy-Management Integration
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+For commercial-building energy management:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+- ISO 16484 + ASHRAE BACnet (Standard 135) is the
+  on-premise building-automation baseline.
+- Project Haystack semantic tagging is used by
+  building-energy-management software to interpret
+  point names and units.
+- The operator's cloud exposes per-tenancy energy-
+  data subscriptions (e.g., Green Button Connect My
+  Data) for commercial customers.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §9 Cybersecurity Supervisor Integration
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+For US bulk-electric-system operators NERC + CISA
++ DOE OE-417 reporting; for EU operators ENISA + NIS2
+incident reporting; for KR operators KISA + KrCERT-CC
++ FSC + 한국에너지공단 reporting.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §10 External Audit and ISMS Certification
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+The operator's ISMS is certified against ISO/IEC
+27001:2022 with the ISO/IEC 27019:2024 energy-sector
+extension applied. The certification body operates
+under ISO/IEC 17021-1; the conformity-assessment body
+for WIA-energy-cloud operates under ISO/IEC 17065.
+ISO 50001 energy-management certification is held by
+the operator where applicable.
 
-## Annex H — Versioning and Deprecation Policy
+## §11 Long-Term Archival Integration
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Records governed by the operator's retention horizons
+(NERC CIP retention; FERC retention; KR 전기사업법
++ KPX 보존) are migrated to the long-term archive at
+the close of the active retention window. The archive
+preserves the CIM-model snapshots, the DER-fleet
+aggregations, the forecast records, the market-
+participation records, the engagement records, the
+operations-event records, and the audit-event trail.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §12 Climate-Disclosure Integration
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+For operators subject to ESG-disclosure regimes the
+operator's energy-cloud benefits the entity's GHG-
+inventory (avoided emissions through demand-response,
+renewable integration, EV-charging optimisation)
+recorded under the WIA-esg-finance disclosure record
+(ISSB IFRS S2 + ESRS E1) where the entity is a CSRD
+or ISSB-reporting entity.
 
-## Annex I — Interoperability Profiles
+## §13 EV-Charging Network Integration
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+For utility-side EV-charging integration:
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+- The OCPP 2.0.1 CSMS at the EV-charge-network
+  operator publishes charging-station status and
+  smart-charging acceptance to the operator's cloud.
+- Bilateral OCPI (Open Charge Point Interface)
+  agreements enable cross-network roaming.
+- Vehicle-grid-integration analytics combine the
+  charging-load forecast with the distribution-
+  feeder hosting-capacity analysis to optimise
+  charging schedules.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §14 Distributed-Energy-Resource Hosting Capacity
+        Integration
+
+The hosting-capacity-analysis (HCA) integration:
+
+- The ADMS / DERMS computes per-feeder hosting-
+  capacity maps and exposes them to the
+  interconnection-application portal.
+- Customer-and-installer applications consult the
+  HCA to confirm the feasibility of a proposed DER
+  installation.
+- The HCA is refreshed on the operator's published
+  cadence as DER penetration evolves.
+
+## §15 Wholesale-Market Settlement Engine Integration
+
+The settlement-engine integration:
+
+- The operator forwards meter-reads, dispatch
+  instructions, and award-acknowledgements to the
+  RTO / ISO settlement engine via the relevant
+  market interface.
+- Settlement statements are reconciled against the
+  operator's internal accounting; reconciliation
+  exceptions are tracked through the operator's
+  settlement-dispute workflow.
+- For KR-jurisdiction the KPX 정산시스템 reconciles
+  against KEPCO retail tariffs and the operator's
+  internal accounting.
+
+## §16 Disaster-Recovery Geographic-Diversity
+        Integration
+
+The DR site's geographic-diversity integration:
+
+- The DR site mirrors the production CIM model,
+  the production AMI/SCADA telemetry, and the
+  production audit log on the operator's published
+  RPO.
+- The DR-failover procedure is exercised on the
+  DR-drill cadence (typically annual full-stack +
+  quarterly tabletop).
+- Recovery-time objective alignment with the
+  operating jurisdiction's reliability expectations
+  (NERC EOP-008-2 cyber-attack contingency planning;
+  NIS2 Article 21 minimum cybersecurity measures).
+
+## §17 OPC-UA / IEC 62541 Industrial-Telemetry Bridge
+
+For industrial-customer telemetry consumers the
+operator's bridge to OPC UA (IEC 62541) supports
+direct integration with the customer's plant-level
+historian:
+
+- The operator's OPC-UA-aligned data model maps to
+  IEC 61968 message envelopes.
+- Per-customer signed certificates establish the
+  trust between the operator and the customer's
+  OPC-UA client.
+
+## §18 Time-of-Use and Tariff-Engine Integration
+
+The tariff-engine integration carries the operating
+jurisdiction's published rate-structure into the
+operator's billing pipeline:
+
+- Time-of-use periods (peak, mid-peak, off-peak)
+  with seasonal variation.
+- Critical-peak-pricing event triggers and
+  customer-facing notifications.
+- Real-time-pricing pass-through where applicable.
+- Per-customer-class rate selection and tariff-
+  switching workflows.
+
+## §19 Conformance
+
+Implementations claiming PHASE-4 conformance maintain
+the substation-automation, AMI, wholesale-market, and
+neighbouring-utility integrations, exercise the
+supervisory-authority filing obligations, hold the
+ISO/IEC 27001 + 27019 certifications, exercise the
+DOE C2M2 cybersecurity-maturity discipline, and
+operate the long-term archival integration described
+above.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-energy-cloud
+- **Last Updated:** 2026-04-28

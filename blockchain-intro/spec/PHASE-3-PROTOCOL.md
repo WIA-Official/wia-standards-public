@@ -5,237 +5,313 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-blockchain-intro (Blockchain Intro).
+This document defines the protocols that govern a
+blockchain-intro operator: the ISO/TC 307 reference-
+architecture discipline; the W3C VC / DID identity
+discipline; the smart-contract security and audit
+discipline (OWASP Smart Contract Top 10 + SWC
+registry + EEA Common Standards); the wallet-and-
+key-management discipline; the regulatory-
+classification discipline (EU MiCA + US Howey-test
++ KR Virtual Asset User Protection Act); the AML /
+KYC + Travel Rule discipline (FATF Rec 16 + 31 CFR
++ EU AMLR); the privacy-and-data-protection
+discipline (ISO/TR 23244 + GDPR Art 17 erasure
+challenge for immutable ledgers); the post-quantum
+migration discipline (NIST FIPS 203 / 204 / 205);
+the curriculum-integrity discipline for educational
+operators; and the supervisory cooperation
+discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015, ISO/IEC 27001:2022
+- ISO/TC 307 — ISO 22739:2024 + ISO 23257:2022 +
+  ISO 23455:2019 + ISO/TS 23635 + ISO/TR 23244 +
+  ISO/TR 23576 + ISO/TS 23258 + ISO/TR 3242
+- ITU-T FG DLT
+- W3C VC 2.0 + DID Core 1.0 + Linked Data Proofs +
+  VC Bitstring Status List + Data Integrity 1.0
+- IETF RFC 9381 (VRF), RFC 7515-7519 (JOSE / JWT),
+  RFC 9162 (Certificate Transparency), RFC 5905
+  (NTPv4), RFC 9421 (HTTP Message Signatures), RFC
+  9457 (Problem Details), RFC 8949 (CBOR), RFC 8152
+  (COSE)
+- NIST IR 8202 + IR 8301 + FIPS 186-5 + FIPS 203 +
+  FIPS 204 + FIPS 205
+- OWASP Smart Contract Top 10
+- SWC (Smart Contract Weakness Classification)
+  registry
+- Enterprise Ethereum Alliance (EEA) Mainnet Working
+  Group Common Standards
+- ConsenSys Diligence Smart Contract Best Practices
+- US SEC Framework for "Investment Contract"
+  Analysis of Digital Assets (April 2019)
+- US CFTC LabCFTC primer + virtual currency
+  derivatives oversight
+- US FinCEN BSA + 31 CFR 1010.100(ff)(5) MSB +
+  FinCEN guidance FIN-2019-G001 (Travel Rule for
+  CVCs)
+- FATF Recommendations 15 + 16 (the Travel Rule
+  for Virtual Asset Service Providers)
+- EU MiCA (Reg (EU) 2023/1114) Articles 16-58
+  (asset-referenced tokens) + 59-66 (e-money
+  tokens) + 67-89 (CASP) + 90-92 (transparency)
+- EU AMLR (Reg (EU) 2024/1153) extension to crypto-
+  asset service providers
+- KR 가상자산 이용자 보호 등에 관한 법률 (in force
+  2024-07-19) + 특정금융정보법 + 자본시장법
 
 ---
 
-## §1 Scope
+## §1 ISO/TC 307 Reference-Architecture Discipline
 
-This PHASE document is one of four that together define the WIA-blockchain-intro
-standard. It addresses the protocol layer of the standard.
+The ISO/TC 307 reference-architecture discipline:
 
-## §2 Manifest
+- ISO 22739:2024 vocabulary applied uniformly across
+  the operator's documentation.
+- ISO 23257:2022 reference architecture maps the
+  operator's deployment to the standardised layers
+  (cryptographic services, distributed-ledger,
+  smart contracts, identity-and-access management,
+  application services).
+- ISO/TS 23635 governance baseline for the
+  operator's network operations.
+- ISO/TR 23244 privacy considerations integrated
+  with the operator's PIA / DPIA.
+- ISO/TR 23576 digital-asset-custodian security
+  baseline integrated with the operator's wallet
+  discipline.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "blockchain-intro"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 W3C VC / DID Identity Discipline
 
-## §3 Conformance Tiers
+The VC / DID discipline:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- DID method selection — did:web for institutional
+  identifiers, did:key / did:jwk for ephemeral
+  identities, did:ion / did:cheqd for DID-on-DLT
+  use cases, did:pkh for blockchain-account-bound
+  identifiers.
+- VC issuance — the issuer publishes the credential
+  schema, issues VCs with cryptographic proof
+  (Data Integrity 1.0 / JSON Web Signature 2020 /
+  Ed25519 Signature 2020 / BBS Signature 2023).
+- Verifiable Presentation — the holder selectively
+  discloses VC claims to the verifier per the
+  presentation-request.
+- Status checking — the verifier consults the VC
+  Bitstring Status List for revocation status
+  before accepting a credential.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Smart-Contract Security and Audit Discipline
 
-## §4 Discovery
+The smart-contract security discipline:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/blockchain-intro`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- OWASP Smart Contract Top 10 covering reentrancy,
+  arithmetic overflow / underflow, oracle
+  manipulation, access-control bypass, denial-of-
+  service, front-running, randomness predictability,
+  signature replay, off-by-one errors, gas
+  optimisation hazards.
+- SWC registry mapping each weakness to a unique
+  identifier referenced in audit reports.
+- EEA Mainnet Working Group Common Standards for
+  EVM-class enterprise deployments.
+- Independent security audit by at least two firms
+  for production-class contracts handling real
+  value.
+- Formal verification (K-framework, Dafny, Coq) for
+  high-stakes contracts.
+- Bug bounty programme for contracts in production.
 
-## §5 Time and Identity
+## §4 Wallet-and-Key-Management Discipline
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The wallet discipline:
 
-## §6 Versioning and Deprecation
+- Custodial wallets — the operator's HSM under
+  FIPS 140-3 (Level 3 minimum for production-value
+  custody).
+- Non-custodial wallets — user-controlled private
+  keys; the operator's role is education only.
+- MPC wallets — threshold-cryptography schemes
+  (e.g., GG18, CMP, FROST) replacing single-key
+  signing.
+- Smart-contract wallets — ERC-4337 account
+  abstraction with social recovery, session keys,
+  gas sponsorship.
+- Insurance — custodial-wallet operators carry
+  cyber-and-crime insurance against the published
+  loss scenarios.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Regulatory-Classification Discipline
 
-## §7 Privacy and Security
+For each token / digital-asset issued or supported:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- US SEC Howey-Test analysis — the SEC Framework
+  for "Investment Contract" Analysis of Digital
+  Assets (April 2019) walks through the four
+  prongs.
+- US CFTC commodity classification (Bitcoin and
+  Ether classified as commodities).
+- US FinCEN MSB obligation — wallet operators and
+  exchanges that meet 31 CFR 1010.100(ff)(5)
+  register and comply with BSA.
+- EU MiCA classification — asset-referenced token
+  (ART), e-money token (EMT), or other crypto-
+  asset; per-classification disclosures and
+  authorisation regime.
+- KR 가상자산이용자보호법 — KR Virtual Asset User
+  Protection Act covers user-protection,
+  segregation of customer assets, cold-storage
+  ratios, and listing-and-delisting transparency.
+- KR 특정금융정보법 — KR-jurisdiction VASP
+  registration and Travel-Rule compliance.
 
-## §8 Open Governance
+## §6 AML / KYC and Travel-Rule Discipline
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `blockchain-intro` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+For VASPs (Virtual Asset Service Providers):
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- FATF Rec 15 covering VASPs.
+- FATF Rec 16 Travel Rule — originator and
+  beneficiary information travels with each
+  transfer above the de-minimis threshold (USD /
+  EUR 1,000).
+- US FinCEN Travel Rule under 31 CFR 1010.410(e)
+  + 1010.410(f) extended to CVCs by FinCEN
+  guidance FIN-2019-G001.
+- EU AMLR Reg (EU) 2024/1153 extending the AML
+  regime to crypto-asset service providers; the
+  EU Wire Transfer Regulation (Reg (EU) 2023/1113)
+  Travel Rule applies to crypto.
+- KR 특정금융정보법 Travel-Rule applied through
+  bilateral integration between KR-licensed VASPs.
+- Travel-Rule technical solutions — IVMS 101 +
+  TRP / TRISA / OpenVASP / Sygna Bridge.
 
+## §7 Privacy and GDPR Erasure-Challenge Discipline
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+For immutable-ledger privacy:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+- ISO/TR 23244 privacy considerations.
+- Personal-data minimisation — store hashes /
+  pseudonyms on-chain; reference off-chain
+  encrypted data store.
+- GDPR Article 17 right-to-erasure challenge —
+  immutable ledger conflicts with erasure;
+  mitigation through pseudonymisation, encryption-
+  with-key-discard, or off-chain storage.
+- Right of access (Art 15) and rectification (Art
+  16) addressed through off-chain operator records.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Post-Quantum Migration Discipline
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The post-quantum-cryptography migration discipline:
 
-## Annex F — Adoption Roadmap
+- NIST FIPS 203 (ML-KEM) + FIPS 204 (ML-DSA) + FIPS
+  205 (SLH-DSA) post-quantum primitives.
+- Crypto-agility — the operator's signature and
+  key-encapsulation algorithms are versioned so
+  migration is possible without protocol breaks.
+- Hash-based signatures (XMSS / LMS) for one-shot
+  signing where appropriate.
+- Hybrid signing (classical + post-quantum) during
+  the transition window.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Educational-Curriculum Integrity Discipline
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+For educational operators:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+- Curriculum content references the cited
+  references (ISO 22739 vocabulary, NIST IR 8202
+  / 8301 introduction, W3C VC / DID, OWASP / SWC
+  for security).
+- Hands-on labs use test-network deployments only
+  (Sepolia / Holesky / Polygon Amoy / private
+  test-chains) — no real-value tokens for student
+  exercises.
+- Assessment integrity — student submissions are
+  attributable via signed VC issuance, not by
+  username only.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Identity, Time, and Audit Discipline
 
-## Annex G — Test Vectors and Conformance Evidence
+NTPv4 stratum-2 or better is the operator's clock
+baseline. Audit-events are emitted for every VC
+issuance / verification / revocation, contract
+deployment / upgrade / audit completion, custody-
+event recording, regulatory-classification update,
+and educational-assessment submission.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Layer-2 and Rollup Discipline
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+For operators integrating Layer-2 / rollup
+networks:
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+- Optimistic rollups (Arbitrum, Optimism, Base) —
+  fraud-proof window, sequencer decentralisation
+  status, withdrawal challenge period.
+- ZK rollups (zkSync, StarkNet, Linea, Scroll) —
+  validity-proof system, prover decentralisation,
+  data-availability layer.
+- Validium / volition — data-availability committee
+  governance.
+- L2 cross-chain bridge audits per SWC + EEA Best
+  Practices.
+- Sequencer-decentralisation roadmap participation.
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Stablecoin and Payment-Token Discipline
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+For operators issuing or supporting stablecoins:
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+- Reserve-backing attestation per the operator's
+  published auditor cadence (typically monthly or
+  quarterly).
+- Reserve composition disclosure (USD cash + cash-
+  equivalent + Treasury bills + repo).
+- Smart-contract-controlled mint / burn restricted
+  to authorised parties.
+- Per-jurisdictional licensing — EU MiCA Title
+  III (asset-referenced) + Title IV (e-money
+  token); US state money-transmitter licensing;
+  KR 가상자산이용자보호법 stablecoin reserve
+  requirements when in force.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Cross-Chain Bridge Risk Discipline
 
-## Annex I — Interoperability Profiles
+For operators integrating cross-chain bridges:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- Bridge architecture review — lock-and-mint vs.
+  burn-and-mint vs. liquidity-pool design.
+- Validator-set decentralisation — multi-party
+  computation, threshold signing, trusted-execution-
+  environment attestation.
+- Bridge audit cadence — quarterly minimum given
+  historical bridge-exploit incidents (Ronin,
+  Wormhole, Nomad, Multichain post-mortems).
+- Insurance integration — Nexus Mutual / Sherlock /
+  InsurAce coverage for bridge exposure.
+- Withdrawal-pause governance — emergency-pause
+  authority and accountability.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §14 Conformance
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations claiming PHASE-3 conformance enforce
+the discipline at every relevant decision point,
+satisfy the ISO/TC 307 reference-architecture
+baseline, exercise the smart-contract security and
+audit discipline before promoting any contract to
+production, satisfy the regulatory-classification
+discipline for the operating jurisdiction, exercise
+the AML / KYC / Travel-Rule discipline where the
+operator is a VASP, and exercise the post-quantum
+migration discipline.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-blockchain-intro
+- **Last Updated:** 2026-04-28

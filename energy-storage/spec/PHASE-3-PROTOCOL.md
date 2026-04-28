@@ -5,237 +5,314 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-energy-storage (Energy Storage).
+This document defines the protocols that govern an
+energy-storage operator: the IEC 62933 series storage-
+specific safety and performance discipline; the
+UL 9540 + 9540A thermal-runaway test discipline; the
+NFPA 855 site-permit + emergency-response discipline;
+the IEC 62619 + UL 1973 industrial-Li-ion + UN 38.3
+transport discipline; the IEEE 1547.9 + IEEE 1679
+grid-interconnection discipline; the IEEE 2030.2.1
+operations-and-maintenance discipline; the BMS
+configuration-and-firmware discipline; the cycle-
+life-and-degradation tracking discipline; the
+warranty-claim discipline; the incident-response
+and emergency-services cooperation discipline; the
+second-life and recycling end-of-life discipline;
+and the supervisory and AHJ correspondence
+discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022 + 27019:2024
+- IEC 62933-1:2018, 62933-2-1:2017, 62933-2-2:2024,
+  62933-5-2:2020
+- IEC 62619:2022, IEC 62620:2014, IEC 60086 series,
+  IEC 61960-3:2017
+- IEEE 1547-2018 + 1547.9-2022 + 1679-2020 +
+  2030.2.1-2019 (cross-reference to WIA-distributed-
+  energy)
+- UL 9540 + UL 9540A + UL 1973
+- NFPA 855 (Standard for the Installation of
+  Stationary Energy Storage Systems)
+- NFPA 68 (Standard on Explosion Protection by
+  Deflagration Venting)
+- NFPA 69 (Standard on Explosion Prevention Systems)
+- NFPA 70 NEC Article 706 (Energy Storage Systems)
+- UN ST/SG/AC.10/11/Rev.7 — UN 38.3 lithium-battery
+  transport tests
+- UN ECE Regulation R100.03
+- IETF RFC 5905 (NTPv4), RFC 9421 (HTTP Message
+  Signatures), RFC 9457 (Problem Details)
+- US OSHA 29 CFR Part 1910 + KR 산업안전보건법
+  occupational-safety
+- KR KEPIC + KR 전기사업법 + KR 한국전기안전공사
+  + KR 소방청 + KR 신·재생에너지법
+- US FERC Order 841 (storage market participation)
+- EU Battery Regulation (Reg (EU) 2023/1542)
 
 ---
 
-## §1 Scope
+## §1 IEC 62933 Series Discipline
 
-This PHASE document is one of four that together define the WIA-energy-storage
-standard. It addresses the protocol layer of the standard.
+The IEC 62933 storage-specific discipline:
 
-## §2 Manifest
+- IEC 62933-1 — terminology baseline used across all
+  storage records.
+- IEC 62933-2-1 — performance-test methodology
+  applied at unit-acceptance test.
+- IEC 62933-2-2 — application-and-performance
+  testing at the integrated installation level.
+- IEC 62933-5-2 — safety requirements for grid-
+  integrated electrochemical EES systems —
+  electrical-protection, thermal-protection,
+  mechanical-protection, and the reliability-and-
+  safety analysis.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "energy-storage"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 UL 9540 / 9540A Discipline
 
-## §3 Conformance Tiers
+The UL 9540 / 9540A discipline:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- UL 9540 certification of the integrated ESS
+  product (battery + power-conversion + protection).
+- UL 9540A test method exercised at the cell level,
+  the module level, the unit level, and (where
+  installation-design warrants) the installation
+  level. Test reports inform the operator's NFPA
+  855-aligned site permit.
+- The cell-level UL 9540A report identifies the
+  thermal-runaway-onset temperature, the off-gas
+  composition, and the propagation behaviour to
+  adjacent cells.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 NFPA 855 Site-Permit and Emergency-Response
+       Discipline
 
-## §4 Discovery
+The NFPA 855 discipline at the installation site:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/energy-storage`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- Maximum stored energy per fire-area limits (varies
+  by chemistry and enclosure kind).
+- Separation distances between adjacent storage
+  units and between storage and exposures (occupied
+  buildings, lot lines, public ways).
+- Required fire-suppression system per the chemistry
+  and enclosure kind.
+- Required ventilation and explosion-control per
+  NFPA 68 / 69 where applicable.
+- Pre-incident plan delivered to the local fire
+  department covering the chemistry, the storage
+  topology, the suppression-system characteristics,
+  and the recommended fire-suppression tactics.
+- Annual emergency-response drill with the local
+  fire department.
 
-## §5 Time and Identity
+## §4 IEC 62619 + UL 1973 + UN 38.3 Discipline
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+For lithium-ion industrial cells and batteries:
 
-## §6 Versioning and Deprecation
+- IEC 62619:2022 — safety requirements for
+  industrial Li-ion cells and batteries (over-
+  charge, internal short, external short, mechanical
+  abuse, thermal abuse, vibration, shock, drop).
+- UL 1973 — battery cell / pack safety for
+  stationary auxiliary power.
+- UN 38.3 — transport-test certification including
+  altitude simulation, thermal test, vibration,
+  shock, external short circuit, impact, overcharge,
+  forced discharge.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 IEEE 1547.9 + 1679 + 2030.2.1 Discipline
 
-## §7 Privacy and Security
+The IEEE-grid-interconnection-and-operations
+discipline:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- IEEE 1547.9-2022 — recommended practice for
+  storage interconnection. Covers the storage-
+  specific aspects of IEEE 1547-2018 — bidirectional
+  operation, charge / discharge ride-through,
+  protection coordination, and reactive-power
+  capability with energy-management.
+- IEEE 1679-2020 — characterization and evaluation
+  of energy-storage technologies (round-trip
+  efficiency, capacity-fade rate, calendar life,
+  temperature dependence).
+- IEEE 2030.2.1-2019 — operations and maintenance
+  guide for stationary BESS.
 
-## §8 Open Governance
+## §6 BMS Configuration and Firmware Discipline
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `energy-storage` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The BMS discipline:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- BMS firmware is signed by the manufacturer's
+  signing key; the BMS verifies the signature at
+  boot per the secure-boot policy.
+- Firmware updates are exercised under the
+  operator's change-management discipline; updates
+  are audit-logged with the operator's approval
+  trail.
+- BMS configuration changes (protection-threshold
+  updates, balancing-method changes) require the
+  operator's risk-and-safety committee approval.
+- BMS-detected anomalies (cell-imbalance, voltage
+  drift, internal-resistance increase) trigger the
+  operator's preventive-maintenance workflow.
 
+## §7 Cycle-Life and Degradation Discipline
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+The degradation discipline:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+- Periodic capacity-test cycles (per IEEE 1679-2020
+  reference method) calibrate the operator's
+  state-of-health estimate.
+- Degradation models — empirical (Arrhenius +
+  capacity-fade-as-power-of-cycles), semi-empirical
+  (single-particle model with Butler-Volmer
+  kinetics), or physics-based (P2D pseudo-2D model)
+  — drive the operator's end-of-life forecast.
+- Degradation-indicator drift (capacity-fade,
+  internal-resistance increase, self-discharge
+  increase) triggers the operator's review and
+  potential warranty claim.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Warranty-Claim Discipline
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The warranty-claim discipline:
 
-## Annex F — Adoption Roadmap
+- Manufacturer warranty terms (typically 10 years
+  / X full-equivalent-cycles / Y% capacity-retention
+  warranted) are recorded in the asset register.
+- Performance-monitoring identifies departures from
+  the warranted trajectory; the operator's claim
+  is filed with the manufacturer with the supporting
+  cycle-life and state-record evidence.
+- Claim resolution (replacement, refurbishment,
+  buy-out) is recorded against the asset.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Incident-Response and Emergency-Services
+       Cooperation Discipline
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The incident-response discipline:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+- Detection — voltage-anomaly, temperature-anomaly,
+  off-gas detection, smoke detection, fire-
+  suppression trigger drives the BMS / facility-
+  alarm into the operator's incident channel.
+- Containment — the BMS isolates the affected
+  module; cooling / ventilation is increased; the
+  operator's site-staff secures the perimeter.
+- Notification — the local fire department / AHJ /
+  KR 한국전기안전공사 / 소방청 is notified per the
+  jurisdictional notification timeline.
+- Suppression — fire-suppression is activated per
+  the pre-incident plan.
+- Post-incident — the NFPA 855 + UL 9540A-aligned
+  post-mortem narrative is prepared; lessons
+  feedback into the operator's NFPA 855 site
+  permit, the BMS configuration, and the operator's
+  emergency-response plan.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Second-Life and Recycling Discipline
 
-## Annex G — Test Vectors and Conformance Evidence
+The end-of-life discipline:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+- Second-life repurposing — the storage's residual
+  capacity (typically 70-80% of beginning-of-life
+  nominal) supports stationary applications with
+  lower performance demands.
+- Recycling — the operator engages a licensed
+  recycler under the operating jurisdiction's
+  battery-recycling regime (EU Battery Regulation
+  (EU) 2023/1542 producer-responsibility scheme;
+  US state-by-state recycling rules; KR 전기·
+  전자제품 및 자동차의 자원순환에 관한 법률).
+- Hazardous-waste classification — Li-ion at end-
+  of-life is classified as hazardous waste (US RCRA;
+  KR 폐기물관리법) until processed.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §11 Identity, Time and Audit Discipline
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+NTPv4 stratum-2 or better is the operator's clock
+baseline. Audit-events are emitted for every BMS
+firmware update, configuration change, market bid,
+incident, AHJ notification, post-mortem update,
+warranty claim, and end-of-life decision.
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Off-Gas-Detection and Deflagration-Prevention
+        Discipline
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+The off-gas discipline:
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+- Cell-vent off-gas detection via H2 / CO / CO2 /
+  HF / electrolyte-vapour sensors at the module and
+  unit levels (operator-published thresholds inform
+  the BMS isolation logic).
+- Deflagration prevention per NFPA 68 (explosion
+  protection by deflagration venting) and NFPA 69
+  (explosion-prevention systems) — engineered vent
+  panels, inert-gas blanketing, or oxygen-depletion
+  for high-density installations.
+- Off-gas detection is the earliest reliable
+  indicator of thermal runaway initiation; the
+  operator's response automation (BMS isolation +
+  ventilation increase + AHJ notification) fires
+  before fire develops.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Calendar-Aging and Path-Dependent Degradation
+        Discipline
 
-## Annex I — Interoperability Profiles
+The degradation modelling discipline:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- Calendar aging — Arrhenius-temperature-dependent
+  capacity-fade models projected from accelerated
+  shelf-life tests.
+- Cycle aging — depth-of-discharge-dependent and
+  C-rate-dependent capacity-fade models.
+- Path-dependent effects — the degradation rate
+  depends on the operating SoC distribution; high
+  SoC dwell-time accelerates aging.
+- Lithium-plating prevention — fast-charge profiles
+  derate at low temperature to avoid lithium
+  plating, the dominant safety-critical aging mode
+  for graphite-anode Li-ion.
+- The operator's BMS adjusts charge-current and SoC
+  bounds based on the calendar-and-cycle aging
+  trajectory.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §14 Cybersecurity-and-Tamper Discipline
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The cybersecurity discipline for storage:
+
+- BMS firmware secure-boot per the manufacturer's
+  signing-key chain; tamper detection feeds the
+  operator's incident channel.
+- IEC 62351 cryptographic profile applied to BMS-
+  to-cloud and BMS-to-DERMS communication.
+- Physical-tamper detection at the cabinet level
+  (door sensors, accelerometers); unauthorised-
+  access events are audit-logged and escalated.
+- Supply-chain integrity — the operator's
+  procurement contract requires the manufacturer
+  to provide CycloneDX or SPDX SBOM declarations
+  for the BMS firmware.
+
+## §15 Conformance
+
+Implementations claiming PHASE-3 conformance enforce
+the discipline at every relevant decision point,
+satisfy the IEC 62933 + UL 9540 + 9540A + NFPA 855
++ UN 38.3 safety baseline, exercise the IEEE 1547.9
+storage-interconnection discipline, and exercise the
+incident-response discipline integrated with the
+local AHJ / fire department / KR 한국전기안전공사 /
+소방청.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-energy-storage
+- **Last Updated:** 2026-04-28

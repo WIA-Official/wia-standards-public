@@ -5,270 +5,316 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-air-cargo (Air Cargo).
+This document defines how an air-cargo operator
+integrates with the systems that surround the air-
+cargo lifecycle: the airline cargo division and its
+yield-management and capacity systems; the freight
+forwarder forwarding-management system; the
+regulated-agent / known-consignor security regime;
+the customs / border-protection authority's
+electronic-filing system; the WCO SAFE Framework
+mutual-recognition partner network; the airport
+cargo terminal's terminal-operating-system (TOS); the
+airline interline-cargo settlement engine; the
+international-postal operator (where airmail is in
+scope); the IATA ONE Record initiative for next-
+generation cargo data sharing; the cargo-insurance
+underwriter; the supervisory authority for the
+operating jurisdiction; the external auditor and
+ISO/IEC 27001 + IATA CEIV certification body; and
+the long-term archive that preserves cargo records
+past the active retention horizon.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ICAO Annex 18 + Annex 17 + Doc 9284 + Doc 9481
+- IATA DGR + IATA TACT + IATA Cargo-IMP / Cargo-XML
+  + IATA ONE Record
+- IATA Resolution 672 + Resolution 674 Cargo iQ
+- IATA CEIV Pharma + Lithium + Live Animals + Fresh
+- WCO SAFE Framework + WCO Data Model 3.x + WCO
+  Mutual Recognition
+- US 19 CFR Part 122 + 49 CFR Parts 171-180 + TSA
+  49 CFR 1544/1546/1548/1549 + 19 CFR 122.49b ACAS
+  + C-TPAT
+- EU Reg (EU) 952/2013 UCC + Reg (EU) 2015/1998 +
+  ICS2 Reg (EU) 2024/1248 + AEO under UCC Art 38
+- KR 관세법 + 항공보안법 + 종합인증우수업체 (AEO-K)
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022, ISO/IEC 17021-1:2015, ISO/IEC
+  17065:2012
+- ISO 8601
+- W3C Verifiable Credentials Data Model 2.0
+- UN/EDIFACT IFTSTA / IFTMIN / IFTMCS
 
 ---
 
-## §1 Scope
+## §1 Airline Cargo Division Integration
 
-This PHASE document is one of four that together define the WIA-air-cargo
-standard. It addresses the integration layer of the standard.
+The operator's airline integration:
 
-## §2 Manifest
+- Capacity and allotment management — IATA Cargo-
+  IMP FRA / FFA messages or Cargo-XML allotment-
+  request / allotment-confirmation.
+- Yield-management feed — booked capacity, accepted
+  bookings, and revenue at the booking class level.
+- Aircraft-load-planning — IATA AHM 350 / 355
+  loadsheet integration; cargo loadsheet by ULD
+  position.
+- Inflight-cargo handling — temperature-controlled
+  containers, live-animal cabin care, dangerous-
+  goods loading restrictions.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "air-cargo"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Freight Forwarder Integration
 
-## §3 Conformance Tiers
+The forwarding-management system integration:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- Booking submission via Cargo-XML or Cargo-IMP.
+- House AWB issuance under the consolidated master
+  AWB.
+- e-AWB Multilateral Agreement participation.
+- Cargo iQ shipment-record-key (SRK) propagation
+  for end-to-end visibility.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Regulated-Agent / Known-Consignor Integration
 
-## §4 Discovery
+The supply-chain-security integration:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/air-cargo`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- Bilateral contractual arrangement establishing
+  the chain of custody.
+- Per-shipment Consignment Security Declaration
+  (CSD) — paper or e-CSD via IATA Cargo-XML.
+- Drift-and-anomaly monitoring at the regulated
+  agent's screening operation.
+- Periodic regulator-led inspections of the RA / KC
+  facility.
 
-## §5 Time and Identity
+## §4 Customs / Border-Protection Integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The customs integration:
 
-## §6 Versioning and Deprecation
+- US CBP — Air Manifest Air AMS, ACAS pre-loading,
+  Automated Commercial Environment (ACE) e-filing.
+- EU Member-State customs — ICS2 entry summary
+  declaration (ENS), import declaration (UCC),
+  transit declaration (NCTS).
+- KR 관세청 — UNI-PASS 통합 신고 시스템.
+- WCO Data Model 3.x harmonised data set.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 WCO SAFE Mutual Recognition Integration
 
-## §7 Privacy and Security
+For AEO operators participating in WCO Mutual
+Recognition Arrangements (MRAs):
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- AEO certificate cross-references in customs
+  declarations enable the partner-country
+  facilitation benefits.
+- Per-MRA-pair benefits — reduced inspection rates,
+  priority release, faster transit times.
+- The operator's MRA-eligible data attributes
+  are forwarded to the partner customs.
 
-## §8 Open Governance
+## §6 Airport Cargo-Terminal Integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `air-cargo` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The cargo-terminal-operating-system integration:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- Booking capacity reservation at the cargo
+  terminal.
+- Freight On Hand (FOH) acknowledgement at receipt.
+- ULD build-up and break-down operations.
+- Inter-terminal transfer where multiple cargo
+  terminals serve the airport.
+- Coordination with airport-operations (cross-
+  reference WIA-airport-operations) for ramp
+  movements.
 
+## §7 IATA ONE Record Integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+For operators participating in the IATA ONE Record
+initiative:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+- ONE Record API + data model (JSON-LD over
+  HTTPS) replaces the EDI-style messaging with a
+  resource-oriented data substrate.
+- Linked-data references between the master AWB,
+  house AWB, shipment events, and party records.
+- Distribution to authorised consumers via OAuth
+  2.1 fine-grained scopes.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Airline Interline-Cargo Settlement Integration
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The interline-cargo settlement integration:
 
-## Annex F — Adoption Roadmap
+- IATA CASS (Cargo Account Settlement Systems) for
+  airline-to-forwarder accounts settlement.
+- IATA SIS (Simplified Invoicing and Settlement)
+  for airline-to-airline interline settlement.
+- The operator's settlement records reconcile
+  against the CASS / SIS clearing data.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 International Postal Operator Integration
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+For airmail handled by the operator:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+- Universal Postal Union (UPU) UCC EDI messages
+  (PREDES, RESDES, CARDIT, RESDIT) for postal-
+  cargo manifests.
+- Postal terminal handling per UPU requirements.
+- Postal customs treatment per the operating
+  jurisdiction's postal-customs regime.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Cargo-Insurance Underwriter Integration
 
-## Annex G — Test Vectors and Conformance Evidence
+The cargo-insurance integration:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+- Shipment-level insurance declaration accompanying
+  the e-AWB.
+- Claim filing for damage / loss / theft per the
+  Montreal Convention 1999 / Warsaw Convention
+  1929 limits.
+- Underwriter risk-engineering on specialised-
+  cargo handling (CEIV Pharma compliance, lithium-
+  battery handling).
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §11 External Audit and Certification
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+The operator's ISMS is certified against ISO/IEC
+27001:2022 with the scope explicitly extending to
+the cargo-messaging, customs-filing, and security-
+screening endpoints. The certification body operates
+under ISO/IEC 17021-1; the conformity-assessment
+body for WIA-air-cargo operates under ISO/IEC
+17065. IATA CEIV Pharma / Lithium / Live Animals /
+Fresh certifications are held where the operator
+handles the relevant specialised cargo.
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Long-Term Archival Integration
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Records governed by the operator's retention horizons
+(US 19 CFR Part 122 retention; EU UCC five-year
+retention; KR 관세법 7-year retention; IATA TACT
+three-year retention; IATA DGR shipment-record
+retention) are migrated to the long-term archive at
+the close of the active retention window. The archive
+preserves the e-AWB record, the dangerous-goods
+declarations, the security-screening records, the
+customs declarations, the Cargo iQ milestone history,
+and the audit-event trail.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §13 Specialised-Carrier Integration
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+For specialised carriers:
 
-## Annex I — Interoperability Profiles
+- Express integrators (FedEx, UPS, DHL, EMS) —
+  integration through the integrator's proprietary
+  API plus ICAO / IATA / WCO baseline message
+  formats.
+- All-cargo airlines — direct integration via
+  IATA Cargo-IMP / Cargo-XML.
+- Combination carriers (passenger aircraft cargo
+  capacity) — booking through belly-cargo allotments.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Sustainable Aviation and Carbon Reporting
+        Integration
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+For air-cargo decarbonisation reporting:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- ICAO CORSIA participation — eligible-fuel
+  attestation for the operator's CO2 inventory.
+- Per-shipment CO2 emissions disclosure for
+  sustainability-conscious shippers — per-leg
+  great-circle distance + payload-share + aircraft-
+  type-specific emission factor (Smart Freight
+  Centre Global Logistics Emissions Council
+  Framework).
+- Cargo-IQ + ONE Record extensions for carbon-
+  intensity attribution.
+- Operator's WIA-esg-finance disclosure record
+  integrates the air-cargo Scope 1 + Scope 3
+  attribution.
 
-## Annex J — Reference Implementation Topology
+## §15 Counterfeit-Goods and Wildlife-Trafficking
+        Cooperation Integration
 
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
+For supply-chain integrity:
 
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-4-INTEGRATION validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
+- WCO + Interpol cooperation on counterfeit goods
+  intercepted in the cargo channel.
+- CITES (Convention on International Trade in
+  Endangered Species of Wild Fauna and Flora)
+  permit verification for trade in CITES-listed
+  species.
+- IATA Live Animals Regulations LAR Chapter 2
+  CITES compliance.
+- US Lacey Act + EU Wildlife Trade Regulation
+  338/97 enforcement support.
 
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+## §16 Cybersecurity and Cargo-Data Protection
+        Integration
+
+For cargo-data integrity and confidentiality:
+
+- ICAO Annex 17 + Doc 8973 cyber-security baseline
+  applied to cargo information systems.
+- For EU-jurisdiction NIS2 (Directive (EU) 2022/2555)
+  Annex I sector-criticality covers air-transport
+  operators.
+- TSA Cybersecurity Directives for US air-cargo
+  operators.
+- KR 정보통신망법 + KISA + KrCERT-CC for KR-
+  jurisdiction operators.
+- Cargo-data classification — booking, AWB, DG
+  declarations, security-screening, customs
+  declarations are sensitive supply-chain
+  information requiring confidentiality controls.
+
+## §17 Express Carrier and E-Commerce Cross-Border
+        Integration
+
+For express-carrier-and-e-commerce flows:
+
+- Express integrators (FedEx / UPS / DHL / USPS /
+  EMS / Korea Post / 한진 / CJ Logistics) integrate
+  via proprietary API + IATA Cargo-XML baseline.
+- US Section 321 de minimis threshold ($800)
+  filings via ACE Type 86.
+- EU Import One-Stop Shop (IOSS) for B2C imports.
+- KR 해외직구 통관시스템 + 목록통관 channels.
+- E-commerce-platform-to-postal handovers under
+  UPU EMS Cooperative arrangement.
+
+## §18 Pharma Cold-Chain Integration
+
+For pharmaceutical cargo:
+
+- IATA CEIV Pharma certified facilities along the
+  routing.
+- Temperature-controlled containers (active or
+  passive) per IATA TCR specifications.
+- WHO Good Distribution Practice for Medical
+  Products (GDP) compliance.
+- US FDA + EU EMA + KR MFDS supply-chain
+  attestation.
+- Continuous temperature monitoring with deviation
+  alerts to the shipper.
+
+## §19 Conformance
+
+Implementations claiming PHASE-4 conformance maintain
+the airline, forwarder, RA / KC, customs, terminal,
+and IATA ONE Record (where adopted) integrations,
+exercise the WCO SAFE + AEO mutual-recognition where
+the operator is AEO-certified, hold the ISO/IEC
+27001 certification + IATA CEIV certifications where
+applicable, and operate the long-term archival
+integration described above.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-air-cargo
+- **Last Updated:** 2026-04-28

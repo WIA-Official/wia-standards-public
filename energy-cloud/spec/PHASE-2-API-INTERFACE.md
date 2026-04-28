@@ -5,237 +5,353 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-energy-cloud (Energy Cloud).
+This document defines the API contract that an
+energy-cloud operator exposes for the records defined
+in PHASE-1. Three complementary surfaces are
+described: the IEC 61968 / 61970 CIM exchange surface
+(message envelopes, RDF profiles); the IEC 61850
+control-and-monitoring surface (where the operator
+interfaces directly with substation automation); and
+the HTTPS / JSON RESTful surface for the customer-
+facing engagement, third-party-app catalogue, and
+operator examination.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IEC 61968-100:2022 (implementation profiles for
+  IEC 61968 messages — JMS, AMQP, web services)
+- IEC 61968-13:2019 (CIM RDF model exchange)
+- IEC 61970-301 (CIM base) + IEC 61970-452 + 453 +
+  456 (profiles)
+- IEC 61850-7-2 + 7-420
+- IEC 62325 series (energy-market communications —
+  ENTSO-E + EMIX schemas)
+- IETF RFC 9110 (HTTP Semantics), RFC 9111 (HTTP
+  Caching), RFC 9457 (Problem Details), RFC 6901 /
+  6902 (JSON Pointer / Patch), RFC 8288 (Web Linking),
+  RFC 8259 (JSON), RFC 9421 (HTTP Message Signatures)
+- ISO 8601, ISO/IEC 27001:2022, ISO/IEC 27019:2024
+- W3C Trace Context
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-energy-cloud
-standard. It addresses the api-interface layer of the standard.
+The operator exposes:
 
-## §2 Manifest
+- IEC 61968-100 message-envelope endpoints (JMS /
+  AMQP / web-services binding) for distribution-
+  management interactions.
+- IEC 61970 web-service endpoints for transmission
+  EMS interactions (where the operator participates
+  in transmission-system EMS).
+- The HTTPS / JSON RESTful surface served from a
+  domain published by the operator under `/v1/`.
+- The customer-portal endpoints under `/portal/v1/`.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "energy-cloud"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The OpenAPI 3.1 document at `/v1/openapi.json` is
+canonical for the JSON surface; the IEC 61968-100
+WSDL / AMQP descriptor is canonical for the CIM
+surface; the IEC 61850 SCD is canonical for the
+substation-automation surface.
 
-## §3 Conformance Tiers
+## §2 Root Discovery
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+GET /v1/
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```json
+{
+  "standard": "WIA-energy-cloud",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":              "/v1/programmes",
+    "cimNetworkModels":        "/v1/cim-network-models",
+    "tenancies":               "/v1/tenancies",
+    "derFleetAggregations":    "/v1/der-fleet-aggregations",
+    "forecasts":               "/v1/forecasts",
+    "marketParticipations":    "/v1/market-participations",
+    "engagements":             "/v1/engagements",
+    "appCatalogue":            "/v1/app-catalogue",
+    "operationsEvents":        "/v1/operations-events",
+    "examination":             "/v1/examination",
+    "openapi":                 "/v1/openapi.json"
+  }
+}
+```
 
-## §4 Discovery
+## §3 IEC 61968 Message-Envelope Surface
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/energy-cloud`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+IEC 61968-100 envelopes carry the per-message-type
+payloads:
 
-## §5 Time and Identity
+```
+NetworkOperations (61968-3) — messages: GetSwitchesRequest,
+SwitchActionRequest, AlarmEvent, CrewDispatch
+RecordsAssetManagement (61968-4) — AssetCondition,
+WorkRequest, MaintenanceSchedule
+CustomerSupport (61968-8) — CustomerInquiry,
+ServiceRequestEnvelope, OutageNotification
+MeterReading (61968-9) — MeterReadingRequest /
+Response, EndDeviceEvent, MeterAddRemove
+DistributionConfiguration (61968-13) — model exchange
+of distribution network topology and equipment
+parameters
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The envelope verb / noun pattern (Get / Show / Cancel /
+Change / Create / Close / Delete · Asset / Customer /
+Meter / Switch · Request / Reply / Event) is
+canonical.
 
-## §6 Versioning and Deprecation
+## §4 IEC 61970 EMS-API Surface
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+For transmission-EMS-class deployments:
 
-## §7 Privacy and Security
+```
+GET    /ems/v1/topology                  (CIM topology
+                                          export per
+                                          61970-452)
+GET    /ems/v1/state-estimator-results   (steady-state
+                                          solution per
+                                          61970-456)
+POST   /ems/v1/scada-write               (SCADA-class
+                                          control writes)
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Tenancy and Customer-Site Endpoints
 
-## §8 Open Governance
+```
+GET    /v1/tenancies?premise={geo}
+GET    /v1/tenancies/{tenancyId}
+POST   /v1/tenancies
+PATCH  /v1/tenancies/{tenancyId}
+GET    /v1/tenancies/{tenancyId}/meters
+GET    /v1/tenancies/{tenancyId}/der-assets
+GET    /v1/tenancies/{tenancyId}/program-enrolments
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `energy-cloud` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 DER Fleet and Forecasting Endpoints
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+GET    /v1/der-fleet-aggregations?scope={scope}
+GET    /v1/der-fleet-aggregations/{aggregationId}
+POST   /v1/der-fleet-aggregations
+GET    /v1/forecasts?kind={kind}&horizon={hours}
+POST   /v1/forecasts
+GET    /v1/forecasts/{forecastId}/values
+GET    /v1/forecasts/{forecastId}/error-metrics
+```
 
+## §7 Wholesale-Market Endpoints
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+GET    /v1/market-participations
+GET    /v1/market-participations/{participationId}
+POST   /v1/market-participations/{participationId}/bids
+GET    /v1/market-participations/{participationId}/awards
+GET    /v1/market-participations/{participationId}/settlements
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## §8 Customer-Engagement and Third-Party App
+       Endpoints
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+GET    /portal/v1/me                        (tenant's
+                                             tenancy)
+GET    /portal/v1/me/usage?from={iso}&to={iso}
+GET    /portal/v1/me/forecast
+POST   /portal/v1/me/program-enrolment
+GET    /v1/app-catalogue
+POST   /v1/app-catalogue                    (register a
+                                             third-party
+                                             app)
+PATCH  /v1/app-catalogue/{appId}/approve
+PATCH  /v1/app-catalogue/{appId}/suspend
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §9 Operations-Event Endpoints
 
-## Annex F — Adoption Roadmap
+```
+GET    /v1/operations-events?from={iso}&to={iso}
+GET    /v1/operations-events/{eventId}
+POST   /v1/operations-events                (record an
+                                             operations
+                                             event)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §10 Examination Endpoints
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+GET    /v1/examination/programmes
+GET    /v1/examination/cim-network-models
+GET    /v1/examination/operations-events
+GET    /v1/examination/cybersecurity-posture
+GET    /v1/examination/audit-events
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The examination scope is read-only and bound to the
+authority's identity (NERC for US bulk-electric-
+system operators; FERC for FERC-jurisdictional
+markets; KR FSC + KEPCO + KPX for KR-jurisdiction;
+the local Public Utility Commission).
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §11 Authentication and Authorisation
 
-## Annex G — Test Vectors and Conformance Evidence
+Bearer tokens conform to OAuth 2.1 with audiences
+declared per surface. The IEC 61968-100 message-
+envelope surface uses TLS with mutual authentication
+per IEC 62351-3. The customer-portal surface uses
+consumer-OAuth flows.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §12 HTTP Status Codes and Caching
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Standard codes apply (200 / 201 / 202 / 400 / 401 /
+403 / 404 / 409 / 422 / 429 / 503). `ETag` carries
+the resource's version-id; PII / NPI-bearing
+responses use `Cache-Control: private, no-store`.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §13 Webhook and Event Surface
 
-## Annex H — Versioning and Deprecation Policy
+Lifecycle events through a webhook channel:
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+- `cim-model.published`, `cim-model.deprecated`
+- `der-fleet.dispatch-issued`,
+  `der-fleet.dispatch-acknowledged`
+- `forecast.updated`
+- `market-participation.bid-submitted`,
+  `market-participation.award-received`
+- `operations-event.declared`,
+  `operations-event.restored`
+- `app-catalogue.app-approved`,
+  `app-catalogue.app-suspended`
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Signatures use HTTP Message Signatures (RFC 9421).
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §14 Bulk-Export and Settlement-Reconciliation Surface
 
-## Annex I — Interoperability Profiles
+```
+POST   /v1/bulk-export
+GET    /v1/bulk-export/{exportId}/status
+GET    /v1/settlement-reconciliation?period={iso}
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+The settlement-reconciliation endpoint surfaces the
+fleet-level dispatch instructions, the actual
+metered output, and the settlement-engine reconciled
+deltas for the requested billing period.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §15 Per-Tenancy Energy-Data Subscription Surface
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The Green Button Connect My Data convention (NAESB
+REQ.21 in US; equivalent in EU and KR) underlies the
+operator's per-tenancy energy-data subscription:
+
+```
+GET    /portal/v1/me/usage.xml          (Green Button
+                                         Connect My
+                                         Data ESPI 1.1)
+GET    /portal/v1/me/usage.json         (operator
+                                         JSON variant)
+POST   /portal/v1/me/data-sharing/grant (grant a
+                                         third-party
+                                         app the
+                                         tenant's
+                                         energy-data
+                                         scope)
+PATCH  /portal/v1/me/data-sharing/{grantId}/revoke
+```
+
+Energy-data subscriptions follow the customer's
+explicit consent under the operating jurisdiction's
+data-protection regime; the operator's audit-events
+record every grant, every read, and every revocation.
+
+## §16 Synchrophasor and PMU Integration Surface
+
+For operators integrating phasor-measurement-unit
+data:
+
+```
+GET    /v1/synchrophasor/sources
+GET    /v1/synchrophasor/sources/{sourceId}/streams
+GET    /v1/synchrophasor/streams/{streamId}/snapshot
+```
+
+The synchrophasor data substrate uses IEEE C37.118
++ IEEE C37.118.2 message envelopes; the cloud-side
+ingest aggregates per-PMU streams for wide-area
+situational awareness and oscillation-detection
+analytics.
+
+## §17 GraphQL Federation Surface
+
+For analytics consumers preferring GraphQL the
+operator exposes a federated GraphQL endpoint:
+
+```
+POST   /v1/graphql        (federated GraphQL with
+                           per-resolver scope
+                           gating)
+GET    /v1/graphql/schema (introspection of the
+                           published schema)
+```
+
+The GraphQL schema federates the tenancy, der-
+fleet-aggregation, forecast, market-participation,
+operations-event, and engagement subgraphs. Per-
+resolver authorisation enforces the per-tenancy and
+per-app scope discipline.
+
+## §18 Streaming Telemetry Surface
+
+Real-time streaming telemetry is exposed via:
+
+- WebSocket over TLS for browser-class consumers.
+- Server-Sent Events (SSE) for one-way streaming.
+- Apache Kafka or AMQP for backend consumers
+  receiving high-cardinality telemetry.
+
+The streaming surface carries the canonical IEC
+61968 / 61970 envelopes; quality-of-service
+guarantees follow the operator's published
+publication-rate budget per topic.
+
+## §19 Examination Bulk-Export Audit Surface
+
+The examination scope's bulk-export endpoints
+support the supervisory authority's annual data
+calls:
+
+```
+POST   /v1/examination/bulk-export
+GET    /v1/examination/bulk-export/{exportId}/manifest
+GET    /v1/examination/operations-events.csv
+GET    /v1/examination/cybersecurity-posture.csv
+```
+
+The manifest declares the cryptographic digest of
+each NDJSON / CSV file produced; the receiving
+authority can verify integrity end-to-end.
+
+## §20 Conformance
+
+Implementations claiming PHASE-2 conformance publish
+the OpenAPI document, expose the IEC 61968-100 +
+IEC 61970 surfaces relevant to the operator's role,
+expose the customer-portal and third-party-app
+catalogue surfaces, expose the supervisory examination
+surface, and propagate trace-context across the
+forecast-to-dispatch-to-settlement chain.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-energy-cloud
+- **Last Updated:** 2026-04-28

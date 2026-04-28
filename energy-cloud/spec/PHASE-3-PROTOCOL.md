@@ -5,237 +5,333 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-energy-cloud (Energy Cloud).
+This document defines the protocols that govern an
+energy-cloud operator: the CIM-model lifecycle
+discipline (IEC 61968-13 + IEC 61970-301);
+the wholesale-market participation discipline (FERC
+Order 2222 + RTO / ISO + KR KPX market rules); the
+forecast-and-scheduling discipline; the customer-
+engagement and program-enrolment discipline; the
+third-party app-catalogue discipline; the cybersecurity
+discipline (IEC 62351 + NERC CIP-002~014 + DOE C2M2);
+the data-quality discipline applied to the AMI / SCADA
+data substrate; the outage-management and reliability-
+reporting discipline (NERC EOP / OE-417); the
+operational-resilience discipline (DORA-equivalent
+where applicable); and the supervisory and balancing-
+authority cooperation discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022 + 27019:2024
+- ISO 50001:2018
+- IEC 61968 series, IEC 61970 series, IEC 61850-7
+  series, IEC 62325 series, IEC 62351 series
+- IEEE 1547-2018 + IEEE 2030.5-2018 (cross-domain
+  reference)
+- NERC CIP-002 through CIP-014
+- NERC BAL-001-2 + BAL-003-2 + BAL-005-1 (frequency
+  response, primary frequency response, balancing
+  authority control)
+- NERC IRO-001 + IRO-008 + IRO-010 (interconnection
+  reliability operations and coordination)
+- NERC COM-001-3 + COM-002-4 (communications)
+- NERC EOP-004-4 + EOP-005-3 + EOP-008-2 (emergency
+  preparedness and operations, including OE-417
+  electric-emergency reporting)
+- US FERC Order 2222 + Order 2003-D
+- US DOE C2M2 v2.1 (Cybersecurity Capability
+  Maturity Model)
+- IETF RFC 5905 (NTPv4), RFC 9421 (HTTP Message
+  Signatures), RFC 9457 (Problem Details)
+- KR 전기사업법 + 전력시장운영규칙 + KPX 운영규정 +
+  KEPIC
 
 ---
 
-## §1 Scope
+## §1 CIM Model Lifecycle Discipline
 
-This PHASE document is one of four that together define the WIA-energy-cloud
-standard. It addresses the protocol layer of the standard.
+The CIM model lifecycle:
 
-## §2 Manifest
+1. Model build — the operator's distribution-and-
+   transmission planning function builds the network
+   model in a CIM-conformant tool.
+2. Validation — the model is validated against IEC
+   61968-13 / IEC 61970-301 schema and against the
+   operator's published validation rules
+   (connectivity, data-completeness, electrical-
+   feasibility).
+3. Profile export — the appropriate profile (CGMES
+   for ENTSO-E grids; per-RTO profiles in US; KEPCO
+   profile in KR) is exported.
+4. Publication — the model is published to the
+   operator's federation registry; consumer
+   subsystems (DERMS / ADMS / EMS / DMS) ingest the
+   model.
+5. Diff and rollback — model-update deltas are
+   recorded; rollback to a prior version is
+   exercised through the registry.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "energy-cloud"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Wholesale-Market Participation Discipline
 
-## §3 Conformance Tiers
+For FERC-jurisdictional markets:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- Order 2222 — DER aggregations participate through
+  the operator's market-participation surface; the
+  RTO / ISO's tariff-aligned product set (energy DA /
+  RT, ancillary services, capacity, demand response)
+  drives the operator's bid catalogue.
+- Order 2003-D — generator interconnection.
+- Per-RTO market rules — CAISO Tariff §29 + §30 ·
+  PJM OATT · MISO Module C / E · ERCOT Nodal
+  Protocols · NYISO Services Tariff · ISO-NE OATT ·
+  SPP Open Access Transmission Tariff.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+For KR-jurisdiction:
 
-## §4 Discovery
+- KR 전력시장운영규칙 — the KPX market-operating
+  rules cover the Korean wholesale-market
+  participation discipline.
+- KR 전기사업법 — the underlying statutory framework.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/energy-cloud`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Forecasting and Scheduling Discipline
 
-## §5 Time and Identity
+The forecasting discipline applies probabilistic
+forecasts where appropriate:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- Solar-irradiance and wind-resource forecasts
+  feed the renewable-DER fleet output forecast.
+- Net-load forecasts (load minus distributed-
+  generation) drive the wholesale-market bidding.
+- EV-charging-load forecasts inform the
+  distribution-feeder constraint analysis.
+- Wholesale-price forecasts inform the dispatch
+  optimisation for behind-the-meter storage.
 
-## §6 Versioning and Deprecation
+Forecast-error metrics (MAE / RMSE / pinball-loss /
+prediction-interval coverage) are reported on the
+operator's published cadence; material drift
+triggers the operator's model-revalidation
+workflow.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Customer-Engagement and Program-Enrolment Discipline
 
-## §7 Privacy and Security
+The engagement discipline:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+- Net-metering programs — the customer's net-export
+  is metered and credited per the operator's
+  published rate.
+- Time-of-use tariff — the customer's hourly /
+  seasonal price is communicated through the
+  customer-portal.
+- Demand-response programs — opt-in / opt-out
+  enrolment, baseline-and-performance settlement,
+  and customer dispatch.
+- Virtual-power-plant programs — aggregation of
+  behind-the-meter resources for wholesale-market
+  participation.
+- Consent capture — every program enrolment captures
+  the customer's informed consent under the operating
+  jurisdiction's data-protection regime (GDPR for
+  EU; CCPA for CA; KR PIPA for KR).
+
+## §5 Third-Party App-Catalogue Discipline
+
+The app-catalogue discipline:
+
+- App registration — the third-party developer
+  registers the app with the operator's catalogue
+  declaring the requested OAuth scopes and the
+  customer-data-access patterns.
+- App review — the operator's app-review committee
+  reviews against security, customer-protection, and
+  data-minimisation criteria.
+- App approval — approved apps are published to
+  the customer-facing app catalogue; customers grant
+  the OAuth consent on the app's first use.
+- App monitoring — anomalous data-access patterns
+  trigger the operator's review or suspension.
+
+## §6 Cybersecurity Discipline
+
+The cybersecurity discipline:
+
+- IEC 62351 series — TLS profile (62351-3), MMS
+  secure profile (62351-4), DNP3 SAv6 (62351-5),
+  GOOSE / SV (62351-6), NSM (62351-7), RBAC
+  (62351-8), KMS (62351-9).
+- NERC CIP-002 to CIP-014 — bulk-electric-system
+  cyber asset categorisation, security-management
+  controls, personnel and training, electronic
+  security perimeters, physical security, system-
+  security management, incident-reporting, recovery,
+  configuration-change, information-protection,
+  supply-chain risk management, physical security
+  for transmission stations and substations.
+- DOE C2M2 v2.1 — the operator's MIL maturity
+  level is documented and exercised on a periodic
+  re-assessment cadence.
+
+## §7 Data-Quality Discipline (AMI / SCADA Substrate)
+
+The data-quality discipline:
+
+- AMI data — meter reads pass through the operator's
+  validation, estimation, and editing (VEE) process
+  before settlement use.
+- SCADA data — analog and status-point quality
+  flags drive the operator's state-estimator
+  reconciliation.
+- Topology consistency — the network model is
+  reconciled against switch-status reports and field
+  observations.
+
+## §8 Outage-Management and Reliability-Reporting
+       Discipline
+
+Outage management and reliability:
+
+- The operator's OMS records every interruption with
+  the duration, the affected customer count, and
+  the cause code.
+- SAIDI / SAIFI / CAIDI / MAIFI reliability indices
+  are computed under IEEE 1366-2022.
+- Reportable events follow NERC EOP-004-4
+  (electric-emergency report and disturbance
+  reporting) — DOE Form OE-417 for US-jurisdiction;
+  KR 전기사업법 reporting for KR-jurisdiction.
+
+## §9 Operational-Resilience Discipline
+
+For energy-cloud operators that are also financial
+entities subject to DORA Regulation (EU) 2022/2554
+the DORA discipline applies; otherwise the operator's
+internal operational-resilience programme covers:
+
+- ICT-third-party-risk mapping.
+- ICT-incident reporting under the operating
+  jurisdiction's regime (NERC CIP-008 / EU NIS2 /
+  KR 정보통신망법).
+- Threat-led penetration testing on the operator's
+  cadence.
+- Annual resilience-test programme.
+
+## §10 Identity, Time, and Audit Discipline
+
+NTPv4 stratum-2 or better is the operator's clock
+baseline; IEEE 1588 PTP is exercised where sub-
+millisecond precision is required for synchrophasor
+time-stamping. Audit-events are emitted for every
+CIM publication, dispatch instruction, market bid,
+program enrolment, app approval, customer-data
+access, operations event, and cybersecurity-posture
+update.
+
+## §11 Volt-VAr / Volt-Watt Coordination Discipline
+
+The volt-VAr and volt-watt coordination discipline
+operationalises distributed-DER reactive-power
+support at the distribution-feeder level:
+
+- The ADMS computes feeder-level voltage profiles
+  using the CIM topology and real-time measurements.
+- Volt-VAr / Volt-Watt curves are dispatched to the
+  fleet via IEEE 2030.5 DERControl messages or via
+  the IEC 61850 GOOSE / MMS substation channel.
+- Per-feeder hosting-capacity analysis identifies
+  the maximum DER penetration the feeder can absorb
+  without violating ANSI C84.1 voltage limits.
+- Reactive-power dispatch follows the IEEE 1547-2018
+  Category B reactive-capability envelope by default.
+
+## §12 Demand-Response Settlement Discipline
+
+The DR settlement discipline:
+
+- Customer baseline computation per the relevant
+  RTO / ISO methodology (CAISO 10-of-10 baseline,
+  PJM CBL with day-of adjustment, ERCOT 4CP
+  baseline, NYISO baseline, ISO-NE baseline, KR
+  KPX 표준 베이스라인).
+- Performance evaluation — the difference between
+  baseline and actual is the DR performance.
+- Settlement payment — per-product clearing prices
+  apply to the dispatched DR quantity per the
+  market's tariff.
+- Performance penalties — under-performance
+  penalties apply per the program's performance-
+  band rules.
+
+## §13 Wide-Area Monitoring (WAMS) Discipline
+
+The wide-area monitoring discipline:
+
+- Synchrophasor data ingestion via IEEE C37.118 +
+  C37.118.2 message envelopes from PMUs deployed
+  across the operator's transmission network.
+- Time-synchronisation via IEEE 1588 PTP with sub-
+  microsecond precision.
+- Oscillation detection — sub-synchronous
+  resonance, low-frequency inter-area oscillations,
+  and forced-oscillation source identification.
+- State-estimation enhancement — synchrophasor data
+  improves the SCADA-only state-estimator
+  observability.
+
+## §14 Climate-and-Decarbonisation Tracking Discipline
+
+For operators tracking the energy-cloud's
+contribution to decarbonisation:
+
+- Emission-intensity tracking — per-MWh CO2e
+  computed against the operator's grid mix.
+- Renewable-portfolio standard tracking — REC
+  balance against jurisdictional RPS targets.
+- Avoided-emissions accounting — DR program
+  performance, behind-the-meter solar uplift, and
+  EV-charging managed-load shifting are translated
+  into avoided-emissions metrics.
+
+The decarbonisation metrics feed the operator's
+WIA-esg-finance disclosure record (ISSB IFRS S2 +
+ESRS E1) where the operator is a CSRD or ISSB
+reporting entity.
+
+## §15 Renewable-Resource Integration Discipline
+
+For high-renewable-penetration grids the
+integration discipline:
+
+- Solar-PV ramp-rate limits enforced at the inverter
+  level via IEEE 2030.5 DERControl ramp-rate fields.
+- Wind-resource frequency-response capability per
+  IEEE 1547-2018 Category B + NERC BAL-003-2.
+- Storage-coupled smoothing — co-located storage
+  participates in inverter-level smoothing of solar
+  / wind ramps.
+- Synchronous-condenser retirement coordination —
+  as conventional plants retire the operator
+  coordinates inertia and short-circuit current
+  contribution from grid-forming inverters.
+
+## §16 Conformance
+
+Implementations claiming PHASE-3 conformance enforce
+the discipline at every relevant decision point,
+maintain the CIM lifecycle and wholesale-market
+participation, satisfy the IEC 62351 + NERC CIP +
+DOE C2M2 cybersecurity discipline, and exercise the
+operations-event and reliability-reporting discipline
+under the operating jurisdiction's regulatory
 regime.
 
-## §8 Open Governance
+---
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `energy-cloud` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+**Document Information:**
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
-
-
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
-
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
-
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-energy-cloud
+- **Last Updated:** 2026-04-28

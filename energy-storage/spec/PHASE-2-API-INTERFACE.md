@@ -5,237 +5,319 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-energy-storage (Energy Storage).
+This document defines the API contract that an
+energy-storage operator exposes for the records
+defined in PHASE-1. Three complementary surfaces are
+described: the IEEE 2030.5 + SunSpec Modbus surface
+(cross-domain reference to WIA-distributed-energy)
+for asset-level monitoring and control; the safety-
+event reporting surface for thermal-runaway / off-
+gas / fire incidents; and the HTTPS / JSON RESTful
+surface for operational visibility, certification
+records, lifecycle tracking, and supervisory
+examination.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IEEE 2030.5-2018 + SunSpec Alliance Modbus
+- IEC 61850-7-420:2021 + 90-7 (cross-domain
+  reference)
+- IEC 62933-1 + 62933-2-1 + 62933-2-2 + 62933-5-2
+- IETF RFC 9110 (HTTP Semantics), RFC 9111 (HTTP
+  Caching), RFC 9457 (Problem Details), RFC 6901 /
+  6902 (JSON Pointer / Patch), RFC 8288 (Web
+  Linking), RFC 8259 (JSON), RFC 9421 (HTTP Message
+  Signatures)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022, ISO/IEC 27019:2024
+- W3C Trace Context
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-energy-storage
-standard. It addresses the api-interface layer of the standard.
+The operator exposes:
 
-## §2 Manifest
+- The IEEE 2030.5 + SunSpec Modbus monitoring
+  surface (cross-reference to WIA-distributed-
+  energy PHASE-2).
+- The HTTPS / JSON RESTful surface served from a
+  domain published by the operator under `/v1/`.
+- The safety-event reporting surface integrated with
+  the operating jurisdiction's authority having
+  jurisdiction (AHJ) / fire department / electrical
+  inspector / KR 한국전기안전공사.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "energy-storage"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The OpenAPI 3.1 document at `/v1/openapi.json` is
+canonical for the JSON surface.
 
-## §3 Conformance Tiers
+## §2 Root Discovery
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+GET /v1/
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```json
+{
+  "standard": "WIA-energy-storage",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":              "/v1/programmes",
+    "storageAssets":           "/v1/storage-assets",
+    "certifications":          "/v1/certifications",
+    "bmsConfigurations":       "/v1/bms-configurations",
+    "stateRecords":            "/v1/state-records",
+    "cycleLifeRecords":        "/v1/cycle-life-records",
+    "marketParticipations":    "/v1/market-participations",
+    "incidents":               "/v1/incidents",
+    "endOfLifeRecords":        "/v1/end-of-life-records",
+    "examination":             "/v1/examination",
+    "openapi":                 "/v1/openapi.json"
+  }
+}
+```
 
-## §4 Discovery
+## §3 Storage Asset and Certification Endpoints
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/energy-storage`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+GET    /v1/storage-assets
+GET    /v1/storage-assets/{assetId}
+POST   /v1/storage-assets
+PATCH  /v1/storage-assets/{assetId}
+GET    /v1/certifications?asset={assetId}
+POST   /v1/certifications
+GET    /v1/certifications/{certificationId}
+GET    /v1/certifications/{certificationId}/9540a-reports
+       (cell-, module-, unit-, installation-level
+        UL 9540A test reports)
+```
 
-## §5 Time and Identity
+## §4 BMS Configuration and State-Telemetry Endpoints
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+GET    /v1/bms-configurations?asset={assetId}
+GET    /v1/bms-configurations/{bmsId}
+PATCH  /v1/bms-configurations/{bmsId}/firmware
+       (firmware-update event recording — secure-
+        boot signed-firmware policy required)
+GET    /v1/state-records?asset={assetId}&from={iso}&to={iso}
+GET    /v1/state-records/{recordId}
+GET    /v1/state-records/realtime/{assetId}
+       (server-sent events stream of the per-asset
+        state telemetry)
+```
 
-## §6 Versioning and Deprecation
+## §5 Cycle-Life and Degradation Endpoints
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+GET    /v1/cycle-life-records?asset={assetId}&period={iso}
+POST   /v1/cycle-life-records
+GET    /v1/cycle-life-records/{recordId}
+GET    /v1/cycle-life-records/{recordId}/degradation-forecast
+       (the forward end-of-life forecast under the
+        operator's degradation model)
+```
 
-## §7 Privacy and Security
+## §6 Market Participation Endpoints
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+GET    /v1/market-participations?asset={assetId}
+GET    /v1/market-participations/{participationId}
+POST   /v1/market-participations/{participationId}/bids
+GET    /v1/market-participations/{participationId}/awards
+GET    /v1/market-participations/{participationId}/settlements
+```
 
-## §8 Open Governance
+## §7 Incident-Reporting Endpoints
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `energy-storage` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST   /v1/incidents                  (record a
+                                       thermal-runaway
+                                       / off-gas /
+                                       fire / smoke
+                                       incident)
+GET    /v1/incidents?asset={assetId}
+GET    /v1/incidents/{incidentId}
+PATCH  /v1/incidents/{incidentId}/post-mortem
+       (record the NFPA 855 + UL 9540A-aligned post-
+        mortem narrative)
+PATCH  /v1/incidents/{incidentId}/ahj-reported
+       (record AHJ notification timestamp)
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+The incident-reporting surface integrates with the
+operating jurisdiction's emergency-services and AHJ
+notification channels — the operator's incident
+record is forwarded automatically where the
+jurisdiction's regime requires.
 
+## §8 End-of-Life and Recycling Endpoints
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+GET    /v1/end-of-life-records?asset={assetId}
+POST   /v1/end-of-life-records
+GET    /v1/end-of-life-records/{recordId}
+GET    /v1/end-of-life-records/{recordId}/recovery-attestation
+       (the recycler's per-material recovery
+        attestation — Li / Ni / Co / Cu fractions)
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## §9 Examination Endpoints
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+GET    /v1/examination/programmes
+GET    /v1/examination/storage-assets
+GET    /v1/examination/certifications
+GET    /v1/examination/incidents
+GET    /v1/examination/cycle-life-records
+GET    /v1/examination/end-of-life-records
+GET    /v1/examination/audit-events
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The examination scope is read-only and bound to the
+authority's identity (NERC + FERC + state-PUC for
+US-jurisdiction; ENISA + Member-State NCA for EU-
+jurisdiction; KR FSC + 산업통상자원부 + 소방청 +
+한국전기안전공사 for KR-jurisdiction).
 
-## Annex F — Adoption Roadmap
+## §10 Authentication and Authorisation
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Bearer tokens conform to OAuth 2.1 with audiences
+declared per surface. Internal subsystem-to-subsystem
+calls use mutual TLS with the operator's internal
+certificate authority. The incident-reporting and
+firmware-update endpoints require elevated scope
+and four-eyes approval.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §11 HTTP Status Codes
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Standard codes apply (200 / 201 / 202 / 400 / 401 /
+403 / 404 / 409 / 422 / 429 / 503) with Problem
+Details bodies.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §12 Webhook and Event Surface
 
-## Annex G — Test Vectors and Conformance Evidence
+Lifecycle events through a webhook channel:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+- `storage-asset.commissioned`,
+  `storage-asset.retired`.
+- `bms.firmware-updated`.
+- `state.threshold-breached` (over-temperature,
+  over-voltage, etc.).
+- `incident.detected`, `incident.resolved`,
+  `incident.ahj-reported`.
+- `cycle-life.warranty-claim-filed`.
+- `end-of-life.decision-recorded`.
+- `market-participation.award-received`.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Signatures use HTTP Message Signatures (RFC 9421).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §13 Streaming Telemetry Surface
 
-## Annex H — Versioning and Deprecation Policy
+For real-time per-asset state telemetry the
+operator exposes:
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+- WebSocket Secure (WSS) endpoints for browser-
+  class consumers.
+- Server-Sent Events (SSE) for one-way streaming.
+- AMQP / MQTT for backend consumers.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+The streaming surface follows the operator's
+published QoS budget per topic.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §14 Caching, Trace-Context
 
-## Annex I — Interoperability Profiles
+`ETag` carries the resource's version-id. PII /
+operational-sensitive responses use `Cache-Control:
+private, no-store`. Trace-context (`traceparent`) is
+propagated across the operator's pipeline.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §15 Bulk-Export and Forensic Surface
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+POST   /v1/bulk-export
+GET    /v1/bulk-export/{exportId}/status
+GET    /v1/bulk-export/{exportId}/manifest
+GET    /v1/forensic/incident-reconstruction?incident={incidentId}
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The forensic-reconstruction endpoint produces the
+deterministic post-incident packaging — the BMS
+state record at and around the incident, the cell-
+voltage / temperature time-series, the fire-
+suppression system response timeline, and the AHJ-
+notification audit trail. The packaging is signed
+using the operator's signing key for downstream
+forensic consumers (insurance investigation, AHJ
+review, manufacturer's recall investigation).
+
+## §16 Battery-Passport Surface (EU Battery Regulation
+        2023/1542)
+
+For storage operators placing batteries on the EU
+market under Reg (EU) 2023/1542:
+
+```
+GET    /v1/battery-passport/{assetId}
+GET    /v1/battery-passport/{assetId}/qr-code
+GET    /v1/battery-passport/{assetId}/recycled-content
+GET    /v1/battery-passport/{assetId}/carbon-footprint
+GET    /v1/battery-passport/{assetId}/due-diligence-attestation
+```
+
+The battery-passport surface satisfies Article 77
+of Reg 2023/1542 — the persistent, machine-readable
+record carrying chemistry, performance, recycled-
+content, carbon-footprint, and raw-material due-
+diligence information for each industrial or EV
+battery placed on the EU market.
+
+## §17 Examination Surface for Storage Audits
+
+Supervisory authorities and external auditors with
+the operator's examination scope read records
+through:
+
+```
+GET    /v1/examination/programmes
+GET    /v1/examination/storage-assets
+GET    /v1/examination/certifications
+GET    /v1/examination/incidents
+GET    /v1/examination/cycle-life-records
+GET    /v1/examination/end-of-life-records
+GET    /v1/examination/audit-events
+GET    /v1/examination/battery-passport-summary
+       (EU Battery Regulation 2023/1542 examination
+        view)
+GET    /v1/examination/incident-rate-by-chemistry
+       (statistical aggregation across the operator's
+        fleet — for AHJ / regulator trend analysis)
+```
+
+The examination surface is read-only and bound to
+the supervisory authority's identity (NERC + FERC +
+state-PUC + AHJ for US-jurisdiction; ENISA + Member-
+State NCA + EU Battery Authority for EU-jurisdiction;
+KR FSC + 산업통상자원부 + 소방청 + 한국전기안전공사
++ 환경부 for KR-jurisdiction).
+
+## §18 Conformance
+
+Implementations claiming PHASE-2 conformance publish
+the OpenAPI document, expose the IEEE 2030.5 +
+SunSpec monitoring surface for the operator's storage
+assets, expose the incident-reporting surface
+integrated with the operating jurisdiction's AHJ /
+emergency-services notification, and propagate trace-
+context across the state-to-incident chain.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-energy-storage
+- **Last Updated:** 2026-04-28

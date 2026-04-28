@@ -5,258 +5,467 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-ai-survival-2026.
+This document defines the canonical data-format
+layer for WIA-ai-survival-2026. The standard covers
+persistent record shapes for the lifecycle of an
+AI-survival programme — the operator's organisational
+identity and AI-deployment perimeter; the AI-system
+inventory and risk-classification record under EU AI
+Act Annex III; the AI-management-system (AIMS)
+record under ISO/IEC 42001:2023; the workforce-
+transition and human-oversight record; the existential-
+risk and frontier-AI policy record (UN AI Advisory
+Body Final Report 2024 + International AI Safety
+Report 2025 + AI Safety Institutes); the safety-and-
+security testing record (red-teaming, evaluation
+benchmarks, capability elicitation); the incident
+and near-miss reporting record (EU AI Act Art 73 +
+US EO 14110 + KR AI 기본법); the supply-chain-AI-
+integrity record; the dual-use-and-export-control
+record; and the supervisory and consultation
+correspondence record. Records are consumed by the
+operator's board of directors, the operator's chief
+AI / risk officer, the AI red-team and safety
+function, the supervisory authority for the operating
+jurisdiction (US AISI + EU AI Office + KR AI 안전
+연구소), the international coordination bodies (UN
+AI Advisory Body, GPAI), the workforce-transition
+stakeholders, and external auditors.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID) and IETF RFC 4122 (UUID URN)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 42001:2023 (AI management system)
+- ISO/IEC 22989:2022 (AI concepts and terminology)
+- ISO/IEC 23053:2022 (framework for AI systems
+  using ML)
+- ISO/IEC 23894:2023 (AI risk management)
+- ISO/IEC 24029-1:2021 + 24029-2:2023 (AI
+  robustness — overview and via formal methods)
+- ISO/IEC TR 24027:2021 (Bias in AI systems and
+  AI-aided decision making)
+- ISO/IEC TR 24028:2020 (Trustworthiness of AI
+  systems)
+- ISO/IEC TS 4213:2022 (AI system performance
+  evaluation)
+- ISO/IEC 38507:2022 (Governance implications of
+  the use of AI by organizations)
+- IETF RFC 8259 (JSON), RFC 9457 (Problem Details)
+- NIST AI Risk Management Framework 1.0 + NIST AI
+  600-1 GenAI Profile + NIST IR 8332 (RMF
+  Implementation) + NIST IR 8259 (IoT-AI baseline)
+- US Executive Order 14110 (Safe, Secure, and
+  Trustworthy Development and Use of Artificial
+  Intelligence) + successor executive guidance
+- US OMB Memorandum M-24-10 (federal-agency AI use)
+- US AI Safety Institute (AISI) at NIST + AISI
+  Consortium voluntary commitments
+- EU AI Act (Regulation (EU) 2024/1689) Articles 5
+  (prohibited practices), 6 (high-risk
+  classification), 7 (Annex III amendment), 8 to
+  17 (high-risk obligations), 25 (provider
+  obligations), 26 (deployer obligations), 27
+  (Fundamental Rights Impact Assessment), 50
+  (transparency), 51 to 55 (general-purpose AI
+  models with systemic risk), 71 (high-risk system
+  database), 72 (post-market monitoring), 73
+  (serious-incident reporting), Annex III + Annex
+  IV + Annex XI
+- EU Code of Practice for General-Purpose AI Models
+  (AI Act Article 56)
+- UN AI Advisory Body Final Report (Governing AI
+  for Humanity, September 2024) + UN GA Resolution
+  on AI 2024
+- International AI Safety Report 2025 (chaired by
+  Yoshua Bengio under the AI Action Summit)
+- OECD AI Principles (the OECD Recommendation of
+  the Council on Artificial Intelligence 2019,
+  updated 2024)
+- UNESCO Recommendation on the Ethics of Artificial
+  Intelligence (2021)
+- ETSI ISG SAI (Securing Artificial Intelligence)
+  GR / GS series — ETSI GR SAI 002 (Threat
+  ontology), GR SAI 004 (Privacy considerations),
+  GR SAI 005 (Mitigation strategy report), GR SAI
+  006 (Hardware role), GS SAI 010 (Mitigation
+  strategy)
+- IEC 62443 series (Industrial automation and
+  control systems security; cited where AI is
+  embedded in OT)
+- KR 인공지능 발전 및 신뢰 기반 조성 등에 관한 기본법
+  (KR AI Basic Act, in force after 2025-01-21
+  promulgation; the 22 January 2026 effective date
+  for high-impact-AI is the reference horizon for
+  KR-jurisdiction operators) + KR PIPC AI guidance
+- ISO 17442 LEI for institutional identifiers
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-ai-survival-2026
-standard. Schemas use JSON Schema 2020-12; APIs use OpenAPI 3.1.
+This PHASE defines persistent shapes for the artefacts
+an AI-survival operator (an enterprise AI-deployer,
+a frontier-AI provider, a critical-infrastructure
+operator with embedded AI, a research consortium, a
+public-sector AI deployer, a workforce-transition
+support operator) maintains:
 
-## §2 Manifest
+- The organisational AI-deployment perimeter record.
+- The AI-system inventory and risk-classification
+  record.
+- The AIMS (AI management system) record.
+- The workforce-transition and human-oversight
+  record.
+- The frontier-AI / existential-risk policy record.
+- The safety-and-security testing record.
+- The incident-and-near-miss record.
+- The supply-chain-AI-integrity record.
+- The dual-use-and-export-control record.
+- The supervisory and consultation correspondence
+  record.
 
-Implementations publish a signed manifest containing standardSlug,
-version, implementation (name + build digest + SBOM URL), profile
-(named + version), per-requirement support status, and a Sigstore
-DSSE signature. The manifest is anchored to a Sigstore Rekor entry.
+## §2 Programme Identifier
 
-## §3 Conformance Tiers
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name)
+operatorRole         : enum ("enterprise-ai-deployer"
+                       | "frontier-ai-provider" |
+                       "critical-infrastructure-
+                       operator-embedded-ai" |
+                       "research-consortium" |
+                       "public-sector-ai-deployer"
+                       | "workforce-transition-
+                       support" | "ai-safety-
+                       institute" | "user-defined")
+operatorJurisdiction : array of string (ISO 3166-1)
+operatorLei          : string (ISO 17442)
+governingFrameworks  : array of enum ("ISO-IEC-
+                       42001-2023" |
+                       "ISO-IEC-22989-2022" |
+                       "ISO-IEC-23053-2022" |
+                       "ISO-IEC-23894-2023" |
+                       "ISO-IEC-24029-1-2021" |
+                       "ISO-IEC-24029-2-2023" |
+                       "ISO-IEC-TR-24027-2021" |
+                       "ISO-IEC-TR-24028-2020" |
+                       "ISO-IEC-TS-4213-2022" |
+                       "ISO-IEC-38507-2022" |
+                       "NIST-AI-RMF-1-0" |
+                       "NIST-AI-600-1-GENAI" |
+                       "NIST-IR-8332" |
+                       "US-EO-14110" |
+                       "US-OMB-M-24-10" |
+                       "US-AISI-CONSORTIUM" |
+                       "EU-AI-ACT-2024-1689" |
+                       "EU-AI-ACT-COP-GPAI" |
+                       "UN-AI-ADVISORY-BODY-2024" |
+                       "INTL-AI-SAFETY-REPORT-2025"
+                       | "OECD-AI-PRINCIPLES-2024"
+                       | "UNESCO-AI-ETHICS-2021" |
+                       "ETSI-ISG-SAI" |
+                       "IEC-62443-AI-OT" |
+                       "KR-AI-기본법-2026" |
+                       "user-defined")
+existentialRiskTier  : enum ("frontier-ai-systemic"
+                       | "high-risk-annex-iii" |
+                       "limited-transparency-art-50"
+                       | "minimal-risk" | "user-
+                       defined") (per EU AI Act
+                       classification + International
+                       AI Safety Report 2025
+                       frontier-tier)
+programmeStatus      : enum ("design" | "operating"
+                       | "limited-rollout" |
+                       "wind-down" | "archived")
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 AI-System Inventory Record
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+aiSystemRecord:
+  systemId           : string (uuidv7)
+  systemName         : string
+  intendedPurpose    : string (the EU AI Act Article
+                       3(12) intended purpose
+                       declared by the provider)
+  highRiskClassification : enum ("not-high-risk" |
+                       "annex-iii-1-biometric" |
+                       "annex-iii-2-critical-
+                       infrastructure" | "annex-iii
+                       -3-education" | "annex-iii-4
+                       -employment" | "annex-iii-5-
+                       essential-services" |
+                       "annex-iii-6-law-enforcement"
+                       | "annex-iii-7-migration" |
+                       "annex-iii-8-justice" |
+                       "annex-iii-democratic-process"
+                       | "user-defined")
+  gpaiClassification : enum ("not-gpai" | "gpai-not-
+                       systemic" | "gpai-systemic-
+                       risk" | "gpai-foss-not-
+                       systemic")
+  modelArtefactRef   : string (the WIA-generative-
+                       ai-aligned model registry
+                       reference where applicable)
+  systemDeployerRef  : string (the deployer's legal
+                       identity per EU AI Act Article
+                       26)
+  technicalDocumentationRef : string (URI of the
+                       Annex IV + Annex XI technical
+                       documentation set)
+  fundamentalRightsImpactAssessmentRef : string (URI
+                       of the Article 27 FRIA where
+                       applicable)
+```
 
-## §4 Discovery
+## §4 AIMS Record (ISO/IEC 42001:2023)
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/ai-survival-2026`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key.
+```
+aimsRecord:
+  recordId           : string (uuidv7)
+  scope              : string (the AIMS scope
+                       declaration)
+  contextOfTheOrganisation : string (URI of the
+                       Clause 4 context narrative)
+  leadershipCommitment : string (URI of the Clause
+                       5 leadership-commitment
+                       evidence)
+  policiesRef        : array of string (the AI policy
+                       set per Clause 5.2)
+  aiObjectivesRef    : array of string (the
+                       measurable AI objectives per
+                       Clause 6.2)
+  riskAssessmentRef  : string (URI of the AI risk
+                       assessment per Clause 6.1.2 +
+                       Annex B)
+  aiSystemImpactAssessmentRef : string (URI of the
+                       AI-system impact assessment
+                       per Clause 6.1.4 + Annex C)
+  managementReviewRef : string (URI of the most
+                       recent Clause 9.3 management
+                       review)
+```
 
-## §5 Time and Identity
+## §5 Workforce-Transition and Human-Oversight Record
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better). Time-bound tokens (RFC 9700) are verified against the TLS
-session's exporter value (RFC 8446 §7.5).
+```
+workforceTransitionRecord:
+  recordId           : string (uuidv7)
+  transitionScope    : enum ("upskilling-incumbent
+                       -workforce" | "reskilling-
+                       displaced-workforce" |
+                       "redeployment-internal" |
+                       "exit-with-severance" |
+                       "exit-with-job-search-
+                       support" | "user-defined")
+  affectedHeadcount  : integer
+  programmeRef       : string (URI of the operator's
+                       transition programme
+                       narrative)
+  partnershipsRef    : array of string (educational-
+                       institution / public-employment
+                       agency / sectoral-training-
+                       fund partnerships)
+  fundingSourceRef   : string (the operator's fund
+                       allocation; statutory severance
+                       compliance per the operating
+                       jurisdiction)
 
-## §6 Versioning and Deprecation
+humanOversightRecord:
+  recordId           : string (uuidv7)
+  systemRef          : string (PHASE-1 §3)
+  oversightModel     : enum ("human-in-the-loop" |
+                       "human-on-the-loop" |
+                       "human-out-of-the-loop-
+                       monitored" | "user-defined")
+  oversightRoleRef   : string (the operator's
+                       designated oversight role per
+                       AI Act Article 14 + ISO/IEC
+                       38507)
+  competencyAttestationRef : string (URI of the
+                       oversight personnel's training
+                       and competency record)
+  overrideCapability : object (the human override
+                       latency budget + scope)
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version.
-Patch releases are editorial only. Deprecation enters a 12-month
-sunset window during which the registry marks the version as
-Deprecated with a migration note.
+## §6 Frontier-AI / Existential-Risk Policy Record
 
-## §7 Privacy and Security
+For frontier-AI providers and operators of GPAI
+systems with systemic risk:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446)
-and at rest (AES-256-GCM or stronger), apply role-based access
-controls, and maintain tamper-evident audit logs (Merkle tree per
-RFC 9162-style transparency log pattern).
+```
+frontierPolicyRecord:
+  recordId           : string (uuidv7)
+  riskTier           : enum ("frontier-ai-systemic"
+                       | "near-frontier")
+  responsibleScalingPolicyRef : string (URI of the
+                       operator's responsible-scaling
+                       / preparedness / responsible-
+                       AI scaling policy)
+  capabilityEvaluationsRef : array of string (URIs
+                       of the cyber / CBRN / autonomy
+                       / persuasion capability
+                       evaluations)
+  systemSafetyCommitmentsRef : string (URI of the
+                       voluntary commitments — UK /
+                       US AI Safety Institute
+                       evaluations, Seoul AI Summit
+                       commitments, AI Action Summit
+                       Paris 2025 commitments)
+  preDeploymentReviewRef : string (URI of the pre-
+                       deployment review record per
+                       AI Act Article 55)
+  postDeploymentMonitoringRef : string (URI of the
+                       post-deployment monitoring
+                       per AI Act Article 72)
+```
 
-## §8 Open Governance
+## §7 Safety-and-Security Testing Record
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `ai-survival-2026` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle.
+```
+safetyTestRecord:
+  recordId           : string (uuidv7)
+  systemRef          : string
+  testKind           : enum ("capability-benchmark"
+                       | "robustness-test-iso-iec-
+                       24029" | "fairness-test-
+                       iso-iec-tr-24027" |
+                       "trustworthiness-test-iso-
+                       iec-tr-24028" | "adversarial
+                       -red-team" | "cyber-tabletop"
+                       | "cbrn-uplift-evaluation" |
+                       "autonomy-evaluation" |
+                       "persuasion-evaluation" |
+                       "supply-chain-attack-test" |
+                       "user-defined")
+  conductedBy        : string (internal team or
+                       external red-team firm)
+  externalRedTeamRef : string (the external red-
+                       team firm reference; absent
+                       for internal-only)
+  startedAt          : string (ISO 8601)
+  completedAt        : string (ISO 8601)
+  findingsRef        : string (URI of the findings
+                       narrative)
+  systemicRiskIndicatorsRef : array of string (URIs
+                       of any systemic-risk
+                       indicators raised per AI Act
+                       Article 55(1)(a))
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §8 Incident and Near-Miss Record
 
+```
+incidentRecord:
+  incidentId         : string (uuidv7)
+  systemRef          : string
+  reportedAt         : string (ISO 8601)
+  reporterKind       : enum ("end-user" | "operator-
+                       internal" | "downstream-
+                       deployer" | "third-party-
+                       researcher" | "regulator" |
+                       "ai-safety-institute" |
+                       "user-defined")
+  incidentKind       : enum ("safety-failure-injury"
+                       | "fundamental-rights-
+                       violation" | "privacy-leak" |
+                       "fabricated-output-causing-
+                       harm" | "prompt-injection-
+                       exploit" | "model-jailbreak"
+                       | "supply-chain-compromise"
+                       | "near-miss-no-impact" |
+                       "user-defined")
+  severityKind       : enum ("near-miss" | "minor"
+                       | "moderate" | "serious" |
+                       "critical")
+  rootCauseRef       : string
+  correctiveActions  : array of object
+  euAiActArt73ReportRef : string (URI of the EU AI
+                       Act Article 73 serious-
+                       incident report; absent
+                       unless reported)
+  usAisiNotificationRef : string (URI of the US
+                       AISI notification; absent
+                       unless reported)
+  krAiBasicActReportRef : string (URI of the KR AI
+                       기본법 incident report under
+                       2025/2026 reporting
+                       discipline)
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+## §9 Supply-Chain-AI-Integrity Record
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```
+supplyChainIntegrity:
+  recordId           : string (uuidv7)
+  componentKind      : enum ("foundation-model" |
+                       "fine-tune-adapter" |
+                       "training-dataset" |
+                       "evaluation-benchmark" |
+                       "inference-runtime" |
+                       "ml-framework" | "hardware-
+                       accelerator" | "user-defined")
+  componentRef       : string
+  sbomRef            : string (URI of the CycloneDX
+                       AI/ML SBOM declaration —
+                       CycloneDX v1.6 ML profile)
+  modelCardRef       : string (URI of the
+                       HuggingFace Model Card or
+                       equivalent)
+  datasheetRef       : string (URI of the Datasheet
+                       for Datasets)
+  provenanceAttestationRef : string (URI of the
+                       provenance attestation —
+                       in-toto / Sigstore)
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §10 Dual-Use and Export-Control Record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+dualUseRecord:
+  recordId           : string (uuidv7)
+  systemRef          : string
+  exportControlClass : enum ("eu-dual-use-reg-2021-
+                       821" | "us-ear-15-cfr-742" |
+                       "us-itar-22-cfr-120" |
+                       "wassenaar-arrangement-
+                       cybertools" | "kr-대외무역법-
+                       전략물자" | "n/a-not-export-
+                       controlled" | "user-defined")
+  technicalParameter : object (FLOPs threshold,
+                       capability-class threshold,
+                       per-jurisdiction control list
+                       reference)
+  destinationCountrySanctionsRef : string (the
+                       country-level sanctions /
+                       embargo screening reference)
+  licenceReferences  : array of string (export
+                       licence references)
+```
 
-## Annex F — Adoption Roadmap
+## §11 Conformance
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Implementations claiming PHASE-1 conformance maintain
+the records defined above for every AI system within
+the operating perimeter, exercise the AIMS discipline
+under ISO/IEC 42001:2023, satisfy the EU AI Act +
+NIST AI RMF + KR AI 기본법 obligations applicable to
+the operator, and preserve the records under the
+operating jurisdiction's recordkeeping discipline
+(EU AI Act Article 18 ten-year retention for high-
+risk systems; US OMB M-24-10 federal use-case
+inventory annual; KR AI 기본법 retention horizon).
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+---
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+**Document Information:**
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
-
-## Annex J — Reference Implementation Topology
-
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
-
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-1-DATA-FORMAT validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
-
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-ai-survival-2026
+- **Last Updated:** 2026-04-29

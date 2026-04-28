@@ -5,258 +5,299 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-ai-survival-2026.
+This document defines the API contract that an
+AI-survival operator exposes for the records defined
+in PHASE-1. The contract is consumed by the
+operator's internal AI governance committee, the
+operator's red-team and safety function, the
+supervisory authority's examination tooling (US AISI
++ EU AI Office + Member-State NCAs + KR AI 안전
+연구소), the international coordination bodies, the
+operator's workforce-transition stakeholders, and
+the public-disclosure surface for transparency
+reports under EU AI Act Article 51.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO/IEC 42001:2023 + 22989 + 23053 + 23894 +
+  24029 + TR 24027 + TR 24028 + TS 4213 + 38507
+- IETF RFC 9110 (HTTP Semantics), RFC 9111 (HTTP
+  Caching), RFC 9457 (Problem Details), RFC 6901 /
+  6902 (JSON Pointer / Patch), RFC 8288 (Web
+  Linking), RFC 8259 (JSON), RFC 9421 (HTTP Message
+  Signatures)
+- ISO 8601, ISO 17442 LEI
+- ISO/IEC 27001:2022
+- W3C Trace Context, W3C Verifiable Credentials Data
+  Model 2.0
+- NIST AI RMF + AI 600-1
+- EU AI Act Articles 50, 51, 52, 53, 54, 55, 71,
+  72, 73
+- US AISI Consortium voluntary commitments
+- KR AI 기본법 reporting discipline
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-ai-survival-2026
-standard. Schemas use JSON Schema 2020-12; APIs use OpenAPI 3.1.
+JSON-over-HTTPS served from a domain published by
+the operator. Versioning uses `/v1/` path segments.
+The OpenAPI 3.1 document at `/v1/openapi.json` is
+canonical.
 
-## §2 Manifest
+The operator exposes:
 
-Implementations publish a signed manifest containing standardSlug,
-version, implementation (name + build digest + SBOM URL), profile
-(named + version), per-requirement support status, and a Sigstore
-DSSE signature. The manifest is anchored to a Sigstore Rekor entry.
+- The HTTPS / JSON RESTful surface for the
+  programme, AI-system inventory, AIMS, workforce-
+  transition, frontier-policy, safety-test,
+  incident, supply-chain, and dual-use records.
+- The public-disclosure surface for AI Act Article
+  51 systemic-risk transparency.
+- The supervisory examination surface.
 
-## §3 Conformance Tiers
+## §2 Root Discovery
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+GET /v1/
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```json
+{
+  "standard": "WIA-ai-survival-2026",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":              "/v1/programmes",
+    "aiSystems":               "/v1/ai-systems",
+    "aimsRecords":             "/v1/aims-records",
+    "workforceTransition":     "/v1/workforce-transition",
+    "humanOversight":          "/v1/human-oversight",
+    "frontierPolicies":        "/v1/frontier-policies",
+    "safetyTests":             "/v1/safety-tests",
+    "incidents":               "/v1/incidents",
+    "supplyChainIntegrity":    "/v1/supply-chain-integrity",
+    "dualUse":                 "/v1/dual-use",
+    "publicDisclosure":        "/v1/public-disclosure",
+    "examination":             "/v1/examination",
+    "openapi":                 "/v1/openapi.json"
+  }
+}
+```
 
-## §4 Discovery
+## §3 AI-System Inventory Endpoints
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/ai-survival-2026`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key.
+```
+GET    /v1/ai-systems
+GET    /v1/ai-systems/{systemId}
+POST   /v1/ai-systems
+PATCH  /v1/ai-systems/{systemId}/risk-classification
+GET    /v1/ai-systems/{systemId}/technical-documentation
+GET    /v1/ai-systems/{systemId}/fria          (Article
+                                                27
+                                                Fundamental
+                                                Rights
+                                                Impact
+                                                Assessment)
+```
 
-## §5 Time and Identity
+## §4 AIMS Record Endpoints
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better). Time-bound tokens (RFC 9700) are verified against the TLS
-session's exporter value (RFC 8446 §7.5).
+```
+GET    /v1/aims-records
+POST   /v1/aims-records
+GET    /v1/aims-records/{recordId}
+GET    /v1/aims-records/{recordId}/risk-assessment
+GET    /v1/aims-records/{recordId}/impact-assessment
+GET    /v1/aims-records/{recordId}/management-review
+```
 
-## §6 Versioning and Deprecation
+## §5 Workforce-Transition and Human-Oversight
+       Endpoints
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version.
-Patch releases are editorial only. Deprecation enters a 12-month
-sunset window during which the registry marks the version as
-Deprecated with a migration note.
+```
+GET    /v1/workforce-transition
+POST   /v1/workforce-transition
+PATCH  /v1/workforce-transition/{recordId}/programme-progress
+GET    /v1/human-oversight?system={systemId}
+POST   /v1/human-oversight
+GET    /v1/human-oversight/{recordId}/competency-attestation
+```
 
-## §7 Privacy and Security
+## §6 Frontier-Policy and Safety-Test Endpoints
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446)
-and at rest (AES-256-GCM or stronger), apply role-based access
-controls, and maintain tamper-evident audit logs (Merkle tree per
-RFC 9162-style transparency log pattern).
+```
+GET    /v1/frontier-policies
+POST   /v1/frontier-policies          (declare
+                                       frontier
+                                       commitments
+                                       per AI Act
+                                       Art 55)
+GET    /v1/safety-tests?system={systemId}
+POST   /v1/safety-tests
+GET    /v1/safety-tests/{recordId}/findings
+GET    /v1/safety-tests/{recordId}/systemic-risk-indicators
+```
 
-## §8 Open Governance
+## §7 Incident-Reporting Endpoints
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `ai-survival-2026` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle.
+```
+POST   /v1/incidents                  (record an
+                                       incident or
+                                       near-miss)
+GET    /v1/incidents/{incidentId}
+PATCH  /v1/incidents/{incidentId}/root-cause
+PATCH  /v1/incidents/{incidentId}/eu-art-73-report
+PATCH  /v1/incidents/{incidentId}/us-aisi-notify
+PATCH  /v1/incidents/{incidentId}/kr-ai-기본법-report
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §8 Supply-Chain-Integrity Endpoints
 
+```
+GET    /v1/supply-chain-integrity?component={componentId}
+POST   /v1/supply-chain-integrity     (record a
+                                       provenance
+                                       attestation)
+GET    /v1/supply-chain-integrity/{recordId}/sbom
+GET    /v1/supply-chain-integrity/{recordId}/model-card
+GET    /v1/supply-chain-integrity/{recordId}/datasheet
+```
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+## §9 Dual-Use and Export-Control Endpoints
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+```
+GET    /v1/dual-use?system={systemId}
+POST   /v1/dual-use                   (record an
+                                       export-control
+                                       classification)
+GET    /v1/dual-use/{recordId}/licence-references
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §10 Public-Disclosure Endpoints (AI Act Article 51)
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+GET    /v1/public-disclosure/me/transition-plan
+GET    /v1/public-disclosure/me/safety-summary
+GET    /v1/public-disclosure/me/responsible-scaling-policy
+GET    /v1/public-disclosure/me/incident-summary?period={iso}
+```
 
-## Annex F — Adoption Roadmap
+The public-disclosure surface exposes the AI Act
+Article 51 systemic-risk transparency artefacts and
+the operator's voluntary AI Action Summit / Seoul
+AI Summit / UK AISI commitment disclosures.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §11 Examination Endpoints
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+GET    /v1/examination/programmes
+GET    /v1/examination/ai-systems
+GET    /v1/examination/aims-records
+GET    /v1/examination/incidents
+GET    /v1/examination/safety-tests
+GET    /v1/examination/dual-use
+GET    /v1/examination/audit-events
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The examination scope is read-only and bound to the
+authority's identity (US AISI + EU AI Office +
+Member-State NCA + KR AI 안전연구소 + UN AI Advisory
+Body).
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §12 Authentication and Authorisation
 
-## Annex G — Test Vectors and Conformance Evidence
+Bearer tokens conform to OAuth 2.1 with audiences
+declared per surface. The frontier-policy endpoints
+require elevated scope and the safety-test endpoints
+require the four-eyes review on systemic-risk-
+indicator escalation.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §13 HTTP Status Codes
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Standard codes apply (200 / 201 / 202 / 400 / 401 /
+403 / 404 / 409 / 422 / 429 / 503) with Problem
+Details bodies.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §14 Webhook and Event Surface
 
-## Annex H — Versioning and Deprecation Policy
+Lifecycle events:
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+- `ai-system.deployed`, `ai-system.retired`,
+  `ai-system.risk-reclassified`
+- `aims.management-review-completed`
+- `safety-test.completed`,
+  `safety-test.systemic-risk-indicator-raised`
+- `incident.reported`, `incident.root-cause-
+  determined`, `incident.regulator-notified`
+- `frontier-policy.published`,
+  `frontier-policy.amended`
+- `workforce-transition.programme-launched`
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Webhook signatures use HTTP Message Signatures
+(RFC 9421).
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §15 Bulk-Export Surface
 
-## Annex I — Interoperability Profiles
+```
+POST   /v1/bulk-export
+GET    /v1/bulk-export/{exportId}/manifest
+GET    /v1/examination/audit-events.csv
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Supports the supervisory authority's annual data
+calls and the operator's annual transparency report.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §16 AI-Safety-Institute Pre-Deployment Testing
+        Surface
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+For frontier providers participating in AISI pre-
+deployment testing:
 
-## Annex J — Reference Implementation Topology
+```
+POST   /v1/aisi/pre-deployment-testing/request
+GET    /v1/aisi/pre-deployment-testing/{requestId}/status
+GET    /v1/aisi/pre-deployment-testing/{requestId}/findings
+POST   /v1/aisi/post-deployment-monitoring
+```
 
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
+The pre-deployment testing endpoint registers the
+operator's frontier model with the relevant AISI
+under the published memorandum of understanding;
+findings are exchanged through the trusted-channel
+infrastructure (cryptographically signed, access-
+controlled). The post-deployment monitoring endpoint
+forwards real-world performance data per AI Act
+Article 72.
 
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-2-API-INTERFACE validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
+## §17 International Coordination Reporting Surface
 
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+```
+GET    /v1/coordination/un-advisory-body/inputs
+POST   /v1/coordination/gpai/working-group-inputs
+GET    /v1/coordination/oecd-ai/observatory-disclosure
+GET    /v1/coordination/unesco/ethics-implementation-report
+```
+
+The coordination surface forwards the operator's
+contributions to the multilateral AI governance
+bodies; the receiving channels follow each body's
+published submission format.
+
+## §18 Conformance
+
+Implementations claiming PHASE-2 conformance publish
+the OpenAPI document, expose the public-disclosure
+surface for AI Act Article 51 transparency, expose
+the supervisory examination surface, and propagate
+trace-context across the deployment-to-incident
+chain.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-ai-survival-2026
+- **Last Updated:** 2026-04-29

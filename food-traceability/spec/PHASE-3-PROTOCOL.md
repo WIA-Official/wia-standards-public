@@ -5,237 +5,330 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-food-traceability (Food Traceability).
+This document defines the protocols that govern a
+food-traceability operator: the Codex CAC/GL
+60-2006 product-tracing-as-tool discipline; the
+ISO 22005 traceability-system-design discipline; the
+GS1 EPCIS 2.0 + CBV 2.0 + GTS 2.0 critical-tracking-
+event discipline; the FSMA 204 KDE discipline for
+the Food Traceability List commodities; the EU Reg
+178/2002 Article 18 one-step-back / one-step-forward
+discipline; the GFSI-recognised-scheme + ISO 22000
+food-safety-management discipline; the recall-and-
+withdrawal discipline; the allergen-and-labelling
+discipline (EU Reg 1169/2011 + FDA 21 CFR 101 + KR
+표시·광고법); the foreign-supplier-verification
+discipline (US FSMA FSVP); and the supervisory and
+recall-coordination discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015, ISO/IEC 27001:2022, ISO 22000:2018
+- ISO/TS 22002 series, ISO 22005:2007
+- Codex Alimentarius CAC/GL 60-2006 + CAC/RCP
+  1-1969 + CAC/GL 81-2013
+- GS1 EPCIS 2.0 + CBV 2.0 + GTS 2.0 + GDM + Digital
+  Link 1.4
+- GFSI Benchmarking Requirements + recognised
+  schemes (BRCGS Food 9, IFS Food 8, FSSC 22000 v6,
+  SQF v9, PrimusGFS)
+- EU Reg (EC) 178/2002 General Food Law Art 18 +
+  Reg (EU) 1169/2011 FIC + Reg (EU) 931/2011 + Reg
+  (EC) 852/2004 + Reg (EC) 853/2004 + Reg (EU)
+  2017/625 + Reg (EU) 2017/2470 + Reg (EC)
+  1924/2006
+- US FDA FSMA Section 204 + 21 CFR Part 1 Subpart
+  S + Subpart L FSVP + Subpart J Bioterrorism
+- US FDA 21 CFR Part 101 (food labelling)
+- US USDA COOL 7 CFR Part 65 + Part 60
+- US FDA Reportable Food Registry (RFR)
+- KR 식품위생법 + 식품안전기본법 + 농수산물품질관리법
+  + 식품 등의 표시·광고에 관한 법률 + 식품 등의 이물
+  발견 보고 등에 관한 규정 + MFDS 식품안전나라 + KR
+  RASFF-K 식품안전관리 시스템
+- IETF RFC 5905 (NTPv4), RFC 9421 (HTTP Message
+  Signatures), RFC 9457 (Problem Details)
 
 ---
 
-## §1 Scope
+## §1 Codex CAC/GL 60-2006 Discipline
 
-This PHASE document is one of four that together define the WIA-food-traceability
-standard. It addresses the protocol layer of the standard.
+The Codex Alimentarius CAC/GL 60 discipline:
 
-## §2 Manifest
+- Traceability / product tracing applied as a tool
+  within food inspection and certification systems.
+- The objectives of traceability — facilitating
+  recalls, supporting consumer information,
+  protecting consumers from unsafe products,
+  facilitating verification.
+- The principles — the system is fit for purpose,
+  designed in accordance with risk, technically
+  feasible, economically viable, transparent in
+  operation.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "food-traceability"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 ISO 22005 Traceability-System-Design Discipline
 
-## §3 Conformance Tiers
+The ISO 22005:2007 discipline:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- Identification of products and product lots.
+- Identification of involved parties.
+- Identification of the lifecycle steps each
+  product/lot has been through.
+- Documentation of the linkages between these
+  identifiers.
+- Documentation of the procedures for
+  identification, recording, transmission, and
+  retrieval.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 GS1 EPCIS 2.0 + CBV 2.0 Discipline
 
-## §4 Discovery
+The EPCIS 2.0 + CBV 2.0 discipline:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/food-traceability`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- Five W's framing — what (EPC), when (eventTime),
+  where (readPoint / bizLocation), why (bizStep /
+  disposition), how (event-specific extensions).
+- Five EPCIS event types — ObjectEvent (commissioning,
+  observing, decommissioning), AggregationEvent
+  (cases on pallets, items in cases), TransactionEvent
+  (associating EPCs with business transactions),
+  TransformationEvent (transforming inputs into
+  outputs — e.g. milling wheat to flour),
+  AssociationEvent (associating sub-objects with
+  parent objects).
+- Capture-and-query interface — capture exposes
+  the per-event JSON-LD payload; query exposes
+  filter-based retrieval.
+- Subscription — push-style notification of events
+  matching subscriber-defined criteria.
 
-## §5 Time and Identity
+## §4 FSMA Section 204 KDE Discipline
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+For US-jurisdiction operators handling Food
+Traceability List (FTL) commodities the FSMA 204
+discipline:
 
-## §6 Versioning and Deprecation
+- Critical Tracking Events (CTEs) per 21 CFR
+  1.1305 — harvesting, cooling, initial-packing,
+  first-land-based-receiver, shipping, receiving,
+  transformation.
+- Per-CTE Key Data Elements per 21 CFR 1.1330 to
+  1.1340.
+- Traceability Lot Code (TLC) — per 21 CFR 1.1320
+  the TLC is assigned at growing, initial packing,
+  first land-based receipt, or transformation.
+- TLC Source — the entity that originated the
+  lot code.
+- 24-hour FDA-request response — operators provide
+  electronic, sortable spreadsheet of records to
+  FDA upon request within 24 hours.
+- Compliance date — 20 January 2026 originally, with
+  FDA proposing extension; the operator's
+  compliance plan tracks the applicable date.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 EU Reg 178/2002 Art 18 One-Up / One-Down
+       Discipline
 
-## §7 Privacy and Security
+For EU-jurisdiction operators:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Article 18(1) — the operator establishes the
+  traceability of food at all stages of production,
+  processing, and distribution.
+- Article 18(2) — operators identify any person
+  from whom they have been supplied with a food /
+  feed / food-producing-animal / substance intended
+  to be incorporated into a food / feed (one-step-
+  back).
+- Article 18(3) — operators identify the businesses
+  to which their products have been supplied (one-
+  step-forward); the requirement does not apply to
+  final consumers.
+- Article 18(5) — information available to
+  authorities upon request.
+- Reg (EU) 931/2011 imposes additional traceability
+  for food of animal origin.
 
-## §8 Open Governance
+## §6 KR 식품위생법 추적 Discipline
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `food-traceability` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+For KR-jurisdiction operators:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- 식품위생법 Article 49 (식품 이력 추적관리 시스템)
+  — selected food categories required to participate
+  in the food-history traceability system operated
+  by MFDS.
+- 농수산물품질관리법 (Agricultural and Marine Products
+  Quality Management Act) — agricultural and marine
+  products traceability system.
+- 식품안전기본법 — recall, withdrawal, and supervisory
+  cooperation.
+- 식품 등의 이물 발견 보고 등에 관한 규정 — foreign-
+  matter detection reporting.
 
+## §7 GFSI-Recognised Scheme Discipline
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+The GFSI Benchmarking Requirements + recognised
+schemes:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+- BRCGS Food Safety Issue 9 — site-level
+  certification covering HACCP, food-safety-
+  management, site standards, product control,
+  process control, personnel.
+- IFS Food version 8 — German / French retailer-
+  driven scheme covering similar scope.
+- FSSC 22000 v6.0 — ISO 22000 + ISO/TS 22002 + FSSC
+  additional requirements.
+- SQF Food Safety Code v9 — North American retailer-
+  driven scheme.
+- PrimusGFS — fresh produce-focused scheme.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Recall-and-Withdrawal Discipline
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The recall-and-withdrawal discipline:
 
-## Annex F — Adoption Roadmap
+- US FDA — Class I / II / III recall classes per
+  21 CFR Part 7. The operator's recall is
+  voluntary unless FDA mandates per FSMA Section
+  206 + FDCA 423.
+- EU RASFF (Rapid Alert System for Food and Feed)
+  — Member-State authority issues the notification;
+  the EU-level RASFF window distributes to all
+  Member-States.
+- KR MFDS 회수·폐기 명령 — MFDS issues the recall /
+  destruction order.
+- Consumer-facing notice — the operator publishes
+  the recall through its website, retailer
+  channels, social media, and (for high-risk
+  recalls) news media.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Allergen and Labelling Discipline
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The allergen-and-labelling discipline:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+- EU Reg 1169/2011 Annex II 14 allergens list —
+  cereals containing gluten, crustaceans, eggs,
+  fish, peanuts, soybeans, milk (including lactose),
+  nuts, celery, mustard, sesame, sulphur-dioxide
+  and sulphites, lupin, molluscs.
+- US FDA major-food-allergens — 9 (the FALCPA 8
+  plus sesame added per FASTER Act of 2021).
+- KR 식품 등의 표시·광고법 — KR allergen labelling
+  list (계란, 우유, 메밀, 땅콩, 대두, 밀, 고등어,
+  게, 새우, 돼지고기, 복숭아, 토마토, 아황산류,
+  호두, 닭고기, 쇠고기, 오징어, 조개류, 잣).
+- Country-of-origin labelling — US COOL + EU Reg
+  1169/2011 Article 9(1)(i) + KR 농수산물의 원산지
+  표시에 관한 법률.
+- Nutrition labelling — FDA 21 CFR 101.9 + EU Reg
+  1169/2011 Annex XV + KR 식품등의 표시기준.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 FSVP Discipline (US FSMA)
 
-## Annex G — Test Vectors and Conformance Evidence
+For US-importer operators the Foreign Supplier
+Verification Program per 21 CFR Part 1 Subpart L:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+- Hazard analysis of each foreign supplier's food.
+- Evaluation of the foreign supplier's performance
+  and food risk.
+- Approval of the foreign supplier.
+- Establishing and following written procedures.
+- Verification activities (onsite audit, sampling
+  and testing, review of supplier's food-safety
+  records).
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §11 Identity, Time, and Audit Discipline
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+NTPv4 stratum-2 or better is the operator's clock
+baseline. Audit-events are emitted for every EPCIS
+capture, KDE record, supply-chain-partner update,
+FSMS record, recall step, and consumer-disclosure
+amendment.
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Sampling-and-Testing Discipline
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+The operator's sampling-and-testing discipline:
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+- Risk-based sampling plan covering microbiological
+  hazards (Salmonella, Listeria monocytogenes,
+  Campylobacter, E. coli O157:H7), chemical
+  hazards (heavy metals, pesticide residues,
+  mycotoxins), and physical hazards.
+- ISO/IEC 17025 accredited laboratories selected
+  for the analytical work.
+- Sample chain-of-custody documented in EPCIS
+  events.
+- Out-of-specification results trigger the
+  operator's release-or-hold decision under the
+  HACCP plan.
+- Trend monitoring across multiple sampling
+  campaigns identifies process drift.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Cross-Border Trade Discipline
 
-## Annex I — Interoperability Profiles
+For exports / imports:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- US FDA Prior Notice (21 CFR 1.276 to 1.285) for
+  imported food shipments.
+- EU Reg (EU) 2017/625 official-controls plus the
+  TRACES NT veterinary-and-phytosanitary
+  certification system.
+- KR 식품의 수입신고 system through KR MFDS for
+  imported food.
+- Codex Alimentarius export certification per
+  CAC/GL 38-2001.
+- Phytosanitary certification per IPPC ISPM 12.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §14 Foreign-Material and Adulteration Discipline
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The foreign-material and adulteration discipline:
+
+- Metal-detection / X-ray inspection at processing
+  CCPs.
+- Glass / plastic / wood / stone foreign-material
+  detection with documented control of the source.
+- Adulteration prevention — economically motivated
+  adulteration (EMA) under FDA FSMA Section 106 +
+  21 CFR Part 121 (Mitigation Strategies to Protect
+  Food Against Intentional Adulteration).
+- Food fraud vulnerability assessment per the
+  GFSI-recognised scheme (BRCGS clause 5.4 / FSSC
+  22000 V6 PRP / SQF clause 2.7).
+- Food defense plans where the operator is in
+  scope of FSMA IA.
+
+## §15 Date-Marking and Shelf-Life Discipline
+
+The date-marking discipline:
+
+- "Use by" date for highly-perishable products
+  (microbiological food-safety risk).
+- "Best before" / "Best before end" date for
+  shelf-stable products (quality, not safety).
+- KR 식품 등의 표시·광고법 — 유통기한 / 소비기한 /
+  품질유지기한 distinction (소비기한 mandatory in
+  KR from 2023).
+- Shelf-life validation per the operator's challenge
+  studies and predictive microbiology models
+  (ComBase, Pathogen Modeling Program).
+- Date code embedded in the FSMA 204 traceability
+  lot code where possible.
+
+## §16 Conformance
+
+Implementations claiming PHASE-3 conformance enforce
+the discipline at every relevant decision point,
+satisfy the Codex CAC/GL 60 + ISO 22005 + EPCIS 2.0
++ CBV 2.0 baseline, exercise the FSMA 204 KDE
+discipline (US) + EU Reg 178/2002 Art 18 one-up /
+one-down + KR 식품위생법 추적 + GFSI-scheme
+discipline applicable to the operator, and exercise
+the recall-and-withdrawal discipline integrated with
+the operating jurisdiction's recall channel.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-food-traceability
+- **Last Updated:** 2026-04-28

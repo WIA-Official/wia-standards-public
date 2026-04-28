@@ -5,270 +5,328 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-air-cargo (Air Cargo).
+This document defines the protocols that govern an
+air-cargo operator: the IATA DGR + ICAO Annex 18 +
+Doc 9284 dangerous-goods discipline; the IATA TACT
+acceptance discipline; the IATA e-AWB issuance and
+digital-signature discipline; the regulated-agent /
+known-consignor security discipline (ICAO Annex 17 +
+EU Reg 2015/1998 + TSA 49 CFR 1544/1546/1548/1549);
+the WCO SAFE Framework + AEO discipline; the EU
+ICS2 Pre-Loading Advance Cargo Information (PLACI)
+discipline; the US ACAS pre-loading discipline; the
+Cargo iQ shipment-progress discipline; the
+specialised-cargo discipline (CEIV-Pharma / LAR /
+PCR / TCR + IATA Lithium Battery Shipping
+Guidelines); the post-flight reconciliation
+discipline; and the supervisory cooperation
+discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022
+- ICAO Annex 18 + Doc 9284 (TI) + Doc 9481
+  emergency response
+- ICAO Annex 17 (Security)
+- IATA DGR + IATA TACT + IATA Cargo-IMP / Cargo-XML
+- IATA Resolution 672 e-AWB + Multilateral Agreement
+- IATA Resolution 833 / 600a / 600b
+- IATA Cargo iQ Resolution 674 master operating
+  plan v6
+- IATA CEIV-Pharma + CEIV-Lithium + CEIV-Live-
+  Animals + CEIV-Fresh
+- IATA LAR + PCR + TCR + Lithium Battery Shipping
+  Guidelines
+- WCO SAFE Framework of Standards + WCO Data Model
+  3.x
+- US 19 CFR Part 122 + Part 4 + 19 CFR 122.49b
+  ACAS
+- US 49 CFR Parts 171-180 HMR
+- US TSA 49 CFR 1544 + 1546 + 1548 + 1549
+- US C-TPAT (Customs-Trade Partnership Against
+  Terrorism) for AEO-equivalent in US
+- EU Reg (EU) 2015/1998 + Reg (EU) 952/2013 UCC +
+  ICS2 Reg (EU) 2024/1248 + AEO under UCC Art 38
+- KR 관세법 + 항공보안법 + 종합인증우수업체 (AEO)
+- IETF RFC 5905 (NTPv4), RFC 9421 (HTTP Message
+  Signatures), RFC 9457 (Problem Details)
 
 ---
 
-## §1 Scope
+## §1 IATA DGR + ICAO Annex 18 + Doc 9284 Discipline
 
-This PHASE document is one of four that together define the WIA-air-cargo
-standard. It addresses the protocol layer of the standard.
+The dangerous-goods discipline:
 
-## §2 Manifest
+- The shipper's declaration follows IATA DGR §8
+  shipper's-declaration-for-dangerous-goods format.
+- The freight forwarder's acceptance check follows
+  IATA DGR §9 acceptance-checklist procedure (the
+  92-point checklist).
+- Packing per the IATA DGR Packing Instruction (PI)
+  applicable to the UN number.
+- Marking and labelling per IATA DGR §7.
+- Documentation — air waybill carries the dangerous-
+  goods indication per IATA DGR §8.1.6.4 and the
+  shipper's declaration accompanies the shipment.
+- Loading per IATA DGR §9.3 — segregation rules,
+  passenger-aircraft prohibitions, hidden-dangerous-
+  goods awareness training.
+- ICAO Doc 9481 emergency response procedures
+  carried on the aircraft.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "air-cargo"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 IATA TACT Acceptance Discipline
 
-## §3 Conformance Tiers
+The TACT acceptance discipline:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- Conditions of carriage per IATA Resolution 600
+  a / b — the air-waybill incorporates the
+  conditions by reference.
+- Rate application per IATA TACT Rate Manual.
+- Acceptance criteria — packaging, marking,
+  labelling, documentation completeness, security
+  status.
+- Refusal of carriage criteria — dangerous-goods
+  prohibited on the routing, prohibited articles,
+  embargoed destinations, missing documentation.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 IATA e-AWB Discipline (Resolution 672)
 
-## §4 Discovery
+The e-AWB discipline:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/air-cargo`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- The Multilateral e-AWB Agreement signatories
+  (the freight forwarder, the airline, and the
+  ground-handling agent) operate without a paper
+  air waybill on enabled trade lanes.
+- The e-AWB digital signature is verifiable per
+  IATA Resolution 672 Annex.
+- The e-AWB record's canonical digest is preserved
+  for tamper detection.
 
-## §5 Time and Identity
+## §4 Regulated-Agent / Known-Consignor Security
+       Discipline
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The security discipline aligns with the operating
+jurisdiction's regime:
 
-## §6 Versioning and Deprecation
+- ICAO Annex 17 baseline — every consignment loaded
+  onto a passenger or all-cargo aircraft is subject
+  to security screening.
+- EU Reg (EU) 2015/1998 — regulated agent (RA),
+  known consignor (KC), account consignor (AC),
+  and the RA3 / KC3 third-country regime.
+- US TSA — Indirect Air Carrier (IAC) under 49 CFR
+  1548; Certified Cargo Screening Program (CCSP)
+  under 49 CFR 1549; Air Carrier under 49 CFR
+  1544 / 1546.
+- KR 항공보안법 — 화물 보안 검색 + 화주 보안
+  관리 + 알려진 화주 등록 + 알려진 운송사 등록.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The supply-chain security discipline maintains the
+unbroken chain of custody from KC to RA to airline
+cargo terminal to aircraft.
 
-## §7 Privacy and Security
+## §5 WCO SAFE Framework + AEO Discipline
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The WCO SAFE Framework discipline:
 
-## §8 Open Governance
+- Pillar 1 — Customs-to-Customs information sharing.
+- Pillar 2 — Customs-to-Business AEO partnership.
+- Pillar 3 — Customs-to-Other-Government-Agencies
+  cooperation.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `air-cargo` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The Authorised Economic Operator status (AEO under
+EU UCC Art 38; C-TPAT in US; KR 종합인증우수업체)
+is the operating jurisdiction's certification of
+the operator's secure-and-compliant supply-chain
+management. AEO benefits include reduced data-set
+requirements, priority treatment, and mutual-
+recognition with partner-country AEO programmes.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §6 EU ICS2 PLACI Discipline
 
+The EU ICS2 (Import Control System 2) Pre-Loading
+Advance Cargo Information discipline:
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+- Pre-Loading data submission for express courier
+  shipments (Release 1) and air-cargo (Release 2).
+- Risk analysis at the EU border-customs level.
+- High-risk shipments may receive a "do-not-load"
+  decision before departure.
+- Authorised Filer designation for shippers,
+  forwarders, and carriers.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## §7 US ACAS Discipline
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The US Air Cargo Advance Screening (ACAS) discipline
+under 19 CFR 122.49b:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+- Pre-loading data filing for shipments destined
+  to or transiting the US.
+- Risk-based targeting at the CBP National Targeting
+  Center.
+- The "do-not-load" message is delivered to the
+  carrier within the screening timeframe.
+- Acceptable Filer Identification — US-bound
+  freight-forwarder or carrier identifier.
 
-## Annex F — Adoption Roadmap
+## §8 IATA Cargo iQ Discipline (Resolution 674)
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+The Cargo iQ master-operating-plan (MOP v6)
+discipline:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+- The shipment record key (SRK) ties together the
+  multi-leg journey at the master AWB level.
+- Per-leg milestone events publish actual times
+  against the planned schedule.
+- Performance measurement at the operator and
+  airline levels feeds the IATA Cargo iQ
+  membership performance benchmarking.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §9 Specialised-Cargo Discipline
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The specialised-cargo discipline:
 
-## Annex G — Test Vectors and Conformance Evidence
+- IATA CEIV Pharma — pharmaceutical cargo handling
+  per IATA TCR + GDP; temperature-controlled chain
+  attestation.
+- IATA CEIV Lithium — lithium-battery shipping
+  per the IATA Lithium Battery Shipping Guidelines.
+- IATA CEIV Live Animals — live-animal shipping
+  per the IATA Live Animals Regulations (LAR).
+- IATA CEIV Fresh — perishable-cargo handling per
+  IATA PCR.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §10 Post-Flight Reconciliation Discipline
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The post-flight reconciliation discipline:
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+- Manifest-to-load reconciliation — the loaded
+  cargo against the manifest is verified at
+  arrival.
+- Discrepancy reporting (FNA notification of
+  arrival, FBL booking-list adjustments,
+  documentary discrepancies) feeds the operator's
+  quality-management process.
+- Damage / loss / pilferage reports trigger the
+  operator's claim workflow under IATA TACT
+  conditions of carriage.
 
-## Annex H — Versioning and Deprecation Policy
+## §11 Identity, Time, and Audit Discipline
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+NTPv4 stratum-2 or better is the operator's clock
+baseline. Audit-events are emitted for every
+acceptance, screening, customs-filing, milestone,
+DG declaration, and post-flight reconciliation
+event.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §12 Lithium-Battery Shipping Discipline
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+The IATA Lithium Battery Shipping Guidelines (LBSG)
++ IATA DGR Section II discipline:
 
-## Annex I — Interoperability Profiles
+- Battery type identification — UN3480 (lithium-
+  ion shipped alone), UN3481 (lithium-ion contained
+  in or packed with equipment), UN3090 (lithium-
+  metal shipped alone), UN3091 (lithium-metal
+  contained in or packed with equipment).
+- State-of-charge limit — UN3480 lithium-ion at
+  not more than 30% SoC for shipment by air.
+- Section II shipper's exemptions for small
+  cells/batteries, with weight and quantity
+  thresholds and the Section II Lithium Battery
+  Mark (CAO/PI requirements).
+- Damaged / defective / recalled lithium battery
+  prohibition for transport unless under specific
+  approval.
+- Operator variations (the airline's
+  acceptance-policy specifically deviating from
+  IATA DGR baseline) recorded against the routing.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §13 Damage / Loss / Pilferage and Liability
+        Discipline
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+The Montreal Convention 1999 (MC99) and Warsaw
+Convention 1929 liability discipline:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- Carrier liability for cargo per MC99 Article 18 —
+  17 SDR per kg unless special declaration of
+  value made.
+- Special declaration of value (SDV) carries
+  additional charges and increases the liability
+  ceiling.
+- Notice-of-claim timeline — apparent damage at
+  delivery; non-apparent damage within 14 days;
+  delay within 21 days; loss declared within 21
+  days of expected delivery.
+- Documentation requirements — air-waybill
+  remarks, irregularity reports, damage assessment
+  by airline or its handler.
 
-## Annex J — Reference Implementation Topology
+## §14 ULD Management Discipline
 
-The reference implementation topology described in this annex is
-non-normative; it documents the deployment shape that the WIA
-Standards working group used to validate the test vectors in Annex G
-and is intended as a starting point, not a recommendation against
-alternative topologies.
+The Unit Load Device (ULD) management discipline:
 
-- **Single-tenant edge** — one runtime per organization, no shared
-  state. Used for early-pilot deployments where conformance evidence
-  is published manually. Sufficient for PHASE-3-PROTOCOL validation when the
-  organization signs the manifest itself.
-- **Multi-tenant gateway** — one shared runtime serves multiple
-  tenants via header-based isolation. Typically backed by a
-  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
-  identity provider. The manifest is per-tenant; the runtime
-  publishes a federation manifest that aggregates tenant manifests.
-- **Federated mesh** — multiple runtimes peer to one another and
-  publish their manifests to a directory service. Each peer signs
-  its own manifest; the directory service signs the aggregated
-  index. This is the topology used by cross-organization deployments
-  that need to compose conformance.
-- **Air-gapped batch** — no network connection between the runtime
-  and the directory service. The runtime emits a signed evidence
-  package on each batch and the operator transports the package via
-  out-of-band channels. This is the topology used by regulators that
-  prohibit live connectivity from sensitive environments.
+- IATA ULD Care Code (ULDCC) compliance for ULD
+  build-up, handling, and storage.
+- IATA ULD Regulations (ULDR) document compliance
+  for the operator handling ULDs across multiple
+  airlines.
+- ULD damage assessment and repair authorisation
+  per the airline's published damage-limit policy.
+- ULD inventory reconciliation and CASS-based
+  cross-airline settlement under IATA Resolution
+  830d.
 
-Implementations declare their topology in the manifest (see Annex I).
-A topology change MUST be reflected in a new manifest signature; the
-prior topology's manifest remains valid for the deprecation window
-described in Annex H to preserve audit traceability.
+## §15 Customs Bonded-Warehouse and Free-Trade-Zone
+        Discipline
+
+For operators with bonded-warehouse / FTZ
+operations:
+
+- US 19 CFR Part 19 (customs warehouses) + Part
+  146 (foreign trade zones).
+- EU UCC Articles 240-242 (customs warehousing)
+  + 243-249 (free zones).
+- KR 관세법 + 외국인투자촉진법 (free economic
+  zones).
+- Per-jurisdiction inventory-control software and
+  bond-discharge procedures.
+
+## §16 Documentary-Compliance Discipline
+
+The documentary-compliance discipline:
+
+- Air-waybill consistency check across master /
+  house levels.
+- Commercial-invoice + packing-list + certificate-
+  of-origin alignment for customs filing.
+- Specific-license / export-license verification
+  for export-controlled commodities (US EAR / ITAR;
+  EU Dual-Use Reg 2021/821; KR 대외무역법 + 전략
+  물자관리원).
+- Sanctions-screening integration with US OFAC SDN
+  + EU Consolidated List + UN Security Council
+  Sanctions Committee + KR 외교부 제재대상자 목록.
+
+## §17 Conformance
+
+Implementations claiming PHASE-3 conformance enforce
+the discipline at every relevant decision point,
+satisfy the IATA DGR + ICAO Annex 18 baseline,
+exercise the regulated-agent / known-consignor
+discipline per the operating jurisdiction's regime,
+satisfy the WCO SAFE Framework + AEO discipline,
+exercise the EU ICS2 / US ACAS pre-loading
+discipline, and exercise the specialised-cargo
+disciplines where the operator handles such cargo.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-air-cargo
+- **Last Updated:** 2026-04-28

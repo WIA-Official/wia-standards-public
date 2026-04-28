@@ -5,237 +5,462 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-blockchain-intro (Blockchain Intro).
+This document defines the canonical data-format
+layer for WIA-blockchain-intro. The standard covers
+persistent record shapes for the lifecycle of a
+blockchain / distributed-ledger-technology (DLT)
+introduction or learning programme — the DLT
+platform identification record; the consensus-and-
+governance record; the cryptographic-primitive
+record; the W3C VC / DID identity-and-credential
+record; the smart-contract definition and audit
+record; the wallet and key-management record; the
+chain-of-custody record for tokens, assets, and
+digital twins; the regulatory-classification record
+(EU MiCA + the operating jurisdiction's virtual-
+asset law); the privacy-and-data-protection record;
+and the supervisory-and-curriculum correspondence
+record. WIA-blockchain-intro is targeted at the
+introduction / on-ramp / educational phase — it
+provides the reference data shape suitable for a
+learning-platform or pilot deployment, while the
+deeper trade and exchange disciplines remain in
+specialised standards. Records are consumed by the
+learning-platform operator, the developer / student
+audience, the operator's compliance-and-risk function,
+the supervisory authority for the operating
+jurisdiction (US SEC + CFTC + FinCEN + state
+regulators; EU EBA + ESMA + Member-State NCAs; KR
+FSC + FSS + MOEF + KISA), and external auditors.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID) and IETF RFC 4122 (UUID URN)
+- ISO/IEC 27001:2022 (information security management)
+- IETF RFC 8259 (JSON), RFC 9457 (Problem Details)
+- ISO/TC 307 (Blockchain and distributed ledger
+  technologies) deliverables — ISO 22739:2024
+  (Vocabulary), ISO 23257:2022 (Reference
+  architecture), ISO 23455:2019 (Overview of and
+  interactions between smart contracts in
+  blockchain and distributed ledger technology
+  systems), ISO/TS 23635 (Guidelines for governance),
+  ISO/TR 23244 (Privacy and personally identifiable
+  information protection considerations), ISO/TR
+  23576 (Security of digital asset custodians),
+  ISO/TS 23258 (Taxonomy and ontology), ISO/TR
+  3242 (Use cases — interoperability)
+- ITU-T FG DLT — Focus Group on Application of
+  Distributed Ledger Technology deliverables
+  (TR-DLT-Reqs, TR-DLT-Plat, TR-DLT-Reg-Frmwk,
+  TR-DLT-Use-Cases)
+- W3C Verifiable Credentials Data Model 2.0
+- W3C Decentralized Identifiers (DIDs) v1.0
+- W3C Linked Data Proofs + Data Integrity 1.0
+- W3C VC JSON Schema 2023 + VC Status List 2021 +
+  VC Bitstring Status List + VC Revocation List
+  2020
+- IETF RFC 9381 (Verifiable Random Function, VRF)
+- IETF RFC 7515 / 7516 / 7517 / 7519 / 7638 / 9162
+  (JOSE / JWT / JWK / Certificate Transparency)
+- IETF RFC 8949 (CBOR), RFC 8152 (COSE)
+- NIST IR 8202 (Blockchain Technology Overview)
+- NIST IR 8301 (Blockchain Networks: Token Design
+  and Management Overview)
+- NIST FIPS 186-5 (Digital Signature Standard
+  including ECDSA + EdDSA)
+- NIST FIPS 203 / 204 / 205 (Module-Lattice-Based
+  Key-Encapsulation, Module-Lattice-Based Digital
+  Signature, Stateless Hash-Based Digital Signature
+  — post-quantum cryptography)
+- Ethereum ERC standards reference set (ERC-20
+  fungible token, ERC-721 non-fungible token,
+  ERC-1155 multi-token, ERC-4626 tokenized vault,
+  ERC-1271 smart-contract signature validation,
+  ERC-2771 meta-transactions, ERC-4337 account
+  abstraction)
+- EIP standards reference set (EIP-155 chain-id,
+  EIP-712 typed-data signing, EIP-1559 fee market,
+  EIP-2930 access lists, EIP-4844 blob transactions
+  proto-danksharding)
+- EU MiCA (Regulation (EU) 2023/1114) for crypto-
+  asset operators + Reg (EU) 2024/859 (DLT Pilot
+  Regime amendment)
+- EU Reg (EU) 1153/2024 (anti-money-laundering
+  package extension to crypto-asset service
+  providers)
+- US SEC No-Action Letter and Investor Bulletin
+  references for digital-asset securities; SEC
+  Framework for "Investment Contract" Analysis of
+  Digital Assets (April 2019)
+- US CFTC oversight of virtual-currency derivatives
+  + Bitcoin and Ether classified as commodities
+- US FinCEN BSA + 31 CFR 1010.100(ff)(5) money
+  services business
+- KR 가상자산 이용자 보호 등에 관한 법률 (the
+  KR Virtual Asset User Protection Act, in force
+  2024-07-19) + KR 특정금융정보법 + KR 자본시장법
+  + KR FSS 가상자산 거래소 검사 + KR FIU
+- ISO 17442 LEI for institutional identifiers
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-blockchain-intro
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the
+artefacts a blockchain-intro operator (a learning-
+platform operator, a pilot-deployment operator, a
+service-provider exposing introductory blockchain
+features, an educational institution providing
+blockchain coursework) maintains:
 
-## §2 Manifest
+- The DLT platform identification record.
+- The consensus-and-governance record.
+- The cryptographic-primitive record.
+- The W3C VC / DID identity record.
+- The smart-contract definition and audit record.
+- The wallet and key-management record.
+- The token / asset / digital-twin chain-of-custody
+  record.
+- The regulatory-classification record.
+- The privacy-and-data-protection record.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "blockchain-intro"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Programme Identifier
 
-## §3 Conformance Tiers
+```
+programmeId          : string (uuidv7)
+operatorName         : string (legal name)
+operatorRole         : enum ("learning-platform" |
+                       "pilot-deployment" |
+                       "intro-service-provider" |
+                       "educational-institution" |
+                       "research-consortium" |
+                       "user-defined")
+operatorJurisdiction : array of string (ISO 3166-1)
+operatorLei          : string (ISO 17442)
+governingFrameworks  : array of enum ("ISO-22739-
+                       2024" | "ISO-23257-2022" |
+                       "ISO-23455-2019" |
+                       "ISO-TS-23635" |
+                       "ISO-TR-23244" |
+                       "ISO-TR-23576" |
+                       "ITU-T-FG-DLT" |
+                       "W3C-VC-2-0" | "W3C-DID-1-0"
+                       | "RFC-9381-VRF" |
+                       "RFC-7515-7516-7517-7519-
+                       JOSE-JWT" | "RFC-9162-CT" |
+                       "NIST-IR-8202" |
+                       "NIST-IR-8301" |
+                       "NIST-FIPS-186-5" |
+                       "NIST-FIPS-203-204-205-PQ" |
+                       "ERC-20-721-1155-4626-1271-
+                       2771-4337" |
+                       "EIP-155-712-1559-2930-4844"
+                       | "EU-MICA-2023-1114" |
+                       "EU-MICA-PILOT-2024-859" |
+                       "EU-AMLR-2024-1153" |
+                       "US-SEC-DIGITAL-ASSET-FRMWK
+                       -2019" |
+                       "US-CFTC-VIRTUAL-CURRENCY" |
+                       "US-FINCEN-31-CFR-1010-MSB"
+                       | "KR-가상자산이용자보호법" |
+                       "KR-특정금융정보법" |
+                       "user-defined")
+introductionPurpose  : enum ("educational-only" |
+                       "pilot-with-permissioned-
+                       network" | "intro-service-
+                       with-test-tokens" |
+                       "intro-service-with-real-
+                       value-tokens" |
+                       "research-prototype" |
+                       "user-defined")
+programmeStatus      : enum ("design" | "operating"
+                       | "limited-rollout" |
+                       "wind-down" | "archived")
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 DLT Platform Identification Record
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+dltPlatform:
+  platformId         : string (uuidv7)
+  platformName       : string
+  platformKind       : enum ("public-permissionless
+                       -bitcoin" | "public-
+                       permissionless-ethereum" |
+                       "public-permissionless-
+                       polkadot" | "public-
+                       permissionless-cosmos" |
+                       "permissioned-hyperledger-
+                       fabric" | "permissioned-
+                       hyperledger-besu" |
+                       "permissioned-corda" |
+                       "permissioned-quorum" |
+                       "consortium-other" |
+                       "private-test-only" |
+                       "user-defined")
+  networkChainId     : string (the chain identifier
+                       per EIP-155 for EVM-class
+                       networks; the equivalent
+                       per-platform identifier
+                       elsewhere)
+  blockTimeAverage   : object (target average
+                       block-time; ms)
+  finality           : enum ("probabilistic-bitcoin"
+                       | "probabilistic-ethereum-
+                       pre-merge" | "casper-ffg-
+                       finality-ethereum-post-merge"
+                       | "byzantine-fault-tolerant
+                       -bft" | "instant-finality" |
+                       "user-defined")
+```
 
-## §4 Discovery
+## §4 Consensus-and-Governance Record
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/blockchain-intro`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+consensusRecord:
+  consensusKind      : enum ("proof-of-work" |
+                       "proof-of-stake" | "delegated
+                       -proof-of-stake" |
+                       "proof-of-authority" |
+                       "practical-byzantine-fault-
+                       tolerant-pbft" |
+                       "raft" | "tendermint-bft" |
+                       "casper-ffg" | "user-defined")
+  validatorSetSize   : integer (the cardinality of
+                       the validator / miner set;
+                       absent for fully-permissionless
+                       networks)
+  byzantineFaultThreshold : object (the BFT
+                       threshold — typically 1/3 for
+                       BFT-class consensus)
 
-## §5 Time and Identity
+governanceRecord:
+  governanceModel    : enum ("on-chain-token-
+                       weighted-voting" |
+                       "off-chain-improvement-
+                       proposal" | "consortium-
+                       multisig" | "foundation-
+                       managed" | "decentralized-
+                       autonomous-organization-dao"
+                       | "hybrid" | "user-defined")
+  upgradeMechanism   : enum ("hard-fork" | "soft-
+                       fork" | "smart-contract-
+                       upgrade-pattern" |
+                       "proxy-upgrade-eip-1822-1967"
+                       | "user-defined")
+  improvementProposalRegistryRef : string (URI of
+                       the EIP / BIP / cosmos-IP /
+                       per-network improvement-
+                       proposal registry)
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 Cryptographic-Primitive Record
 
-## §6 Versioning and Deprecation
+```
+cryptoPrimitives:
+  recordId           : string (uuidv7)
+  hashAlgorithms     : array of enum ("sha-256" |
+                       "sha-3-256" | "keccak-256" |
+                       "blake2b" | "blake3" |
+                       "user-defined")
+  signatureAlgorithms : array of enum ("ecdsa-secp
+                       -256k1" | "ecdsa-p-256" |
+                       "ed25519" | "bls12-381" |
+                       "schnorr-bip-340" |
+                       "fips-186-5-eddsa" |
+                       "ml-dsa-fips-204-pq" |
+                       "user-defined")
+  zkProofSystems     : array of enum ("groth16" |
+                       "plonk" | "halo2" | "stark"
+                       | "bulletproofs" |
+                       "marlin" | "user-defined")
+                       (zero-knowledge proof
+                       systems used by the
+                       network's privacy / scaling
+                       layers)
+  pqMigrationStatus  : enum ("not-pq-aware" |
+                       "pq-readiness-evaluated" |
+                       "pq-co-deployed" |
+                       "pq-only" | "user-defined")
+                       (post-quantum migration
+                       posture per NIST FIPS 203 /
+                       204 / 205)
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 W3C VC / DID Identity Record
 
-## §7 Privacy and Security
+```
+identityRecord:
+  identityId         : string (uuidv7)
+  didMethod          : enum ("did-web" | "did-key"
+                       | "did-jwk" | "did-ion" |
+                       "did-pkh" | "did-cheqd" |
+                       "user-defined")
+  did                : string (the W3C DID URI per
+                       RFC 3986)
+  didDocumentRef     : string (URI of the DID
+                       document conformant to W3C
+                       DID Core 1.0)
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+verifiableCredential:
+  vcId               : string (uuidv7)
+  issuerDid          : string
+  subjectDid         : string
+  credentialType     : array of string (W3C VC type
+                       URIs)
+  proofKind          : enum ("data-integrity-proof
+                       -2023" | "ed25519-signature
+                       -2020" | "bbs-signature-2023"
+                       | "json-web-signature-2020"
+                       | "ecdsa-secp256k1-signature
+                       -2019" | "user-defined")
+  validityWindow     : object (issuance / expiration
+                       per ISO 8601)
+  statusListRef      : string (URI of the W3C VC
+                       Bitstring Status List entry
+                       for revocation)
+```
 
-## §8 Open Governance
+## §7 Smart-Contract Definition and Audit Record
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `blockchain-intro` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+smartContract:
+  contractId         : string (uuidv7)
+  platformRef        : string (PHASE-1 §3)
+  contractAddress    : string (the on-chain contract
+                       address)
+  bytecodeDigest     : string (cryptographic digest
+                       of the deployed bytecode)
+  sourceLanguage     : enum ("solidity" | "vyper" |
+                       "ink-rust" | "rust-cosmwasm"
+                       | "move-aptos" | "move-sui"
+                       | "go-fabric-chaincode" |
+                       "kotlin-corda-flow" |
+                       "user-defined")
+  sourceVersion      : string (the language /
+                       compiler version)
+  ercStandardsImplemented : array of enum ("erc-20"
+                       | "erc-721" | "erc-1155" |
+                       "erc-4626" | "erc-1271" |
+                       "erc-2771-meta-tx" |
+                       "erc-4337-aa" | "user-defined")
+  formallyVerified   : boolean
+  formalSpecRef      : string (URI of the formal
+                       specification — Hoare logic,
+                       K-framework, Dafny, Coq;
+                       absent if not formally
+                       verified)
+  auditReportRefs    : array of string (URIs of the
+                       independent security-audit
+                       reports)
+  upgradePattern     : enum ("non-upgradeable" |
+                       "transparent-proxy-eip-1967"
+                       | "uups-eip-1822" |
+                       "diamond-eip-2535" |
+                       "user-defined")
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §8 Wallet and Key-Management Record
 
+```
+walletRecord:
+  walletId           : string (uuidv7)
+  walletKind         : enum ("custodial-exchange-
+                       hosted" | "custodial-platform
+                       -hosted" | "non-custodial-
+                       hot-software" | "non-
+                       custodial-hardware-secure-
+                       element" | "non-custodial-
+                       multi-party-computation-mpc"
+                       | "smart-contract-wallet-
+                       erc-4337" | "multisig" |
+                       "user-defined")
+  keyDerivationPath  : string (BIP-32 / BIP-44
+                       derivation path; absent for
+                       contract wallets)
+  hsmReference       : string (the HSM identifier
+                       under FIPS 140-3 for
+                       institutional custody)
+  insurancePolicyRef : string (URI of the wallet's
+                       insurance policy; absent for
+                       non-custodial)
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+## §9 Token / Asset Chain-of-Custody Record
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```
+custodyEvent:
+  eventId            : string (uuidv7)
+  tokenAddress       : string (the on-chain token
+                       contract)
+  tokenStandard      : enum ("erc-20" | "erc-721" |
+                       "erc-1155" | "fungible-other"
+                       | "non-fungible-other" |
+                       "user-defined")
+  fromAddress        : string
+  toAddress          : string
+  amount             : object (UoM-quantified —
+                       fungible quantity or NFT
+                       tokenId)
+  txHash             : string
+  blockNumber        : integer
+  blockTimestamp     : string (ISO 8601)
+  custodyKind        : enum ("user-to-user" |
+                       "user-to-contract" |
+                       "contract-to-user" |
+                       "contract-to-contract" |
+                       "issuance-mint" | "burn" |
+                       "user-defined")
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §10 Regulatory-Classification Record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+regulatoryClassification:
+  classificationId   : string (uuidv7)
+  tokenAddressOrName : string
+  classificationKind : enum ("eu-mica-asset-
+                       referenced-token-art" |
+                       "eu-mica-e-money-token-emt"
+                       | "eu-mica-other-crypto-
+                       asset" | "us-sec-investment
+                       -contract-howey-test" |
+                       "us-cftc-commodity" |
+                       "us-fincen-cvc-msb" |
+                       "kr-가상자산-가상자산이용자
+                       보호법" | "kr-증권성-자본
+                       시장법" | "user-defined")
+  regulatoryAuthority : string (the operating
+                       authority — EBA / ESMA /
+                       Member-State NCA for EU; SEC
+                       / CFTC / FinCEN for US; FSC
+                       / FSS for KR)
+  decisionRef        : string (URI of the regulator's
+                       decision document or the
+                       operator's published legal
+                       analysis)
+```
 
-## Annex F — Adoption Roadmap
+## §11 Conformance
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Implementations claiming PHASE-1 conformance maintain
+the records defined above for the operator's
+introductory blockchain programme, satisfy the
+operating jurisdiction's regulatory-classification
+discipline, and preserve the records under the
+applicable retention horizon (US SEC 17a-4 where
+the operator is a regulated entity; EU MiCA Art 70
+records-and-record-keeping; KR 가상자산이용자보호법
+보존 의무).
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+---
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+**Document Information:**
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-blockchain-intro
+- **Last Updated:** 2026-04-28

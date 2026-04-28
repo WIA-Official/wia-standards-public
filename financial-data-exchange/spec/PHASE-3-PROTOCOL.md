@@ -5,237 +5,297 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-financial-data-exchange (Financial Data Exchange).
+This document defines the protocols that govern a
+financial-data-exchange operator: the ISO 20022
+message-discipline (per business-area implementation
+guidelines + the SWIFT MT-to-ISO-20022 industry
+coexistence cutover); the FIX 5.0 SP2 trading
+discipline; the Strong Customer Authentication and
+exemption discipline (PSD2 RTS Articles 4-18); the
+Open Banking discipline (PSD2 + Open Banking UK +
+FDX + KR 마이데이터 + US §1033); the consent-
+withdrawal and customer-rights discipline; the
+sanctions-screening + AML discipline; the
+operational-resilience discipline (DORA + FFIEC IT
+Exam + KR 전자금융감독규정); the supervisory and
+oversight cooperation discipline.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015, ISO/IEC 27001:2022, ISO 22301:2019
+  BCMS
+- ISO 20022 + 9362 + 13616 + 17442 + 6166 + 10962
+  + 11649 + 10383 + 18774
+- FIX 5.0 SP2 + FIX FAST + FIXatdl + FIX Orchestra
+- SWIFT MT + MX + GPI + CSP/CSCF
+- IETF RFC 5905 (NTPv4), RFC 9421 (HTTP Message
+  Signatures), RFC 9457 (Problem Details), RFC
+  6749 (OAuth 2.0), RFC 8252, RFC 9126, RFC 9396,
+  RFC 9449
+- OpenID FAPI 2.0 Security Profile + Message
+  Signing + CIBA Profile
+- EU PSD2 (Directive (EU) 2015/2366) + Commission
+  Delegated Reg (EU) 2018/389 RTS-SCA Articles
+  1-36
+- EU PSD3 proposal + EU PSR proposal
+- EU FIDA proposal
+- EU EBA RTS on SCA + RTS v2 + EBA Final Guidelines
+  on outsourcing + EBA Final Report on incident
+  reporting under PSD2
+- UK OBIE Read/Write API specifications + UK Open
+  Finance LTRF (Long-Term Regulatory Framework)
+- US CFPB §1033 final rule + 12 CFR Part 1033 (2024)
+- US FFIEC IT Examination Handbook
+- US Reg E (12 CFR Part 1005) + Reg DD (12 CFR
+  Part 1030)
+- US OFAC SDN + EU Consolidated List + UN Security
+  Council sanctions
+- FATF Recommendations 10 / 11 / 13 / 16 / 20 / 21
+  + Travel Rule
+- EU DORA (Reg (EU) 2022/2554) ICT-third-party
+  risk + incident reporting + threat-led
+  penetration testing
+- KR 신용정보의 이용 및 보호에 관한 법률 + KR 마이
+  데이터 표준 API + KR 전자금융거래법 + KR 전자금융
+  감독규정 + KR 금융보안원 (FSI) 가이드 + KR 자금
+  세탁방지(특정금융정보법)
 
 ---
 
-## §1 Scope
+## §1 ISO 20022 Message-Discipline
 
-This PHASE document is one of four that together define the WIA-financial-data-exchange
-standard. It addresses the protocol layer of the standard.
+The ISO 20022 message-discipline:
 
-## §2 Manifest
+- Per-business-area implementation guidelines (CGI-MP
+  Common Global Implementation Market Practice for
+  pacs / pain / camt; SMPG Securities Market
+  Practice Group for setr / semt / seev; ISITC for
+  US securities-services).
+- Message-version pinning per the operator's bilateral
+  CT-and-MT migration timeline.
+- Canonical-ISO-20022 schema validation at the
+  inbound gateway.
+- The SWIFT MT-to-ISO-20022 industry coexistence
+  cutover programme observed for cross-border
+  payments (the operator publishes its outbound
+  pacs.008 / pacs.009 cutover date and the inbound
+  translation shim).
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "financial-data-exchange"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 FIX 5.0 SP2 Trading Discipline
 
-## §3 Conformance Tiers
+The FIX trading discipline:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- Session-level resilience — re-connection, sequence-
+  number recovery, possible-resend processing.
+- Application-level message integrity via FIX
+  Orchestra-defined rules and the venue's
+  conformance certification.
+- Pre-trade risk controls per WIA-automated-trading
+  cross-reference.
+- Post-trade reporting cadence per the venue's
+  publication-rules.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Strong-Customer-Authentication and Exemption
+       Discipline
 
-## §4 Discovery
+The PSD2 SCA discipline (RTS Articles 4-18):
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/financial-data-exchange`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- Article 4 — SCA elements (knowledge / possession
+  / inherence) — at least two independent factors.
+- Article 5 — dynamic-linking for payment-SCA: the
+  authentication code is uniquely linked to the
+  payment amount and the payee.
+- Articles 10-12 — confidentiality and integrity of
+  the user's personalised security credentials.
+- Article 13 — trusted beneficiaries exemption.
+- Article 14 — recurring-transaction exemption.
+- Article 16 — low-value-payment exemption (under
+  EUR 30 with cumulative caps).
+- Article 17 — corporate-payment exemption.
+- Article 18 — transaction-risk-analysis (TRA)
+  exemption — per-PSP fraud-rate-banded.
 
-## §5 Time and Identity
+For US §1033 the equivalent is OAuth 2.0 + FAPI
+2.0 Security Profile baseline; KR 마이데이터 also
+applies FAPI-aligned authentication.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Open-Banking Discipline
 
-## §6 Versioning and Deprecation
+The open-banking discipline aligned across regimes:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+- EU PSD2 — AISP / PISP / CBPII registered with
+  the home-Member-State NCA + EBA register.
+- UK OBIE — the Open Banking Implementation Entity
+  Read/Write API specification + the OBIE
+  Conformance Tool.
+- US §1033 (CFPB final rule 2024) — Authorized
+  Data Provider obligations + Standard Setting
+  Body recognition + permissioned data access via
+  the FDX standard.
+- KR 마이데이터 — 본인신용정보관리업 license +
+  표준 API + 전송요구권.
+- FDX (Financial Data Exchange) — US-led API
+  v6.0 + Common Standard.
 
-## §7 Privacy and Security
+The operator's consent-and-token discipline retains
+PSD2 RTS Article 10 180-day cap unless renewed via
+SCA; US §1033 has its own 12-month re-authorisation
+cadence.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Consent-Withdrawal and Customer-Rights
+       Discipline
 
-## §8 Open Governance
+PSD2 Article 64 customer right to withdraw consent;
+US §1033 right to revoke; KR 마이데이터 전송요구권
+withdrawal; FDX recipient-driven consent.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `financial-data-exchange` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The operator's discipline:
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+- Withdrawal channel as easy as the capture channel.
+- Immediate effect on token / API access.
+- No fee for withdrawal.
+- Audit-log of withdrawal preserved for the
+  retention horizon.
 
+## §6 Sanctions-Screening and AML Discipline
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Cross-domain reference to WIA-cross-border-payment
++ WIA-anti-money-laundering disciplines:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+- Originator and beneficiary screening at message
+  acceptance.
+- OFAC SDN + non-SDN + 50% rule (US-jurisdiction).
+- EU Consolidated List + UK HMT (UK-jurisdiction).
+- KR 외교부 제재 + KoFIU (KR-jurisdiction).
+- UN Security Council Sanctions List.
+- FATF Recommendation 16 Travel Rule for cross-
+  border wire transfers.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §7 Operational-Resilience Discipline
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The operational-resilience discipline:
 
-## Annex F — Adoption Roadmap
+- EU DORA (Reg (EU) 2022/2554) — for EU-regulated
+  financial entities the ICT-third-party-risk-
+  management, incident-reporting, threat-led
+  penetration testing (TIBER-EU), and resilience-
+  testing programme.
+- US FFIEC IT Examination Handbook — for US-
+  regulated banks, credit unions, and savings
+  associations the operational-resilience
+  expectations.
+- ISO 22301:2019 BCMS — the operator's business-
+  continuity-management system.
+- KR 전자금융감독규정 + KR 금융보안원 가이드 — KR-
+  jurisdiction operational-resilience.
+- SWIFT Customer Security Programme (CSP) +
+  Customer Security Controls Framework (CSCF)
+  annual self-attestation + (where elected)
+  independent assessment.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §8 Identity, Time, and Audit Discipline
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+NTPv4 stratum-2 or better is the operator's clock
+baseline. UTC traceability per MiFID II RTS 25
+applies for the trading-execution surface (cross-
+domain reference to WIA-automated-trading).
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Audit-events emitted for every message, payment,
+SCA, consent, trade, and supervisory correspondence.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §9 Customer-Information-Security Discipline
 
-## Annex G — Test Vectors and Conformance Evidence
+The customer-information-security discipline:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+- ISO/IEC 27001:2022 ISMS baseline.
+- ISO/IEC 27018:2019 PII in public clouds.
+- ISO/IEC 27701:2019 PIMS.
+- PCI DSS v4 for card-data scope.
+- KR 금융보안원 (FSI) 가이드 + 전자금융감독규정.
+- US Gramm-Leach-Bliley Act + Reg P (12 CFR Part
+  1016) Privacy of Consumer Financial Information.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §10 Settlement-Finality and Liquidity Discipline
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+Cross-domain reference to WIA-cross-border-payment
++ WIA-automated-trading:
 
-## Annex H — Versioning and Deprecation Policy
+- Settlement finality on TARGET2 / CHIPS / Fedwire
+  / BOK-Wire+ per the system's posted finality
+  rules (TARGET2 + Settlement Finality Directive
+  98/26/EC; CHIPS Rules; Fedwire Operating Circular
+  6).
+- T+1 securities settlement for US-jurisdiction
+  (post-2024-05 transition); EU CSDR T+2 with
+  T+1 in scope under the EU SP4T1 Action Plan.
+- Liquidity-risk discipline per CPMI PFMI Principle
+  7 + Basel III LCR / NSFR.
+- Intraday liquidity management per BCBS 248
+  monitoring tools.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 Operational-Risk and Cyber-Resilience
+        Discipline
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+The operational-risk and cyber-resilience discipline:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+- Basel III + Basel IV operational-risk capital
+  framework.
+- DORA Articles 5-23 ICT-risk-management framework
+  (where EU-jurisdiction).
+- DORA Article 24-27 advanced-resilience-testing
+  programme + threat-led penetration testing per
+  TIBER-EU.
+- DORA Articles 28-30 ICT-third-party-risk-
+  management.
+- US Reg SCI for SCI-entities + FFIEC IT Exam.
+- KR 전자금융감독규정 + 금융보안원 가이드.
+- ISO/IEC 27031 ICT-readiness for business
+  continuity.
 
-## Annex I — Interoperability Profiles
+## §12 Card-Networks-and-Tokenisation Discipline
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+For card-issuing and acquiring operators:
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+- PCI DSS v4 compliance for card-data scope.
+- EMVCo Tokenisation Specification for network
+  tokenisation.
+- 3-D Secure 2.x (EMVCo) for cardholder
+  authentication aligned with PSD2 SCA.
+- Card-network rule books (Visa Core Rules /
+  Mastercard Rules) for chargeback and dispute
+  processing.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §13 Reference-Data Distribution Discipline
+
+For reference-data operators:
+
+- ISIN allocation per ISO 6166 by the National
+  Numbering Agency.
+- LEI issuance per ISO 17442:2020 by the GLEIF-
+  accredited Local Operating Unit.
+- BIC issuance by SWIFT under ISO 9362.
+- ISO 10962 CFI per the issuing CSD.
+- Reference-data subscription distribution via
+  ISO 20022 reda messages.
+
+## §14 Conformance
+
+Implementations claiming PHASE-3 conformance enforce
+the discipline at every relevant decision point,
+satisfy the ISO 20022 + FIX + SWIFT message-
+discipline applicable to the operator, exercise the
+PSD2 / §1033 / 마이데이터 / FDX SCA + consent
+discipline on the operator's open-banking surface,
+exercise the operational-resilience discipline (DORA
+/ FFIEC / KR 전자금융감독규정), and exercise the
+sanctions-screening + AML discipline.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-financial-data-exchange
+- **Last Updated:** 2026-04-29

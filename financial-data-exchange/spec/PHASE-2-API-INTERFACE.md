@@ -5,237 +5,315 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-financial-data-exchange (Financial Data Exchange).
+This document defines the API contract that a
+financial-data-exchange operator exposes for the
+records defined in PHASE-1. Four complementary
+surfaces are described: the ISO 20022 messaging
+surface; the FIX 5.0 SP2 trading surface; the
+SWIFT MT/MX legacy surface; and the HTTPS / JSON
+RESTful surface for open-banking (PSD2 / Open Banking
+UK / FDX / KR 마이데이터) and operational visibility.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 20022 message implementation guidelines + the
+  SWIFT MT-to-ISO-20022 industry coexistence
+  cutover specification
+- FIX 5.0 SP2 + FIX FAST + FIXatdl 1.1 + FIX
+  Orchestra
+- SWIFT MT + MX + GPI + CCT Inst
+- IETF RFC 9110 (HTTP Semantics), RFC 9111 (HTTP
+  Caching), RFC 9457 (Problem Details), RFC 6901 /
+  6902 (JSON Pointer / Patch), RFC 8288 (Web
+  Linking), RFC 8259 (JSON), RFC 9421 (HTTP Message
+  Signatures)
+- IETF RFC 6749 (OAuth 2.0), RFC 8252 (OAuth for
+  Native Apps), RFC 9126 (Pushed Authorization
+  Requests), RFC 9396 (RAR Rich Authorization
+  Requests), RFC 9449 (DPoP)
+- OpenID Foundation FAPI 2.0 Security Profile +
+  FAPI 2.0 Message Signing + FAPI-CIBA Profile
+- OpenID Connect 1.0
+- ISO 8601, ISO 9362, ISO 13616, ISO 17442
+- ISO/IEC 27001:2022
+- W3C Trace Context
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-financial-data-exchange
-standard. It addresses the api-interface layer of the standard.
+The operator exposes:
 
-## §2 Manifest
+- The ISO 20022 messaging endpoint (SWIFT InterAct
+  + bilateral channels).
+- The FIX 5.0 SP2 endpoint for order entry and
+  execution-report exchange.
+- The SWIFT MT / MX endpoint over the SWIFT
+  network.
+- The HTTPS / JSON RESTful surface served from a
+  domain published by the operator under `/v1/`.
+- The open-banking endpoints for PSD2 / Open
+  Banking UK / FDX / KR 마이데이터.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "financial-data-exchange"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The OpenAPI 3.1 document at `/v1/openapi.json` is
+canonical for the JSON surface; the FIX Orchestra
+document, the ISO 20022 implementation guidelines,
+and the relevant open-banking specification (PSD2
+RTS / OBIE / FDX / KR 마이데이터) are canonical for
+their respective surfaces.
 
-## §3 Conformance Tiers
+## §2 Root Discovery
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+GET /v1/
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```json
+{
+  "standard": "WIA-financial-data-exchange",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "programmes":              "/v1/programmes",
+    "parties":                 "/v1/parties",
+    "accounts":                "/v1/accounts",
+    "instruments":             "/v1/instruments",
+    "iso20022":                "/iso20022/",
+    "fix":                     "/fix/",
+    "swiftMt":                 "/swift-mt/",
+    "openBanking":             "/open-banking/",
+    "fpml":                    "/v1/fpml-trades",
+    "corporateActions":        "/v1/corporate-actions",
+    "consents":                "/v1/consents",
+    "examination":             "/v1/examination",
+    "openapi":                 "/v1/openapi.json"
+  }
+}
+```
 
-## §4 Discovery
+## §3 ISO 20022 Surface
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/financial-data-exchange`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Per business area:
 
-## §5 Time and Identity
+```
+POST   /iso20022/pacs/{messageId}    (pacs.008
+                                      customer credit
+                                      transfer · pacs.
+                                      009 FI credit
+                                      transfer · pacs.
+                                      002 status report)
+POST   /iso20022/pain/{messageId}    (pain.001 customer
+                                      credit transfer
+                                      initiation · pain.
+                                      002 status report)
+POST   /iso20022/camt/{messageId}    (camt.054 / camt.029
+                                      / camt.056)
+POST   /iso20022/setr/{messageId}    (setr.010 fund-
+                                      order)
+POST   /iso20022/seev/{messageId}    (corporate-actions
+                                      seev.031~037)
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 FIX 5.0 SP2 Surface
 
-## §6 Versioning and Deprecation
+```
+FIX session (TCP / TLS) — order entry, modify,
+cancel, execution-report exchange (D / G / F / 8)
+FIX FAST / FIX-Stream over UDP for market-data
+FIX Orchestra metadata served at /fix-orchestra/
+descriptor.xml
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 SWIFT MT / MX Surface
 
-## §7 Privacy and Security
+```
+SWIFTNet FIN — MT 103 / 202 / 202 COV legacy
+customer / FI / cover-payment messages
+SWIFTNet InterAct — MX wrapped ISO 20022 messages
+SWIFT GPI tracker — UETR-keyed status updates
+SWIFT GPI CCT Inst — cross-border instant
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Open-Banking Surface (PSD2 / Open Banking UK /
+       FDX / KR 마이데이터)
 
-## §8 Open Governance
+```
+GET    /open-banking/aisp/v3/accounts             (PSD2
+                                                   account-
+                                                   information)
+GET    /open-banking/aisp/v3/accounts/{accountId}/transactions
+POST   /open-banking/pisp/v3/payments             (PSD2
+                                                   payment-
+                                                   initiation)
+GET    /open-banking/cbpii/v3/funds-confirmations (PSD2
+                                                   funds-
+                                                   confirmation)
+GET    /fdx/core/v6/accounts                      (FDX
+                                                   v6 API)
+GET    /fdx/core/v6/accounts/{accountId}/payments
+GET    /fdx/core/v6/accounts/{accountId}/statements
+GET    /마이데이터/v1/bank/accounts                 (KR
+                                                   마이데이터)
+GET    /마이데이터/v1/bank/accounts/{id}/transactions
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `financial-data-exchange` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The OAuth 2.0 client-authentication uses FAPI 2.0
+Security Profile (mTLS or private_key_jwt + DPoP);
+Pushed Authorization Requests (RFC 9126) and Rich
+Authorization Requests (RFC 9396) carry the
+account-set + permission-set scope per consent.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Party, Account, Instrument Endpoints
 
+```
+GET    /v1/parties?lei={lei}
+GET    /v1/parties/{partyId}
+POST   /v1/parties
+GET    /v1/accounts?iban={iban}
+GET    /v1/accounts/{accountId}
+GET    /v1/instruments?isin={isin}
+GET    /v1/instruments/{instrumentId}
+```
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+## §8 FpML and Corporate-Actions Endpoints
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+```
+GET    /v1/fpml-trades?uti={uti}
+POST   /v1/fpml-trades
+GET    /v1/fpml-trades/{tradeId}
+GET    /v1/corporate-actions?instrument={isin}
+POST   /v1/corporate-actions
+GET    /v1/corporate-actions/{actionId}
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §9 Consent and SCA Endpoints
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+GET    /v1/consents?party={partyId}
+POST   /v1/consents               (SCA-protected)
+PATCH  /v1/consents/{consentId}/withdraw  (PSD2
+                                           Art 64
+                                           customer-
+                                           withdrawal)
+GET    /v1/consents/{consentId}/sca-history
+```
 
-## Annex F — Adoption Roadmap
+## §10 Examination Endpoints
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+GET    /v1/examination/programmes
+GET    /v1/examination/parties
+GET    /v1/examination/accounts
+GET    /v1/examination/messages?from={iso}&to={iso}
+GET    /v1/examination/fpml-trades
+GET    /v1/examination/consents
+GET    /v1/examination/audit-events
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The examination scope is read-only and bound to the
+authority's identity (US SEC + CFTC + FRB + OCC +
+CFPB; EU EBA + ESMA + ECB + Member-State NCA; UK
+FCA + PRA; KR FSC + FSS + FIU).
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §11 Authentication and Authorisation
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Bearer tokens conform to OAuth 2.1 baseline; FAPI
+2.0 Security Profile is the open-banking baseline.
+Internal subsystem-to-subsystem calls use mutual
+TLS with the operator's internal certificate
+authority. The supervisory examination scope uses
+read-only tokens bound to the authority's identity.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §12 HTTP Status Codes
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Standard codes apply (200 / 201 / 202 / 400 / 401 /
+403 / 404 / 409 / 422 / 429 / 503) with Problem
+Details bodies. Open-banking error responses follow
+the operating jurisdiction's published error-code
+schema.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §13 Webhook and Event Surface
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Lifecycle events:
 
-## Annex H — Versioning and Deprecation Policy
+- `message.sent`, `message.received`,
+  `message.acknowledged`
+- `payment.initiated`, `payment.executed`,
+  `payment.rejected`
+- `consent.captured`, `consent.withdrawn`,
+  `consent.expired`
+- `sca.completed`, `sca.exempted`
+- `corporate-action.announced`,
+  `corporate-action.payment-due`
+- `fpml-trade.executed`,
+  `fpml-trade.confirmed-clearing`
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Webhook signatures use HTTP Message Signatures
+(RFC 9421); FAPI 2.0 Message Signing applies to
+open-banking webhooks.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §14 Bulk-Export Surface
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+```
+POST   /v1/bulk-export
+GET    /v1/bulk-export/{exportId}/manifest
+GET    /v1/examination/audit-events.csv
+```
 
-## Annex I — Interoperability Profiles
+Supports the supervisory authority's MiFIR Article
+26 transaction-report retrieval, EMIR trade-
+repository retrieval, and FFIEC IT Exam data calls.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §15 Trade-Repository and Reporting Surface
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+For OTC-derivative reporting and MiFIR transaction
+reporting:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+```
+POST   /v1/reporting/emir-trade
+POST   /v1/reporting/dodd-frank-swap
+POST   /v1/reporting/mifir-transaction
+GET    /v1/reporting/{reportId}/status
+GET    /v1/reporting/{reportId}/acknowledgement
+```
+
+The reporting endpoints forward the report to the
+operator's chosen ARM / SDR / TR per the operating
+jurisdiction's rules. UPI + UTI + LEI references
+are validated before submission.
+
+## §16 GPI Tracker and UETR Surface
+
+```
+GET    /v1/gpi/tracker/{uetr}/status
+GET    /v1/gpi/tracker/{uetr}/timeline
+POST   /v1/gpi/tracker/update            (carrier-
+                                          published
+                                          status
+                                          update)
+```
+
+The UETR is the canonical end-to-end correlation
+identifier for SWIFT-routed customer-credit
+transfers; the tracker exposes the per-hop status
+chain for the originator's reconciliation.
+
+## §17 Conformance
+
+Implementations claiming PHASE-2 conformance publish
+the OpenAPI document, expose the ISO 20022 / FIX /
+SWIFT / open-banking surfaces relevant to the
+operator's role, expose the supervisory examination
+surface, exercise the FAPI 2.0 Security Profile on
+the open-banking surface, and propagate trace-
+context across the message-to-settlement chain.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-financial-data-exchange
+- **Last Updated:** 2026-04-29
