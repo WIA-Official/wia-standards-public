@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Audio and Voice Interface Design</title>
+    <style>
+        :root { --bg: #0f172a; --surface: #1e293b; --primary: #6366F1; --text: #f1f5f9; --text-dim: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Georgia, 'Times New Roman', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 3rem; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--text); font-size: 1.3rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--bg); }
+        th, td { padding: 1rem; text-align: left; border: 1px solid var(--border); }
+        th { background: var(--primary); color: white; font-weight: 600; }
+        .summary { background: var(--bg); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; }
+        .summary h3 { color: var(--primary); margin-top: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .nav-links { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .nav-links a { color: var(--primary); text-decoration: none; padding: 0.75rem 1.5rem; border: 1px solid var(--primary); border-radius: 6px; transition: all 0.3s; }
+        .nav-links a:hover { background: var(--primary); color: white; }
+        code { background: var(--bg); color: var(--primary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Courier New', monospace; }
+        pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        .callout { background: rgba(99, 102, 241, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; }
+        .questions { background: var(--bg); padding: 1.5rem; border-radius: 8px; margin: 2rem 0; }
+        .questions ol { margin-left: 1.5rem; }
+        .philosophy { text-align: center; color: var(--primary); font-size: 1.2rem; margin: 2rem 0; padding: 1rem; border-top: 2px solid var(--primary); border-bottom: 2px solid var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 5: Audio and Voice Interface Design</h1>
+        <div class="philosophy">弘益人間 (Benefit All Humanity)</div>
+        
+        <p>Audio and voice interfaces provide critical accessibility for older adults with visual impairments, motor limitations, or cognitive challenges. While visual interfaces dominate modern computing, voice interaction offers natural, hands-free operation that leverages preserved verbal abilities while bypassing age-related declines in vision and fine motor control. This chapter explores voice user interface (VUI) design, audio feedback implementation, speech recognition optimization, and text-to-speech systems specifically for older adult users.</p>
+
+        <p>The WIA-SENIOR-006 standard addresses audio accessibility through multiple dimensions: clear speech output, accurate speech recognition that accommodates age-related voice changes, multimodal interaction combining voice and visual cues, comprehensive audio alternatives for visual content, and configurable speech parameters enabling personalization.</p>
+
+        <h2>Age-Related Hearing Changes</h2>
+        <p>Presbycusis—age-related hearing loss—affects approximately 30% of adults over 65 and 50% over 75. This hearing loss typically affects high frequencies first, making consonant sounds (s, f, th, sh) difficult to distinguish. Background noise compounds comprehension challenges, and the cocktail party effect—ability to focus on one voice among multiple sounds—declines significantly with age.</p>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 5.1: Hearing Changes and Audio Design Requirements</caption>
+            <thead><tr><th>Hearing Change</th><th>Prevalence</th><th>Impact</th><th>Design Solution</th></tr></thead>
+            <tbody>
+                <tr><td>High-frequency loss</td><td>75% over 65</td><td>Consonant confusion</td><td>Lower pitch, clear enunciation</td></tr>
+                <tr><td>Background noise sensitivity</td><td>Universal decline</td><td>Reduced comprehension</td><td>Noise reduction, visual alternatives</td></tr>
+                <tr><td>Slower auditory processing</td><td>Progressive</td><td>Need more time</td><td>Slower speech rate, pausing</td></tr>
+                <tr><td>Reduced cocktail party effect</td><td>Significant decline</td><td>Difficulty with multiple sounds</td><td>Single audio source at a time</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Voice User Interface Design</h2>
+        <p>Voice interfaces must accommodate age-related voice changes including reduced volume, increased vocal tremor, and altered pitch. Speech recognition systems optimized for younger voices may fail to recognize older adult speech accurately. The WIA-SENIOR-006 standard requires:</p>
+
+        <ul>
+            <li><strong>Adaptive recognition:</strong> Systems that learn individual voice characteristics</li>
+            <li><strong>Tolerance for pauses:</strong> Accommodate slower, more deliberate speech patterns</li>
+            <li><strong>Flexible command structure:</strong> Accept natural language variations, not just exact phrases</li>
+            <li><strong>Confirmation mechanisms:</strong> Verify understanding before executing critical actions</li>
+            <li><strong>Error recovery:</strong> Clear pathways to correct misrecognized commands</li>
+        </ul>
+
+        <h3>Speech Recognition Implementation</h3>
+        <pre><code>// Web Speech API with age-friendly configuration
+class AgeFriendlyVoiceInterface {
+  constructor() {
+    this.recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    this.configureRecognition();
+    this.setupHandlers();
+  }
+
+  configureRecognition() {
+    // Continuous listening for slower speakers
+    this.recognition.continuous = true;
+    this.recognition.interimResults = true;
+    
+    // Language configuration
+    this.recognition.lang = 'en-US';
+    
+    // Maximum alternatives for accuracy
+    this.recognition.maxAlternatives = 3;
+  }
+
+  setupHandlers() {
+    this.recognition.onresult = (event) => {
+      const results = event.results[event.results.length - 1];
+      
+      if (results.isFinal) {
+        this.processFinalResult(results);
+      } else {
+        this.showInterimResult(results[0].transcript);
+      }
+    };
+
+    this.recognition.onerror = (event) => {
+      this.handleError(event.error);
+    };
+  }
+
+  processFinalResult(results) {
+    // Consider multiple alternatives for better accuracy
+    const alternatives = Array.from(results).map(alt => ({
+      transcript: alt.transcript,
+      confidence: alt.confidence
+    }));
+
+    // Require high confidence for critical actions
+    const topResult = alternatives[0];
+    if (topResult.confidence < 0.7) {
+      this.requestConfirmation(topResult.transcript);
+    } else {
+      this.executeCommand(topResult.transcript);
+    }
+  }
+
+  requestConfirmation(transcript) {
+    this.speak(`Did you say "${transcript}"? Say yes to confirm or no to try again.`);
+    // Handle confirmation response...
+  }
+
+  speak(text) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9; // Slower for clarity
+    utterance.pitch = 0.9; // Lower pitch
+    utterance.volume = 1.0; // Full volume
+    speechSynthesis.speak(utterance);
+  }
+}
+</code></pre>
+
+        <h2>Text-to-Speech Configuration</h2>
+        <p>Text-to-speech (TTS) systems provide essential accessibility for users with visual impairments. Age-friendly TTS implementation requires careful attention to speech parameters, pronunciation, and user control over voice characteristics.</p>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 5.2: Text-to-Speech Parameters for Older Adults</caption>
+            <thead><tr><th>Parameter</th><th>Default Range</th><th>Older Adult Range</th><th>Rationale</th></tr></thead>
+            <tbody>
+                <tr><td>Speech rate</td><td>150-180 wpm</td><td>120-140 wpm</td><td>Processing time</td></tr>
+                <tr><td>Pitch</td><td>1.0 (neutral)</td><td>0.8-0.9 (lower)</td><td>High-frequency hearing loss</td></tr>
+                <tr><td>Volume</td><td>0.8</td><td>1.0</td><td>Hearing loss compensation</td></tr>
+                <tr><td>Pause duration</td><td>200ms</td><td>300-400ms</td><td>Comprehension time</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Advanced TTS Implementation</h3>
+        <pre><code>// Configurable text-to-speech with user preferences
+class AccessibleTTS {
+  constructor(userPreferences = {}) {
+    this.preferences = {
+      rate: userPreferences.rate || 0.85,
+      pitch: userPreferences.pitch || 0.9,
+      volume: userPreferences.volume || 1.0,
+      voice: userPreferences.voice || null
+    };
+    this.initVoices();
+  }
+
+  initVoices() {
+    speechSynthesis.onvoiceschanged = () => {
+      const voices = speechSynthesis.getVoices();
+      
+      // Prefer high-quality voices
+      const preferredVoices = voices.filter(v => 
+        v.lang.startsWith('en') && 
+        (v.name.includes('Premium') || v.name.includes('Enhanced'))
+      );
+      
+      if (!this.preferences.voice && preferredVoices.length > 0) {
+        this.preferences.voice = preferredVoices[0];
+      }
+    };
+  }
+
+  speak(text, options = {}) {
+    // Cancel any ongoing speech
+    speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Apply preferences
+    utterance.rate = options.rate || this.preferences.rate;
+    utterance.pitch = options.pitch || this.preferences.pitch;
+    utterance.volume = options.volume || this.preferences.volume;
+    
+    if (this.preferences.voice) {
+      utterance.voice = this.preferences.voice;
+    }
+
+    // Add SSML-like pauses for readability
+    const processedText = this.addPauses(text);
+    utterance.text = processedText;
+
+    // Event handlers
+    utterance.onstart = () => this.onSpeechStart();
+    utterance.onend = () => this.onSpeechEnd();
+    utterance.onerror = (e) => this.onSpeechError(e);
+
+    speechSynthesis.speak(utterance);
+  }
+
+  addPauses(text) {
+    // Add natural pauses at punctuation
+    return text
+      .replace(/\./g, '. ') // Period pause
+      .replace(/,/g, ', ')  // Comma pause
+      .replace(/;/g, '; ')  // Semicolon pause
+      .replace(/\n/g, '. '); // Line break pause
+  }
+
+  speakHeading(text) {
+    this.speak(`Heading: ${text}`, { rate: 0.8 });
+  }
+
+  speakButton(text) {
+    this.speak(`Button: ${text}`);
+  }
+
+  speakLink(text) {
+    this.speak(`Link: ${text}`);
+  }
+
+  updatePreferences(newPreferences) {
+    this.preferences = { ...this.preferences, ...newPreferences };
+    this.savePreferences();
+  }
+
+  savePreferences() {
+    localStorage.setItem('tts-preferences', JSON.stringify(this.preferences));
+  }
+}
+
+// Usage
+const tts = new AccessibleTTS();
+tts.speak('Welcome to the application. Please select an option from the menu.');
+</code></pre>
+
+        <h2>Audio Feedback and Cues</h2>
+        <p>Audio feedback provides confirmation of actions without requiring visual attention. For older adults, audio cues offer valuable supplementary information that reinforces visual feedback and supports users with reduced vision.</p>
+
+        <h3>Audio Feedback Principles</h3>
+        <ul>
+            <li><strong>Distinctive sounds:</strong> Different actions produce unique audio signatures</li>
+            <li><strong>Volume control:</strong> User adjustable audio levels independent of system volume</li>
+            <li><strong>Optional speech:</strong> Spoken confirmation available for all actions</li>
+            <li><strong>Frequency consideration:</strong> Avoid high-frequency sounds difficult for older ears</li>
+            <li><strong>Timing:</strong> Immediate feedback (under 100ms latency)</li>
+        </ul>
+
+        <h3>Multimodal Feedback Implementation</h3>
+        <pre><code>// Comprehensive multimodal feedback system
+class MultimodalFeedback {
+  constructor() {
+    this.audioEnabled = true;
+    this.speechEnabled = true;
+    this.hapticsEnabled = true;
+    this.loadAudioAssets();
+  }
+
+  loadAudioAssets() {
+    this.sounds = {
+      buttonClick: new Audio('/sounds/click-low.mp3'),
+      success: new Audio('/sounds/success-chord.mp3'),
+      error: new Audio('/sounds/error-buzz.mp3'),
+      notification: new Audio('/sounds/notification-bell.mp3')
+    };
+
+    // Preload audio for immediate playback
+    Object.values(this.sounds).forEach(sound => sound.load());
+  }
+
+  provideButtonFeedback(buttonText) {
+    // Audio
+    if (this.audioEnabled) {
+      this.sounds.buttonClick.play();
+    }
+
+    // Haptic
+    if (this.hapticsEnabled && navigator.vibrate) {
+      navigator.vibrate(10);
+    }
+
+    // Speech
+    if (this.speechEnabled) {
+      this.speak(buttonText);
+    }
+
+    // Visual
+    this.showVisualFeedback();
+  }
+
+  provideSuccessFeedback(message) {
+    if (this.audioEnabled) {
+      this.sounds.success.play();
+    }
+
+    if (this.hapticsEnabled && navigator.vibrate) {
+      navigator.vibrate([50, 100, 50]);
+    }
+
+    if (this.speechEnabled) {
+      this.speak(`Success: ${message}`);
+    }
+
+    this.showSuccessNotification(message);
+  }
+
+  provideErrorFeedback(message) {
+    if (this.audioEnabled) {
+      this.sounds.error.play();
+    }
+
+    if (this.hapticsEnabled && navigator.vibrate) {
+      navigator.vibrate([100, 50, 100, 50, 100]);
+    }
+
+    if (this.speechEnabled) {
+      this.speak(`Error: ${message}`);
+    }
+
+    this.showErrorNotification(message);
+  }
+
+  speak(text) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 0.9;
+    speechSynthesis.speak(utterance);
+  }
+
+  showVisualFeedback() {
+    // Visual feedback implementation
+  }
+
+  showSuccessNotification(message) {
+    // Success notification UI
+  }
+
+  showErrorNotification(message) {
+    // Error notification UI
+  }
+}
+</code></pre>
+
+        <h2>Captions and Transcripts</h2>
+        <p>Captions for audio content and transcripts for video ensure accessibility for users with hearing loss. The WIA-SENIOR-006 standard requires synchronized captions for all time-based media and complete text transcripts available separately.</p>
+
+        <h3>Caption Quality Requirements</h3>
+        <ul>
+            <li><strong>Accuracy:</strong> 99% word accuracy minimum</li>
+            <li><strong>Synchronization:</strong> Within 200ms of audio</li>
+            <li><strong>Speaker identification:</strong> Identify speakers in multi-person content</li>
+            <li><strong>Sound descriptions:</strong> Include [music], [applause], [door closes], etc.</li>
+            <li><strong>Text size:</strong> Minimum 18px, user-adjustable</li>
+            <li><strong>Contrast:</strong> Minimum 4.5:1 against background</li>
+        </ul>
+
+        <div class="callout">
+            <strong>Best Practice:</strong> Provide captions in multiple formats (WebVTT, SRT, TTML) and offer downloadable transcripts in addition to synchronized captions for maximum accessibility and user choice.
+        </div>
+
+        <div class="summary">
+            <h3>Chapter Summary</h3>
+            <p><strong>Key Takeaways:</strong></p>
+            <ol>
+                <li>Age-related hearing loss affects 30-50% of older adults, requiring lower pitch audio, slower speech rates, reduced background noise, and comprehensive visual alternatives for all audio content.</li>
+                <li>Voice user interfaces must accommodate age-related voice changes through adaptive recognition, flexible command structures, confirmation mechanisms, and graceful error recovery for misrecognized speech.</li>
+                <li>Text-to-speech systems should operate at 120-140 words per minute (slower than default), use lower pitch (0.8-0.9), full volume, and provide generous pauses for comprehension.</li>
+                <li>Multimodal feedback combining audio, haptic, speech, and visual cues provides redundant confirmation that accommodates diverse sensory abilities and preferences among older adult users.</li>
+                <li>Captions and transcripts require 99% accuracy, proper synchronization, speaker identification, sound descriptions, and sufficient text size with high contrast for users with hearing loss.</li>
+                <li>User control over all audio parameters—speech rate, pitch, volume, voice selection—enables personalization essential for accommodating individual differences in hearing ability and preferences.</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Explain how presbycusis (age-related hearing loss) affects audio interface design. What specific accommodations address high-frequency hearing loss?</li>
+                <li>Design a voice command system for a smart home application. What commands would you support? How would you handle recognition errors?</li>
+                <li>Why does the WIA-SENIOR-006 standard recommend slower speech rates (120-140 wpm) compared to typical TTS output (150-180 wpm)? What cognitive and auditory factors support this requirement?</li>
+                <li>Implement a multimodal feedback system for a form submission. Include audio, haptic, speech, and visual feedback components with appropriate timing and user controls.</li>
+                <li>Compare automated captions generated by speech recognition with human-created captions. What quality differences affect accessibility for older adults with hearing loss?</li>
+                <li>Describe three different strategies for handling speech recognition errors. Which approach proves most appropriate for critical actions like financial transactions?</li>
+                <li>Design a settings panel that allows users to customize text-to-speech parameters. What controls should you provide? What default values would you use?</li>
+            </ol>
+        </div>
+
+        <div class="callout">
+            <h3>Looking Ahead</h3>
+            <p>Chapter 6 examines assistive technology integration, exploring how age-friendly interfaces interact with screen readers, magnification software, alternative input devices, and other assistive technologies commonly used by older adults.</p>
+        </div>
+
+        <div class="philosophy">弘益人間 · Benefit All Humanity</div>
+
+        <div class="nav-links">
+            <a href="chapter-04.html">← Previous Chapter</a>
+            <a href="chapter-06.html">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

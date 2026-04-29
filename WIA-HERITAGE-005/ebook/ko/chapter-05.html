@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>제05장: Phase 2 - API 인터페이스 | WIA-HERITAGE-005</title>
+<style>:root{--bg:#0f172a;--surface:#1e293b;--surface-2:#283548;--primary:#D97706;--text:#f1f5f9;--text-dim:#94a3b8;--border:#334155;--gold:#ffd700;--success:#10b981}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);line-height:1.8}.container{max-width:900px;margin:0 auto;padding:2rem}header{text-align:center;padding:3rem 0;border-bottom:2px solid var(--primary);margin-bottom:2rem}.badge{display:inline-block;background:var(--primary);color:var(--bg);padding:0.5rem 1.5rem;border-radius:2rem;font-weight:600;margin-bottom:1rem}h1{font-size:2.2rem;color:var(--primary)}h2{color:var(--primary);font-size:1.6rem;margin:2rem 0 1rem;border-bottom:1px solid var(--border);padding-bottom:0.5rem}h3{color:var(--gold);font-size:1.3rem;margin:1.5rem 0 1rem}p{margin-bottom:1rem}.callout{background:var(--surface);border-left:4px solid var(--primary);padding:1.5rem;margin:1.5rem 0;border-radius:0 0.5rem 0.5rem 0}.callout-title{font-weight:600;margin-bottom:0.5rem}ul,ol{margin:1rem 0 1rem 1.5rem}li{margin-bottom:0.5rem}table{width:100%;border-collapse:collapse;margin:1.5rem 0;background:var(--surface)}th,td{padding:0.75rem;text-align:left;border-bottom:1px solid var(--border)}th{background:var(--surface-2);color:var(--primary)}pre{background:var(--surface-2);padding:1rem;border-radius:0.5rem;overflow-x:auto;margin:1rem 0}code{font-family:'Courier New',monospace;font-size:0.9em}.nav{display:flex;justify-content:space-between;padding:2rem 0;border-top:1px solid var(--border);margin-top:2rem}.nav a{color:var(--primary);text-decoration:none;padding:0.75rem 1.5rem;background:var(--surface);border-radius:0.5rem}.philosophy{text-align:center;padding:2rem;background:var(--surface);border-radius:1rem;margin:2rem 0}.philosophy-text{font-size:1.5rem;color:var(--gold)}footer{text-align:center;padding:2rem;color:var(--text-dim)}</style>
+</head>
+<body>
+<div class="container">
+<header><div class="badge">제05장 / 8</div><h1>Phase 2: API 인터페이스 - 공동체 중심 접근 제어</h1><p style="color:var(--text-dim)">WIA-HERITAGE-005: Traditional Knowledge Standard</p></header>
+
+<section>
+<h2>05.1 전통적 API 설계의 근본적 문제</h2>
+<p>일반적인 API 설계는 "누가 이 데이터에 접근할 수 있는가?"라는 기술적 질문에 초점을 맞춥니다. 그러나 전통 지식의 경우, 진짜 질문은 "공동체가 이 접근을 승인했는가?", "사용 목적이 공동체의 가치와 일치하는가?", "이익이 공정하게 공유되는가?" 입니다.</p>
+
+<h3>기존 API의 한계</h3>
+<p>2010년대 초반, 여러 생물다양성 데이터베이스들이 원주민 전통 지식을 포함하는 RESTful API를 공개했습니다. 이들의 공통된 문제점:</p>
+
+<ul>
+<li><strong>API 키 기반 인증의 맹점</strong>: API 키만 있으면 누구나 대량으로 데이터를 수집할 수 있었고, 공동체는 누가 자신들의 지식을 사용하는지조차 몰랐습니다.</li>
+<li><strong>목적 검증 없음</strong>: 제약 회사 연구자와 학부생 숙제가 동일한 접근 권한을 가졌고, 상업적 이용과 학술 연구가 구분되지 않았습니다.</li>
+<li><strong>실시간 통보 부재</strong>: 민감한 의례 지식이 수백 번 조회되어도 공동체는 알 수 없었습니다.</li>
+<li><strong>이익 추적 불가</strong>: 전통 지식이 신약 개발로 이어져도 원천 데이터와 연결할 방법이 없었습니다.</li>
+</ul>
+
+<div class="callout">
+<div class="callout-title">⚠️ 사례 연구: 남아프리카 후디아 사건의 API 측면</div>
+<p>2001년, 남아프리카 CSIR(과학산업연구협의회)은 산(San)족의 후디아 식물 지식을 데이터베이스화하고 API로 공개했습니다. 제약 회사 Pfizer는 이 API를 통해 데이터를 수집하고, 산족의 동의 없이 식욕 억제제 특허를 출원했습니다.</p>
+<p>문제점:</p>
+<ul>
+<li>API 접근 로그에 Pfizer 접근 기록이 있었지만, 산족에게 통보되지 않음</li>
+<li>API는 "학술 연구용"으로 표시되어 있었지만, 상업적 이용 검증 메커니즘 없음</li>
+<li>데이터에 출처가 표시되어 있었지만, 자동 이익 공유 장치 부재</li>
+</ul>
+<p>결과: 6년간의 법적 분쟁 끝에 산족은 이익의 8%만 받았고, 이미 수억 달러의 연구 개발비가 지출된 후였습니다.</p>
+</div>
+</section>
+
+<section>
+<h2>05.2 WIA-TK API 아키텍처: 3층 보안 모델</h2>
+<p>WIA-HERITAGE-005 API는 기술적 보안, 공동체 거버넌스, 블록체인 투명성의 3층 구조로 설계되었습니다.</p>
+
+<h3>3층 보안 아키텍처</h3>
+<table>
+<tr><th>계층</th><th>목적</th><th>기술</th><th>책임 주체</th></tr>
+<tr><td>Layer 1: 기술 인증</td><td>신원 확인</td><td>OAuth 2.0 + OpenID Connect</td><td>시스템</td></tr>
+<tr><td>Layer 2: 공동체 승인</td><td>목적 및 윤리 검증</td><td>FPIC 워크플로우 엔진</td><td>공동체 대표</td></tr>
+<tr><td>Layer 3: 블록체인 기록</td><td>투명성 및 이익 추적</td><td>Ethereum 스마트 계약</td><td>분산 원장</td></tr>
+</table>
+
+<h3>API 엔드포인트 구조</h3>
+<p>WIA-TK API는 RESTful과 GraphQL 두 가지 인터페이스를 제공합니다:</p>
+
+<pre><code>Base URL: https://api.wia-heritage.org/v1/
+
+# RESTful 엔드포인트
+GET    /knowledge/{id}              # 단일 지식 항목 조회
+GET    /knowledge/search            # 지식 검색
+POST   /knowledge                   # 새 지식 기록 (공동체만)
+PUT    /knowledge/{id}              # 지식 업데이트 (공동체만)
+DELETE /knowledge/{id}              # 지식 삭제 (공동체만)
+
+GET    /communities/{id}            # 공동체 정보
+GET    /communities/{id}/knowledge  # 공동체별 지식 목록
+
+POST   /consent/request             # FPIC 동의 요청
+GET    /consent/status/{id}         # 동의 상태 확인
+POST   /consent/revoke/{id}         # 동의 철회
+
+GET    /access-log/{knowledge_id}   # 접근 이력 (블록체인)
+GET    /benefit-tracking/{id}       # 이익 추적
+
+# GraphQL 엔드포인트
+POST   /graphql                     # GraphQL 쿼리/뮤테이션
+</code></pre>
+</section>
+
+<section>
+<h2>05.3 Layer 1: OAuth 2.0 + 공동체 확장</h2>
+<p>WIA-TK API는 표준 OAuth 2.0 프로토콜을 사용하지만, 원주민 공동체의 특수한 요구사항을 반영하여 확장했습니다.</p>
+
+<h3>사용자 유형별 인증 흐름</h3>
+<table>
+<tr><th>사용자 유형</th><th>인증 방식</th><th>추가 요구사항</th></tr>
+<tr><td>공동체 구성원</td><td>공동체 ID + 생체인증</td><td>장로 위원회 승인</td></tr>
+<tr><td>학술 연구자</td><td>대학 ORCID + 윤리 승인서</td><td>IRB 증명, 연구 계획서</td></tr>
+<tr><td>정부 기관</td><td>정부 SSO</td><td>공식 협력 협약</td></tr>
+<tr><td>민간 기업</td><td>기업 인증 + 법인 등록</td><td>이익 공유 계약 사전 체결</td></tr>
+<tr><td>일반 대중</td><td>이메일/소셜 로그인</td><td>Level 1 (공개) 데이터만</td></tr>
+</table>
+
+<h3>토큰 구조 확장</h3>
+<p>표준 OAuth 토큰에 전통 지식 특화 클레임을 추가합니다:</p>
+
+<pre><code>{
+  // 표준 OAuth 2.0 클레임
+  "sub": "researcher_12345",
+  "iss": "https://auth.wia-heritage.org",
+  "aud": "wia-tk-api",
+  "exp": 1735689600,
+  "iat": 1735603200,
+
+  // WIA-TK 확장 클레임
+  "tk_user_type": "academic_researcher",
+  "tk_organization": "University of São Paulo",
+  "tk_orcid": "0000-0002-1825-0097",
+  "tk_irb_approval": "USP-IRB-2024-0342",
+  "tk_purpose": "medicinal-plant-research",
+  "tk_commercial_intent": false,
+
+  // 접근 승인 정보
+  "tk_approved_communities": [
+    "ashaninka_apiwtxa",
+    "yawanawa_nova_esperanca"
+  ],
+  "tk_access_level": 2,  // Restricted
+  "tk_consent_ids": [
+    "fpic_2024_089",
+    "fpic_2024_103"
+  ],
+
+  // 블록체인 앵커
+  "tk_blockchain_tx": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+}
+</code></pre>
+
+<h3>실시간 공동체 통보 시스템</h3>
+<p>토큰이 발급될 때마다 관련 공동체에 실시간 알림이 전송됩니다:</p>
+
+<pre><code>// 공동체 대표에게 전송되는 웹훅
+POST https://community-portal.ashaninka.org/api/notifications
+
+{
+  "type": "ACCESS_REQUEST",
+  "timestamp": "2024-01-15T14:30:00Z",
+  "requester": {
+    "name": "Dr. Maria Silva",
+    "organization": "University of São Paulo",
+    "orcid": "0000-0002-1825-0097"
+  },
+  "purpose": "연구 목적: 말라리아 치료를 위한 전통 약용 식물 연구",
+  "requested_knowledge": [
+    "Cat's Claw (Uncaria tomentosa) - 면역 강화 용도",
+    "Copaiba oil - 항염증 특성"
+  ],
+  "access_level": "Restricted (Level 2)",
+  "commercial_intent": false,
+  "research_duration": "24 months",
+  "data_deletion_after": "36 months",
+  "benefit_sharing_agreement": "학술 논문 공저자 포함, 특허 발생 시 12% 로열티",
+
+  "actions": [
+    {
+      "type": "APPROVE",
+      "url": "/consent/approve/req_2024_089"
+    },
+    {
+      "type": "REJECT",
+      "url": "/consent/reject/req_2024_089"
+    },
+    {
+      "type": "REQUEST_MORE_INFO",
+      "url": "/consent/info-request/req_2024_089"
+    }
+  ]
+}
+</code></pre>
+</section>
+
+<section>
+<h2>05.4 Layer 2: FPIC (사전 정보 동의) 자동화</h2>
+<p>FPIC (Free, Prior and Informed Consent)는 유엔 원주민 권리 선언(UNDRIP)의 핵심 원칙입니다. WIA-TK API는 이를 디지털 워크플로우로 구현합니다.</p>
+
+<h3>FPIC 워크플로우 단계</h3>
+<table>
+<tr><th>단계</th><th>설명</th><th>소요 시간</th><th>주체</th></tr>
+<tr><td>1. 정보 제공</td><td>연구자가 목적, 방법, 예상 결과를 공동체 언어로 설명</td><td>7일</td><td>연구자</td></tr>
+<tr><td>2. 공동체 숙의</td><td>장로 위원회와 공동체 구성원이 내부 회의</td><td>14-30일</td><td>공동체</td></tr>
+<tr><td>3. 질문 및 협상</td><td>추가 정보 요청, 조건 협상</td><td>7-14일</td><td>양측</td></tr>
+<tr><td>4. 결정</td><td>공동체가 승인/거부/조건부 승인 결정</td><td>1일</td><td>공동체</td></tr>
+<tr><td>5. 계약 체결</td><td>이익 공유 조건을 스마트 계약으로 기록</td><td>3일</td><td>양측</td></tr>
+<tr><td>6. 지속적 모니터링</td><td>연구 진행 상황 보고, 동의 철회 가능</td><td>연구 기간</td><td>공동체</td></tr>
+</table>
+
+<h3>다국어 FPIC 문서 생성</h3>
+<p>API는 연구자의 신청 내용을 공동체의 언어로 자동 번역하고, 문화적으로 적절한 형식으로 제시합니다:</p>
+
+<pre><code>POST /consent/request
+
+Request Body:
+{
+  "requester_id": "researcher_12345",
+  "target_community": "ashaninka_apiwtxa",
+  "purpose": "To study traditional medicinal plants for treating malaria",
+  "methodology": "Ethnobotanical interviews and plant sample collection",
+  "duration_months": 24,
+  "commercial_intent": false,
+  "benefit_sharing_proposal": {
+    "academic_coauthorship": true,
+    "royalty_percentage": 12,
+    "capacity_building": "Training 2 community members in botanical documentation"
+  }
+}
+
+Response:
+{
+  "consent_request_id": "fpic_2024_089",
+  "status": "PENDING_COMMUNITY_REVIEW",
+  "documents_generated": [
+    {
+      "language": "ashaninka",
+      "format": "audio",  // 구전 전통 고려
+      "url": "/documents/fpic_2024_089_ashaninka.mp3",
+      "narrated_by": "community_translator_003"
+    },
+    {
+      "language": "portuguese",
+      "format": "pdf",
+      "url": "/documents/fpic_2024_089_pt.pdf"
+    },
+    {
+      "language": "english",
+      "format": "pdf",
+      "url": "/documents/fpic_2024_089_en.pdf"
+    }
+  ],
+  "community_meeting_scheduled": "2024-02-01T10:00:00-05:00",
+  "decision_deadline": "2024-03-01",
+  "notification_sent_to": [
+    "chief@ashaninka-apiwtxa.org",
+    "elders_council@ashaninka-apiwtxa.org"
+  ]
+}
+</code></pre>
+
+<h3>조건부 승인 및 동적 권한</h3>
+<p>공동체는 단순 승인/거부 외에 상세한 조건을 설정할 수 있습니다:</p>
+
+<pre><code>{
+  "consent_decision": "CONDITIONAL_APPROVAL",
+  "conditions": {
+    "access_restrictions": {
+      "exclude_knowledge_ids": ["tk_sacred_ritual_089"],  // 신성한 의례 제외
+      "seasonal_blackout": {
+        "period": "rainy_season",  // 우기에는 접근 불가
+        "months": [11, 12, 1, 2, 3]
+      },
+      "daily_query_limit": 50,
+      "requires_elder_approval_for": ["medicinal_formulas"]
+    },
+
+    "usage_terms": {
+      "no_patenting": true,
+      "academic_only": true,
+      "data_retention_max_months": 36,
+      "mandatory_data_deletion_after": true
+    },
+
+    "benefit_sharing": {
+      "coauthorship_required": true,
+      "royalty_if_commercialized": 15,  // 상업화 시 15%
+      "annual_report_required": true,
+      "community_presentation_required": true
+    },
+
+    "transparency": {
+      "monthly_access_report": true,
+      "real_time_notification_threshold": 10  // 10회 이상 접근 시 알림
+    }
+  }
+}
+</code></pre>
+</section>
+
+<section>
+<h2>05.5 Layer 3: 블록체인 기반 투명성</h2>
+<p>모든 API 접근, 동의 기록, 이익 분배가 블록체인에 기록되어 변조 불가능하고 투명하게 추적됩니다.</p>
+
+<h3>스마트 계약 구조</h3>
+<p>Ethereum 기반 스마트 계약으로 자동 이익 분배를 구현합니다:</p>
+
+<pre><code>// Solidity 스마트 계약 (단순화된 예시)
+contract TraditionalKnowledgeAccess {
+    struct ConsentRecord {
+        address researcher;
+        address communityRepresentative;
+        string knowledgeId;
+        uint256 approvalDate;
+        uint256 expirationDate;
+        uint8 royaltyPercentage;
+        bool isActive;
+    }
+
+    mapping(bytes32 => ConsentRecord) public consents;
+    mapping(address => uint256) public communityBalances;
+
+    event ConsentGranted(
+        bytes32 consentId,
+        address indexed researcher,
+        address indexed community,
+        string knowledgeId,
+        uint256 expirationDate
+    );
+
+    event AccessLogged(
+        bytes32 consentId,
+        address indexed researcher,
+        string knowledgeId,
+        uint256 timestamp
+    );
+
+    event RoyaltyPaid(
+        address indexed community,
+        uint256 amount,
+        string commercialProduct
+    );
+
+    function grantConsent(
+        address _researcher,
+        address _community,
+        string memory _knowledgeId,
+        uint256 _durationDays,
+        uint8 _royaltyPercentage
+    ) public returns (bytes32) {
+        // FPIC 승인 시 호출
+        bytes32 consentId = keccak256(
+            abi.encodePacked(_researcher, _community, _knowledgeId, block.timestamp)
+        );
+
+        consents[consentId] = ConsentRecord({
+            researcher: _researcher,
+            communityRepresentative: _community,
+            knowledgeId: _knowledgeId,
+            approvalDate: block.timestamp,
+            expirationDate: block.timestamp + (_durationDays * 1 days),
+            royaltyPercentage: _royaltyPercentage,
+            isActive: true
+        });
+
+        emit ConsentGranted(
+            consentId,
+            _researcher,
+            _community,
+            _knowledgeId,
+            consents[consentId].expirationDate
+        );
+
+        return consentId;
+    }
+
+    function logAccess(bytes32 _consentId, string memory _knowledgeId) public {
+        require(consents[_consentId].isActive, "Consent not active");
+        require(block.timestamp <= consents[_consentId].expirationDate, "Consent expired");
+
+        emit AccessLogged(
+            _consentId,
+            msg.sender,
+            _knowledgeId,
+            block.timestamp
+        );
+    }
+
+    function payRoyalty(
+        address _community,
+        string memory _productName
+    ) public payable {
+        communityBalances[_community] += msg.value;
+
+        emit RoyaltyPaid(_community, msg.value, _productName);
+    }
+
+    function withdrawRoyalty() public {
+        uint256 balance = communityBalances[msg.sender];
+        require(balance > 0, "No balance to withdraw");
+
+        communityBalances[msg.sender] = 0;
+        payable(msg.sender).transfer(balance);
+    }
+}
+</code></pre>
+
+<h3>접근 로그 조회 API</h3>
+<p>공동체는 언제든지 자신들의 지식이 어떻게 사용되고 있는지 확인할 수 있습니다:</p>
+
+<pre><code>GET /access-log/tk_catsclaw_medicinal_use
+
+Response:
+{
+  "knowledge_id": "tk_catsclaw_medicinal_use",
+  "total_accesses": 247,
+  "unique_users": 18,
+  "access_history": [
+    {
+      "timestamp": "2024-01-15T14:32:18Z",
+      "user": "Dr. Maria Silva (USP)",
+      "purpose": "Academic research - malaria treatment",
+      "consent_id": "fpic_2024_089",
+      "blockchain_tx": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+      "ip_location": "São Paulo, Brazil"
+    },
+    {
+      "timestamp": "2024-01-14T09:15:42Z",
+      "user": "PharmaCorp Research Team",
+      "purpose": "Drug discovery - immune disorders",
+      "consent_id": "fpic_2023_456",
+      "blockchain_tx": "0x8f3e42Aa9876B543Dc7891E0fC2b345A6D78e9F",
+      "royalty_agreement": "12% of net revenue",
+      "ip_location": "Basel, Switzerland"
+    }
+  ],
+
+  "revenue_tracking": {
+    "total_royalties_earned": "48,500 USD",
+    "pending_royalties": "12,300 USD",
+    "products_derived": [
+      {
+        "product_name": "ImmunoBoost Plus",
+        "company": "PharmaCorp",
+        "market_launch": "2023-06-01",
+        "royalty_rate": "12%",
+        "quarterly_revenue": "3,200,000 USD",
+        "community_share": "384,000 USD"
+      }
+    ]
+  }
+}
+</code></pre>
+</section>
+
+<section>
+<h2>05.6 GraphQL API: 유연한 쿼리</h2>
+<p>복잡한 관계를 가진 전통 지식을 효율적으로 조회하기 위해 GraphQL 인터페이스를 제공합니다.</p>
+
+<h3>스키마 정의</h3>
+<pre><code>type TraditionalKnowledge {
+  id: ID!
+  label: [MultilingualLabel!]!
+  scientificName: String
+  category: KnowledgeCategory!
+  accessLevel: AccessLevel!
+
+  # 관계
+  treats: [MedicalCondition!]
+  usedBy: [Community!]!
+  taughtBy: [Elder!]
+  relatedKnowledge: [TraditionalKnowledge!]
+
+  # 메타데이터
+  provenance: Provenance!
+  consent: ConsentRecord
+  accessHistory: [AccessLog!]
+
+  # 멀티미디어
+  images: [Image!]
+  audioRecordings: [Audio!]
+  videos: [Video!]
+}
+
+type Community {
+  id: ID!
+  name: String!
+  language: String!
+  location: GeoLocation!
+  population: Int
+
+  # 지식
+  knowledgeItems: [TraditionalKnowledge!]!
+  elders: [Elder!]!
+
+  # 거버넌스
+  representatives: [Person!]!
+  consentRecords: [ConsentRecord!]!
+}
+
+type ConsentRecord {
+  id: ID!
+  community: Community!
+  researcher: Person!
+  knowledgeItems: [TraditionalKnowledge!]!
+  purpose: String!
+  approvalDate: DateTime!
+  expirationDate: DateTime!
+  conditions: ConsentConditions!
+  blockchainTx: String!
+  status: ConsentStatus!
+}
+
+type Query {
+  # 지식 조회
+  knowledge(id: ID!): TraditionalKnowledge
+  searchKnowledge(
+    query: String
+    category: KnowledgeCategory
+    community: ID
+    accessibleBy: ID
+  ): [TraditionalKnowledge!]!
+
+  # 공동체 조회
+  community(id: ID!): Community
+  communities(region: String): [Community!]!
+
+  # 동의 관리
+  myConsents: [ConsentRecord!]!
+  communityConsents(communityId: ID!): [ConsentRecord!]!
+}
+
+type Mutation {
+  # FPIC 워크플로우
+  requestConsent(input: ConsentRequestInput!): ConsentRequest!
+  approveConsent(consentId: ID!, conditions: ConsentConditions): ConsentRecord!
+  revokeConsent(consentId: ID!, reason: String!): Boolean!
+
+  # 지식 기여 (공동체만)
+  contributeKnowledge(input: KnowledgeInput!): TraditionalKnowledge!
+  updateKnowledge(id: ID!, input: KnowledgeInput!): TraditionalKnowledge!
+}
+</code></pre>
+
+<h3>복잡한 쿼리 예시</h3>
+<pre><code>query AmazonianMedicinalPlants {
+  searchKnowledge(
+    category: MEDICINAL_PLANT
+    community: "ashaninka_apiwtxa"
+  ) {
+    id
+    label(language: "ashaninka") {
+      text
+    }
+    scientificName
+    treats {
+      name(language: "ko")
+      symptoms
+    }
+    usedBy {
+      name
+      location {
+        latitude
+        longitude
+      }
+    }
+    provenance {
+      recordedBy {
+        name
+      }
+      recordedDate
+      verifiedBy {
+        name
+        role
+      }
+    }
+    consent {
+      status
+      expirationDate
+    }
+  }
+}
+
+Response:
+{
+  "data": {
+    "searchKnowledge": [
+      {
+        "id": "tk_catsclaw_001",
+        "label": [
+          {
+            "text": "Koshompaari"
+          }
+        ],
+        "scientificName": "Uncaria tomentosa",
+        "treats": [
+          {
+            "name": "관절염",
+            "symptoms": ["관절 통증", "부종", "뻣뻣함"]
+          },
+          {
+            "name": "면역 결핍",
+            "symptoms": ["잦은 감염", "피로"]
+          }
+        ],
+        "usedBy": [
+          {
+            "name": "Ashaninka Community of Apiwtxa",
+            "location": {
+              "latitude": -10.7892,
+              "longitude": -72.8361
+            }
+          }
+        ],
+        "provenance": {
+          "recordedBy": {
+            "name": "Dr. Carlos Pimenta"
+          },
+          "recordedDate": "2023-08-12",
+          "verifiedBy": [
+            {
+              "name": "Elder Antonio Piyãko",
+              "role": "Traditional Healer"
+            }
+          ]
+        },
+        "consent": {
+          "status": "ACTIVE",
+          "expirationDate": "2025-08-12"
+        }
+      }
+    ]
+  }
+}
+</code></pre>
+</section>
+
+<section>
+<h2>05.7 속도 제한 및 공정 사용 정책</h2>
+<p>대량 스크래핑과 악의적 사용을 방지하기 위한 속도 제한을 구현합니다.</p>
+
+<h3>사용자 유형별 제한</h3>
+<table>
+<tr><th>사용자 유형</th><th>시간당 요청</th><th>일일 요청</th><th>동시 연결</th></tr>
+<tr><td>미인증 (공개 데이터만)</td><td>100</td><td>1,000</td><td>1</td></tr>
+<tr><td>학술 연구자</td><td>500</td><td>10,000</td><td>3</td></tr>
+<tr><td>공동체 구성원</td><td>무제한</td><td>무제한</td><td>10</td></tr>
+<tr><td>정부 기관</td><td>1,000</td><td>50,000</td><td>5</td></tr>
+<tr><td>민간 기업</td><td>200</td><td>5,000</td><td>2</td></tr>
+</table>
+
+<h3>과도한 접근 시 자동 공동체 알림</h3>
+<pre><code>// 10분 내 동일 지식 항목 50회 이상 조회 시
+{
+  "alert_type": "EXCESSIVE_ACCESS",
+  "knowledge_id": "tk_ayahuasca_preparation",
+  "user": "researcher_98765",
+  "access_count": 127,
+  "time_window": "10 minutes",
+  "pattern": "Suspected automated scraping",
+
+  "recommended_action": "SUSPEND_ACCESS",
+  "community_decision_required": true,
+
+  "notification_sent_to": [
+    "elders_council@yawanawa.org"
+  ]
+}
+</code></pre>
+</section>
+
+<section>
+<h2>05.8 장 요약</h2>
+<div class="callout" style="border-color:var(--success)">
+<div class="callout-title">✅ 핵심 내용</div>
+<ol>
+<li><strong>공동체 중심 설계</strong>: 기존 API의 기술 중심 접근과 달리, WIA-TK API는 "공동체의 승인"을 핵심으로 하며, 남아프리카 후디아 사건과 같은 생물해적행위를 방지하기 위한 실시간 통보 시스템을 구현합니다.</li>
+<li><strong>3층 보안 아키텍처</strong>: OAuth 2.0 기술 인증, FPIC 공동체 승인, 블록체인 투명성 기록의 3층 구조로 접근 제어와 이익 추적을 보장합니다. 각 층은 독립적으로 작동하면서 상호 보완합니다.</li>
+<li><strong>FPIC 자동화</strong>: 유엔 원주민 권리 선언의 핵심인 사전 정보 동의를 6단계 디지털 워크플로우로 구현하며, 공동체 언어로 된 다국어 문서를 자동 생성하고 조건부 승인 메커니즘을 지원합니다.</li>
+<li><strong>블록체인 투명성</strong>: Ethereum 스마트 계약으로 모든 접근, 동의, 이익 분배를 변조 불가능하게 기록하며, 상업화 시 자동 로열티 분배가 가능합니다. 공동체는 실시간으로 수익을 추적하고 인출할 수 있습니다.</li>
+<li><strong>GraphQL 유연성</strong>: 전통 지식의 복잡한 관계를 효율적으로 조회하기 위해 RESTful API 외에 GraphQL 인터페이스를 제공하며, 클라이언트가 필요한 데이터만 정확히 요청할 수 있습니다.</li>
+<li><strong>공정 사용 보호</strong>: 사용자 유형별 차등 속도 제한과 과도한 접근 탐지 시스템으로 대량 스크래핑을 방지하고, 의심스러운 패턴 발견 시 공동체에 자동 알림을 전송합니다.</li>
+</ol>
+</div>
+
+<div class="philosophy">
+<div class="philosophy-text">弘益人間</div>
+<p>API는 단순한 데이터 접근 인터페이스가 아니라, 공동체와 연구자 간의 신뢰 브리지입니다. 기술은 투명성을 보장하고, 공동체는 통제권을 유지하며, 인류는 지혜를 공유합니다.</p>
+</div>
+</section>
+
+<section>
+<h2>05.9 복습 문제</h2>
+<ol>
+<li>남아프리카 후디아 사건에서 API의 어떤 결함이 생물해적행위를 가능하게 했는지 분석하고, WIA-TK API의 3층 보안 아키텍처가 이를 어떻게 방지하는지 각 층별로 설명하세요.</li>
+<li>OAuth 2.0 토큰의 표준 클레임과 WIA-TK 확장 클레임을 비교하고, 전통 지식 접근 제어에 특화된 5개 이상의 커스텀 클레임의 역할을 설명하세요.</li>
+<li>FPIC 워크플로우의 6단계를 상세히 설명하고, 각 단계에서 공동체의 자기결정권이 어떻게 보장되는지 논의하세요. 조건부 승인의 예시를 3가지 제시하세요.</li>
+<li>Ethereum 스마트 계약의 `grantConsent`, `logAccess`, `payRoyalty` 함수가 어떻게 작동하는지 설명하고, 제약 회사가 전통 지식 기반 신약을 출시했을 때 자동 로열티 분배 프로세스를 단계별로 서술하세요.</li>
+<li>GraphQL API가 RESTful API보다 전통 지식 조회에 적합한 이유를 설명하고, 제공된 스키마를 사용하여 "안데스 지역의 기후 변화 적응 농업 지식"을 조회하는 복잡한 쿼리를 작성하세요.</li>
+<li>속도 제한 정책에서 공동체 구성원에게 무제한 접근을 허용하는 이유를 논의하고, 과도한 접근 탐지 시스템이 10분 내 127회 조회를 "자동화된 스크래핑"으로 판단하는 근거를 설명하세요.</li>
+</ol>
+</section>
+
+<section>
+<h2>05.10 다음 장 예고</h2>
+<p>제6장에서는 여러 공동체와 기관 간 전통 지식을 안전하게 교환하기 위한 프로토콜을 다룹니다. 종단 간 암호화(E2EE) 통신 체계, 장로 디지털 서명을 통한 지식 진위 검증, 문화적 금기를 자동으로 필터링하는 시스템, 동의 철회 시 분산 네트워크에서 데이터를 완전히 삭제하는 메커니즘, 그리고 국경을 넘는 원주민 공동체 간 지식 공유 프로토콜을 상세히 살펴봅니다. 실제 사례로 아마존 유역 7개국 원주민 연합의 의약 지식 교환 네트워크를 분석합니다.</p>
+<hr>
+<p><strong>제5장 완료</strong> | 예상 독서 시간: 19분</p>
+<p><a href="chapter-06.html" style="color:var(--primary)">다음: 제6장 - Phase 3: 프로토콜</a></p>
+</section>
+
+</div>
+</body>
+</html>

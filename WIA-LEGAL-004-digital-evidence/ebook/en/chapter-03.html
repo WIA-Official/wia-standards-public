@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Digital Evidence Collection | WIA-LEGAL-004</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #64748B;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+        }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--text); font-size: 1.3rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--bg); }
+        th, td { padding: 1rem; text-align: left; border: 1px solid var(--border); }
+        th { background: var(--primary); color: white; font-weight: 600; }
+        .summary { background: var(--bg); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; }
+        .summary h3 { color: var(--primary); margin-top: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .nav-links { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .nav-links a { color: var(--primary); text-decoration: none; padding: 0.75rem 1.5rem; border: 1px solid var(--primary); border-radius: 6px; transition: all 0.3s; }
+        .nav-links a:hover { background: var(--primary); color: white; }
+        code { background: var(--bg); color: var(--primary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Courier New', monospace; }
+        pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        .callout { background: rgba(100, 116, 139, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; }
+        .questions { background: var(--bg); padding: 1.5rem; border-radius: 8px; margin: 2rem 0; }
+        .questions ol { margin-left: 1.5rem; }
+        .philosophy { text-align: center; padding: 2rem; margin: 2rem 0; background: var(--bg); border-radius: 8px; }
+        .philosophy-text { font-size: 1.5rem; color: var(--primary); letter-spacing: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 3: Digital Evidence Collection</h1>
+
+        <h2>3.1 The Order of Volatility Principle</h2>
+
+        <p>Digital evidence collection must follow the "order of volatility" principle: collect most volatile evidence first, then progressively less volatile evidence. This prioritization prevents evidence loss when systems power down, networks disconnect, or time-sensitive data expires. RFC 3227 establishes standard volatility ordering, but practitioners must adapt to specific situations, understanding which data disappears quickest and which remains accessible longer.</p>
+
+        <p>Consider investigating a running server suspected of data breach. Volatile RAM contents may reveal decryption keys, active network connections, running processes, and malware in memory—critical evidence that vanishes when the system powers off. Network traffic flowing through the system at collection time provides real-time attack visibility but exists only momentarily. System logs may rotate hourly, daily, or weekly, with old entries disappearing as new ones arrive. Hard drive contents persist unless deliberately deleted or overwritten. Backup tapes may retain evidence for months or years. Each evidence type requires different urgency and different collection techniques.</p>
+
+        <table>
+            <caption>Table 3.1: Evidence Collection Priority by Volatility</caption>
+            <thead>
+                <tr>
+                    <th>Priority Level</th>
+                    <th>Evidence Type</th>
+                    <th>Persistence Duration</th>
+                    <th>Collection Method</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1 - Highest</td>
+                    <td>CPU registers, cache</td>
+                    <td>Milliseconds</td>
+                    <td>Memory dump tools, hardware debuggers</td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td>RAM contents, routing tables</td>
+                    <td>Until power loss</td>
+                    <td>Live memory acquisition, cold boot</td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td>Network connections, processes</td>
+                    <td>Seconds to minutes</td>
+                    <td>Live system commands, packet capture</td>
+                </tr>
+                <tr>
+                    <td>4</td>
+                    <td>Temporary files, swap space</td>
+                    <td>Hours to days</td>
+                    <td>Forensic imaging with write-blocking</td>
+                </tr>
+                <tr>
+                    <td>5</td>
+                    <td>Disk contents, logs</td>
+                    <td>Days to months</td>
+                    <td>Bit-for-bit disk imaging</td>
+                </tr>
+                <tr>
+                    <td>6 - Lowest</td>
+                    <td>Backups, archives</td>
+                    <td>Months to years</td>
+                    <td>Restoration and imaging</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>3.1.1 Live System Collection Dilemmas</h3>
+
+        <p>Collectors face difficult choices with running systems. Powering down preserves current disk state but loses volatile memory and active network connections. Leaving systems running allows volatile evidence collection but risks evidence modification through continued operation. Malware may detect investigation activity and trigger evidence destruction. Legitimate system processes may overwrite critical temporary files. Auto-update mechanisms may modify system files, complicating forensic analysis.</p>
+
+        <p>WIA-LEGAL-004 protocols require documenting collection decisions and their rationales. If collectors power down systems, documentation must explain why volatile evidence was deemed less important than disk preservation. If systems remain running, documentation must detail what commands were executed, what changes occurred, and how evidence integrity was verified despite continued operation.</p>
+
+        <h2>3.2 Forensic Imaging Methodology</h2>
+
+        <p>Forensic imaging creates exact duplicates of storage media, preserving every bit including allocated files, deleted files, slack space, and system metadata. Unlike simple file copying—which captures only active files—forensic imaging replicates entire storage devices at the sector level, enabling complete forensic analysis while protecting original evidence from alteration.</p>
+
+        <h3>3.2.1 Write Blocking Hardware</h3>
+
+        <p>Write blockers prevent any modification to source evidence during imaging. These hardware devices sit between source storage and imaging computers, allowing read operations while blocking all write commands. This protection ensures original evidence remains pristine even if imaging software malfunctions, operators make mistakes, or systems attempt automatic modifications.</p>
+
+        <p>Hardware write blockers provide stronger protection than software write blocking because they operate at the physical interface level, preventing writes before operating systems even process commands. However, hardware blockers cannot protect against certain advanced attacks (firmware modification, command spoofing in intelligent devices) that software blockers might detect through integrity checking.</p>
+
+        <h3>3.2.2 Hash Verification Protocol</h3>
+
+        <p>Hash verification proves images match source evidence byte-for-byte. Forensic tools calculate cryptographic hashes (typically SHA-256, sometimes MD5 and SHA-1 for legacy compatibility) of source media and forensic images. Matching hashes prove perfect duplication; mismatches indicate corruption or alteration requiring investigation.</p>
+
+        <pre><code>// WIA-LEGAL-004 Imaging Verification Protocol
+
+// Step 1: Calculate source hash before imaging
+$ sha256sum /dev/sda
+a4f8e2d9c3b7a1f5e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6  /dev/sda
+
+// Step 2: Create forensic image
+$ dc3dd if=/dev/sda of=/evidence/case123/image.dd hash=sha256 log=/evidence/case123/imaging.log
+    Progress: 500 GB / 1000 GB | Hash: Computing...
+
+// Step 3: Verify image hash matches source
+Source Hash:  a4f8e2d9c3b7a1f5e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6
+Image Hash:   a4f8e2d9c3b7a1f5e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6
+Verification: PASS - Bit-perfect copy confirmed
+
+// Step 4: Document in chain of custody
+{
+  "evidence_id": "CASE-123-HDD-001",
+  "source_device": "/dev/sda",
+  "image_path": "/evidence/case123/image.dd",
+  "hash_algorithm": "SHA-256",
+  "source_hash": "a4f8e2d9c3b7a1f5e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6",
+  "image_hash": "a4f8e2d9c3b7a1f5e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6",
+  "verification": "PASS",
+  "collector": "forensic_analyst_001",
+  "timestamp": "2025-12-27T14:30:00Z",
+  "write_blocker": "Tableau T35u"
+}</code></pre>
+
+        <table>
+            <caption>Table 3.2: Common Forensic Imaging Tools</caption>
+            <thead>
+                <tr>
+                    <th>Tool</th>
+                    <th>Platform</th>
+                    <th>Key Features</th>
+                    <th>Typical Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>FTK Imager</td>
+                    <td>Windows, Linux</td>
+                    <td>GUI interface, multiple hash algorithms, compression</td>
+                    <td>Workstation and laptop imaging</td>
+                </tr>
+                <tr>
+                    <td>dd / dc3dd</td>
+                    <td>Linux, macOS</td>
+                    <td>Command-line, sector-level copy, hash verification</td>
+                    <td>Server imaging, scripted workflows</td>
+                </tr>
+                <tr>
+                    <td>EnCase</td>
+                    <td>Windows</td>
+                    <td>Commercial forensic suite, court-accepted, compression</td>
+                    <td>Law enforcement, litigation support</td>
+                </tr>
+                <tr>
+                    <td>X-Ways Forensics</td>
+                    <td>Windows</td>
+                    <td>Fast processing, low resource usage, advanced features</td>
+                    <td>Large-scale investigations</td>
+                </tr>
+                <tr>
+                    <td>Cellebrite</td>
+                    <td>Dedicated hardware</td>
+                    <td>Mobile device imaging, app data extraction, cloud sync</td>
+                    <td>Smartphone and tablet acquisition</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>3.3 Mobile Device Collection Challenges</h2>
+
+        <p>Smartphones present unique collection challenges: diverse operating systems (iOS, Android, proprietary), manufacturer customizations, carrier modifications, encryption by default, cloud synchronization, remote wipe capabilities, and frequent updates that change extraction techniques. Traditional disk imaging often proves impossible with mobile devices, requiring specialized tools and techniques.</p>
+
+        <h3>3.3.1 Isolation and Faraday Containment</h3>
+
+        <p>Seized mobile devices must be immediately isolated from networks to prevent remote wiping, evidence destruction, or cloud synchronization that might alter device contents. Faraday bags block all radio frequencies (cellular, WiFi, Bluetooth, NFC), preventing device communication. However, some devices enter emergency mode when losing network connectivity, potentially accelerating battery drain or triggering security features. Collectors must balance isolation needs against device preservation requirements.</p>
+
+        <h3>3.3.2 Logical vs Physical Extraction</h3>
+
+        <p>Logical extraction retrieves accessible files through device operating systems and applications—messages, contacts, photos, call logs. This approach preserves user data but misses deleted content, system files, and unallocated space. Physical extraction captures complete device memory including deleted items, system partitions, and hidden data. However, physical extraction often requires device unlocking or exploits, raising legal and technical challenges.</p>
+
+        <h2>3.4 Cloud Evidence Collection</h2>
+
+        <p>Evidence increasingly resides in cloud services rather than local devices. Email exists on Gmail servers, documents live in Office 365, photos sync to iCloud, and business data populates Salesforce, AWS, and Azure. Collecting this evidence requires different techniques than traditional device imaging.</p>
+
+        <h3>3.4.1 Direct Service Access</h3>
+
+        <p>When users provide credentials or consent to access, investigators can directly log into cloud services and preserve evidence. However, direct access creates chain of custody complications: Who logged in? When? What data was downloaded? What changed during access? WIA-LEGAL-004 requires automated logging of all cloud evidence access, capturing exact data retrieved, timestamps, and authentication credentials used.</p>
+
+        <h3>3.4.2 Legal Process and Third-Party Disclosure</h3>
+
+        <p>Subpoenas, court orders, and search warrants compel cloud service providers to disclose user data. Providers typically return evidence in provider-specific formats with varying levels of metadata preservation. Some providers offer law enforcement portals with standardized evidence packages; others provide ad-hoc responses in inconsistent formats. This variability complicates evidence authentication and analysis.</p>
+
+        <table>
+            <caption>Table 3.3: Cloud Evidence Collection Methods</caption>
+            <thead>
+                <tr>
+                    <th>Collection Method</th>
+                    <th>Legal Basis</th>
+                    <th>Data Completeness</th>
+                    <th>Metadata Preservation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>User Consent Access</td>
+                    <td>Voluntary consent</td>
+                    <td>User-visible data only</td>
+                    <td>Limited to UI display</td>
+                </tr>
+                <tr>
+                    <td>API Export</td>
+                    <td>User authorization</td>
+                    <td>API-accessible data</td>
+                    <td>Good (JSON/XML format)</td>
+                </tr>
+                <tr>
+                    <td>Provider Subpoena</td>
+                    <td>Legal compulsion</td>
+                    <td>Depends on request specificity</td>
+                    <td>Variable by provider</td>
+                </tr>
+                <tr>
+                    <td>Warrant Production</td>
+                    <td>Court authorization</td>
+                    <td>Full account contents</td>
+                    <td>Excellent (forensic format)</td>
+                </tr>
+                <tr>
+                    <td>Third-Party Tools</td>
+                    <td>User credentials</td>
+                    <td>Comprehensive extraction</td>
+                    <td>Very good (forensic packaging)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>3.5 Network Traffic Capture</h2>
+
+        <p>Network traffic provides real-time visibility into system communications, revealing malware command-and-control, data exfiltration, unauthorized access, and lateral movement. However, network evidence proves extremely volatile, existing only momentarily as packets traverse networks. Effective capture requires advance preparation, appropriate legal authorization, and careful consideration of privacy implications.</p>
+
+        <h3>3.5.1 Full Packet Capture vs Flow Data</h3>
+
+        <p>Full packet capture records complete network traffic including headers and payloads, enabling deep protocol analysis and content reconstruction. However, high-speed networks generate massive data volumes—10 Gbps networks can produce terabytes per day—making comprehensive packet capture expensive and storage-intensive. Flow data (NetFlow, sFlow, IPFIX) records metadata about connections—source, destination, ports, protocols, volume—without capturing payloads. Flow data requires minimal storage but provides limited investigation capabilities.</p>
+
+        <h3>3.5.2 Encryption and Traffic Analysis</h3>
+
+        <p>Modern network traffic is predominantly encrypted via TLS/SSL, preventing payload inspection. Investigators can capture encrypted traffic but cannot decrypt without private keys. Traffic analysis examines connection patterns, volume, timing, and unencrypted metadata despite encryption. These techniques identify suspicious behavior—unusual destinations, abnormal volumes, irregular timing—without accessing encrypted content.</p>
+
+        <pre><code>// WIA-LEGAL-004 Network Evidence Capture
+
+// Capture configuration with privacy protections
+{
+  "capture_id": "NET-CASE-456-001",
+  "authorization": "warrant-2025-12-27-789",
+  "capture_filter": {
+    "target_ips": ["192.0.2.50", "192.0.2.51"],
+    "exclude_ips": ["192.0.2.10"], // Exclude attorney-client traffic
+    "protocols": ["HTTP", "HTTPS", "DNS", "SMTP"],
+    "minimize_personal_data": true
+  },
+  "capture_parameters": {
+    "mode": "full_packet",
+    "max_capture_size": "100GB",
+    "duration": "24_hours",
+    "encryption_handling": "capture_encrypted_preserve_metadata",
+    "privacy_redaction": true
+  },
+  "chain_of_custody": {
+    "capture_start": "2025-12-27T15:00:00Z",
+    "capture_device": "wireshark-server-03",
+    "analyst": "network_forensics_002",
+    "storage_location": "/secure/evidence/case456/",
+    "hash_algorithm": "SHA-256"
+  }
+}
+
+// Captured traffic metadata example
+Connection: 192.0.2.50:45891 → 203.0.113.100:443 [HTTPS]
+  Duration: 127 seconds
+  Bytes sent: 45,231
+  Bytes received: 892,445
+  SNI: suspicious-domain.example
+  Certificate: CN=*.example, Valid: 2025-01-01 to 2026-01-01
+  TLS Version: 1.3
+  Cipher: TLS_AES_256_GCM_SHA384
+  // Payload: [Encrypted - Not Available]
+  // Traffic Pattern: Consistent with data exfiltration profile</code></pre>
+
+        <h2>3.6 Social Media and Online Evidence</h2>
+
+        <p>Social media platforms contain vast amounts of potential evidence: posts, messages, photos, videos, comments, likes, friend connections, location check-ins, and more. This evidence proves both valuable and vulnerable—users can delete posts, accounts can be suspended, and platforms can change access policies. Timely, authenticated collection proves essential.</p>
+
+        <h3>3.6.1 Screen Capture vs API Collection</h3>
+
+        <p>Screen captures provide visual evidence of social media content as it appears to users. Courts readily understand screenshot evidence, and captures preserve visual context including user interfaces, timestamps, and platform branding. However, screenshots alone provide weak authentication—they can be easily fabricated with browser developer tools or image editing. Metadata from screenshots reveals creation times but not content authenticity.</p>
+
+        <p>API-based collection retrieves structured data directly from platforms, preserving extensive metadata and enabling authentication through platform verification. However, APIs may not capture all user-visible content (formatting, visual styling, context). WIA-LEGAL-004 recommends combined approaches: screen captures for visual documentation plus API data for authentication and metadata preservation.</p>
+
+        <h3>3.6.2 Authentication Challenges</h3>
+
+        <p>Authenticating social media evidence requires proving: (1) the account belongs to the claimed user, (2) the content was actually posted by that user, (3) the content has not been altered since posting, and (4) the capture accurately reflects the original content. Each element presents difficulties. Anonymous accounts lack clear ownership proof. Account hijacking means legitimate users may not control their accounts. Post editing and deletion capabilities mean current content may differ from historical content.</p>
+
+        <div class="callout">
+            <h3>Case Study: Authenticating Instagram Evidence</h3>
+            <p>In Commonwealth v. Williams (2019), prosecutors sought to introduce Instagram posts allegedly showing defendant's gang affiliation. Defense challenged authentication, arguing posts could have been fabricated. The court required prosecution to demonstrate: (1) testimony from witnesses who saw defendant post content, (2) distinctive profile features matching defendant (photos, username, biographical info), (3) IP logs from Instagram showing posts originated from defendant's known locations, and (4) verification from Instagram's records team confirming post authenticity.</p>
+            <p>This multi-layered authentication approach—combining witness testimony, circumstantial indicators, technical records, and platform verification—demonstrates the rigorous proof required for social media evidence admissibility.</p>
+        </div>
+
+        <h2>3.7 Collection Documentation Requirements</h2>
+
+        <p>Every evidence collection activity must be comprehensively documented to establish chain of custody, prove integrity, and enable reproduction. WIA-LEGAL-004 specifies mandatory documentation including: collector identity and credentials, evidence description and location, collection date and time, collection methodology and tools, hash values and verification, storage location, and any issues or anomalies encountered.</p>
+
+        <h3>3.7.1 Automated Collection Logging</h3>
+
+        <p>Manual documentation introduces errors, omissions, and credibility challenges. Automated logging systems capture collection activities electronically, recording exact commands executed, files accessed, hashes calculated, and errors encountered. These logs provide contemporaneous records resistant to later alteration or reconstruction from memory. WIA-LEGAL-004-compliant tools automatically generate structured logs in standardized JSON formats suitable for blockchain chain of custody recording.</p>
+
+        <h3>3.7.2 Photographic Documentation</h3>
+
+        <p>Photographs document physical evidence conditions: computer connections before disconnection, device damage or peculiarities, evidence storage configurations, serial numbers and labels. Visual documentation provides verification that written descriptions accurately reflect actual conditions and helps explain technical configurations to non-technical audiences. Photos should include timestamps, location metadata, and photographer identification embedded in EXIF data.</p>
+
+        <div class="summary">
+            <h3>Chapter Summary</h3>
+            <p><strong>Key Takeaways:</strong></p>
+            <ol>
+                <li>Evidence collection must follow the order of volatility principle, prioritizing ephemeral evidence (RAM, network traffic) before persistent evidence (disk contents, backups) to prevent critical data loss.</li>
+                <li>Forensic imaging creates bit-perfect storage media copies using write-blocking hardware and hash verification, preserving deleted files and metadata while protecting original evidence from modification.</li>
+                <li>Mobile devices require specialized collection techniques including Faraday isolation, logical versus physical extraction trade-offs, and cloud synchronization management that traditional computer forensics cannot adequately address.</li>
+                <li>Cloud evidence collection through direct access, API exports, and legal process presents chain of custody and authentication challenges requiring automated logging and standardized evidence packaging.</li>
+                <li>Comprehensive documentation through automated logging, photographic records, and standardized reporting establishes evidence authenticity, enables collection process verification, and satisfies chain of custody requirements.</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Explain the order of volatility principle. Why must investigators collect RAM contents before powering down systems, even though this risks evidence modification?</li>
+                <li>What is the purpose of write-blocking hardware during forensic imaging? How does hardware write-blocking differ from software write-blocking?</li>
+                <li>Describe the difference between logical and physical mobile device extraction. What evidence might logical extraction miss that physical extraction would capture?</li>
+                <li>What are the primary challenges in authenticating social media evidence? Why are screenshots alone insufficient for authentication?</li>
+                <li>Explain how network flow data differs from full packet capture. What investigation capabilities does full packet capture provide that flow data cannot?</li>
+                <li>What documentation must accompany digital evidence collection according to WIA-LEGAL-004? Why is automated logging superior to manual documentation?</li>
+            </ol>
+        </div>
+
+        <div class="callout">
+            <h3>Looking Ahead</h3>
+            <p>Chapter 4 examines evidence preservation and storage requirements, exploring how collected evidence must be protected from corruption, unauthorized access, and degradation throughout investigation and litigation lifecycles.</p>
+        </div>
+
+        <div class="philosophy">
+            <p class="philosophy-text">弘益人間</p>
+            <p style="color: var(--text-dim); margin-top: 0.5rem;">Benefit All Humanity</p>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-02.html">← Previous Chapter</a>
+            <a href="chapter-04.html">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

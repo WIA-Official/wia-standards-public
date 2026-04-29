@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: Phase 3 - 실시간 프로토콜 - WIA-ART-008</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #F59E0B; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; box-shadow: 0 10px 40px rgba(245, 158, 11, 0.1); }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; text-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        p { margin: 1rem 0; text-align: justify; color: var(--text-secondary); }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; color: var(--text-secondary); }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .philosophy { text-align: center; font-size: 1.5rem; color: var(--primary); margin: 2rem 0; padding: 1rem; background: rgba(245, 158, 11, 0.1); border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: rgba(245, 158, 11, 0.05); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; font-weight: bold; transition: all 0.3s; }
+        .btn:hover { background: #D97706; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(245, 158, 11, 0.3); }
+        .key-takeaways { background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.05) 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; border: 2px solid rgba(245, 158, 11, 0.3); }
+        .key-takeaways h3 { margin-top: 0; }
+        .review-questions { background: rgba(245, 158, 11, 0.05); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; }
+        .review-questions h3 { margin-top: 0; }
+        .review-questions ol { margin-left: 1.5rem; }
+        .review-questions li { margin: 1rem 0; line-height: 1.6; }
+        strong { color: var(--primary); }
+        code { background: var(--bg-tertiary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 0.9em; }
+        pre { background: var(--bg-tertiary); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; padding: 0; }
+        .protocol-box { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border: 1px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제6장: Phase 3 - 실시간 프로토콜</h1>
+
+        <div class="philosophy">
+            弘益人間 · 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>개요</h2>
+        <p>
+            Phase 3는 디지털 패션 자산의 실시간 협업과 라이브 이벤트를 가능하게 하는 통신 프로토콜을 정의합니다.
+            여러 디자이너가 동시에 같은 의상을 편집하거나, 메타버스 패션쇼에서 실시간으로 의상이 변경되는 시나리오를
+            지원하기 위해 WebSocket 기반 이벤트 스트리밍, Operational Transform(OT), Conflict-free Replicated Data Types(CRDT)
+            등의 기술을 활용합니다.
+        </p>
+
+        <p>
+            이 장에서는 실시간 프로토콜의 설계 원칙, WebSocket 연결 관리, 이벤트 타입, 동시 편집 충돌 해결,
+            상태 동기화 전략, 그리고 실제 구현 예시를 다룹니다.
+        </p>
+
+        <h2>WebSocket 연결</h2>
+
+        <h3>1. 연결 수립</h3>
+        <p>
+            WIA-ART-008 실시간 프로토콜은 WebSocket을 사용하여 클라이언트와 서버 간 양방향 통신을 수립합니다.
+        </p>
+
+        <pre><code>// TypeScript 클라이언트 예시
+import { WIARealtimeClient } from '@wia/art-008-sdk';
+
+const rtClient = new WIARealtimeClient({
+  endpoint: 'wss://realtime.wiastandards.org/art-008/v1',
+  accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+});
+
+// WebSocket 연결
+await rtClient.connect();
+
+// 연결 상태 이벤트
+rtClient.on('connected', () => {
+  console.log('Connected to WIA real-time server');
+});
+
+rtClient.on('disconnected', () => {
+  console.log('Disconnected. Attempting reconnection...');
+});
+
+rtClient.on('error', (error) => {
+  console.error('WebSocket error:', error);
+});</code></pre>
+
+        <h3>2. 연결 인증</h3>
+        <p>
+            WebSocket 연결 시 OAuth 2.0 access token 또는 Web3 서명을 사용하여 인증합니다.
+        </p>
+
+        <div class="protocol-box">
+            <h4>연결 핸드셰이크</h4>
+            <pre><code>// 클라이언트 → 서버
+{
+  "type": "auth",
+  "payload": {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "client_id": "fashion-editor-v1.0",
+    "capabilities": ["edit", "subscribe", "broadcast"]
+  }
+}
+
+// 서버 → 클라이언트
+{
+  "type": "auth_success",
+  "payload": {
+    "session_id": "sess_abc123",
+    "user_id": "0x742d35Cc...",
+    "expires_at": "2024-03-15T12:30:00Z"
+  }
+}</code></pre>
+        </div>
+
+        <h2>이벤트 타입</h2>
+
+        <p>
+            WIA-ART-008 실시간 프로토콜은 다음 이벤트 타입을 정의합니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>이벤트 타입</th>
+                    <th>방향</th>
+                    <th>설명</th>
+                    <th>페이로드</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>garment.created</code></td>
+                    <td>서버 → 클라이언트</td>
+                    <td>새 의상 생성 알림</td>
+                    <td>의상 메타데이터</td>
+                </tr>
+                <tr>
+                    <td><code>garment.updated</code></td>
+                    <td>서버 → 클라이언트</td>
+                    <td>의상 수정 알림</td>
+                    <td>변경된 필드만</td>
+                </tr>
+                <tr>
+                    <td><code>garment.deleted</code></td>
+                    <td>서버 → 클라이언트</td>
+                    <td>의상 삭제 알림</td>
+                    <td>의상 ID</td>
+                </tr>
+                <tr>
+                    <td><code>edit.lock</code></td>
+                    <td>클라이언트 ↔ 서버</td>
+                    <td>편집 잠금 요청/응답</td>
+                    <td>잠금 범위, 기간</td>
+                </tr>
+                <tr>
+                    <td><code>edit.operation</code></td>
+                    <td>클라이언트 → 서버</td>
+                    <td>편집 작업 전송</td>
+                    <td>OT operation</td>
+                </tr>
+                <tr>
+                    <td><code>edit.broadcast</code></td>
+                    <td>서버 → 클라이언트</td>
+                    <td>편집 작업 브로드캐스트</td>
+                    <td>OT operation</td>
+                </tr>
+                <tr>
+                    <td><code>presence.join</code></td>
+                    <td>서버 → 클라이언트</td>
+                    <td>사용자 참여</td>
+                    <td>사용자 정보</td>
+                </tr>
+                <tr>
+                    <td><code>presence.leave</code></td>
+                    <td>서버 → 클라이언트</td>
+                    <td>사용자 퇴장</td>
+                    <td>사용자 ID</td>
+                </tr>
+                <tr>
+                    <td><code>cursor.move</code></td>
+                    <td>클라이언트 ↔ 서버</td>
+                    <td>커서 위치 공유</td>
+                    <td>3D 좌표</td>
+                </tr>
+                <tr>
+                    <td><code>live.stream</code></td>
+                    <td>서버 → 클라이언트</td>
+                    <td>라이브 이벤트 스트림</td>
+                    <td>이벤트 데이터</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>실시간 협업 편집</h2>
+
+        <h3>1. 의상 구독 (Subscribe)</h3>
+        <p>
+            특정 의상의 변경사항을 실시간으로 받기 위해 구독합니다.
+        </p>
+
+        <pre><code>// 의상 구독
+await rtClient.subscribe('garment', 'urn:uuid:abc123');
+
+// 변경 이벤트 수신
+rtClient.on('garment.updated', (event) => {
+  console.log('Garment updated:', event.garment_id);
+  console.log('Changed fields:', event.changes);
+  console.log('Editor:', event.editor.name);
+
+  // UI 업데이트
+  updateGarmentView(event.changes);
+});
+
+// 구독 해제
+await rtClient.unsubscribe('garment', 'urn:uuid:abc123');</code></pre>
+
+        <h3>2. Operational Transform (OT)</h3>
+        <p>
+            여러 사용자가 동시에 같은 의상을 편집할 때 충돌을 방지하기 위해 Operational Transform 알고리즘을 사용합니다.
+        </p>
+
+        <div class="highlight-box">
+            <h3>OT 동작 원리</h3>
+            <p>
+                <strong>시나리오:</strong> 디자이너 A와 B가 동시에 같은 드레스의 색상을 변경합니다.
+            </p>
+            <ol>
+                <li>초기 상태: <code>color: "#FF0000"</code></li>
+                <li>A가 <code>"#00FF00"</code>으로 변경 (Operation 1)</li>
+                <li>B가 <code>"#0000FF"</code>로 변경 (Operation 2)</li>
+                <li>서버가 Operation 1을 먼저 받음 → 적용</li>
+                <li>서버가 Operation 2를 받음 → Operation 1에 대해 변환(transform) → 적용</li>
+                <li>최종 상태는 마지막 작업인 B의 <code>"#0000FF"</code></li>
+            </ol>
+        </div>
+
+        <pre><code>// 편집 작업 전송
+await rtClient.sendOperation({
+  garment_id: 'urn:uuid:abc123',
+  operation: {
+    type: 'set',
+    path: 'semantic.color_primary',
+    value: '#00FF00',
+    version: 42  // 로컬 버전 번호
+  }
+});
+
+// 서버로부터 변환된 작업 수신
+rtClient.on('edit.broadcast', (event) => {
+  if (event.operation.version > localVersion) {
+    applyOperation(event.operation);
+    localVersion = event.operation.version;
+  }
+});</code></pre>
+
+        <h3>3. 편집 잠금 (Locking)</h3>
+        <p>
+            특정 부분을 배타적으로 편집하기 위해 잠금을 요청할 수 있습니다.
+        </p>
+
+        <pre><code>// 특정 필드 잠금 요청
+const lock = await rtClient.requestLock({
+  garment_id: 'urn:uuid:abc123',
+  scope: 'semantic.color_primary',
+  duration: 300  // 5분
+});
+
+if (lock.granted) {
+  console.log('Lock acquired. Editing...');
+
+  // 편집 수행
+  await client.garments.update(garmentId, {
+    semantic: { color_primary: '#00FF00' }
+  });
+
+  // 잠금 해제
+  await rtClient.releaseLock(lock.lock_id);
+} else {
+  console.log('Lock denied. Field is being edited by:', lock.owner);
+}</code></pre>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>잠금 범위</th>
+                    <th>대상</th>
+                    <th>허용 동시 편집</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>전체</strong></td>
+                    <td>의상 전체</td>
+                    <td>❌</td>
+                </tr>
+                <tr>
+                    <td><strong>섹션</strong></td>
+                    <td>metadata, technical, semantic 등</td>
+                    <td>다른 섹션만</td>
+                </tr>
+                <tr>
+                    <td><strong>필드</strong></td>
+                    <td>semantic.color_primary 등 개별 필드</td>
+                    <td>다른 필드만</td>
+                </tr>
+                <tr>
+                    <td><strong>레이어</strong></td>
+                    <td>특정 glTF 레이어</td>
+                    <td>다른 레이어만</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Presence (참여자 정보)</h2>
+
+        <p>
+            협업 세션에 참여 중인 사용자 목록과 각자의 활동 상태를 실시간으로 공유합니다.
+        </p>
+
+        <pre><code>// Presence 구독
+await rtClient.subscribePresence('garment', 'urn:uuid:abc123');
+
+// 참여자 정보 수신
+rtClient.on('presence.join', (user) => {
+  console.log(`${user.name} joined the session`);
+  displayUserCursor(user);
+});
+
+rtClient.on('presence.leave', (userId) => {
+  console.log(`User ${userId} left the session`);
+  removeUserCursor(userId);
+});
+
+// 현재 참여자 목록 조회
+const participants = await rtClient.getPresence('garment', 'urn:uuid:abc123');
+console.log('Active participants:', participants);
+
+// 커서 위치 공유
+rtClient.sendCursor({
+  garment_id: 'urn:uuid:abc123',
+  position: { x: 0.5, y: 0.3, z: 0.1 },
+  viewport: { zoom: 1.5, rotation: [0, 45, 0] }
+});
+
+// 다른 사용자 커서 표시
+rtClient.on('cursor.move', (event) => {
+  updateCursor(event.user_id, event.position);
+});</code></pre>
+
+        <h2>라이브 이벤트 스트리밍</h2>
+
+        <h3>1. 패션쇼 라이브 스트리밍</h3>
+        <p>
+            메타버스 패션쇼에서 의상이 실시간으로 변경되는 것을 수천 명의 시청자가 동시에 볼 수 있습니다.
+        </p>
+
+        <div class="protocol-box">
+            <h4>라이브 스트림 구조</h4>
+            <pre><code>// 스트림 구독
+await rtClient.subscribeLiveStream('fashion-show-2024');
+
+// 이벤트 수신
+rtClient.on('live.stream', (event) => {
+  switch (event.event_type) {
+    case 'garment_showcase':
+      displayGarment(event.garment);
+      break;
+    case 'garment_transform':
+      animateGarmentChange(event.from, event.to, event.duration);
+      break;
+    case 'announcement':
+      showAnnouncement(event.message);
+      break;
+  }
+});
+
+// 이벤트 예시
+{
+  "stream_id": "fashion-show-2024",
+  "event_type": "garment_transform",
+  "timestamp": "2024-03-15T19:30:45Z",
+  "sequence": 127,
+  "payload": {
+    "from": "urn:uuid:dress-001",
+    "to": "urn:uuid:dress-002",
+    "duration": 3000,
+    "transition": "fade"
+  }
+}</code></pre>
+        </div>
+
+        <h3>2. Pub/Sub 패턴</h3>
+        <p>
+            WIA-ART-008 실시간 프로토콜은 Publish/Subscribe 패턴을 사용하여 확장 가능한 이벤트 배포를 지원합니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>채널 타입</th>
+                    <th>패턴</th>
+                    <th>예시</th>
+                    <th>용도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>garment:{id}</strong></td>
+                    <td>단일 의상</td>
+                    <td>garment:urn:uuid:abc123</td>
+                    <td>특정 의상 실시간 편집</td>
+                </tr>
+                <tr>
+                    <td><strong>collection:{id}</strong></td>
+                    <td>컬렉션</td>
+                    <td>collection:summer-2024</td>
+                    <td>컬렉션 내 모든 의상 업데이트</td>
+                </tr>
+                <tr>
+                    <td><strong>creator:{wallet}</strong></td>
+                    <td>창작자</td>
+                    <td>creator:0x742d35...</td>
+                    <td>창작자의 모든 작품 업데이트</td>
+                </tr>
+                <tr>
+                    <td><strong>live:{event}</strong></td>
+                    <td>라이브 이벤트</td>
+                    <td>live:fashion-show-2024</td>
+                    <td>패션쇼, 런웨이 스트리밍</td>
+                </tr>
+                <tr>
+                    <td><strong>platform:{name}</strong></td>
+                    <td>플랫폼</td>
+                    <td>platform:decentraland</td>
+                    <td>플랫폼별 업데이트</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>충돌 해결 전략</h2>
+
+        <h3>1. Last-Write-Wins (LWW)</h3>
+        <p>
+            가장 최근의 쓰기 작업이 승리합니다. 간단하지만 데이터 손실 가능성이 있습니다.
+        </p>
+
+        <pre><code>{
+  "strategy": "last-write-wins",
+  "timestamp": "2024-03-15T10:30:45.123Z",
+  "operation": {
+    "path": "semantic.color_primary",
+    "value": "#FF0000"
+  }
+}</code></pre>
+
+        <h3>2. Version Vector</h3>
+        <p>
+            각 클라이언트의 버전을 추적하여 인과 관계(causality)를 보장합니다.
+        </p>
+
+        <pre><code>{
+  "strategy": "version-vector",
+  "version": {
+    "client_a": 5,
+    "client_b": 3,
+    "client_c": 7
+  },
+  "operation": { ... }
+}</code></pre>
+
+        <h3>3. CRDT (Conflict-free Replicated Data Type)</h3>
+        <p>
+            수학적으로 증명된 충돌 없는 데이터 구조를 사용합니다.
+        </p>
+
+        <pre><code>// CRDT 카운터 예시 (의상 좋아요 수)
+{
+  "type": "g-counter",
+  "increments": {
+    "client_a": 5,
+    "client_b": 3,
+    "client_c": 2
+  },
+  "value": 10  // 5 + 3 + 2
+}</code></pre>
+
+        <h2>성능 최적화</h2>
+
+        <h3>1. 델타 동기화</h3>
+        <p>
+            전체 상태가 아닌 변경된 부분만 전송하여 대역폭을 절약합니다.
+        </p>
+
+        <pre><code>// 전체 상태 전송 (비효율)
+{
+  "garment": {
+    "id": "...",
+    "name": "...",
+    "semantic": {
+      "color_primary": "#FF0000",
+      "color_secondary": ["#00FF00", "#0000FF"],
+      // ... 모든 필드
+    }
+  }
+}
+
+// 델타만 전송 (효율적)
+{
+  "garment_id": "urn:uuid:abc123",
+  "delta": {
+    "semantic.color_primary": "#FF0000"
+  }
+}</code></pre>
+
+        <h3>2. 배치 처리</h3>
+        <p>
+            여러 작은 이벤트를 모아서 한 번에 전송합니다.
+        </p>
+
+        <pre><code>// 100ms마다 변경사항을 배치로 전송
+const batchQueue = [];
+setInterval(() => {
+  if (batchQueue.length > 0) {
+    rtClient.sendBatch(batchQueue);
+    batchQueue.length = 0;
+  }
+}, 100);</code></pre>
+
+        <h3>3. 압축</h3>
+        <p>
+            대용량 메시지는 gzip 또는 Brotli로 압축하여 전송합니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>메시지 크기</th>
+                    <th>압축 사용</th>
+                    <th>예상 압축률</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>&lt; 1KB</td>
+                    <td>없음</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>1KB - 10KB</td>
+                    <td>gzip</td>
+                    <td>60-70%</td>
+                </tr>
+                <tr>
+                    <td>&gt; 10KB</td>
+                    <td>Brotli</td>
+                    <td>70-80%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="key-takeaways">
+            <h3>핵심 요점</h3>
+            <ul>
+                <li><strong>WebSocket 기반:</strong> wss:// 프로토콜로 양방향 실시간 통신. OAuth 2.0 또는 Web3 서명으로 연결 인증. 자동 재연결 및 백오프 전략 지원.</li>
+                <li><strong>이벤트 타입:</strong> garment.created/updated/deleted, edit.lock/operation/broadcast, presence.join/leave, cursor.move, live.stream 등 10가지 표준 이벤트 정의.</li>
+                <li><strong>협업 편집:</strong> Operational Transform(OT)으로 동시 편집 충돌 해결. 편집 잠금(전체/섹션/필드/레이어 단위)으로 배타적 접근 보장. 실시간 커서 공유.</li>
+                <li><strong>Presence:</strong> 참여자 목록, 활동 상태, 커서 위치 실시간 공유. 협업 세션의 투명성과 조율 향상.</li>
+                <li><strong>Pub/Sub 패턴:</strong> 채널 기반 메시지 배포(garment:{id}, collection:{id}, creator:{wallet}, live:{event}). 확장 가능한 이벤트 스트리밍.</li>
+                <li><strong>성능 최적화:</strong> 델타 동기화(변경 부분만 전송), 배치 처리(100ms 간격), 메시지 압축(gzip/Brotli). 충돌 해결(LWW, Version Vector, CRDT).</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li><strong>WIA-ART-008 WebSocket 연결 수립 과정을 설명하십시오. 인증 핸드셰이크에서 클라이언트가 전송하는 정보(access_token, client_id, capabilities)와 서버 응답(session_id, user_id, expires_at)의 역할을 서술하십시오.</strong></li>
+                <li><strong>실시간 프로토콜의 10가지 이벤트 타입을 표로 정리하고, 각 이벤트의 방향(클라이언트 → 서버, 서버 → 클라이언트, 양방향), 용도, 페이로드 구조를 설명하십시오.</strong></li>
+                <li><strong>Operational Transform(OT)의 동작 원리를 예시와 함께 설명하십시오. 두 디자이너가 동시에 같은 의상의 색상을 변경할 때 충돌이 어떻게 해결되는지 단계별로 서술하십시오.</strong></li>
+                <li><strong>네 가지 편집 잠금 범위(전체, 섹션, 필드, 레이어)를 비교하고, 각 범위에서 허용되는 동시 편집의 수준을 설명하십시오. 편집 잠금 요청/해제 코드를 작성하십시오.</strong></li>
+                <li><strong>Presence 기능을 설명하고, presence.join, presence.leave, cursor.move 이벤트가 협업 편집에서 어떤 역할을 하는지 서술하십시오. 다섯 가지 Pub/Sub 채널 타입(garment:{id}, collection:{id}, creator:{wallet}, live:{event}, platform:{name})의 용도를 설명하십시오.</strong></li>
+                <li><strong>세 가지 충돌 해결 전략(Last-Write-Wins, Version Vector, CRDT)을 비교하고 각각의 장단점을 분석하십시오. 성능 최적화 기법(델타 동기화, 배치 처리, 압축)이 대역폭과 응답 속도에 미치는 영향을 설명하십시오.</strong></li>
+            </ol>
+        </div>
+
+        <h2>다음 장 예고</h2>
+        <p>
+            제7장에서는 Phase 4(통합)를 다룹니다. CLO3D, Marvelous Designer, Browzwear 등 전문 도구에서
+            WIA-ART-008로 내보내기, Decentraland, Roblox, VRChat 등 메타버스 플랫폼으로 임포트하기,
+            Unity/Unreal Engine 게임 엔진 플러그인, 클라우드 스토리지 연동을 배웁니다.
+            또한 레거시 시스템 마이그레이션 전략과 엔터프라이즈 PLM 통합 사례를 실습합니다.
+        </p>
+
+        <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);">
+        </div>
+</body>
+</html>

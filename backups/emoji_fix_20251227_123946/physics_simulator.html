@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Physics - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #A855F7;
+            --primary-dark: #9333EA;
+            --secondary: #F59E0B;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #E879F9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .reactor-viz { background: radial-gradient(circle at center, #ff6b35 0%, #f7931e 30%, #9333EA 60%, #1e293b 100%); width: 200px; height: 200px; border-radius: 50%; margin: 30px auto; display: flex; align-items: center; justify-content: center; animation: pulse-reactor 2s ease-in-out infinite; box-shadow: 0 0 60px rgba(168, 85, 247, 0.5); }
+        @keyframes pulse-reactor { 0%, 100% { transform: scale(1); box-shadow: 0 0 60px rgba(168, 85, 247, 0.5); } 50% { transform: scale(1.05); box-shadow: 0 0 100px rgba(168, 85, 247, 0.8); } }
+        .reactor-temp { font-size: 1.5rem; font-weight: bold; color: white; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
+
+        .settings-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+        .settings-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .settings-card h5 { color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+
+        .slider-row { padding: 15px 0; border-bottom: 1px solid var(--border); }
+        .slider-row:last-child { border-bottom: none; }
+        .slider-label { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .slider-value { color: var(--primary); font-weight: 600; }
+        input[type="range"] { width: 100%; height: 8px; border-radius: 4px; background: var(--border); appearance: none; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--primary); cursor: pointer; }
+
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .toggle-row:last-child { border-bottom: none; }
+        .toggle-switch { position: relative; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 26px; transition: 0.3s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(24px); }
+
+        .particle-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin: 20px 0; }
+        .particle-card { background: var(--bg); border: 2px solid var(--border); border-radius: 10px; padding: 15px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .particle-card:hover { border-color: var(--primary); }
+        .particle-card.selected { border-color: var(--primary); background: rgba(168, 85, 247, 0.1); }
+        .particle-icon { font-size: 2rem; margin-bottom: 8px; }
+        .particle-name { font-weight: 600; font-size: 0.9rem; }
+        .particle-mass { font-size: 0.75rem; color: var(--text-muted); }
+
+        .crystal-viz { background: linear-gradient(135deg, #1e1b4b, #312e81); border-radius: 12px; padding: 40px; margin: 20px 0; text-align: center; position: relative; overflow: hidden; }
+        .time-crystal { width: 100px; height: 100px; margin: 0 auto; background: linear-gradient(45deg, var(--primary), #E879F9); clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); animation: rotate-crystal 3s linear infinite; }
+        @keyframes rotate-crystal { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .dark-matter-viz { background: radial-gradient(ellipse at center, rgba(168, 85, 247, 0.2) 0%, transparent 70%); border-radius: 12px; padding: 40px; margin: 20px 0; text-align: center; }
+        .halo { width: 200px; height: 200px; margin: 0 auto; border: 3px dashed var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; animation: spin-halo 10s linear infinite; }
+        @keyframes spin-halo { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .metric-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .metric-value { font-size: 1.3rem; font-weight: bold; color: var(--primary); }
+        .metric-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .settings-grid { grid-template-columns: 1fr; }
+            .metric-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Physics</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">⚡ WIA Physics</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Physics Computing Standard" data-ko="물리 컴퓨팅 표준">Physics Computing Standard</h1>
+            <p data-en="Fusion, particles, dark matter, quantum gravity" data-ko="핵융합, 입자, 암흑물질, 양자중력">Fusion, particles, quantum gravity</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="☢️ Fusion" data-ko="☢️ 핵융합">☢️ Fusion</div>
+            <div class="tab" onclick="showPanel(1)" data-en="⏰ Crystal" data-ko="⏰ 크리스탈">⏰ Crystal</div>
+            <div class="tab" onclick="showPanel(2)" data-en="⚛️ Particle" data-ko="⚛️ 입자">⚛️ Particle</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🌑 Dark" data-ko="🌑 암흑물질">🌑 Dark</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🔬 Gravity" data-ko="🔬 중력">🔬 Gravity</div>
+        </div>
+
+        <!-- Panel 0: Fusion -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="☢️ Nuclear Fusion Simulator" data-ko="☢️ 핵융합 시뮬레이터">☢️ Nuclear Fusion</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Tokamak and stellarator plasma simulation" data-ko="토카막 및 스텔러레이터 플라즈마 시뮬레이션">Plasma simulation</p>
+
+            <div class="reactor-viz">
+                <div class="reactor-temp" id="plasmaTemp">150M K</div>
+            </div>
+
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <h5>🌡️ <span data-en="Plasma Parameters" data-ko="플라즈마 파라미터">Plasma</span></h5>
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span data-en="Temperature" data-ko="온도">Temperature</span>
+                            <span class="slider-value" id="tempValue">150 MK</span>
+                        </div>
+                        <input type="range" min="50" max="300" value="150" oninput="updateTemp(this.value)">
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span data-en="Density" data-ko="밀도">Density</span>
+                            <span class="slider-value" id="densityValue">10²⁰ m⁻³</span>
+                        </div>
+                        <input type="range" min="19" max="22" value="20" oninput="updateDensity(this.value)">
+                    </div>
+                </div>
+                <div class="settings-card">
+                    <h5>🧲 <span data-en="Magnetic Confinement" data-ko="자기 가둠">Confinement</span></h5>
+                    <div class="toggle-row">
+                        <span>Tokamak</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span>Stellarator</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value" id="qValue">Q > 1</div>
+                    <div class="metric-label" data-en="Energy Gain" data-ko="에너지 이득">Q Factor</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">D-T</div>
+                    <div class="metric-label" data-en="Fuel" data-ko="연료">Fuel</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">5.6 T</div>
+                    <div class="metric-label" data-en="Magnetic Field" data-ko="자기장">B Field</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">500 MW</div>
+                    <div class="metric-label" data-en="Target Power" data-ko="목표 출력">Power</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runFusion()" data-en="☢️ Ignite Plasma" data-ko="☢️ 플라즈마 점화">☢️ Ignite</button>
+            </div>
+            <div class="output" id="fusionOutput"></div>
+        </div>
+
+        <!-- Panel 1: Time Crystal -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="⏰ Time Crystal Simulator" data-ko="⏰ 타임 크리스탈 시뮬레이터">⏰ Time Crystal</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Discrete time translation symmetry breaking" data-ko="이산 시간 병진 대칭 깨짐">Time symmetry breaking</p>
+
+            <div class="crystal-viz">
+                <div class="time-crystal"></div>
+                <p style="color: var(--primary); margin-top: 20px;" data-en="Period: 2T (time-doubled)" data-ko="주기: 2T (시간 두배)">Period: 2T</p>
+            </div>
+
+            <div class="settings-card" style="margin: 20px 0;">
+                <h5>⚙️ <span data-en="Crystal Parameters" data-ko="크리스탈 파라미터">Parameters</span></h5>
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span data-en="Drive Frequency" data-ko="구동 주파수">Drive ω</span>
+                        <span class="slider-value" id="driveFreq">1.0 MHz</span>
+                    </div>
+                    <input type="range" min="0.1" max="10" step="0.1" value="1" oninput="updateDrive(this.value)">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span data-en="Interaction Strength" data-ko="상호작용 강도">J</span>
+                        <span class="slider-value" id="interactionJ">0.5</span>
+                    </div>
+                    <input type="range" min="0" max="1" step="0.01" value="0.5" oninput="updateJ(this.value)">
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulateCrystal()" data-en="⏰ Simulate" data-ko="⏰ 시뮬레이션">⏰ Simulate</button>
+            </div>
+            <div class="output" id="crystalOutput"></div>
+        </div>
+
+        <!-- Panel 2: Particle -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="⚛️ Particle Physics" data-ko="⚛️ 입자 물리학">⚛️ Particle Physics</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Standard Model particles and beyond" data-ko="표준 모형 입자와 그 너머">Standard Model & beyond</p>
+
+            <div class="particle-grid">
+                <div class="particle-card selected" onclick="selectParticle('higgs')">
+                    <div class="particle-icon">⚛️</div>
+                    <div class="particle-name">Higgs</div>
+                    <div class="particle-mass">125.25 GeV</div>
+                </div>
+                <div class="particle-card" onclick="selectParticle('top')">
+                    <div class="particle-icon">🔴</div>
+                    <div class="particle-name">Top Quark</div>
+                    <div class="particle-mass">172.76 GeV</div>
+                </div>
+                <div class="particle-card" onclick="selectParticle('wboson')">
+                    <div class="particle-icon">🟡</div>
+                    <div class="particle-name">W Boson</div>
+                    <div class="particle-mass">80.38 GeV</div>
+                </div>
+                <div class="particle-card" onclick="selectParticle('zboson')">
+                    <div class="particle-icon">🟢</div>
+                    <div class="particle-name">Z Boson</div>
+                    <div class="particle-mass">91.19 GeV</div>
+                </div>
+                <div class="particle-card" onclick="selectParticle('neutrino')">
+                    <div class="particle-icon">👻</div>
+                    <div class="particle-name">Neutrino</div>
+                    <div class="particle-mass">< 0.8 eV</div>
+                </div>
+                <div class="particle-card" onclick="selectParticle('graviton')">
+                    <div class="particle-icon">🌀</div>
+                    <div class="particle-name">Graviton</div>
+                    <div class="particle-mass">? (BSM)</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="analyzeParticle()" data-en="⚛️ Analyze" data-ko="⚛️ 분석">⚛️ Analyze</button>
+            </div>
+            <div class="output" id="particleOutput"></div>
+        </div>
+
+        <!-- Panel 3: Dark Matter -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🌑 Dark Matter & Antimatter" data-ko="🌑 암흑물질 & 반물질">🌑 Dark & Antimatter</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="The invisible universe" data-ko="보이지 않는 우주">The invisible universe</p>
+
+            <div class="dark-matter-viz">
+                <div class="halo">
+                    <span style="font-size: 3rem;">🌀</span>
+                </div>
+                <p style="color: var(--primary); margin-top: 20px;" data-en="Dark Matter Halo" data-ko="암흑물질 헤일로">Dark Halo</p>
+            </div>
+
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <h5>🌑 <span data-en="Dark Matter Candidates" data-ko="암흑물질 후보">DM Candidates</span></h5>
+                    <div class="toggle-row">
+                        <span>WIMPs</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span>Axions</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span>Primordial BH</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="settings-card">
+                    <h5>⚡ <span data-en="Antimatter" data-ko="반물질">Antimatter</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="Positron" data-ko="양전자">Positron e⁺</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Antiproton" data-ko="반양성자">Antiproton p̄</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Antihydrogen" data-ko="반수소">Antihydrogen H̄</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="searchDark()" data-en="🌑 Search" data-ko="🌑 탐색">🌑 Search</button>
+            </div>
+            <div class="output" id="darkOutput"></div>
+        </div>
+
+        <!-- Panel 4: Quantum Gravity -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="🔬 Quantum Gravity" data-ko="🔬 양자 중력">🔬 Quantum Gravity</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Unifying gravity and quantum mechanics" data-ko="중력과 양자역학의 통합">Unifying GR & QM</p>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value">10⁻³⁵ m</div>
+                    <div class="metric-label" data-en="Planck Length" data-ko="플랑크 길이">ℓₚ</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">10⁻⁴⁴ s</div>
+                    <div class="metric-label" data-en="Planck Time" data-ko="플랑크 시간">tₚ</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">10¹⁹ GeV</div>
+                    <div class="metric-label" data-en="Planck Energy" data-ko="플랑크 에너지">Eₚ</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">10⁻⁸ kg</div>
+                    <div class="metric-label" data-en="Planck Mass" data-ko="플랑크 질량">mₚ</div>
+                </div>
+            </div>
+
+            <div class="settings-card" style="margin: 20px 0;">
+                <h5>🎯 <span data-en="Theory Approaches" data-ko="이론적 접근">Theories</span></h5>
+                <div class="toggle-row">
+                    <span data-en="String Theory" data-ko="끈 이론">String Theory</span>
+                    <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="toggle-row">
+                    <span data-en="Loop Quantum Gravity" data-ko="루프 양자중력">Loop QG</span>
+                    <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                </div>
+                <div class="toggle-row">
+                    <span data-en="Causal Set Theory" data-ko="인과 집합 이론">Causal Sets</span>
+                    <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="exploreGravity()" data-en="🔬 Explore" data-ko="🔬 탐구">🔬 Explore</button>
+            </div>
+            <div class="output" id="gravityOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Physics: Understanding the universe" data-ko="WIA Physics: 우주를 이해하다">WIA Physics: Understanding universe</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let selectedParticle = 'higgs';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.toLowerCase() === lang));
+            document.querySelectorAll('[data-en]').forEach(el => el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en'));
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function updateTemp(val) {
+            document.getElementById('tempValue').textContent = val + ' MK';
+            document.getElementById('plasmaTemp').textContent = val + 'M K';
+        }
+
+        function updateDensity(val) {
+            document.getElementById('densityValue').textContent = '10' + String.fromCharCode(8304 + parseInt(val.toString()[0])) + (val.toString()[1] ? String.fromCharCode(8304 + parseInt(val.toString()[1])) : '') + ' m⁻³';
+        }
+
+        function updateDrive(val) { document.getElementById('driveFreq').textContent = val + ' MHz'; }
+        function updateJ(val) { document.getElementById('interactionJ').textContent = val; }
+
+        function runFusion() {
+            const temp = document.getElementById('tempValue').textContent;
+            document.getElementById('fusionOutput').textContent = JSON.stringify({
+                reactor: 'Tokamak', plasmaTemperature: temp,
+                confinementTime: '3.2 s', tripleProduct: '1.5×10²¹ keV·s/m³',
+                energyGain: 'Q = 1.5 (net positive!)',
+                reaction: 'D + T → He⁴ (3.5 MeV) + n (14.1 MeV)',
+                status: currentLang === 'ko' ? '플라즈마 점화 성공!' : 'Plasma ignition success!'
+            }, null, 2);
+        }
+
+        function simulateCrystal() {
+            document.getElementById('crystalOutput').textContent = JSON.stringify({
+                type: 'Discrete Time Crystal', drivePeriod: 'T',
+                responsePeriod: '2T (period doubling)',
+                symmetryBroken: 'Discrete time translation',
+                platform: 'Trapped ions / NV centers',
+                lifetime: 'Quasi-infinite (MBL protected)',
+                message: currentLang === 'ko' ? '타임 크리스탈 시뮬레이션 완료' : 'Time crystal simulation complete'
+            }, null, 2);
+        }
+
+        function selectParticle(p) {
+            selectedParticle = p;
+            document.querySelectorAll('.particle-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.particle-card').classList.add('selected');
+        }
+
+        function analyzeParticle() {
+            const particles = {
+                higgs: { mass: '125.25 ± 0.17 GeV', spin: 0, charge: 0, discovered: '2012 (LHC)' },
+                top: { mass: '172.76 ± 0.30 GeV', spin: '1/2', charge: '+2/3', discovered: '1995 (Tevatron)' },
+                wboson: { mass: '80.379 ± 0.012 GeV', spin: 1, charge: '±1', discovered: '1983 (SPS)' },
+                zboson: { mass: '91.1876 ± 0.0021 GeV', spin: 1, charge: 0, discovered: '1983 (SPS)' },
+                neutrino: { mass: '< 0.8 eV', spin: '1/2', charge: 0, discovered: '1956 (Cowan-Reines)' },
+                graviton: { mass: '0 (theoretical)', spin: 2, charge: 0, discovered: 'Not yet (BSM)' }
+            };
+            document.getElementById('particleOutput').textContent = JSON.stringify({ particle: selectedParticle, ...particles[selectedParticle] }, null, 2);
+        }
+
+        function searchDark() {
+            document.getElementById('darkOutput').textContent = JSON.stringify({
+                darkMatter: { fraction: '26.8% of universe', candidates: ['WIMPs', 'Axions', 'Sterile neutrinos'], detection: 'Direct/Indirect/Collider' },
+                antimatter: { created: 'CERN ALPHA experiment', trapped: 'Antihydrogen (1000+ atoms)', cpViolation: 'Explains matter-antimatter asymmetry' },
+                message: currentLang === 'ko' ? '암흑물질 탐색 완료' : 'Dark matter search complete'
+            }, null, 2);
+        }
+
+        function exploreGravity() {
+            document.getElementById('gravityOutput').textContent = JSON.stringify({
+                challenge: 'Unify General Relativity + Quantum Mechanics',
+                approaches: {
+                    stringTheory: { dimensions: '10 or 11', particles: 'Vibrating strings', status: 'Leading candidate' },
+                    loopQG: { spacetime: 'Discrete (spin networks)', area: 'Quantized (Aₘᵢₙ ≈ ℓₚ²)', status: 'Background independent' },
+                    causalSets: { spacetime: 'Discrete events', principle: 'Causal order fundamental' }
+                },
+                planckScale: { length: '1.616×10⁻³⁵ m', time: '5.391×10⁻⁴⁴ s', energy: '1.22×10¹⁹ GeV' },
+                message: currentLang === 'ko' ? '양자중력 탐구 완료' : 'Quantum gravity exploration complete'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang('en'));
+    </script>
+</body>
+</html>

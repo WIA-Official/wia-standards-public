@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Network Architecture Design | WIA-CONTACT-009</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-secondary:#cbd5e1;--contact-color:#6366F1;--border:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:800px;margin:0 auto;background:var(--bg-card);border:2px solid var(--contact-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--contact-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--contact-color);margin:40px 0 20px;border-bottom:2px solid var(--contact-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--contact-color);margin:30px 0 15px}
+        p{margin:15px 0;font-size:17px}
+        .philosophy{text-align:center;color:var(--contact-color);margin:20px 0;font-size:18px;font-weight:bold}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border}}
+        .nav a{color:var(--contact-color);text-decoration:none;font-size:16px}
+        .nav a:hover{text-decoration:underline}
+        ul{margin:15px 0 15px 30px}
+        li{margin:10px 0}
+        .highlight{background:rgba(99,102,241,0.1);padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid var(--contact-color)}
+        table{width:100%;border-collapse:collapse;margin:20px 0;background:rgba(99,102,241,0.05)}
+        th,td{padding:12px;text-align:left;border:1px solid var(--border)}
+        th{background:rgba(99,102,241,0.2);color:var(--contact-color);font-weight:bold}
+        code{background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-family:monospace;color:var(--contact-color)}
+        pre{background:rgba(99,102,241,0.1);padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}
+        pre code{background:none;padding:0}
+        .diagram{background:rgba(99,102,241,0.05);padding:30px;border-radius:8px;margin:20px 0;text-align:center;border:2px dashed var(--contact-color)}
+        .summary{background:rgba(99,102,241,0.15);padding:25px;border-radius:8px;margin:30px 0;border:2px solid var(--contact-color)}
+        .summary h3{margin-top:0;color:var(--contact-color}}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="philosophy">弘益人間 · Benefit All Humanity</div>
+        <h1>Chapter 6: Network Architecture Design</h1>
+
+        <h2>Overview</h2>
+        <p>Cosmic communication networks face challenges unlike any terrestrial system. Signal delays measured in years make traditional request-response protocols impossible. Network nodes may be separated by light-years, operating on different timescales, with unpredictable availability. This chapter explores network architectures designed for delay-tolerant, asynchronous cosmic communication.</p>
+
+        <p>WIA-CONTACT-009 defines network principles that enable robust, scalable communication across interstellar distances, drawing from delay-tolerant networking (DTN), distributed systems theory, and decades of deep space mission experience.</p>
+
+        <h2>Delay-Tolerant Networking (DTN)</h2>
+
+        <h3>The Store-and-Forward Paradigm</h3>
+        <p>When round-trip times span years, traditional TCP/IP fails catastrophically. DTN employs "store-and-forward" message passing:</p>
+
+        <div class="diagram">
+            <pre>
+Traditional Internet (TCP/IP):
+Earth ←→ Server (RTT: milliseconds)
+  │
+  └─ Immediate acknowledgment expected
+     Connection-oriented, synchronous
+
+Cosmic Network (DTN):
+Earth → Mars → Jupiter → Saturn (RTT: hours to days)
+  │      │       │         │
+  └──────┴───────┴─────────┴─ Store message until next hop available
+                               Bundle-based, asynchronous
+                               No end-to-end connection required
+            </pre>
+        </div>
+
+        <h3>Bundle Protocol Architecture</h3>
+        <p>DTN uses "bundles" (self-contained message packages) rather than packet streams:</p>
+
+        <pre><code>/**
+ * DTN Bundle Structure for Cosmic Communication
+ * Based on RFC 5050 (Bundle Protocol)
+ */
+
+class CosmicBundle {
+  constructor() {
+    this.header = {
+      version: "WIA-CONTACT-009-v1.0",
+      sourceEID: null,        // Endpoint Identifier (e.g., "earth://nasa/dss43")
+      destinationEID: null,   // e.g., "mars://colony-alpha/receiver-1"
+      creationTimestamp: null,
+      lifetimeSeconds: null,  // How long bundle remains valid
+      priority: "normal"      // bulk, normal, expedited
+    };
+
+    this.payload = {
+      type: null,             // "data", "acknowledgment", "query", "response"
+      contentEncoding: null,  // "utf-8", "binary", "compressed"
+      data: null
+    };
+
+    this.metadata = {
+      routingHints: [],       // Suggested relay nodes
+      securityBlocks: [],     // Encryption, signatures
+      extensionBlocks: []     // Custom protocol extensions
+    };
+  }
+
+  // Create bundle with intelligent defaults
+  createBundle(source, destination, data, lifetimeDays = 3650) {
+    this.header.sourceEID = source;
+    this.header.destinationEID = destination;
+    this.header.creationTimestamp = Date.now();
+    this.header.lifetimeSeconds = lifetimeDays * 86400;
+
+    this.payload.data = data;
+    this.payload.type = "data";
+    this.payload.contentEncoding = "utf-8";
+
+    return this.serialize();
+  }
+
+  // Serialize bundle for transmission
+  serialize() {
+    return {
+      header: this.header,
+      payload: this.payload,
+      metadata: this.metadata,
+      checksum: this.calculateChecksum()
+    };
+  }
+
+  calculateChecksum() {
+    // CRC or cryptographic hash of entire bundle
+    return "SHA256:...";
+  }
+
+  // Determine if bundle is still valid
+  isExpired() {
+    const now = Date.now();
+    const created = this.header.creationTimestamp;
+    const lifetime = this.header.lifetimeSeconds * 1000;
+
+    return (now - created) > lifetime;
+  }
+}
+
+// Usage example
+const bundle = new CosmicBundle();
+const message = bundle.createBundle(
+  "earth://arecibo/transmitter",
+  "proxima-centauri://unknown/receiver",
+  "Greetings from humanity. We seek peaceful contact.",
+  10950 // 30 year lifetime (10x round-trip time)
+);
+
+console.log("Bundle created:", message);</code></pre>
+
+        <h3>Custody Transfer</h3>
+        <p>In DTN, intermediate nodes accept "custody" of bundles, guaranteeing delivery or returning failure notification:</p>
+
+        <table>
+            <tr>
+                <th>Node</th>
+                <th>Action</th>
+                <th>Responsibility</th>
+            </tr>
+            <tr>
+                <td>Earth transmitter</td>
+                <td>Create bundle, transmit</td>
+                <td>Custody until acknowledged by relay</td>
+            </tr>
+            <tr>
+                <td>Mars relay</td>
+                <td>Receive, store, forward</td>
+                <td>Custody until acknowledged by next hop</td>
+            </tr>
+            <tr>
+                <td>Jupiter relay</td>
+                <td>Receive, store, forward</td>
+                <td>Custody until acknowledged by destination</td>
+            </tr>
+            <tr>
+                <td>Destination</td>
+                <td>Receive, acknowledge</td>
+                <td>Custody permanently (or until processed)</td>
+            </tr>
+        </table>
+
+        <h2>Interplanetary Internet Architecture</h2>
+
+        <h3>Solar System Network Topology</h3>
+        <p>Within our solar system, a network of relay nodes enables multi-hop communication:</p>
+
+        <div class="diagram">
+            <pre>
+┌────────────────────────────────────────────────────┐
+│          SOLAR SYSTEM COMMUNICATION NETWORK        │
+├────────────────────────────────────────────────────┤
+│                                                    │
+│                    ☉ Sun                           │
+│                     │                              │
+│         ┌───────────┼───────────┐                  │
+│         │           │           │                  │
+│     Mercury      Venus        Earth                │
+│       (relay)    (relay)    (primary hub)          │
+│                                │                    │
+│                     ┌──────────┼──────────┐         │
+│                     │          │          │         │
+│                   Mars      Jupiter    Saturn       │
+│                 (colony)   (relay)    (relay)       │
+│                              │           │          │
+│                           Europa     Titan          │
+│                          (outpost)  (outpost)       │
+│                                                    │
+│  Beyond Solar System:                              │
+│    → Voyager 1/2 (deep space relay)                │
+│    → Breakthrough Starshot probes (α Centauri)     │
+│    → Future interstellar relays                    │
+└────────────────────────────────────────────────────┘
+            </pre>
+        </div>
+
+        <h3>Routing in High-Latency Networks</h3>
+        <p>Traditional routing (BGP, OSPF) assumes millisecond updates. Cosmic networks require predictive routing based on orbital mechanics:</p>
+
+        <pre><code>/**
+ * Predictive Routing for Cosmic Networks
+ * Uses orbital mechanics to predict contact windows
+ */
+
+class CosmicRouter {
+  constructor() {
+    this.ephemeris = {}; // Planetary positions over time
+    this.contactWindows = [];
+    this.routingTable = new Map();
+  }
+
+  // Calculate optimal route given current orbital positions
+  calculateRoute(source, destination, transmitTime) {
+    // Get positions of all potential relay nodes at transmitTime
+    const positions = this.predictPositions(transmitTime);
+
+    // Find path minimizing total delay
+    const path = this.dijkstraWithDelay(source, destination, positions);
+
+    return path;
+  }
+
+  // Predict planetary positions using ephemeris data
+  predictPositions(timestamp) {
+    const positions = {};
+
+    // For each body in solar system
+    for (const body of ["mercury", "venus", "earth", "mars", "jupiter", "saturn"]) {
+      positions[body] = this.calculateOrbitalPosition(body, timestamp);
+    }
+
+    return positions;
+  }
+
+  // Calculate position using Keplerian elements (simplified)
+  calculateOrbitalPosition(body, timestamp) {
+    const elements = this.ephemeris[body];
+    if (!elements) return null;
+
+    // Simplified orbital calculation
+    // Real implementation would use JPL HORIZONS data
+    const meanAnomaly = this.calculateMeanAnomaly(elements, timestamp);
+    const trueAnomaly = this.solveKeplersEquation(meanAnomaly, elements.eccentricity);
+
+    const x = elements.semiMajorAxis * Math.cos(trueAnomaly);
+    const y = elements.semiMajorAxis * Math.sin(trueAnomaly);
+
+    return { x, y, timestamp };
+  }
+
+  // Dijkstra's algorithm adapted for time-varying costs
+  dijkstraWithDelay(source, destination, positions) {
+    const distances = new Map();
+    const previous = new Map();
+    const unvisited = new Set(Object.keys(positions));
+
+    // Initialize
+    distances.set(source, 0);
+    unvisited.forEach(node => {
+      if (node !== source) distances.set(node, Infinity);
+    });
+
+    while (unvisited.size > 0) {
+      // Find unvisited node with minimum distance
+      let minNode = null;
+      let minDist = Infinity;
+      for (const node of unvisited) {
+        if (distances.get(node) < minDist) {
+          minDist = distances.get(node);
+          minNode = node;
+        }
+      }
+
+      if (minNode === destination) break;
+      unvisited.delete(minNode);
+
+      // Update distances to neighbors
+      const neighbors = this.getVisibleNeighbors(minNode, positions);
+      for (const neighbor of neighbors) {
+        const linkDelay = this.calculateLinkDelay(minNode, neighbor, positions);
+        const alt = distances.get(minNode) + linkDelay;
+
+        if (alt < distances.get(neighbor)) {
+          distances.set(neighbor, alt);
+          previous.set(neighbor, minNode);
+        }
+      }
+    }
+
+    // Reconstruct path
+    const path = [];
+    let current = destination;
+    while (current) {
+      path.unshift(current);
+      current = previous.get(current);
+    }
+
+    return {
+      path,
+      totalDelay: distances.get(destination),
+      delaySeconds: distances.get(destination)
+    };
+  }
+
+  getVisibleNeighbors(node, positions) {
+    // Nodes are "neighbors" if line-of-sight exists
+    // (no planetary occlusion, within transmission range)
+    return [];
+  }
+
+  calculateLinkDelay(from, to, positions) {
+    // Distance / speed of light
+    const distance = this.distance(positions[from], positions[to]);
+    const c = 299792458; // m/s
+    return distance / c;
+  }
+
+  distance(pos1, pos2) {
+    const dx = pos1.x - pos2.x;
+    const dy = pos1.y - pos2.y;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+
+  calculateMeanAnomaly(elements, timestamp) {
+    return 0; // Simplified
+  }
+
+  solveKeplersEquation(M, e) {
+    return 0; // Simplified
+  }
+}
+
+const router = new CosmicRouter();
+// Route message from Earth to Mars
+const route = router.calculateRoute("earth", "mars", Date.now());
+console.log("Optimal route:", route);</code></pre>
+
+        <h2>Interstellar Network Topology</h2>
+
+        <h3>The Galactic Backbone</h3>
+        <p>For interstellar distances, a hierarchical network topology makes sense:</p>
+
+        <table>
+            <tr>
+                <th>Network Layer</th>
+                <th>Scope</th>
+                <th>Latency</th>
+                <th>Architecture</th>
+            </tr>
+            <tr>
+                <td>Local (Planetary)</td>
+                <td>Single planet + moons</td>
+                <td>Milliseconds to seconds</td>
+                <td>Traditional Internet + satellites</td>
+            </tr>
+            <tr>
+                <td>Regional (Solar System)</td>
+                <td>Planets, asteroids, comets</td>
+                <td>Minutes to hours</td>
+                <td>DTN with orbital relays</td>
+            </tr>
+            <tr>
+                <td>Interstellar (Local Bubble)</td>
+                <td>Nearby star systems (< 100 ly)</td>
+                <td>Years to centuries</td>
+                <td>Beaconing + opportunistic relay</td>
+            </tr>
+            <tr>
+                <td>Galactic (Milky Way)</td>
+                <td>Galactic scale</td>
+                <td>Millennia</td>
+                <td>Theoretical: quantum relay, wormholes</td>
+            </tr>
+        </table>
+
+        <h3>Interstellar Relay Network</h3>
+        <p>Probes positioned at strategic locations could relay messages between civilizations:</p>
+
+        <div class="highlight">
+            <p><strong>Concept:</strong> Breakthrough Starshot-style probes travel at 0.2c (20% speed of light)</p>
+            <p><strong>Deployment:</strong> Launch relays toward nearby stars at regular intervals</p>
+            <p><strong>Function:</strong> Receive messages from Earth, amplify/store, retransmit toward destination</p>
+            <p><strong>Benefit:</strong> Reduces inverse-square attenuation by breaking long paths into shorter hops</p>
+            <p><strong>Challenge:</strong> Probes must operate autonomously for centuries</p>
+        </div>
+
+        <h2>Message Prioritization and Quality of Service</h2>
+
+        <h3>Priority Classes</h3>
+        <p>Not all cosmic messages have equal urgency. WIA-CONTACT-009 defines priority tiers:</p>
+
+        <table>
+            <tr>
+                <th>Priority</th>
+                <th>Use Case</th>
+                <th>Lifetime</th>
+                <th>Bandwidth Allocation</th>
+            </tr>
+            <tr>
+                <td>CRITICAL</td>
+                <td>Emergency signals, hazard warnings</td>
+                <td>1 year</td>
+                <td>100% (preempts all other traffic)</td>
+            </tr>
+            <tr>
+                <td>HIGH</td>
+                <td>Scientific data, mission-critical comms</td>
+                <td>10 years</td>
+                <td>80%</td>
+            </tr>
+            <tr>
+                <td>NORMAL</td>
+                <td>General messages, cultural exchange</td>
+                <td>100 years</td>
+                <td>50%</td>
+            </tr>
+            <tr>
+                <td>BULK</td>
+                <td>Encyclopedic data dumps, archives</td>
+                <td>1000 years</td>
+                <td>10% (uses spare capacity)</td>
+            </tr>
+        </table>
+
+        <h3>Implementing QoS</h3>
+        <pre><code>/**
+ * Quality of Service Manager for Cosmic Network
+ * Prioritizes transmission of bundles based on urgency
+ */
+
+class CosmicQoS {
+  constructor(totalBandwidth) {
+    this.bandwidth = totalBandwidth; // bits per second
+    this.queues = {
+      critical: [],
+      high: [],
+      normal: [],
+      bulk: []
+    };
+  }
+
+  // Add bundle to appropriate queue
+  enqueue(bundle) {
+    const priority = bundle.header.priority;
+    this.queues[priority].push(bundle);
+  }
+
+  // Select next bundle(s) to transmit
+  scheduleTransmission(durationSeconds) {
+    const availableBits = this.bandwidth * durationSeconds;
+    const toTransmit = [];
+    let bitsUsed = 0;
+
+    // Drain queues in priority order
+    const priorities = ["critical", "high", "normal", "bulk"];
+
+    for (const priority of priorities) {
+      while (this.queues[priority].length > 0 && bitsUsed < availableBits) {
+        const bundle = this.queues[priority][0];
+        const bundleSize = this.estimateSize(bundle);
+
+        if (bitsUsed + bundleSize <= availableBits) {
+          toTransmit.push(this.queues[priority].shift());
+          bitsUsed += bundleSize;
+        } else {
+          break; // Bundle too large, try next priority
+        }
+      }
+    }
+
+    return {
+      bundles: toTransmit,
+      bitsUsed,
+      utilizationPercent: (bitsUsed / availableBits) * 100
+    };
+  }
+
+  // Estimate bundle size in bits
+  estimateSize(bundle) {
+    // Header + payload + metadata
+    const headerSize = 1024; // bits
+    const payloadSize = bundle.payload.data.length * 8; // bytes to bits
+    const metadataSize = 512; // bits
+
+    return headerSize + payloadSize + metadataSize;
+  }
+
+  // Purge expired bundles
+  cleanupExpired() {
+    let purged = 0;
+
+    for (const priority in this.queues) {
+      this.queues[priority] = this.queues[priority].filter(bundle => {
+        if (bundle.isExpired()) {
+          purged++;
+          return false;
+        }
+        return true;
+      });
+    }
+
+    return purged;
+  }
+}
+
+// Usage
+const qos = new CosmicQoS(1e6); // 1 Mbps link
+
+// Add various bundles
+qos.enqueue({ header: { priority: "normal" }, payload: { data: "Hello Proxima!" } });
+qos.enqueue({ header: { priority: "critical" }, payload: { data: "WARN: Solar flare" } });
+qos.enqueue({ header: { priority: "bulk" }, payload: { data: "Encyclopedia vol 1..." } });
+
+// Schedule 1 hour of transmission
+const schedule = qos.scheduleTransmission(3600);
+console.log(`Transmitting ${schedule.bundles.length} bundles`);
+console.log(`Bandwidth utilization: ${schedule.utilizationPercent.toFixed(2)}%`);</code></pre>
+
+        <h2>Resilience and Redundancy</h2>
+
+        <h3>Multi-Path Transmission</h3>
+        <p>Increase reliability by sending copies via different routes:</p>
+
+        <ul>
+            <li><strong>Spatial Diversity:</strong> Transmit from multiple Earth locations (Arecibo, Parkes, Goldstone)</li>
+            <li><strong>Temporal Diversity:</strong> Retransmit periodically over years</li>
+            <li><strong>Frequency Diversity:</strong> Send on multiple wavelengths simultaneously</li>
+            <li><strong>Route Diversity:</strong> Use different relay chains</li>
+        </ul>
+
+        <h3>Erasure Coding for Bundles</h3>
+        <p>Similar to RAID arrays, erasure coding allows reconstruction even if some bundles are lost:</p>
+
+        <div class="highlight">
+            <p><strong>Example:</strong> Encode message into 10 bundles such that any 7 can reconstruct the original</p>
+            <p><strong>Overhead:</strong> 43% (10/7 = 1.43)</p>
+            <p><strong>Benefit:</strong> Tolerates loss of 3 bundles without retransmission</p>
+            <p><strong>Ideal for:</strong> Interstellar transmission where retransmission is impractical</p>
+        </div>
+
+        <div class="summary">
+            <h3>Chapter Summary</h3>
+            <p>Cosmic communication networks require fundamental rethinking of network architecture. Delay-tolerant networking, predictive routing, and intelligent prioritization enable reliable communication despite extreme latencies and unpredictable connectivity.</p>
+
+            <p><strong>Key Takeaways:</strong></p>
+            <ul>
+                <li>DTN's store-and-forward paradigm handles multi-year round-trip times</li>
+                <li>Bundle protocol packages messages into self-contained units with custody transfer</li>
+                <li>Predictive routing uses orbital mechanics to plan optimal transmission windows</li>
+                <li>Hierarchical topology: local (planetary) → regional (solar system) → interstellar → galactic</li>
+                <li>Quality of Service ensures critical messages get priority bandwidth</li>
+                <li>Multi-path transmission and erasure coding provide resilience against message loss</li>
+                <li>The 弘益人間 philosophy guides network design to benefit all participants fairly</li>
+            </ul>
+
+            <p>WIA-CONTACT-009 network architecture creates a foundation for humanity's cosmic communication infrastructure, scalable from our solar system to eventual galactic participation. While current technology limits us to solar system networking, these principles extend seamlessly to interstellar scales as our capabilities grow.</p>
+        </div>
+
+        </div>
+</body>
+</html>

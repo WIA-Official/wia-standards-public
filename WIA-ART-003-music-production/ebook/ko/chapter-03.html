@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: MIDI와 오디오 데이터 형식 - WIA-ART-003-music-production</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #E11D48; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        p { margin: 1rem 0; text-align: justify; color: var(--text-secondary); }
+        .philosophy { text-align: center; font-size: 1.5rem; color: var(--primary); margin: 2rem 0; padding: 1rem; background: rgba(225, 29, 72, 0.1); border-radius: 10px; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        pre { background: var(--bg-tertiary); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Consolas', monospace; color: #10b981; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; color: var(--text-secondary); }
+        .key-takeaways { background: linear-gradient(135deg, rgba(225, 29, 72, 0.1) 0%, rgba(225, 29, 72, 0.05) 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; border: 2px solid rgba(225, 29, 72, 0.3); }
+        .review-questions { background: rgba(225, 29, 72, 0.05); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제3장: MIDI와 오디오 데이터 형식</h1>
+        <div class="philosophy">弘益人間 · 널리 인간을 이롯게 하라</div>
+        
+        <h2>개요</h2>
+        <p>MIDI 2.0, WAV, FLAC, MP3, AAC 표준</p>
+        <p>
+            이 장에서는 MIDI와 오디오 데이터 형식의 기술적 세부사항, 실무 구현 방법, 그리고 WIA-ART-003-music-production 표준과의 통합 방안을 상세히 다룹니다.
+            음악 제작 분야는 빠르게 발전하고 있으며, 표준화를 통해 상호운용성과 혁신을 촉진할 수 있습니다.
+        </p>
+        
+        <h2>기술적 배경</h2>
+        <p>
+            MIDI(Musical Instrument Digital Interface)와 오디오 데이터 형식은 디지털 음악 제작의 양대 축입니다.
+            MIDI는 음표, 컨트롤 정보 등 음악적 이벤트를 전달하며, 오디오 형식은 실제 소리 파형을 저장합니다.
+            1983년 MIDI 1.0의 표준화 이후 40년 이상 업계 표준으로 자리잡았으며, 2020년 MIDI 2.0은 더 높은 해상도와
+            양방향 통신을 도입하여 차세대 음악 제작 환경을 열었습니다.
+        </p>
+
+        <h3>MIDI 1.0 vs MIDI 2.0 비교</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>특성</th>
+                    <th>MIDI 1.0 (1983)</th>
+                    <th>MIDI 2.0 (2020)</th>
+                    <th>개선 사항</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>해상도</strong></td>
+                    <td>7-bit (0-127)</td>
+                    <td>32-bit (0-4,294,967,295)</td>
+                    <td>33,554,432배 향상</td>
+                </tr>
+                <tr>
+                    <td><strong>벨로시티</strong></td>
+                    <td>128 단계</td>
+                    <td>4.29억 단계</td>
+                    <td>극도로 세밀한 표현</td>
+                </tr>
+                <tr>
+                    <td><strong>통신</strong></td>
+                    <td>단방향</td>
+                    <td>양방향</td>
+                    <td>기기 간 대화 가능</td>
+                </tr>
+                <tr>
+                    <td><strong>채널</strong></td>
+                    <td>16 채널</td>
+                    <td>256 채널 그룹</td>
+                    <td>대규모 프로덕션 지원</td>
+                </tr>
+                <tr>
+                    <td><strong>타이밍</strong></td>
+                    <td>~1ms 정확도</td>
+                    <td>~31.25μs 정확도</td>
+                    <td>32배 정밀한 타이밍</td>
+                </tr>
+                <tr>
+                    <td><strong>프로파일</strong></td>
+                    <td>없음</td>
+                    <td>동적 프로파일</td>
+                    <td>자동 기기 설정</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="highlight-box">
+            <h3>MIDI 2.0의 혁신적 기능</h3>
+            <ul>
+                <li><strong>프로퍼티 교환:</strong> 기기 간 설정 자동 동기화</li>
+                <li><strong>프로파일 설정:</strong> 악기별 최적 설정 자동 적용</li>
+                <li><strong>고해상도 컨트롤:</strong> 피치 벤드, 모듈레이션 등 극도로 정밀한 제어</li>
+                <li><strong>하위 호환성:</strong> MIDI 1.0 장비와 완벽 호환</li>
+                <li><strong>타임스탬프:</strong> 정확한 시간 동기화로 레이턴시 제거</li>
+            </ul>
+        </div>
+
+        <h2>MIDI 메시지 체계</h2>
+
+        <h3>1. MIDI 메시지 타입</h3>
+        <p>
+            MIDI 메시지는 크게 채널 메시지와 시스템 메시지로 나뉩니다.
+            각 메시지는 특정 기능을 수행하며, 조합하여 복잡한 음악 표현을 구현합니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>메시지 타입</th>
+                    <th>상태 바이트</th>
+                    <th>데이터 바이트</th>
+                    <th>용도</th>
+                    <th>예시</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Note On</strong></td>
+                    <td>0x90-0x9F</td>
+                    <td>Note, Velocity</td>
+                    <td>음 시작</td>
+                    <td>0x90 3C 64 (C4, vel 100)</td>
+                </tr>
+                <tr>
+                    <td><strong>Note Off</strong></td>
+                    <td>0x80-0x8F</td>
+                    <td>Note, Velocity</td>
+                    <td>음 종료</td>
+                    <td>0x80 3C 40 (C4 off)</td>
+                </tr>
+                <tr>
+                    <td><strong>Control Change</strong></td>
+                    <td>0xB0-0xBF</td>
+                    <td>CC#, Value</td>
+                    <td>컨트롤러 조작</td>
+                    <td>0xB0 07 7F (볼륨 최대)</td>
+                </tr>
+                <tr>
+                    <td><strong>Program Change</strong></td>
+                    <td>0xC0-0xCF</td>
+                    <td>Program#</td>
+                    <td>악기 변경</td>
+                    <td>0xC0 00 (Piano)</td>
+                </tr>
+                <tr>
+                    <td><strong>Pitch Bend</strong></td>
+                    <td>0xE0-0xEF</td>
+                    <td>LSB, MSB</td>
+                    <td>피치 변조</td>
+                    <td>0xE0 00 40 (중심)</td>
+                </tr>
+                <tr>
+                    <td><strong>Aftertouch</strong></td>
+                    <td>0xA0-0xAF</td>
+                    <td>Note, Pressure</td>
+                    <td>연주 후 압력</td>
+                    <td>0xA0 3C 60</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2. 주요 MIDI 컨트롤 체인지 (CC)</h3>
+        <p>
+            Control Change 메시지는 128개의 컨트롤러를 정의합니다.
+            각 CC 번호는 특정 기능에 할당되어 있으며, DAW와 하드웨어에서 널리 사용됩니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>CC 번호</th>
+                    <th>이름</th>
+                    <th>용도</th>
+                    <th>범위</th>
+                    <th>기본값</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>CC 0</strong></td>
+                    <td>Bank Select MSB</td>
+                    <td>뱅크 선택 (상위)</td>
+                    <td>0-127</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td><strong>CC 1</strong></td>
+                    <td>Modulation</td>
+                    <td>모듈레이션 휠</td>
+                    <td>0-127</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td><strong>CC 7</strong></td>
+                    <td>Channel Volume</td>
+                    <td>채널 볼륨</td>
+                    <td>0-127</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td><strong>CC 10</strong></td>
+                    <td>Pan</td>
+                    <td>좌우 패닝</td>
+                    <td>0-127</td>
+                    <td>64 (중앙)</td>
+                </tr>
+                <tr>
+                    <td><strong>CC 11</strong></td>
+                    <td>Expression</td>
+                    <td>표현 (다이나믹)</td>
+                    <td>0-127</td>
+                    <td>127</td>
+                </tr>
+                <tr>
+                    <td><strong>CC 64</strong></td>
+                    <td>Sustain Pedal</td>
+                    <td>서스테인 페달</td>
+                    <td>0-127 (off/on)</td>
+                    <td>0 (off)</td>
+                </tr>
+                <tr>
+                    <td><strong>CC 91</strong></td>
+                    <td>Reverb</td>
+                    <td>리버브 양</td>
+                    <td>0-127</td>
+                    <td>40</td>
+                </tr>
+                <tr>
+                    <td><strong>CC 93</strong></td>
+                    <td>Chorus</td>
+                    <td>코러스 양</td>
+                    <td>0-127</td>
+                    <td>0</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>오디오 데이터 형식</h2>
+
+        <h3>1. 무손실 오디오 형식</h3>
+        <p>
+            프로페셔널 음악 제작에서는 무손실 형식이 필수입니다. WAV와 AIFF는 원본 품질을 유지하며,
+            FLAC와 ALAC은 압축을 통해 파일 크기를 줄이면서도 원본과 동일한 품질을 보장합니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>형식</th>
+                    <th>개발사</th>
+                    <th>압축</th>
+                    <th>메타데이터</th>
+                    <th>플랫폼</th>
+                    <th>용도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>WAV</strong></td>
+                    <td>Microsoft/IBM</td>
+                    <td>없음 (PCM)</td>
+                    <td>제한적</td>
+                    <td>범용</td>
+                    <td>스튜디오 작업, 편집</td>
+                </tr>
+                <tr>
+                    <td><strong>AIFF</strong></td>
+                    <td>Apple</td>
+                    <td>없음 (PCM)</td>
+                    <td>풍부</td>
+                    <td>macOS 최적화</td>
+                    <td>Mac 프로덕션</td>
+                </tr>
+                <tr>
+                    <td><strong>FLAC</strong></td>
+                    <td>Xiph.Org</td>
+                    <td>무손실 (40-50%)</td>
+                    <td>매우 풍부</td>
+                    <td>범용</td>
+                    <td>아카이빙, Hi-Fi 배포</td>
+                </tr>
+                <tr>
+                    <td><strong>ALAC</strong></td>
+                    <td>Apple</td>
+                    <td>무손실 (40-60%)</td>
+                    <td>풍부</td>
+                    <td>Apple 생태계</td>
+                    <td>iTunes, Apple Music</td>
+                </tr>
+                <tr>
+                    <td><strong>DSD</strong></td>
+                    <td>Sony/Philips</td>
+                    <td>없음 (1-bit)</td>
+                    <td>제한적</td>
+                    <td>전문 오디오</td>
+                    <td>초고음질 마스터링</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2. 손실 압축 오디오 형식</h3>
+        <p>
+            스트리밍과 배포를 위해서는 손실 압축 형식이 사용됩니다.
+            인간의 청각 특성을 활용한 심리음향 모델을 통해 파일 크기를 대폭 줄이면서도 지각적 품질을 유지합니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>형식</th>
+                    <th>비트레이트</th>
+                    <th>코덱</th>
+                    <th>압축률</th>
+                    <th>주요 플랫폼</th>
+                    <th>음질 평가</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>MP3</strong></td>
+                    <td>128-320 kbps</td>
+                    <td>MPEG-1 Audio Layer 3</td>
+                    <td>10:1 ~ 12:1</td>
+                    <td>범용</td>
+                    <td>320kbps: 우수</td>
+                </tr>
+                <tr>
+                    <td><strong>AAC</strong></td>
+                    <td>96-256 kbps</td>
+                    <td>Advanced Audio Coding</td>
+                    <td>동일 비트레이트에서 MP3보다 20% 우수</td>
+                    <td>Apple, YouTube</td>
+                    <td>256kbps: 매우 우수</td>
+                </tr>
+                <tr>
+                    <td><strong>OGG Vorbis</strong></td>
+                    <td>64-500 kbps</td>
+                    <td>Vorbis</td>
+                    <td>MP3 대비 30% 우수</td>
+                    <td>Spotify, 게임</td>
+                    <td>320kbps: 최우수</td>
+                </tr>
+                <tr>
+                    <td><strong>Opus</strong></td>
+                    <td>6-510 kbps</td>
+                    <td>Opus (IETF 표준)</td>
+                    <td>가장 우수한 압축률</td>
+                    <td>WhatsApp, Discord</td>
+                    <td>모든 비트레이트 최적</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <h3>2. API 통합</h3>
+        <p>
+            WIA-ART-003-music-production SDK는 TypeScript/JavaScript로 작성되었으며, 모든 주요 플랫폼과 프레임워크를 지원합니다.
+            다음은 기본 사용 예제입니다:
+        </p>
+        
+        <pre><code>import { ART003musicproductionSDK } from '@wia/wia-art-003-music-production';
+
+// SDK 초기화
+const sdk = new ART003musicproductionSDK({
+  apiKey: process.env.WIA_API_KEY,
+  environment: 'production'
+});
+
+// 콘텐츠 생성
+async function createContent() {
+  try {
+    const metadata = {
+      title: "MIDI와 오디오 데이터 형식 예제",
+      creator: "WIA Developer",
+      license: "CC BY-SA 4.0",
+      timestamp: new Date().toISOString()
+    };
+    
+    const result = await sdk.create(metadata);
+    console.log('생성 성공:', result.id);
+    
+    // 검증
+    const validation = await sdk.validate(result);
+    if (validation.isValid) {
+      console.log('검증 통과');
+      return result;
+    } else {
+      console.error('검증 실패:', validation.errors);
+    }
+  } catch (error) {
+    console.error('오류:', error.message);
+    throw error;
+  }
+}
+
+createContent().then(console.log).catch(console.error);
+</code></pre>
+        
+        <h2>실무 구현 가이드</h2>
+        
+        <h3>1. 프로젝트 설정</h3>
+        <p>
+            WIA-ART-003-music-production를 프로젝트에 통합하는 첫 단계는 올바른 환경 설정입니다.
+            다음 절차를 따라 개발 환경을 준비하십시오:
+        </p>
+        
+        <pre><code># NPM을 통한 설치
+npm install @wia/wia-art-003-music-production
+
+# 또는 Yarn 사용
+yarn add @wia/wia-art-003-music-production
+
+# TypeScript 타입 정의 포함됨
+# 추가 설정 불필요
+</code></pre>
+        
+        <h3>2. 메타데이터 스키마</h3>
+        <p>
+            WIA-ART-003-music-production 표준은 풍부한 메타데이터를 통해 콘텐츠의 출처, 권리, 기술 사양을 명확히 기록합니다.
+            다음은 표준 메타데이터 구조입니다:
+        </p>
+        
+        <pre><code>{
+  "standard": "WIA-ART-003-music-production",
+  "version": "1.0.0",
+  "id": "uuid-v4-string",
+  "title": "작품 제목",
+  "description": "상세 설명",
+  "creator": {
+    "name": "창작자명",
+    "email": "contact@example.com",
+    "orcid": "0000-0000-0000-0000"
+  },
+  "created": "2025-01-15T10:30:00Z",
+  "modified": "2025-01-15T14:20:00Z",
+  "license": {
+    "type": "CC BY-SA 4.0",
+    "url": "https://creativecommons.org/licenses/by-sa/4.0/"
+  },
+  "technicalSpecs": {
+    "format": "상세 형식",
+    "quality": "품질 파라미터"
+  },
+  "provenance": {
+    "blockchain": "Ethereum",
+    "txHash": "0x...",
+    "ipfsHash": "Qm..."
+  }
+}</code></pre>
+        
+        <h2>고급 주제</h2>
+        
+        <h3>1. 성능 최적화</h3>
+        <p>
+            대규모 프로젝트에서는 성능 최적화가 필수적입니다. 
+            다음 전략을 통해 처리 속도를 크게 향상시킬 수 있습니다:
+        </p>
+        
+        <ul>
+            <li><strong>배치 처리:</strong> 여러 작업을 그룹화하여 API 호출 횟수 감소</li>
+            <li><strong>캐싱:</strong> 자주 사용되는 데이터를 로컬에 캐시</li>
+            <li><strong>비동기 처리:</strong> Promise.all()을 활용한 병렬 처리</li>
+            <li><strong>지연 로딩:</strong> 필요한 시점에만 리소스 로드</li>
+            <li><strong>CDN 활용:</strong> 정적 자산을 CDN에서 제공</li>
+        </ul>
+        
+        <h3>2. 보안 고려사항</h3>
+        <p>
+            WIA-ART-003-music-production 구현 시 다음 보안 원칙을 준수해야 합니다:
+        </p>
+        
+        <ul>
+            <li><strong>API 키 보호:</strong> 환경 변수 사용, 절대 코드에 하드코딩하지 않음</li>
+            <li><strong>HTTPS 사용:</strong> 모든 통신은 TLS 암호화</li>
+            <li><strong>입력 검증:</strong> 모든 사용자 입력을 서버 측에서 검증</li>
+            <li><strong>접근 제어:</strong> OAuth 2.0 또는 JWT 기반 인증</li>
+            <li><strong>감사 로그:</strong> 모든 중요 작업을 로그에 기록</li>
+        </ul>
+        
+        <h2>통합 사례</h2>
+        
+        <p>
+            주요 플랫폼과의 통합 예제를 통해 실무 적용 방법을 학습합니다:
+        </p>
+        
+        <div class="highlight-box">
+            <h3>React 통합 예제</h3>
+            <pre><code>import React, { useState, useEffect } from 'react';
+import { ART003musicproductionSDK } from '@wia/wia-art-003-music-production';
+
+function ContentCreator() {
+  const [sdk, setSdk] = useState(null);
+  const [status, setStatus] = useState('idle');
+  
+  useEffect(() => {
+    const initSDK = async () => {
+      const instance = new ART003musicproductionSDK({
+        apiKey: process.env.REACT_APP_WIA_API_KEY
+      });
+      setSdk(instance);
+    };
+    initSDK();
+  }, []);
+  
+  const handleCreate = async () => {
+    setStatus('creating');
+    try {
+      const result = await sdk.create({
+        title: "새 작품",
+        creator: "React User"
+      });
+      setStatus('success');
+      console.log(result);
+    } catch (error) {
+      setStatus('error');
+      console.error(error);
+    }
+  };
+  
+  return (
+    <div>
+      <button onClick={handleCreate} disabled={!sdk || status === 'creating'}>
+        {status === 'creating' ? '생성 중...' : '생성'}
+      </button>
+      <p>상태: {status}</p>
+    </div>
+  );
+}
+</code></pre>
+        </div>
+        
+        <h2>문제 해결</h2>
+        
+        <h3>일반적인 오류와 해결책</h3>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>오류</th>
+                    <th>원인</th>
+                    <th>해결 방법</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Authentication Failed</strong></td>
+                    <td>잘못된 API 키</td>
+                    <td>환경 변수 확인, 키 재발급</td>
+                </tr>
+                <tr>
+                    <td><strong>Validation Error</strong></td>
+                    <td>메타데이터 스키마 불일치</td>
+                    <td>스키마 문서 참조, JSON Schema 검증</td>
+                </tr>
+                <tr>
+                    <td><strong>Rate Limit Exceeded</strong></td>
+                    <td>요청 빈도 초과</td>
+                    <td>배치 처리, 요청 간격 조정</td>
+                </tr>
+                <tr>
+                    <td><strong>Network Timeout</strong></td>
+                    <td>네트워크 지연 또는 장애</td>
+                    <td>타임아웃 설정 증가, 재시도 로직 구현</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="key-takeaways">
+            <h3>핵심 요점</h3>
+            <ul>
+                <li><strong>표준 준수:</strong> WIA-ART-003-music-production는 음악 제작 분야의 상호운용성을 보장하는 핵심 표준입니다.</li>
+                <li><strong>실무 적용:</strong> SDK와 API를 통해 빠르게 프로젝트에 통합할 수 있습니다.</li>
+                <li><strong>메타데이터:</strong> 풍부한 메타데이터는 콘텐츠의 출처와 권리를 명확히 기록합니다.</li>
+                <li><strong>성능과 보안:</strong> 최적화와 보안 모범 사례를 적용하여 안정적인 시스템을 구축합니다.</li>
+                <li><strong>생태계:</strong> 다양한 플랫폼 및 도구와의 통합을 통해 혁신을 촉진합니다.</li>
+            </ul>
+        </div>
+        
+        <div class="review-questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li><strong>MIDI와 오디오 데이터 형식의 핵심 개념을 설명하고, WIA-ART-003-music-production 표준에서 이것이 어떻게 구현되는지 논의하십시오.</strong></li>
+                <li><strong>WIA-ART-003-music-production SDK의 주요 메서드를 나열하고 각각의 용도를 상세히 설명하십시오.</strong></li>
+                <li><strong>메타데이터 스키마의 필수 필드를 설명하고, 각 필드가 중요한 이유를 논의하십시오.</strong></li>
+                <li><strong>성능 최적화를 위한 다섯 가지 전략을 제시하고, 각각의 적용 시나리오를 설명하십시오.</strong></li>
+                <li><strong>WIA-ART-003-music-production 구현 시 고려해야 할 보안 사항을 나열하고, 각각의 구현 방법을 논의하십시오.</strong></li>
+                <li><strong>일반적인 오류 상황과 해결 방법을 설명하고, 예방 전략을 제시하십시오.</strong></li>
+            </ol>
+        </div>
+        
+        <div style="text-align: center; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); color: var(--text-secondary);">
+            <p><strong>弘益人間</strong> - Benefit All Humanity</p>
+            <p>&copy; 2025 SmileStory Inc. / WIA</p>
+            <p>WIA-ART-003-music-production 음악 제작 표준 v1.0 - 제3장</p>
+        </div>
+    </div>
+</body>
+</html>

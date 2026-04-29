@@ -1,134 +1,316 @@
-# Farming Robot — Phase 1: Data Format Specification
+# WIA-FARMING_ROBOT: PHASE 1 - Data Format Specification
 
-> **Version:** 1.0.0
-> **Status:** Official
-> **Last Updated:** 2025-01-01
-> **Philosophy:** 弘益人間 (Benefit All Humanity)
-
----
-
-## 1. Overview
-
-Phase 1 defines standardized data formats for Farming Robot systems. This specification establishes the core data model, field definitions, validation rules, and serialization formats to ensure interoperability across robotic control systems and robotic platforms.
+**Version:** 1.0
+**Status:** Active
+**Last Updated:** 2026-01-12
 
 ---
 
-## 2. Data Model
+## Overview
 
-### 2.1 Core Schema
+The WIA-FARMING_ROBOT standard defines data formats for agricultural robotics systems, enabling interoperability between autonomous tractors, harvesting robots, precision agriculture equipment, and farm management systems.
+
+**Market Context:** Global agricultural robotics market projected at $26.35B by 2032, with autonomous systems becoming core elements of farm operations.
+
+---
+
+## Core Data Structures
+
+### 1. Robot Identification
+
+```typescript
+interface RobotIdentification {
+  robotId: string;              // Unique identifier (UUID v4)
+  manufacturer: string;          // Equipment manufacturer
+  model: string;                // Robot model
+  type: RobotType;              // TRACTOR | HARVESTER | SPRAYER | SEEDER | SCOUT
+  serialNumber: string;         // Manufacturing serial number
+  certifications: string[];      // ISO 18497, FIRA compliance
+  firmwareVersion: string;      // Current firmware version
+  deploymentDate: ISO8601Date;  // Initial deployment date
+}
+
+enum RobotType {
+  AUTONOMOUS_TRACTOR = "AUTONOMOUS_TRACTOR",
+  HARVESTING_ROBOT = "HARVESTING_ROBOT",
+  PRECISION_SPRAYER = "PRECISION_SPRAYER",
+  SEEDING_ROBOT = "SEEDING_ROBOT",
+  CROP_SCOUT = "CROP_SCOUT",
+  WEEDING_ROBOT = "WEEDING_ROBOT",
+  LIVESTOCK_MONITORING = "LIVESTOCK_MONITORING"
+}
+```
+
+### 2. Positioning Data
+
+```typescript
+interface PositioningData {
+  timestamp: ISO8601DateTime;
+  gnss: GNSSData;               // Global Navigation Satellite System
+  rtk: RTKData;                 // Real-Time Kinematic (±2.5cm accuracy)
+  heading: number;              // Degrees (0-360)
+  speed: number;                // Meters per second
+  altitude: number;             // Meters above sea level
+  accuracy: AccuracyMetrics;
+}
+
+interface GNSSData {
+  latitude: number;             // Decimal degrees
+  longitude: number;            // Decimal degrees
+  satellites: number;           // Number of satellites in view
+  hdop: number;                 // Horizontal Dilution of Precision
+  quality: GNSSQuality;         // NO_FIX | 2D_FIX | 3D_FIX | RTK_FLOAT | RTK_FIXED
+}
+
+interface RTKData {
+  enabled: boolean;
+  baseStationId: string;
+  correctionAge: number;        // Seconds since last correction
+  positionAccuracy: number;     // Centimeters (target: ±2.5cm)
+}
+
+interface AccuracyMetrics {
+  horizontal: number;           // Centimeters
+  vertical: number;             // Centimeters
+  confidence: number;           // Percentage (0-100)
+}
+```
+
+### 3. Sensor Fusion Data
+
+```typescript
+interface SensorFusionData {
+  timestamp: ISO8601DateTime;
+  lidar: LiDARData;
+  cameras: CameraData[];
+  radar: RadarData;
+  imu: IMUData;                 // Inertial Measurement Unit
+  environmentalSensors: EnvironmentalData;
+}
+
+interface LiDARData {
+  scanId: string;
+  pointCloud: PointCloud3D;     // 3D mapping data
+  obstacleDetection: Obstacle[];
+  scanRate: number;             // Hz
+  range: number;                // Meters
+  resolution: number;           // Points per degree
+}
+
+interface PointCloud3D {
+  points: Point3D[];
+  format: "XYZ" | "XYZRGB" | "XYZI";  // Intensity or color
+  coordinateSystem: "ROBOT" | "WORLD" | "FIELD";
+}
+
+interface Point3D {
+  x: number;
+  y: number;
+  z: number;
+  intensity?: number;           // Reflectivity (0-255)
+  rgb?: [number, number, number];
+}
+
+interface Obstacle {
+  id: string;
+  type: ObstacleType;
+  position: Point3D;
+  boundingBox: BoundingBox3D;
+  velocity: Vector3D;           // If moving
+  confidence: number;           // 0-1
+}
+
+enum ObstacleType {
+  STATIC = "STATIC",
+  DYNAMIC = "DYNAMIC",
+  HUMAN = "HUMAN",
+  ANIMAL = "ANIMAL",
+  VEHICLE = "VEHICLE",
+  TREE = "TREE",
+  ROCK = "ROCK",
+  UNKNOWN = "UNKNOWN"
+}
+
+interface CameraData {
+  cameraId: string;
+  position: CameraPosition;     // FRONT | REAR | LEFT | RIGHT | TOP
+  image: ImageData;
+  detections: ObjectDetection[];
+  cropAnalysis: CropAnalysis;
+}
+
+interface ObjectDetection {
+  class: string;
+  confidence: number;
+  boundingBox: BoundingBox2D;
+  segmentationMask?: Polygon[];
+}
+
+interface CropAnalysis {
+  healthIndex: number;          // 0-100
+  maturityLevel: number;        // 0-100
+  diseaseDetection: DiseaseMarker[];
+  weedDetection: WeedMarker[];
+}
+```
+
+### 4. Operational Data
+
+```typescript
+interface OperationalData {
+  timestamp: ISO8601DateTime;
+  taskId: string;
+  taskType: TaskType;
+  status: OperationalStatus;
+  area: GeoPolygon;             // Working area
+  coverage: CoverageMetrics;
+  performance: PerformanceMetrics;
+}
+
+enum TaskType {
+  PLOWING = "PLOWING",
+  SEEDING = "SEEDING",
+  SPRAYING = "SPRAYING",
+  HARVESTING = "HARVESTING",
+  MONITORING = "MONITORING",
+  WEEDING = "WEEDING",
+  MAINTENANCE = "MAINTENANCE"
+}
+
+enum OperationalStatus {
+  IDLE = "IDLE",
+  NAVIGATING = "NAVIGATING",
+  WORKING = "WORKING",
+  PAUSED = "PAUSED",
+  ERROR = "ERROR",
+  CHARGING = "CHARGING",
+  MAINTENANCE = "MAINTENANCE"
+}
+
+interface CoverageMetrics {
+  totalArea: number;            // Square meters
+  coveredArea: number;          // Square meters
+  completionPercentage: number; // 0-100
+  efficiency: number;           // Actual vs. planned speed
+}
+
+interface PerformanceMetrics {
+  workRate: number;             // Hectares per hour
+  fuelConsumption: number;      // Liters per hectare
+  energyConsumption: number;    // kWh (for electric)
+  seedingRate?: number;         // Seeds per square meter
+  sprayingRate?: number;        // Liters per hectare
+  harvestYield?: number;        // Kg per hectare
+}
+```
+
+### 5. Path Planning Data
+
+```typescript
+interface PathPlanningData {
+  planId: string;
+  field: FieldDefinition;
+  path: PathSegment[];
+  waypoints: Waypoint[];
+  constraints: PathConstraints;
+}
+
+interface FieldDefinition {
+  fieldId: string;
+  boundary: GeoPolygon;
+  obstacles: GeoPolygon[];      // No-go zones
+  entryPoints: GeoPoint[];
+  exitPoints: GeoPoint[];
+  slope: SlopeData;
+  soilType: string;
+}
+
+interface PathSegment {
+  segmentId: string;
+  startPoint: GeoPoint;
+  endPoint: GeoPoint;
+  segmentType: "STRAIGHT" | "CURVE" | "TURN";
+  speed: number;                // m/s
+  heading: number;              // Degrees
+  width: number;                // Working width in meters
+}
+
+interface Waypoint {
+  position: GeoPoint;
+  action: WaypointAction;
+  timestamp: ISO8601DateTime;
+  tolerance: number;            // Meters
+}
+
+enum WaypointAction {
+  PASS = "PASS",
+  STOP = "STOP",
+  TURN = "TURN",
+  START_WORK = "START_WORK",
+  STOP_WORK = "STOP_WORK",
+  ADJUST_SPEED = "ADJUST_SPEED"
+}
+```
+
+---
+
+## Data Exchange Formats
+
+### Primary Format: JSON
 
 ```json
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "WIA Farming Robot Data Format",
-  "type": "object",
-  "required": ["standard", "version", "timestamp", "data"],
-  "properties": {
-    "standard": {
-      "type": "string",
-      "const": "WIA-FARMING_ROBOT"
-    },
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
-    },
-    "timestamp": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "metadata": {
-      "type": "object",
-      "properties": {
-        "source": {"type": "string"},
-        "encoding": {"type": "string", "enum": ["utf-8", "binary", "base64"]},
-        "checksum": {"type": "string"}
-      }
-    },
-    "data": {
-      "type": "object",
-      "description": "Primary robot telemetry payload"
-    }
+  "messageType": "ROBOT_TELEMETRY",
+  "version": "1.0",
+  "timestamp": "2026-01-12T10:30:00Z",
+  "robot": {
+    "robotId": "550e8400-e29b-41d4-a716-446655440000",
+    "type": "AUTONOMOUS_TRACTOR"
+  },
+  "positioning": {
+    "latitude": 42.3601,
+    "longitude": -71.0589,
+    "accuracy": 2.3
+  },
+  "status": "WORKING",
+  "task": {
+    "taskId": "task-2026-001",
+    "type": "SEEDING",
+    "completion": 67.5
   }
 }
 ```
 
-### 2.2 Field Definitions
+### Secondary Format: Protocol Buffers
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| standard | string | Yes | Standard identifier (WIA-FARMING_ROBOT) |
-| version | string | Yes | Specification version (SemVer) |
-| timestamp | string | Yes | ISO 8601 timestamp |
-| metadata.source | string | No | Data source identifier |
-| metadata.encoding | string | No | Content encoding type |
-| metadata.checksum | string | No | SHA-256 integrity hash |
-| data | object | Yes | Domain-specific robot telemetry |
+For high-frequency, low-latency communication (sensor streams, real-time control).
+
+### Tertiary Format: CSV
+
+For bulk data export, historical records, and analytics.
 
 ---
 
-## 3. Data Types
+## Data Quality Requirements
 
-### 3.1 Enumerations
-
-| Enum | Values | Description |
-|------|--------|-------------|
-| Status | `active`, `inactive`, `pending`, `error` | Operational status |
-| Priority | `critical`, `high`, `medium`, `low` | Processing priority |
-| DataQuality | `verified`, `provisional`, `estimated` | Data quality level |
-
-### 3.2 Measurement Units
-
-All measurements follow SI units unless domain-specific conventions apply. Timestamps use ISO 8601 with UTC timezone.
+| Metric | Requirement |
+|--------|-------------|
+| **Positioning Accuracy** | ±2.5cm with RTK |
+| **Update Rate** | 10 Hz minimum |
+| **Timestamp Precision** | Millisecond resolution |
+| **Data Completeness** | >99% of required fields |
+| **Latency** | <100ms for critical data |
 
 ---
 
-## 4. Validation Rules
+## References
 
-Implementations MUST:
-1. Validate all required fields before processing
-2. Reject payloads with unknown `standard` identifiers
-3. Verify version compatibility (major version must match)
-4. Validate timestamp format and reject future-dated entries beyond tolerance
-5. Compute and verify checksums when provided
-
-Implementations SHOULD:
-1. Support partial updates via JSON Patch (RFC 6902)
-2. Log validation failures with diagnostic details
-3. Provide human-readable error descriptions
+- ISO 18497: Agricultural machinery and tractors - Safety of highly automated agricultural machines
+- FIRA Standards (International Forum of Agricultural Robotics)
+- GNSS RTK Positioning Standards
+- LiDAR Point Cloud Data Format (ASTM E3125)
 
 ---
 
-## 5. Serialization
-
-### 5.1 JSON (Primary)
-- UTF-8 encoding required
-- Maximum payload size: 16 MB
-- Compression: gzip or brotli recommended for payloads > 1 KB
-
-### 5.2 Binary (Protocol Buffers)
-- Protobuf schema provided for high-throughput applications
-- Compatible with gRPC transport (see Phase 3)
-
-### 5.3 File Extensions
-- `.wia-farming-robot.json` — JSON format
-- `.wia-farming-robot.pb` — Protocol Buffers
-
----
-
-## 6. Examples
-
-### Minimal Valid Payload
-
-```json
-{
-  "standard": "WIA-FARMING_ROBOT",
-  "version": "1.0.0",
-  "timestamp": "2025-01-15T10:30:00Z",
-  "data": {}
-}
-```
-
----
-
-**© 2025 SmileStory Inc. / WIA - World Certification Industry Association**
-**弘益人間 · Benefit All Humanity**
+**弘益人間 (Benefit All Humanity)**
+© 2026 WIA (World Industry Association)

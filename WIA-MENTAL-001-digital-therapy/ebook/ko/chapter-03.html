@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제03장: CBT 프로토콜 구현 | WIA-MENTAL-001</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #EC4899;
+            --primary-dark: #BE185D;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --code-bg: #1e293b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            line-height: 1.8;
+            color: var(--text);
+            background: var(--bg);
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--surface);
+            padding: 3rem;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+
+        h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin: 2rem 0 1rem 0;
+        }
+
+        h3 {
+            color: var(--primary);
+            font-size: 1.4rem;
+            margin: 1.5rem 0 1rem 0;
+        }
+
+        p {
+            margin-bottom: 1.2rem;
+            line-height: 1.8;
+            color: var(--text);
+        }
+
+        .philosophy-box {
+            background: rgba(236, 72, 153, 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 6px;
+        }
+
+        .philosophy-box strong {
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+            background: var(--bg);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        thead {
+            background: var(--primary);
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            color: white;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr:hover {
+            background: rgba(236, 72, 153, 0.05);
+        }
+
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+        }
+
+        code {
+            color: #EC4899;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .key-takeaways {
+            background: rgba(236, 72, 153, 0.05);
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .key-takeaways h3 {
+            margin-top: 0;
+        }
+
+        .key-takeaways ul {
+            margin-left: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .key-takeaways li {
+            margin-bottom: 0.8rem;
+            line-height: 1.6;
+        }
+
+        .review-questions {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .review-questions h3 {
+            margin-top: 0;
+            color: var(--primary);
+        }
+
+        .review-questions ol {
+            margin-left: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .review-questions li {
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+
+        .nav-links {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 2px solid var(--border);
+        }
+
+        .nav-links a {
+            color: var(--primary);
+            text-decoration: none;
+            padding: 0.8rem 1.5rem;
+            border: 2px solid var(--primary);
+            border-radius: 6px;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .nav-links a:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        ul {
+            margin-left: 2rem;
+            margin-bottom: 1.2rem;
+        }
+
+        li {
+            margin-bottom: 0.6rem;
+            line-height: 1.6;
+        }
+
+        .diagram {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+            font-family: monospace;
+            line-height: 1.4;
+            white-space: pre;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CBT 프로토콜 구현</h1>
+        
+        <div class="philosophy-box">
+            <strong>弘益人間 (Hongik Ingan)</strong> - "널리 인간을 이롭게 하라"<br>인지행동치료를 디지털 형식으로 전환함으로써 우리는 가장 널리 검증된 치료 접근법 중 하나를 이전에는 도달할 수 없었던 수백만 명에게 제공합니다.</div>
+
+        <h2>3.1 Acceptance and Commitment Therapy (ACT)</h2>
+        
+        <p>Acceptance and Commitment Therapy represents a "third wave" behavioral therapy that uses acceptance and mindfulness strategies alongside commitment and behavior change strategies to increase psychological flexibility. Rather than trying to eliminate unwanted thoughts and feelings, ACT teaches people to accept them while committing to value-driven actions.</p>
+
+        <h3>The Six Core ACT Processes</h3>
+
+        <p>ACT is built on six interconnected processes that work together to enhance psychological flexibility - the ability to be present, open up to experience, and do what matters.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Process</th>
+                    <th>Description</th>
+                    <th>Digital Implementation</th>
+                    <th>Example Exercise</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Cognitive Defusion</td>
+                    <td>Creating distance from unhelpful thoughts</td>
+                    <td>Interactive thought observation exercises</td>
+                    <td>"Leaves on a stream" visualization</td>
+                </tr>
+                <tr>
+                    <td>Acceptance</td>
+                    <td>Making room for uncomfortable experiences</td>
+                    <td>Guided acceptance meditations with biofeedback</td>
+                    <td>Expanding awareness breathing practice</td>
+                </tr>
+                <tr>
+                    <td>Present Moment</td>
+                    <td>Flexible attention to here and now</td>
+                    <td>Mindfulness bell notifications, 5-senses exercises</td>
+                    <td>"Notice five things" grounding technique</td>
+                </tr>
+                <tr>
+                    <td>Self-as-Context</td>
+                    <td>Observing self distinct from thoughts/feelings</td>
+                    <td>Metaphor-based learning modules</td>
+                    <td>"Chessboard" vs "chess pieces" metaphor</td>
+                </tr>
+                <tr>
+                    <td>Values</td>
+                    <td>Clarifying what matters most</td>
+                    <td>Interactive values assessment and ranking</td>
+                    <td>Values compass exercise</td>
+                </tr>
+                <tr>
+                    <td>Committed Action</td>
+                    <td>Building patterns of effective action</td>
+                    <td>SMART goal setting with tracking</td>
+                    <td>Values-aligned action planning</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Digital ACT Module Implementation</h3>
+
+        <pre><code>interface ACTModule {
+  // Core ACT processes
+  processes: {
+    defusion: DefusionExercise[];
+    acceptance: AcceptanceExercise[];
+    presentMoment: MindfulnessExercise[];
+    selfAsContext: PerspectiveTakingExercise[];
+    values: ValuesExercise[];
+    committedAction: ActionPlanningExercise[];
+  };
+  
+  // Values assessment
+  valuesAssessment: {
+    domains: ValuesDomain[];
+    rankingExercise: InteractiveRanking;
+    alignment: ValuesAlignmentCheck;
+  };
+  
+  // Metaphor library
+  metaphors: TherapeuticMetaphor[];
+  
+  // Commitment tracking
+  commitmentTracker: {
+    goals: ACTGoal[];
+    barriers: IdentifiedBarrier[];
+    progress: ActionProgress[];
+  };
+}
+
+interface ValuesExercise {
+  type: 'clarification' | 'exploration' | 'alignment';
+  
+  domains: {
+    family: ValuesStatement[];
+    relationships: ValuesStatement[];
+    work: ValuesStatement[];
+    education: ValuesStatement[];
+    health: ValuesStatement[];
+    leisure: ValuesStatement[];
+    spirituality: ValuesStatement[];
+    community: ValuesStatement[];
+  };
+  
+  // Interactive ranking
+  prioritize(): Promise<ValuesPriority>;
+  
+  // Check alignment with actions
+  assessAlignment(
+    values: Value[],
+    actions: Action[]
+  ): AlignmentScore;
+}
+
+// Example: Values Compass Exercise
+class ValuesCompass {
+  domains = [
+    'Relationships',
+    'Work/Career', 
+    'Personal Growth',
+    'Health/Wellbeing',
+    'Leisure/Fun',
+    'Spirituality',
+    'Community',
+    'Environment'
+  ];
+  
+  async conductExercise(userId: string): Promise<ValuesProfile> {
+    // Step 1: Rate importance (0-10)
+    const importance = await this.rateImportance(this.domains);
+    
+    // Step 2: Rate current alignment (0-10)
+    const alignment = await this.rateAlignment(this.domains);
+    
+    // Step 3: Calculate discrepancy
+    const discrepancies = this.domains.map((domain, i) => ({
+      domain,
+      importance: importance[i],
+      alignment: alignment[i],
+      gap: importance[i] - alignment[i]
+    }));
+    
+    // Step 4: Identify priority areas (highest gaps)
+    const priorities = discrepancies
+      .filter(d => d.gap >= 3)
+      .sort((a, b) => b.gap - a.gap);
+    
+    // Step 5: Generate action recommendations
+    const actions = priorities.map(p => 
+      this.generateActionIdeas(p.domain)
+    );
+    
+    return {
+      profile: discrepancies,
+      priorities,
+      recommendedActions: actions
+    };
+  }
+  
+  private generateActionIdeas(domain: string): string[] {
+    const actionLibrary = {
+      'Relationships': [
+        'Schedule weekly quality time with loved ones',
+        'Reach out to someone you miss',
+        'Practice active listening in conversations',
+        'Express appreciation to someone daily'
+      ],
+      'Health/Wellbeing': [
+        'Establish a consistent sleep schedule',
+        'Add one healthy meal per day',
+        'Take a 10-minute walk daily',
+        'Schedule preventive health appointments'
+      ],
+      // ... other domains
+    };
+    
+    return actionLibrary[domain] || [];
+  }
+}</code></pre>
+
+        <h2>3.2 Interpersonal Therapy (IPT)</h2>
+
+        <p>Interpersonal Therapy is a time-limited, diagnosis-focused therapy that addresses the relationship between mood symptoms and interpersonal functioning. IPT focuses on four problem areas: grief and loss, role transitions, interpersonal disputes, and interpersonal deficits.</p>
+
+        <h3>IPT Problem Areas and Interventions</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Problem Area</th>
+                    <th>Target Issues</th>
+                    <th>Digital Tools</th>
+                    <th>Outcome Goals</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Grief and Loss</td>
+                    <td>Unresolved bereavement, complicated grief</td>
+                    <td>Guided mourning exercises, memory timeline</td>
+                    <td>Facilitate mourning process, restore social functioning</td>
+                </tr>
+                <tr>
+                    <td>Role Transitions</td>
+                    <td>Life changes (job, relationship, health status)</td>
+                    <td>Old vs. new role comparison, coping strategies</td>
+                    <td>Mourn old role, develop competence in new role</td>
+                </tr>
+                <tr>
+                    <td>Interpersonal Disputes</td>
+                    <td>Conflicts with partner, family, friends, colleagues</td>
+                    <td>Communication analysis, conflict resolution practice</td>
+                    <td>Resolve dispute or change expectations</td>
+                </tr>
+                <tr>
+                    <td>Interpersonal Deficits</td>
+                    <td>Social isolation, difficulty forming relationships</td>
+                    <td>Social skills training, relationship mapping</td>
+                    <td>Reduce isolation, improve relationship quality</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Relationship Mapping Tool</h3>
+
+        <p>One of the most powerful digital IPT tools is interactive relationship mapping, which helps patients visualize their social network, identify support sources and conflict areas, and track changes over time.</p>
+
+        <div class="diagram">
+Relationship Map Example:
+═════════════════════════════
+
+              [Patient]
+                  │
+        ┌─────────┼─────────┐
+        │         │         │
+    [Family]  [Friends]  [Work]
+        │         │         │
+    ┌───┴───┐ ┌───┴───┐ ┌───┴───┐
+    │       │ │       │ │       │
+ [Spouse] [Mom] [Sarah] [Tom] [Boss] [Colleagues]
+    ⭐⭐⭐  ⚠️⚠️  ⭐⭐⭐  ⭐⭐  ⚠️⚠️⚠️  ⭐
+
+Legend:
+⭐ = Supportive relationship
+⚠️ = Conflict/stress source
+━ = Strong connection
+┄ = Weak connection
+✕ = Broken connection
+        </div>
+
+        <pre><code>interface IPTModule {
+  // Identify primary problem area
+  problemAreaAssessment: {
+    grief: GriefAssessment;
+    roleTransition: RoleTransitionAssessment;
+    interpersonalDispute: DisputeAssessment;
+    interpersonalDeficit: DeficitAssessment;
+  };
+  
+  // Relationship inventory
+  relationshipInventory: {
+    significantRelationships: Relationship[];
+    supportSources: SupportNetwork;
+    conflictAreas: ConflictAnalysis[];
+  };
+  
+  // Communication skills
+  communicationTraining: {
+    expressionExercises: CommunicationExercise[];
+    activeListening: ListeningPractice[];
+    conflictResolution: ConflictSkills[];
+  };
+  
+  // Social rhythm tracking
+  socialRhythm: {
+    dailyRoutine: RoutineTracker;
+    socialContacts: ContactLog;
+    regularityScore: number;
+  };
+}
+
+// Social Rhythm Metric Tracking
+interface SocialRhythmTracker {
+  activities: {
+    name: string;
+    timeOfDay: Time;
+    people: string[]; // who was present
+    consistency: number; // 1-5 scale
+  }[];
+  
+  regularityIndex: number; // overall stability
+  
+  trackActivity(
+    activity: string,
+    time: Time,
+    socialContext: string[]
+  ): void;
+  
+  calculateRegularity(): number;
+  
+  identifyDisruptions(): Disruption[];
+}</code></pre>
+
+        <h2>3.3 Mindfulness-Based Cognitive Therapy (MBCT)</h2>
+
+        <p>MBCT integrates mindfulness meditation practices with cognitive therapy techniques, specifically developed to prevent relapse in recurrent depression. The program teaches participants to recognize and disengage from habitual negative thought patterns that trigger depressive episodes.</p>
+
+        <h3>The 8-Week MBCT Program</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Week</th>
+                    <th>Theme</th>
+                    <th>Core Practices</th>
+                    <th>Digital Components</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td>Automatic Pilot</td>
+                    <td>Body scan, mindful eating</td>
+                    <td>20-min guided body scan audio, raisin exercise</td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td>Dealing with Barriers</td>
+                    <td>Body scan, sitting meditation</td>
+                    <td>10-min sitting meditation, pleasant events calendar</td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td>Mindfulness of Breath</td>
+                    <td>Mindful movement, 3-minute breathing space</td>
+                    <td>Yoga/stretching videos, breathing timer</td>
+                </tr>
+                <tr>
+                    <td>4</td>
+                    <td>Staying Present</td>
+                    <td>Sitting meditation, thought observation</td>
+                    <td>Thought cloud visualization, unpleasant events tracking</td>
+                </tr>
+                <tr>
+                    <td>5</td>
+                    <td>Allowing/Letting Be</td>
+                    <td>Sitting meditation with difficulty</td>
+                    <td>Difficulty meditation audio, exploration exercises</td>
+                </tr>
+                <tr>
+                    <td>6</td>
+                    <td>Thoughts Are Not Facts</td>
+                    <td>Cognitive techniques + meditation</td>
+                    <td>Thought records, alternative perspectives generator</td>
+                </tr>
+                <tr>
+                    <td>7</td>
+                    <td>How Can I Best Take Care of Myself?</td>
+                    <td>Self-care planning, relapse signatures</td>
+                    <td>Action plan builder, warning signs checklist</td>
+                </tr>
+                <tr>
+                    <td>8</td>
+                    <td>Using What Has Been Learned</td>
+                    <td>Review and consolidation</td>
+                    <td>Personalized ongoing practice plan</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Guided Meditation Library</h3>
+
+        <p>A comprehensive digital MBCT implementation requires an extensive library of guided audio meditations with varying lengths and focuses to support daily practice and accommodate different schedules.</p>
+
+        <pre><code>interface MBCTMeditationLibrary {
+  bodyScan: {
+    duration: '10min' | '20min' | '45min';
+    narrator: string;
+    audio: AudioFile;
+    transcript: string;
+  }[];
+  
+  sittingMeditation: {
+    focus: 'breath' | 'body' | 'sounds' | 'thoughts' | 'open-awareness';
+    duration: '5min' | '10min' | '20min' | '30min';
+    guidanceLevel: 'full' | 'moderate' | 'minimal';
+    audio: AudioFile;
+  }[];
+  
+  breathingSpace: {
+    variant: 'standard' | 'extended' | 'emergency';
+    duration: '3min' | '5min' | '10min';
+    audio: AudioFile;
+  }[];
+  
+  mindfulMovement: {
+    type: 'gentle-yoga' | 'stretching' | 'walking';
+    duration: '10min' | '20min' | '30min';
+    video: VideoFile;
+    modifications: Modification[];
+  }[];
+  
+  // Practice tracking
+  practiceLog: {
+    date: Date;
+    practice: string;
+    duration: number;
+    experience: string;
+    difficulty: number; // 1-10
+    insights: string;
+  }[];
+  
+  // Mindfulness bell reminders
+  bells: {
+    frequency: 'hourly' | '2hours' | '3hours' | 'custom';
+    startTime: Time;
+    endTime: Time;
+    sound: AudioFile;
+    prompt: string;
+  };
+}</code></pre>
+
+        <h2>3.4 Advanced Progress Tracking</h2>
+
+        <p>With multiple therapy modalities, comprehensive progress tracking becomes essential to understand which approaches work best for which patients under what circumstances.</p>
+
+        <h3>Multi-Dimensional Progress Metrics</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric Category</th>
+                    <th>Measurements</th>
+                    <th>Collection Method</th>
+                    <th>Frequency</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Symptom Severity</td>
+                    <td>PHQ-9, GAD-7, PCL-5 scores</td>
+                    <td>Standardized assessments</td>
+                    <td>Biweekly</td>
+                </tr>
+                <tr>
+                    <td>Functional Impairment</td>
+                    <td>Work, social, self-care functioning</td>
+                    <td>WHODAS 2.0, custom scales</td>
+                    <td>Monthly</td>
+                </tr>
+                <tr>
+                    <td>Treatment Engagement</td>
+                    <td>Session attendance, homework completion, time invested</td>
+                    <td>Automated platform tracking</td>
+                    <td>Continuous</td>
+                </tr>
+                <tr>
+                    <td>Skills Acquisition</td>
+                    <td>Knowledge checks, skill demonstrations</td>
+                    <td>Interactive quizzes, practice logs</td>
+                    <td>Per module</td>
+                </tr>
+                <tr>
+                    <td>Behavioral Activation</td>
+                    <td>Pleasant activities, social contacts, exercise</td>
+                    <td>Activity scheduling, wearable data</td>
+                    <td>Daily</td>
+                </tr>
+                <tr>
+                    <td>Quality of Life</td>
+                    <td>Subjective wellbeing, life satisfaction</td>
+                    <td>WHO-5, QOLI</td>
+                    <td>Monthly</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>3.5 Therapist Collaboration Portal</h2>
+
+        <p>While digital therapeutics can function autonomously, integration with human clinicians significantly enhances outcomes, especially for more severe cases. The therapist portal provides comprehensive patient oversight while respecting boundaries of digital-first treatment.</p>
+
+        <h3>Portal Features</h3>
+
+        <pre><code>interface TherapistPortal {
+  // Patient dashboard
+  patients: {
+    overview: PatientOverview[];
+    alerts: ClinicalAlert[];
+    pending: ActionItem[];
+  };
+  
+  // Individual patient view
+  patientDetail: {
+    demographics: BasicInfo;
+    diagnosisInfo: DiagnosisData;
+    currentTreatment: TreatmentPlan;
+    progressCharts: ProgressVisualization[];
+    recentSessions: SessionSummary[];
+    assessmentHistory: Assessment[];
+    safetyFlags: SafetyAlert[];
+  };
+  
+  // Clinical documentation
+  documentation: {
+    createNote(type: 'SOAP' | 'progress' | 'discharge'): Note;
+    updateTreatmentPlan(patientId: string, plan: TreatmentPlan): void;
+    signDocumentation(noteId: string): void;
+  };
+  
+  // Communication
+  messaging: {
+    sendMessage(patientId: string, content: string): void;
+    viewMessages(patientId: string): Message[];
+    setAutoResponder(config: AutoResponderConfig): void;
+  };
+  
+  // Analytics and reporting
+  analytics: {
+    caseload: CaseloadStats;
+    outcomes: OutcomeMetrics;
+    engagement: EngagementMetrics;
+    qualityIndicators: QualityMetrics;
+  };
+}</code></pre>
+
+        <div class="key-takeaways">
+            <h3>핵심 요점</h3>
+            <ul>
+                <li><strong>ACT focuses on psychological flexibility</strong> through six core processes: defusion, acceptance, present moment awareness, self-as-context, values, and committed action.</li>
+                
+                <li><strong>IPT addresses interpersonal functioning</strong> across four problem areas: grief, role transitions, disputes, and deficits - all highly amenable to structured digital interventions.</li>
+                
+                <li><strong>MBCT's 8-week structure prevents relapse</strong> by teaching mindfulness skills to recognize and disengage from depressive thought patterns.</li>
+                
+                <li><strong>Multi-dimensional progress tracking</strong> captures symptom severity, functional impairment, engagement, skills acquisition, behavioral activation, and quality of life.</li>
+                
+                <li><strong>Therapist collaboration portals enhance outcomes</strong> by combining the scalability of digital delivery with human clinical oversight for complex cases.</li>
+                
+                <li><strong>Values-based interventions in ACT</strong> help ensure treatment aligns with what matters most to patients, improving engagement and real-world application.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li><strong>How does ACT's approach to negative thoughts differ from CBT's cognitive restructuring?</strong> Explain the concept of cognitive defusion.</li>
+                
+                <li><strong>What are the four IPT problem areas</strong> and how would you determine which is most relevant for a given patient?</li>
+                
+                <li><strong>Why is MBCT specifically effective for preventing depressive relapse</strong> rather than treating acute episodes?</li>
+                
+                <li><strong>How does the Values Compass exercise</strong> help identify priority areas for committed action in ACT?</li>
+                
+                <li><strong>What is social rhythm tracking in IPT</strong> and why is routine regularity important for mood stability?</li>
+                
+                <li><strong>How do the six dimensions of progress tracking</strong> provide a more comprehensive picture than symptom measures alone?</li>
+                
+                <li><strong>What role should human therapists play</strong> in a primarily digital therapeutic intervention? When is human oversight essential vs. optional?</li>
+            </ol>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-02.html">← 이전: Chapter 2</a>
+            <a href="chapter-04.html">다음: Chapter 4 →</a>
+        </div>
+    </div>
+</body>
+</html>

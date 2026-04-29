@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Security and Compliance | WIA-CHRONIC-PAIN</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 5: Security and Compliance</h1>
+
+    <div class="highlight">
+        <strong>Learning Objectives:</strong> Implement HIPAA-compliant security measures, design robust data encryption strategies, and build comprehensive consent management systems for chronic pain management platforms.
+    </div>
+
+    <h2>Health Data Security Fundamentals</h2>
+
+    <p>The WIA-CHRONIC-PAIN standard mandates comprehensive security measures protecting patient data while enabling care coordination.</p>
+
+    <h3>Security Architecture Overview</h3>
+
+    <pre><code>{
+  "security_layers": {
+    "network": {
+      "perimeter": "WAF, DDoS protection, IP allowlisting",
+      "segmentation": "VPC isolation, network ACLs",
+      "encryption": "TLS 1.3 for all traffic"
+    },
+    "application": {
+      "authentication": "OAuth 2.0 / OpenID Connect",
+      "authorization": "RBAC with fine-grained permissions",
+      "input_validation": "Schema validation, sanitization",
+      "output_encoding": "Context-aware encoding"
+    },
+    "data": {
+      "encryption_at_rest": "AES-256-GCM",
+      "encryption_in_transit": "TLS 1.3",
+      "key_management": "HSM-backed key storage",
+      "tokenization": "PHI field tokenization"
+    },
+    "infrastructure": {
+      "hardening": "CIS benchmarks",
+      "patching": "Automated vulnerability management",
+      "monitoring": "SIEM integration, anomaly detection"
+    }
+  }
+}</code></pre>
+
+    <h2>HIPAA Compliance Framework</h2>
+
+    <h3>HIPAA Security Rule Requirements</h3>
+
+    <table>
+        <tr>
+            <th>Safeguard Category</th>
+            <th>Requirements</th>
+            <th>Implementation</th>
+        </tr>
+        <tr>
+            <td>Administrative</td>
+            <td>Risk analysis, workforce training, policies</td>
+            <td>Documented procedures, regular training</td>
+        </tr>
+        <tr>
+            <td>Physical</td>
+            <td>Facility access, workstation security</td>
+            <td>Access controls, device management</td>
+        </tr>
+        <tr>
+            <td>Technical</td>
+            <td>Access control, audit controls, encryption</td>
+            <td>RBAC, logging, AES-256 encryption</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        <strong>Business Associate Agreements:</strong> Third parties handling PHI must sign a BAA binding them to HIPAA requirements.
+    </div>
+
+    <h3>Technical Safeguards Implementation</h3>
+
+    <pre><code>class HIPAASecurityManager {
+  private encryptionService: EncryptionService;
+  private auditLogger: AuditLogger;
+  private accessController: AccessController;
+
+  async protectPHI(data: HealthData): Promise&lt;ProtectedData&gt; {
+    // Validate data classification
+    const classification = this.classifyData(data);
+
+    if (classification.containsPHI) {
+      // Apply encryption
+      const encrypted = await this.encryptionService.encrypt(data, {
+        algorithm: 'AES-256-GCM',
+        keyId: await this.getActiveKeyId(),
+        associatedData: this.buildAAD(data)
+      });
+
+      // Log access
+      await this.auditLogger.logDataAccess({
+        action: 'ENCRYPT',
+        dataType: classification.dataTypes,
+        timestamp: new Date().toISOString(),
+        userId: this.getCurrentUser(),
+        purpose: 'DATA_PROTECTION'
+      });
+
+      return encrypted;
+    }
+
+    return data;
+  }
+
+  async authorizeAccess(
+    userId: string,
+    resource: Resource,
+    action: Action
+  ): Promise&lt;AuthorizationResult&gt; {
+    // Check user permissions
+    const permissions = await this.accessController.getUserPermissions(userId);
+
+    // Verify minimum necessary access
+    const isMinimumNecessary = this.verifyMinimumNecessary(
+      permissions,
+      resource,
+      action
+    );
+
+    // Check for break-glass scenarios
+    const breakGlass = await this.checkBreakGlass(userId, resource);
+
+    // Log authorization decision
+    await this.auditLogger.logAuthorization({
+      userId,
+      resource: resource.id,
+      action,
+      granted: isMinimumNecessary || breakGlass,
+      timestamp: new Date().toISOString()
+    });
+
+    return {
+      authorized: isMinimumNecessary || breakGlass,
+      reason: isMinimumNecessary ? 'STANDARD_ACCESS' :
+              breakGlass ? 'BREAK_GLASS' : 'DENIED'
+    };
+  }
+}</code></pre>
+
+    <h2>Data Encryption Strategies</h2>
+
+    <h3>Encryption at Rest</h3>
+
+    <pre><code>interface EncryptionAtRestConfig {
+  algorithm: 'AES-256-GCM';
+  keyManagement: {
+    provider: 'AWS_KMS' | 'Azure_KeyVault' | 'GCP_KMS' | 'HashiCorp_Vault';
+    keyRotation: {
+      frequency: 'annual';
+      automatic: true;
+    };
+    keyHierarchy: {
+      masterKey: 'HSM-protected';
+      dataEncryptionKeys: 'envelope-encrypted';
+    };
+  };
+  scope: {
+    database: 'column-level for PHI';
+    fileStorage: 'client-side encryption';
+    backups: 'encrypted before transfer';
+  };
+}
+
+class ColumnLevelEncryption {
+  private kms: KeyManagementService;
+
+  async encryptColumn(
+    value: string,
+    context: EncryptionContext
+  ): Promise&lt;EncryptedValue&gt; {
+    // Get data encryption key
+    const dek = await this.kms.generateDataKey({
+      keyId: context.masterKeyId,
+      context: {
+        table: context.table,
+        column: context.column,
+        purpose: 'PHI_PROTECTION'
+      }
+    });
+
+    // Encrypt value with DEK
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', dek.plaintext, iv);
+    cipher.setAAD(Buffer.from(context.aad));
+
+    const encrypted = Buffer.concat([
+      cipher.update(value, 'utf8'),
+      cipher.final()
+    ]);
+
+    const authTag = cipher.getAuthTag();
+
+    // Clear plaintext DEK from memory
+    dek.plaintext.fill(0);
+
+    return {
+      ciphertext: encrypted.toString('base64'),
+      iv: iv.toString('base64'),
+      authTag: authTag.toString('base64'),
+      encryptedDEK: dek.encrypted,
+      keyVersion: dek.keyVersion
+    };
+  }
+}</code></pre>
+
+    <h3>Encryption in Transit</h3>
+
+    <pre><code>// TLS configuration for all services
+const tlsConfig = {
+  minVersion: 'TLSv1.3',
+  cipherSuites: [
+    'TLS_AES_256_GCM_SHA384',
+    'TLS_CHACHA20_POLY1305_SHA256',
+    'TLS_AES_128_GCM_SHA256'
+  ],
+  certificateValidation: {
+    required: true,
+    ocspStapling: true,
+    certificateTransparency: true
+  },
+  hsts: {
+    enabled: true,
+    maxAge: 31536000,
+    includeSubdomains: true,
+    preload: true
+  }
+};
+
+// API Gateway TLS termination
+const apiGatewayConfig = {
+  listeners: [{
+    port: 443,
+    protocol: 'HTTPS',
+    certificate: {
+      type: 'ACM',
+      arn: 'arn:aws:acm:region:account:certificate/id'
+    },
+    tlsPolicy: 'TLS_1_3_ONLY'
+  }],
+  backendTLS: {
+    enabled: true,
+    validateCertificate: true
+  }
+};</code></pre>
+
+    <h2>Consent Management</h2>
+
+    <div class="highlight">
+        <strong>Informed Consent:</strong> Patients must understand how their data will be used before providing consent.
+    </div>
+
+    <h3>Consent Data Model</h3>
+
+    <pre><code>interface PatientConsent {
+  id: string;
+  patientId: string;
+  version: string;
+  timestamp: string;
+  categories: ConsentCategory[];
+  preferences: ConsentPreference[];
+  signatures: ConsentSignature[];
+  revocationHistory: RevocationRecord[];
+}
+
+interface ConsentCategory {
+  category: string;
+  description: string;
+  required: boolean;
+  granted: boolean;
+  purposes: ConsentPurpose[];
+}
+
+enum ConsentPurpose {
+  TREATMENT = 'treatment',
+  CARE_COORDINATION = 'care_coordination',
+  QUALITY_IMPROVEMENT = 'quality_improvement',
+  RESEARCH = 'research',
+  MARKETING = 'marketing',
+  THIRD_PARTY_SHARING = 'third_party_sharing'
+}
+
+class ConsentManager {
+  async captureConsent(
+    patientId: string,
+    consentData: ConsentInput
+  ): Promise&lt;PatientConsent&gt; {
+    // Validate consent completeness
+    this.validateConsentCompleteness(consentData);
+
+    // Create consent record
+    const consent: PatientConsent = {
+      id: generateUUID(),
+      patientId,
+      version: CURRENT_CONSENT_VERSION,
+      timestamp: new Date().toISOString(),
+      categories: this.processCategories(consentData.categories),
+      preferences: consentData.preferences,
+      signatures: [{
+        type: 'electronic',
+        timestamp: new Date().toISOString(),
+        method: consentData.signatureMethod,
+        ipAddress: this.hashIP(consentData.ipAddress),
+        userAgent: consentData.userAgent
+      }],
+      revocationHistory: []
+    };
+
+    // Store with audit trail
+    await this.storage.saveConsent(consent);
+    await this.auditLogger.logConsentCapture(consent);
+
+    // Notify downstream systems
+    await this.publishConsentEvent({
+      type: 'CONSENT_GRANTED',
+      patientId,
+      consentId: consent.id,
+      categories: consent.categories.filter(c => c.granted).map(c => c.category)
+    });
+
+    return consent;
+  }
+
+  async checkConsent(
+    patientId: string,
+    purpose: ConsentPurpose
+  ): Promise&lt;ConsentCheckResult&gt; {
+    const consent = await this.getCurrentConsent(patientId);
+
+    if (!consent) {
+      return { allowed: false, reason: 'NO_CONSENT_ON_FILE' };
+    }
+
+    const category = consent.categories.find(c =>
+      c.purposes.includes(purpose)
+    );
+
+    if (!category) {
+      return { allowed: false, reason: 'PURPOSE_NOT_COVERED' };
+    }
+
+    return {
+      allowed: category.granted,
+      reason: category.granted ? 'CONSENT_GRANTED' : 'CONSENT_DENIED',
+      consentId: consent.id,
+      consentVersion: consent.version
+    };
+  }
+}</code></pre>
+
+    <h2>Audit Logging</h2>
+
+    <pre><code>interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  eventType: AuditEventType;
+  actor: {
+    userId: string;
+    userType: 'patient' | 'provider' | 'system' | 'admin';
+    ipAddress: string;
+    userAgent: string;
+  };
+  resource: {
+    type: string;
+    id: string;
+    patientId?: string;
+  };
+  action: string;
+  outcome: 'success' | 'failure' | 'partial';
+  details: Record&lt;string, unknown&gt;;
+  hash: string;
+}
+
+enum AuditEventType {
+  AUTHENTICATION = 'authentication',
+  AUTHORIZATION = 'authorization',
+  DATA_ACCESS = 'data_access',
+  DATA_MODIFICATION = 'data_modification',
+  DATA_EXPORT = 'data_export',
+  CONSENT_CHANGE = 'consent_change',
+  SECURITY_EVENT = 'security_event',
+  SYSTEM_EVENT = 'system_event'
+}
+
+class AuditLogger {
+  private logStore: ImmutableLogStore;
+  private integrityVerifier: IntegrityVerifier;
+
+  async log(entry: Omit&lt;AuditLogEntry, 'id' | 'hash'&gt;): Promise&lt;void&gt; {
+    const id = generateUUID();
+    const previousHash = await this.logStore.getLastHash();
+
+    const hash = this.calculateHash({
+      ...entry,
+      id,
+      previousHash
+    });
+
+    const fullEntry: AuditLogEntry = {
+      ...entry,
+      id,
+      hash
+    };
+
+    // Write to immutable log store
+    await this.logStore.append(fullEntry);
+
+    // Real-time alerting for security events
+    if (entry.eventType === AuditEventType.SECURITY_EVENT) {
+      await this.alertSecurityTeam(fullEntry);
+    }
+  }
+
+  async verifyLogIntegrity(startTime: string, endTime: string): Promise&lt;IntegrityReport&gt; {
+    const logs = await this.logStore.getRange(startTime, endTime);
+
+    let previousHash = await this.logStore.getHashBefore(startTime);
+    const violations: IntegrityViolation[] = [];
+
+    for (const log of logs) {
+      const expectedHash = this.calculateHash({
+        ...log,
+        previousHash
+      });
+
+      if (log.hash !== expectedHash) {
+        violations.push({
+          logId: log.id,
+          timestamp: log.timestamp,
+          type: 'HASH_MISMATCH'
+        });
+      }
+
+      previousHash = log.hash;
+    }
+
+    return {
+      verified: violations.length === 0,
+      logsChecked: logs.length,
+      violations
+    };
+  }
+}</code></pre>
+
+    <h2>Access Control</h2>
+
+    <pre><code>interface AccessControlPolicy {
+  roles: Role[];
+  permissions: Permission[];
+  roleAssignments: RoleAssignment[];
+}
+
+interface Role {
+  name: string;
+  description: string;
+  permissions: string[];
+  constraints: RoleConstraint[];
+}
+
+const healthcareRoles: Role[] = [
+  {
+    name: 'patient',
+    description: 'Patient accessing their own data',
+    permissions: [
+      'pain_log:create:own',
+      'pain_log:read:own',
+      'medication:read:own',
+      'medication:log_dose:own',
+      'treatment:read:own',
+      'consent:manage:own'
+    ],
+    constraints: [{ type: 'SELF_ONLY' }]
+  },
+  {
+    name: 'treating_provider',
+    description: 'Provider with treatment relationship',
+    permissions: [
+      'patient:read:assigned',
+      'pain_log:read:assigned',
+      'medication:manage:assigned',
+      'treatment:manage:assigned',
+      'clinical_notes:create:assigned'
+    ],
+    constraints: [{ type: 'TREATMENT_RELATIONSHIP' }]
+  },
+  {
+    name: 'care_coordinator',
+    description: 'Care team member coordinating care',
+    permissions: [
+      'patient:read:team',
+      'pain_log:read:team',
+      'treatment:read:team',
+      'scheduling:manage:team'
+    ],
+    constraints: [{ type: 'CARE_TEAM_MEMBER' }]
+  }
+];</code></pre>
+
+    <h2>Incident Response</h2>
+
+    <div class="highlight">
+        <strong>Breach Notification:</strong> HIPAA requires notification within 60 days of discovering a breach.
+    </div>
+
+    <pre><code>interface IncidentResponsePlan {
+  phases: IncidentPhase[];
+  escalation: EscalationMatrix;
+  notifications: NotificationProcedure[];
+  documentation: DocumentationRequirements;
+}
+
+const incidentPhases: IncidentPhase[] = [
+  {
+    name: 'Detection',
+    activities: [
+      'Identify and validate incident',
+      'Initial severity assessment',
+      'Activate incident response team'
+    ],
+    timeframe: 'Immediate'
+  },
+  {
+    name: 'Containment',
+    activities: [
+      'Isolate affected systems',
+      'Preserve evidence',
+      'Prevent further data exposure'
+    ],
+    timeframe: 'Within 1 hour'
+  },
+  {
+    name: 'Investigation',
+    activities: [
+      'Determine scope and impact',
+      'Identify affected individuals',
+      'Root cause analysis'
+    ],
+    timeframe: 'Within 24 hours'
+  },
+  {
+    name: 'Notification',
+    activities: [
+      'Notify affected individuals',
+      'Report to regulators if required',
+      'Media communication if needed'
+    ],
+    timeframe: 'Within 60 days (HIPAA)'
+  },
+  {
+    name: 'Remediation',
+    activities: [
+      'Fix vulnerabilities',
+      'Update security controls',
+      'Document lessons learned'
+    ],
+    timeframe: 'Ongoing'
+  }
+];</code></pre>
+</body>
+</html>

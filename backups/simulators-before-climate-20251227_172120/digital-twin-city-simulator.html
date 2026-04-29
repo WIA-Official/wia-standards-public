@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Digital Twin City - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #0EA5E9;
+            --primary-dark: #0284C7;
+            --secondary: #F59E0B;
+            --danger: #ef4444;
+            --success: #10b981;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #38BDF8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); border-radius: 8px; font-size: 1rem; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .metric-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .metric-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .metric-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .sensor-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+        .sensor-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; cursor: pointer; transition: all 0.2s; }
+        .sensor-card:hover { border-color: var(--primary); }
+        .sensor-card.selected { border-color: var(--primary); background: rgba(14, 165, 233, 0.1); }
+        .sensor-icon { font-size: 2rem; margin-bottom: 8px; }
+        .sensor-name { font-weight: 600; }
+        .sensor-value { color: var(--primary); font-size: 1.2rem; margin-top: 5px; }
+        .sensor-status { font-size: 0.75rem; color: var(--success); margin-top: 3px; }
+
+        .city-viz { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin: 20px 0; height: 200px; display: flex; align-items: center; justify-content: center; }
+        .city-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; }
+        .city-block { width: 20px; height: 20px; background: var(--border); border-radius: 2px; transition: all 0.3s; }
+        .city-block.traffic-low { background: var(--success); }
+        .city-block.traffic-med { background: var(--secondary); }
+        .city-block.traffic-high { background: var(--danger); }
+
+        .layer-toggle { display: flex; gap: 10px; flex-wrap: wrap; margin: 15px 0; }
+        .layer-btn { padding: 8px 16px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 20px; cursor: pointer; font-size: 0.85rem; }
+        .layer-btn.active { background: var(--primary); border-color: var(--primary); }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .form-grid { grid-template-columns: 1fr; }
+            .metric-grid { grid-template-columns: repeat(2, 1fr); }
+            .sensor-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Digital Twin City</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🏙️ WIA Digital Twin City</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Smart City Digital Twin" data-ko="스마트시티 디지털 트윈">Smart City Digital Twin</h1>
+            <p data-en="Real-time city simulation and analytics" data-ko="실시간 도시 시뮬레이션 및 분석">Real-time city simulation</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📡 Sensors" data-ko="📡 센서">📡 Sensors</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🗺️ 3D Model" data-ko="🗺️ 3D 모델">🗺️ 3D Model</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🚗 Traffic" data-ko="🚗 교통">🚗 Traffic</div>
+            <div class="tab" onclick="showPanel(3)" data-en="⚡ Energy" data-ko="⚡ 에너지">⚡ Energy</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🔌 API" data-ko="🔌 API">🔌 API</div>
+        </div>
+
+        <!-- Panel 0: Sensors -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="📡 IoT Sensor Network" data-ko="📡 IoT 센서 네트워크">📡 IoT Sensor Network</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Real-time data from city sensors" data-ko="도시 센서의 실시간 데이터">Real-time sensor data</p>
+
+            <div class="sensor-grid" id="sensorGrid">
+                <div class="sensor-card selected">
+                    <div class="sensor-icon">🚦</div>
+                    <div class="sensor-name" data-en="Traffic Flow" data-ko="교통 흐름">Traffic Flow</div>
+                    <div class="sensor-value">1,523 veh/hr</div>
+                    <div class="sensor-status">[OK] 2s ago</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon">💨</div>
+                    <div class="sensor-name" data-en="Air Quality" data-ko="공기질">Air Quality</div>
+                    <div class="sensor-value">PM2.5: 35</div>
+                    <div class="sensor-status">[OK] 5s ago</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon">⚡</div>
+                    <div class="sensor-name" data-en="Energy Grid" data-ko="에너지 그리드">Energy Grid</div>
+                    <div class="sensor-value">4.2 GW (78%)</div>
+                    <div class="sensor-status">[OK] 3s ago</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon">💧</div>
+                    <div class="sensor-name" data-en="Water Flow" data-ko="수도">Water Flow</div>
+                    <div class="sensor-value">12.5 ML/day</div>
+                    <div class="sensor-status">[OK] 10s ago</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon">🔊</div>
+                    <div class="sensor-name" data-en="Noise Level" data-ko="소음">Noise Level</div>
+                    <div class="sensor-value">72 dB</div>
+                    <div class="sensor-status" style="color: var(--secondary);">[!] High</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon">🌡️</div>
+                    <div class="sensor-name" data-en="Temperature" data-ko="온도">Temperature</div>
+                    <div class="sensor-value">24°C</div>
+                    <div class="sensor-status">[OK] 1s ago</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="refreshSensors()" data-en="📡 Refresh Sensors" data-ko="📡 센서 새로고침">📡 Refresh</button>
+            </div>
+            <div class="output" id="sensorOutput"></div>
+        </div>
+
+        <!-- Panel 1: 3D Model -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🗺️ 3D City Model" data-ko="🗺️ 3D 도시 모델">🗺️ 3D City Model</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Digital twin visualization layers" data-ko="디지털 트윈 시각화 레이어">Visualization layers</p>
+
+            <div class="layer-toggle">
+                <button class="layer-btn active" data-en="Buildings" data-ko="건물">Buildings</button>
+                <button class="layer-btn active" data-en="Roads" data-ko="도로">Roads</button>
+                <button class="layer-btn" data-en="Traffic" data-ko="교통">Traffic</button>
+                <button class="layer-btn" data-en="Air Quality" data-ko="공기질">Air Quality</button>
+                <button class="layer-btn" data-en="Energy" data-ko="에너지">Energy</button>
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value">892K</div>
+                    <div class="metric-label" data-en="Buildings" data-ko="건물">Buildings</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">45K</div>
+                    <div class="metric-label" data-en="Roads" data-ko="도로">Roads</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">1.2M</div>
+                    <div class="metric-label" data-en="Utilities" data-ko="유틸리티">Utilities</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">99.2%</div>
+                    <div class="metric-label" data-en="Sync Rate" data-ko="동기화">Sync Rate</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="loadModel()" data-en="🗺️ Load Model" data-ko="🗺️ 모델 로드">🗺️ Load Model</button>
+            </div>
+            <div class="output" id="modelOutput"></div>
+        </div>
+
+        <!-- Panel 2: Traffic -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🚗 Traffic Simulation" data-ko="🚗 교통 시뮬레이션">🚗 Traffic Simulation</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Real-time traffic flow analysis" data-ko="실시간 교통 흐름 분석">Traffic flow analysis</p>
+
+            <div class="city-viz">
+                <div class="city-grid" id="cityGrid"></div>
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value" id="avgSpeed">42 km/h</div>
+                    <div class="metric-label" data-en="Avg Speed" data-ko="평균 속도">Avg Speed</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="congestion">6.2</div>
+                    <div class="metric-label" data-en="Congestion" data-ko="혼잡도">Congestion</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="vehicles">500K</div>
+                    <div class="metric-label" data-en="Vehicles" data-ko="차량 수">Vehicles</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="co2">8.9 t</div>
+                    <div class="metric-label" data-en="CO₂" data-ko="CO₂">CO₂</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runTrafficSim()" data-en="🚗 Run Simulation" data-ko="🚗 시뮬레이션 실행">🚗 Run Simulation</button>
+            </div>
+            <div class="output" id="trafficOutput"></div>
+        </div>
+
+        <!-- Panel 3: Energy -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="⚡ Energy Optimization" data-ko="⚡ 에너지 최적화">⚡ Energy Optimization</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Smart grid management" data-ko="스마트 그리드 관리">Smart grid management</p>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value">4.2 GW</div>
+                    <div class="metric-label" data-en="Demand" data-ko="수요">Demand</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">4.5 GW</div>
+                    <div class="metric-label" data-en="Supply" data-ko="공급">Supply</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">7.1%</div>
+                    <div class="metric-label" data-en="Reserve" data-ko="예비">Reserve</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" style="color: var(--success);">OK</div>
+                    <div class="metric-label" data-en="Grid Status" data-ko="그리드 상태">Grid Status</div>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-en="Optimization Target" data-ko="최적화 목표">Optimization Target</label>
+                    <select id="optTarget">
+                        <option value="cost">Cost Reduction</option>
+                        <option value="carbon">Carbon Reduction</option>
+                        <option value="peak">Peak Shaving</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Time Horizon" data-ko="시간 범위">Time Horizon</label>
+                    <select id="timeHorizon">
+                        <option value="24h">24 Hours</option>
+                        <option value="7d">7 Days</option>
+                        <option value="30d">30 Days</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="optimizeEnergy()" data-en="⚡ Optimize" data-ko="⚡ 최적화">⚡ Optimize</button>
+            </div>
+            <div class="output" id="energyOutput"></div>
+        </div>
+
+        <!-- Panel 4: API -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="🔌 API Reference" data-ko="🔌 API 레퍼런스">🔌 API Reference</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Digital twin integration endpoints" data-ko="디지털 트윈 연동 API">Integration endpoints</p>
+
+            <div class="form-group">
+                <label data-en="Endpoint" data-ko="엔드포인트">Endpoint</label>
+                <select id="apiEndpoint" onchange="showApiExample()">
+                    <option value="sensors">GET /api/v1/sensors</option>
+                    <option value="model">GET /api/v1/model</option>
+                    <option value="simulate">POST /api/v1/simulate</option>
+                    <option value="realtime">WS /api/v1/stream</option>
+                </select>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="testApi()" data-en="🔌 Test API" data-ko="🔌 API 테스트">🔌 Test API</button>
+            </div>
+            <div class="output" id="apiOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="Building smarter cities for everyone" data-ko="모두를 위한 더 스마트한 도시">Smarter cities for everyone</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.toLowerCase() === lang));
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const text = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = text;
+                else el.textContent = text;
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function initCityGrid() {
+            const grid = document.getElementById('cityGrid');
+            grid.innerHTML = '';
+            for (let i = 0; i < 100; i++) {
+                const block = document.createElement('div');
+                block.className = 'city-block';
+                const r = Math.random();
+                if (r < 0.6) block.classList.add('traffic-low');
+                else if (r < 0.85) block.classList.add('traffic-med');
+                else block.classList.add('traffic-high');
+                grid.appendChild(block);
+            }
+        }
+
+        function refreshSensors() {
+            document.getElementById('sensorOutput').textContent = JSON.stringify({
+                timestamp: new Date().toISOString(),
+                sensors: { traffic: '1523 veh/hr', air: 'PM2.5: 35', energy: '4.2 GW', water: '12.5 ML/day' },
+                syncRate: '99.2%',
+                message: currentLang === 'ko' ? '센서 새로고침 완료' : 'Sensors refreshed'
+            }, null, 2);
+        }
+
+        function loadModel() {
+            document.getElementById('modelOutput').textContent = JSON.stringify({
+                model: { city: 'Seoul', version: '2024.1' },
+                layers: [
+                    { name: 'Buildings', objects: 892341, status: 'LOADED' },
+                    { name: 'Roads', objects: 45892, status: 'LOADED' },
+                    { name: 'Utilities', objects: 1200000, status: 'LOADED' }
+                ],
+                message: currentLang === 'ko' ? '모델 로드 완료' : 'Model loaded'
+            }, null, 2);
+        }
+
+        function runTrafficSim() {
+            initCityGrid();
+            const speed = 35 + Math.floor(Math.random() * 15);
+            document.getElementById('avgSpeed').textContent = speed + ' km/h';
+            document.getElementById('trafficOutput').textContent = JSON.stringify({
+                scenario: 'Rush Hour',
+                results: { avgSpeed: speed + ' km/h', congestion: 6.2, co2Reduction: '-28%' },
+                bottlenecks: ['Gangnam Station', 'Yeouido Bridge'],
+                message: currentLang === 'ko' ? '시뮬레이션 완료' : 'Simulation complete'
+            }, null, 2);
+        }
+
+        function optimizeEnergy() {
+            document.getElementById('energyOutput').textContent = JSON.stringify({
+                optimization: { target: document.getElementById('optTarget').value, horizon: document.getElementById('timeHorizon').value },
+                recommendations: [
+                    { action: 'Shift EV charging to off-peak', savings: '-200 MW' },
+                    { action: 'Pre-cool buildings before peak', savings: '-150 MW' }
+                ],
+                message: currentLang === 'ko' ? '최적화 완료' : 'Optimization complete'
+            }, null, 2);
+        }
+
+        document.querySelectorAll('.layer-btn').forEach(btn => btn.addEventListener('click', () => btn.classList.toggle('active')));
+
+        function showApiExample() { testApi(); }
+
+        function testApi() {
+            const examples = {
+                sensors: { method: 'GET', path: '/api/v1/sensors', response: { traffic: '1523', air: 'PM2.5: 35' } },
+                model: { method: 'GET', path: '/api/v1/model', response: { buildings: 892341, roads: 45892 } },
+                simulate: { method: 'POST', path: '/api/v1/simulate', request: { scenario: 'rush_hour' }, response: { avgSpeed: '42 km/h' } },
+                realtime: { protocol: 'WebSocket', path: '/api/v1/stream', updateRate: '1234 events/sec' }
+            };
+            document.getElementById('apiOutput').textContent = JSON.stringify(examples[document.getElementById('apiEndpoint').value], null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setLang(localStorage.getItem('wiaLang') || 'en');
+            initCityGrid();
+            testApi();
+        });
+    </script>
+</body>
+</html>

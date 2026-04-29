@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 04 - WIA-DIGITAL_CONTENT</title>
+    <style>:root{--primary:#8b5cf6;--primary-dark:#7c3aed}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;color:#334155;background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3)}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content p{margin:15px 0}.info-box{background:#dbeafe;border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px}.key-takeaways h3{color:#065f46;margin-bottom:20px}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid #e2e8f0}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none}.footer{background:#0f172a;color:white;text-align:center;padding:30px}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📖 Chapter 04</h1>
+            <p>WIA-DIGITAL_CONTENT: 시스템 통합</p>
+        </div>
+        <div class="content">
+            <h2>1. 시스템 통합 개요</h2>
+            <p>WIA-DIGITAL_CONTENT를 기존 시스템과 통합하는 것은 실무에서 가장 중요한 과제입니다. 네이버 웹툰, 카카오페이지, 넷플릭스 한국처럼 이미 운영 중인 플랫폼에 표준을 적용하려면 레거시 시스템과의 호환성을 유지하면서 점진적으로 마이그레이션해야 합니다.</p>
+
+            <div class="info-box">
+                <h4>📌 학습 목표</h4>
+                <p>이 장을 마치면 다음 내용을 구현할 수 있습니다:</p>
+                <ul style="margin:10px 0 0 20px;line-height:1.8">
+                    <li>레거시 시스템과의 단계적 통합 전략</li>
+                    <li>네이버/카카오 플랫폼 API 연동</li>
+                    <li>결제 시스템 (PG사) 통합</li>
+                    <li>AWS S3/CloudFront CDN 연동</li>
+                    <li>Elasticsearch 검색 엔진 통합</li>
+                    <li>Grafana/Prometheus 모니터링 구축</li>
+                </ul>
+            </div>
+
+            <h2>2. 레거시 시스템 통합 전략</h2>
+            <p>대부분의 디지털 콘텐츠 플랫폼은 이미 자체 시스템을 운영 중입니다. WIA-DIGITAL_CONTENT 도입 시 기존 서비스를 중단하지 않고 통합하는 전략이 필요합니다.</p>
+
+            <h3>2.1 Strangler Fig Pattern</h3>
+            <p>마틴 파울러가 제안한 Strangler Fig 패턴으로 레거시 시스템을 점진적으로 대체합니다.</p>
+
+            <div style="background:#f0f9ff;padding:20px;margin:20px 0;border-left:5px solid #3b82f6;border-radius:8px">
+                <h4 style="color:#1e40af;margin-bottom:10px">Phase 1: 신규 기능부터 WIA 표준 적용</h4>
+                <p>새로 출시하는 웹툰/웹소설부터 WIA-DIGITAL_CONTENT 메타데이터와 DRM을 사용하고, 기존 콘텐츠는 그대로 유지합니다.</p>
+
+                <h4 style="color:#1e40af;margin:15px 0 10px 0">Phase 2: Adapter Layer 구축</h4>
+                <p>레거시 데이터를 WIA 형식으로 변환하는 어댑터를 개발하여, 기존 콘텐츠도 표준 API로 접근 가능하게 만듭니다.</p>
+
+                <h4 style="color:#1e40af;margin:15px 0 10px 0">Phase 3: 배치 마이그레이션</h4>
+                <p>사용자 영향이 적은 시간대에 레거시 데이터를 WIA 형식으로 전환합니다. 한 번에 전체가 아닌, 카테고리별로 점진적으로 수행합니다.</p>
+
+                <h4 style="color:#1e40af;margin:15px 0 10px 0">Phase 4: 레거시 시스템 폐기</h4>
+                <p>모든 데이터와 기능이 WIA 표준으로 전환되면, 레거시 시스템을 단계적으로 폐기합니다.</p>
+            </div>
+
+            <h3>2.2 데이터 마이그레이션 예시</h3>
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+// 레거시 → WIA 메타데이터 변환
+async function migrateLegacyContent(legacyContent) {
+  const wiaMetadata = {
+    '@context': 'https://wia.org/standards/digital-content/v1.0',
+    '@type': 'Webtoon',
+    contentId: `migrated:${legacyContent.id}`,
+    title: {
+      ko: legacyContent.title,
+      en: legacyContent.title_en || null
+    },
+    creator: {
+      '@type': 'Person',
+      name: legacyContent.author_name,
+      identifier: `legacy:${legacyContent.author_id}`
+    },
+    genre: parseGenre(legacyContent.category),
+    publishedDate: legacyContent.created_at,
+    rights: {
+      copyrightHolder: legacyContent.copyright || legacyContent.author_name,
+      territory: ['KR'], // 레거시는 한국만 지원했다고 가정
+      validFrom: legacyContent.created_at,
+      validUntil: new Date('2099-12-31')
+    }
+  };
+
+  // WIA 시스템에 등록
+  await wiaDigitalContent.createContent(wiaMetadata);
+
+  // 레거시 DB에 마이그레이션 완료 표시
+  await db.query('UPDATE contents SET wia_migrated = true WHERE id = ?', [legacyContent.id]);
+}
+
+// 배치 마이그레이션 (10,000건씩)
+async function batchMigration() {
+  let offset = 0;
+  const batchSize = 10000;
+
+  while (true) {
+    const legacyContents = await db.query(
+      'SELECT * FROM contents WHERE wia_migrated = false LIMIT ? OFFSET ?',
+      [batchSize, offset]
+    );
+
+    if (legacyContents.length === 0) break;
+
+    for (const content of legacyContents) {
+      try {
+        await migrateLegacyContent(content);
+        console.log(`Migrated: ${content.id}`);
+      } catch (error) {
+        console.error(`Failed to migrate ${content.id}:`, error);
+      }
+    }
+
+    offset += batchSize;
+  }
+}</pre>
+
+            <h2>3. 플랫폼 연동</h2>
+            <p>네이버, 카카오 등 주요 플랫폼의 API와 WIA-DIGITAL_CONTENT를 연동합니다.</p>
+
+            <h3>3.1 네이버 웹툰 연동</h3>
+            <table style="width:100%;border-collapse:collapse;margin:20px 0">
+                <thead>
+                    <tr style="background:#7c3aed;color:white">
+                        <th style="padding:12px;border:1px solid #ddd">기능</th>
+                        <th style="padding:12px;border:1px solid #ddd">네이버 API</th>
+                        <th style="padding:12px;border:1px solid #ddd">WIA API</th>
+                        <th style="padding:12px;border:1px solid #ddd">연동 방식</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>인증</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">Naver OAuth 2.0</td>
+                        <td style="padding:10px;border:1px solid #ddd">WIA JWT</td>
+                        <td style="padding:10px;border:1px solid #ddd">OAuth 토큰으로 WIA JWT 발급</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>콘텐츠 등록</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">POST /webtoon/upload</td>
+                        <td style="padding:10px;border:1px solid #ddd">POST /api/v1/contents</td>
+                        <td style="padding:10px;border:1px solid #ddd">Webhook으로 자동 동기화</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>구매</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">Naver Pay</td>
+                        <td style="padding:10px;border:1px solid #ddd">WIA Settlement</td>
+                        <td style="padding:10px;border:1px solid #ddd">구매 완료 시 정산 API 호출</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>DRM</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">자체 DRM</td>
+                        <td style="padding:10px;border:1px solid #ddd">WIA DRM</td>
+                        <td style="padding:10px;border:1px solid #ddd">하이브리드 (양쪽 모두 적용)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>3.2 카카오페이지 연동</h3>
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+// 카카오페이지 Webhook 핸들러
+app.post('/webhooks/kakao/purchase', async (req, res) => {
+  const { userId, episodeId, price, currency, timestamp } = req.body;
+
+  // 1. 카카오 서명 검증
+  const isValid = verifyKakaoSignature(req.headers['x-kakao-signature'], req.body);
+  if (!isValid) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  // 2. WIA Settlement API 호출
+  await wiaDigitalContent.recordPurchase({
+    platform: 'kakao',
+    contentId: episodeId,
+    userId: userId,
+    amount: price,
+    currency: currency,
+    timestamp: timestamp
+  });
+
+  // 3. 창작자 수익 자동 정산 (70:30 비율)
+  await wiaDigitalContent.distributRevenue({
+    episodeId,
+    platformShare: 0.30,
+    creatorShare: 0.70
+  });
+
+  res.json({ success: true });
+});</pre>
+
+            <h2>4. 결제 시스템 통합</h2>
+            <p>토스페이먼츠, 나이스페이먼츠 등 한국 PG사와 연동하여 결제 및 정산을 자동화합니다.</p>
+
+            <h3>4.1 토스페이먼츠 연동</h3>
+            <div style="background:#fef3c7;padding:20px;margin:20px 0;border-radius:8px">
+                <p><strong>결제 흐름</strong>:</p>
+                <ul style="margin-left:20px;margin-top:10px;line-height:1.8">
+                    <li>1. 사용자가 웹툰 에피소드 구매 버튼 클릭</li>
+                    <li>2. 프론트엔드에서 토스페이먼츠 SDK 호출</li>
+                    <li>3. 결제 성공 시 토스 서버에서 Webhook 전송</li>
+                    <li>4. WIA API가 Webhook을 받아 라이선스 발급</li>
+                    <li>5. 사용자는 DRM 해제 키를 받아 콘텐츠 열람</li>
+                </ul>
+            </div>
+
+            <h3>4.2 정산 자동화</h3>
+            <table style="width:100%;border-collapse:collapse;margin:20px 0">
+                <thead>
+                    <tr style="background:#7c3aed;color:white">
+                        <th style="padding:12px;border:1px solid #ddd">수익원</th>
+                        <th style="padding:12px;border:1px solid #ddd">창작자</th>
+                        <th style="padding:12px;border:1px solid #ddd">플랫폼</th>
+                        <th style="padding:12px;border:1px solid #ddd">PG 수수료</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>유료 구매</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">70%</td>
+                        <td style="padding:10px;border:1px solid #ddd">30%</td>
+                        <td style="padding:10px;border:1px solid #ddd">3.3% (플랫폼 부담)</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>광고 수익</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">50%</td>
+                        <td style="padding:10px;border:1px solid #ddd">50%</td>
+                        <td style="padding:10px;border:1px solid #ddd">없음</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>IP 라이선스</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">80%</td>
+                        <td style="padding:10px;border:1px solid #ddd">20%</td>
+                        <td style="padding:10px;border:1px solid #ddd">없음</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5. CDN 및 스토리지 통합</h2>
+            <p>AWS S3에 콘텐츠를 저장하고, CloudFront CDN으로 글로벌 사용자에게 빠르게 전송합니다.</p>
+
+            <h3>5.1 S3 업로드</h3>
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+import AWS from 'aws-sdk';
+import { WIADRM } from '@wia/digital-content-sdk';
+
+const s3 = new AWS.S3({
+  accessKeyId: process.env.AWS_ACCESS_KEY,
+  secretAccessKey: process.env.AWS_SECRET_KEY,
+  region: 'ap-northeast-2' // 서울 리전
+});
+
+async function uploadEncryptedContent(file, contentId) {
+  // 1. DRM 암호화
+  const drm = new WIADRM();
+  const encrypted = await drm.encrypt(file.buffer, contentId);
+
+  // 2. S3 업로드
+  const params = {
+    Bucket: 'naver-webtoon-content',
+    Key: `encrypted/${contentId}/${file.originalname}.enc`,
+    Body: encrypted.data,
+    ContentType: 'application/octet-stream',
+    ServerSideEncryption: 'AES256',
+    Metadata: {
+      'x-wia-content-id': contentId,
+      'x-wia-drm-version': '1.0',
+      'x-wia-encryption-algo': 'AES-256-GCM'
+    }
+  };
+
+  const result = await s3.upload(params).promise();
+
+  // 3. CloudFront CDN URL 생성
+  const cdnUrl = `https://d123abc.cloudfront.net/${params.Key}`;
+
+  return {
+    s3Url: result.Location,
+    cdnUrl: cdnUrl,
+    encryptionKey: encrypted.key,
+    iv: encrypted.iv
+  };
+}</pre>
+
+            <h3>5.2 CloudFront Signed URL</h3>
+            <p>구매한 사용자만 CDN에서 콘텐츠를 다운로드할 수 있도록 서명된 URL을 생성합니다.</p>
+
+            <div style="background:#f0fdf4;padding:20px;margin:20px 0;border-radius:8px">
+                <p><strong>보안 흐름</strong>:</p>
+                <ul style="margin-left:20px;margin-top:10px;line-height:1.8">
+                    <li>사용자가 콘텐츠 요청</li>
+                    <li>서버가 구매 여부 확인</li>
+                    <li>CloudFront Signed URL 생성 (1시간 유효)</li>
+                    <li>사용자는 Signed URL로 CDN에서 다운로드</li>
+                    <li>클라이언트에서 WIA DRM 키로 복호화</li>
+                </ul>
+            </div>
+
+            <h2>6. 검색 엔진 통합</h2>
+            <p>Elasticsearch를 사용하여 웹툰/웹소설 검색 기능을 구현합니다.</p>
+
+            <h3>6.1 메타데이터 인덱싱</h3>
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+// Elasticsearch 인덱스 생성
+PUT /wia-contents
+{
+  "mappings": {
+    "properties": {
+      "contentId": { "type": "keyword" },
+      "title": {
+        "type": "text",
+        "fields": {
+          "ko": { "type": "text", "analyzer": "korean" },
+          "en": { "type": "text", "analyzer": "english" }
+        }
+      },
+      "creator": { "type": "text" },
+      "genre": { "type": "keyword" },
+      "publishedDate": { "type": "date" },
+      "rating": { "type": "float" },
+      "viewCount": { "type": "long" }
+    }
+  }
+}
+
+// 검색 쿼리 (한글 제목 + 작가명)
+GET /wia-contents/_search
+{
+  "query": {
+    "multi_match": {
+      "query": "나 혼자만 레벨업 추공",
+      "fields": ["title.ko^2", "creator"],
+      "type": "best_fields"
+    }
+  },
+  "sort": [
+    { "rating": "desc" },
+    { "viewCount": "desc" }
+  ]
+}</pre>
+
+            <h2>7. 모니터링 및 로깅</h2>
+            <p>Grafana와 Prometheus로 시스템 상태를 실시간 모니터링합니다.</p>
+
+            <h3>7.1 주요 메트릭</h3>
+            <table style="width:100%;border-collapse:collapse;margin:20px 0">
+                <thead>
+                    <tr style="background:#7c3aed;color:white">
+                        <th style="padding:12px;border:1px solid #ddd">메트릭</th>
+                        <th style="padding:12px;border:1px solid #ddd">설명</th>
+                        <th style="padding:12px;border:1px solid #ddd">임계값</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>API 응답 시간</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">평균/P95/P99 응답 시간</td>
+                        <td style="padding:10px;border:1px solid #ddd">P99 < 500ms</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>DRM 키 발급 성공률</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">복호화 키 발급 성공률</td>
+                        <td style="padding:10px;border:1px solid #ddd">> 99.9%</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>CDN 히트율</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">CloudFront 캐시 히트율</td>
+                        <td style="padding:10px;border:1px solid #ddd">> 85%</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>정산 지연 시간</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">구매 → 정산 완료 시간</td>
+                        <td style="padding:10px;border:1px solid #ddd">< 10초</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>8. 弘益人間: 생태계 전체를 이롭게</h2>
+            <p>시스템 통합의 궁극적 목표는 창작자, 플랫폼, 소비자 모두가 이익을 얻는 것입니다.</p>
+
+            <div style="background:#fef3c7;padding:20px;margin:20px 0;border-radius:8px">
+                <h4 style="color:#92400e">창작자: 수익 증가</h4>
+                <p>멀티 플랫폼 배포로 독자층 확대, 투명한 정산으로 신뢰 확보</p>
+
+                <h4 style="color:#92400e;margin-top:15px">플랫폼: 운영 효율화</h4>
+                <p>표준화로 개발 비용 절감, 콘텐츠 확보 경쟁력 강화</p>
+
+                <h4 style="color:#92400e;margin-top:15px">소비자: 편의성 향상</h4>
+                <p>다양한 콘텐츠 접근, 공정한 가격, 안정적인 서비스</p>
+            </div>
+
+            <h2>9. 요약 및 핵심 요점</h2>
+            <div class="key-takeaways">
+                <h3>🎯 핵심 요점</h3>
+                <ul>
+                    <li><strong>레거시 통합</strong>: Strangler Fig 패턴으로 점진적 마이그레이션</li>
+                    <li><strong>플랫폼 연동</strong>: 네이버/카카오 API와 Webhook 연동</li>
+                    <li><strong>결제 통합</strong>: 토스페이먼츠로 자동 정산 구현</li>
+                    <li><strong>CDN</strong>: S3 + CloudFront로 글로벌 콘텐츠 전송</li>
+                    <li><strong>검색</strong>: Elasticsearch로 한글 검색 최적화</li>
+                    <li><strong>모니터링</strong>: Grafana/Prometheus로 실시간 관제</li>
+                    <li><strong>弘益人間</strong>: 생태계 전체의 이익 증진 🌍</li>
+                </ul>
+            </div>
+
+            <h2>10. 생각해볼 질문</h2>
+            <div style="background:#ede9fe;padding:20px;margin:20px 0;border-radius:8px">
+                <ol style="margin-left:20px;line-height:2">
+                    <li>레거시 시스템을 완전히 대체하는 데 얼마나 걸릴까요?</li>
+                    <li>CloudFront 대신 Cloudflare를 사용한다면 어떤 차이가 있을까요?</li>
+                    <li>Elasticsearch 대신 Algolia를 사용하면 어떤 장단점이 있을까요?</li>
+                    <li>해외 송금 시 수수료를 줄이는 방법은?</li>
+                    <li>시스템 장애 시 복구 시간을 최소화하려면?</li>
+                </ol>
+            </div>
+
+            <h2>11. 다음 장에서는</h2>
+            <div style="background:#e0e7ff;padding:20px;margin:20px 0;border-radius:8px">
+                <p><strong>Chapter 05: 실전 적용 사례</strong>에서는 WIA-DIGITAL_CONTENT를 실제 비즈니스에 적용한 사례를 분석합니다:</p>
+                <ul style="margin-left:20px;margin-top:10px;line-height:1.8">
+                    <li>네이버 웹툰 글로벌 진출 사례</li>
+                    <li>카카오페이지 수익 모델 분석</li>
+                    <li>넷플릭스 한국 DRM 전략</li>
+                    <li>유튜브 크리에이터 저작권 보호</li>
+                    <li>성공 요인과 교훈</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter-03.html" class="nav-button">← 이전</a>
+                <a href="chapter-05.html" class="nav-button">다음 →</a>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

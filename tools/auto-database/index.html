@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA AUTO-DATABASE v1.0 | Database Backup & Restore</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <style>
+        :root { --primary: #06B6D4; --primary-dark: #0891B2; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --gold: #ffd700; --green: #22c55e; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid var(--border); margin-bottom: 40px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .lang-switch { display: flex; gap: 5px; }
+        .lang-btn { padding: 6px 12px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); border-radius: 6px; cursor: pointer; }
+        .lang-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        
+        .hero { text-align: center; margin-bottom: 50px; padding: 40px 0; }
+        .hero-emoji { font-size: 80px; margin-bottom: 20px; animation: pulse 2s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+        .hero h1 { font-size: 2.8rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #22D3EE); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero .version { display: inline-block; background: var(--primary); color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.9rem; margin-bottom: 15px; }
+        .hero .subtitle { color: var(--gold); font-size: 1.3rem; margin-bottom: 10px; }
+        .hero .desc { color: var(--text-muted); font-size: 1.1rem; max-width: 700px; margin: 0 auto; }
+        
+        .install-section { background: var(--bg-card); border: 2px solid var(--primary); border-radius: 16px; padding: 40px; margin-bottom: 40px; text-align: center; }
+        .install-section h2 { color: var(--primary); margin-bottom: 20px; }
+        .install-cmd { background: #0d1117; border: 1px solid var(--border); border-radius: 12px; padding: 20px 30px; font-family: monospace; font-size: 0.95rem; color: #58a6ff; margin: 20px 0; display: inline-block; }
+        .install-cmd::before { content: '$ '; color: var(--primary); }
+        .copy-btn { background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 8px; cursor: pointer; }
+        .copy-btn.copied { background: var(--gold); color: #0f172a; }
+        
+        .db-section { margin-bottom: 50px; }
+        .db-section h2 { text-align: center; margin-bottom: 25px; }
+        .db-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .db-card { background: var(--bg-card); border: 2px solid var(--border); border-radius: 12px; padding: 30px; text-align: center; transition: all 0.3s; }
+        .db-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .db-card .icon { font-size: 3rem; margin-bottom: 15px; }
+        .db-card h3 { margin-bottom: 10px; }
+        .db-card p { color: var(--text-muted); font-size: 0.9rem; }
+        .db-card.supported { border-color: var(--green); }
+        
+        .features { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 50px; }
+        .feature-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px; text-align: center; transition: all 0.3s; }
+        .feature-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .feature-icon { font-size: 2.5rem; margin-bottom: 15px; }
+        .feature-card h3 { color: var(--text); margin-bottom: 10px; }
+        .feature-card p { color: var(--text-muted); font-size: 0.9rem; }
+        
+        .commands-section { margin-bottom: 50px; }
+        .commands-section h2 { text-align: center; margin-bottom: 25px; }
+        .commands-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .command-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+        .command-card h3 { color: var(--primary); margin-bottom: 10px; font-size: 1rem; }
+        .command-code { background: #0d1117; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; color: #58a6ff; }
+        
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 50px; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px; text-align: center; }
+        .stat-number { font-size: 2.5rem; font-weight: bold; color: var(--primary); }
+        .stat-label { color: var(--text-muted); }
+        
+        .footer { text-align: center; padding: 40px 0; border-top: 1px solid var(--border); margin-top: 50px; }
+        .footer .hongik { color: var(--gold); font-size: 1.2rem; margin-bottom: 10px; }
+        .footer p { color: var(--text-muted); }
+        .footer a { color: var(--primary); text-decoration: none; }
+        
+        @media (max-width: 768px) { .features, .db-grid, .commands-grid, .stats { grid-template-columns: 1fr; } .hero h1 { font-size: 2rem; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="top-nav">
+            <div class="nav-left">
+                <a href="/" class="nav-home">🤟 WIA</a>
+                <div class="breadcrumb">
+                    <a href="/">Home</a> <span class="sep">›</span>
+                    <a href="/#standards">Tools</a> <span class="sep">›</span>
+                    <span class="current">AUTO-DATABASE</span>
+                </div>
+            </div>
+            <div class="lang-switch">
+                <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                <button class="lang-btn" onclick="setLang('ko')">KO</button>
+            </div>
+        </nav>
+        
+        <section class="hero">
+            <div class="hero-emoji">🗄️</div>
+            <span class="version">v1.0</span>
+            <h1>WIA AUTO-DATABASE</h1>
+            <p class="subtitle">弘益人間 · Benefit All Humanity</p>
+            <p class="desc" data-en="Unified database backup & restore for MySQL, PostgreSQL, MongoDB, and Redis. Protect your data for FREE." data-ko="MySQL, PostgreSQL, MongoDB, Redis를 위한 통합 데이터베이스 백업 및 복원. 무료로 데이터를 보호하세요.">Unified database backup & restore for MySQL, PostgreSQL, MongoDB, and Redis. Protect your data for FREE.</p>
+        </section>
+        
+        <section class="install-section">
+            <h2>🚀 One-Click Installation</h2>
+            <div class="install-cmd" id="installCmd">curl -sSL https://wiastandards.com/tools/auto-database/install.sh | sudo bash</div>
+            <br><button class="copy-btn" onclick="copyCmd()">📋 Copy Command</button>
+        </section>
+        
+        <section class="db-section">
+            <h2 data-en="🗄️ Supported Databases" data-ko="🗄️ 지원 데이터베이스">🗄️ Supported Databases</h2>
+            <div class="db-grid">
+                <div class="db-card supported">
+                    <div class="icon">🐬</div>
+                    <h3>MySQL / MariaDB</h3>
+                    <p>mysqldump with compression</p>
+                </div>
+                <div class="db-card supported">
+                    <div class="icon">🐘</div>
+                    <h3>PostgreSQL</h3>
+                    <p>pg_dump with custom format</p>
+                </div>
+                <div class="db-card supported">
+                    <div class="icon">🍃</div>
+                    <h3>MongoDB</h3>
+                    <p>mongodump with BSON</p>
+                </div>
+                <div class="db-card supported">
+                    <div class="icon">🔴</div>
+                    <h3>Redis</h3>
+                    <p>RDB snapshot backup</p>
+                </div>
+            </div>
+        </section>
+        
+        <section class="features">
+            <div class="feature-card">
+                <div class="feature-icon">🔐</div>
+                <h3 data-en="Encryption" data-ko="암호화">Encryption</h3>
+                <p data-en="AES-256 encryption with OpenSSL" data-ko="OpenSSL AES-256 암호화">AES-256 encryption with OpenSSL</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📦</div>
+                <h3 data-en="Compression" data-ko="압축">Compression</h3>
+                <p data-en="gzip/bzip2/xz - 80%+ savings" data-ko="gzip/bzip2/xz - 80%+ 절약">gzip/bzip2/xz - 80%+ savings</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">☁️</div>
+                <h3 data-en="Cloud Upload" data-ko="클라우드 업로드">Cloud Upload</h3>
+                <p data-en="AWS S3, Google Drive integration" data-ko="AWS S3, Google Drive 통합">AWS S3, Google Drive integration</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔄</div>
+                <h3 data-en="Smart Retention" data-ko="스마트 보관">Smart Retention</h3>
+                <p data-en="Hourly/Daily/Weekly/Monthly rotation" data-ko="시간/일/주/월 로테이션">Hourly/Daily/Weekly/Monthly rotation</p>
+            </div>
+        </section>
+        
+        <section class="commands-section">
+            <h2 data-en="⌨️ Commands" data-ko="⌨️ 명령어">⌨️ Commands</h2>
+            <div class="commands-grid">
+                <div class="command-card">
+                    <h3 data-en="Backup All Databases" data-ko="전체 백업">Backup All Databases</h3>
+                    <div class="command-code">auto-database backup</div>
+                </div>
+                <div class="command-card">
+                    <h3 data-en="Restore Latest" data-ko="최신 복원">Restore Latest</h3>
+                    <div class="command-code">auto-database restore latest</div>
+                </div>
+                <div class="command-card">
+                    <h3 data-en="Clone Database" data-ko="데이터베이스 복제">Clone Database</h3>
+                    <div class="command-code">auto-database clone mydb mydb_copy</div>
+                </div>
+                <div class="command-card">
+                    <h3 data-en="Optimize Tables" data-ko="테이블 최적화">Optimize Tables</h3>
+                    <div class="command-code">auto-database optimize mydb</div>
+                </div>
+                <div class="command-card">
+                    <h3 data-en="Size Analysis" data-ko="크기 분석">Size Analysis</h3>
+                    <div class="command-code">auto-database size</div>
+                </div>
+                <div class="command-card">
+                    <h3 data-en="Backup with Encryption" data-ko="암호화 백업">Backup with Encryption</h3>
+                    <div class="command-code">auto-database backup --encrypt</div>
+                </div>
+            </div>
+        </section>
+        
+        <section class="stats">
+            <div class="stat-card"><div class="stat-number">1,068</div><div class="stat-label">Lines of Code</div></div>
+            <div class="stat-card"><div class="stat-number">$70</div><div class="stat-label">Monthly Value</div></div>
+            <div class="stat-card"><div class="stat-number">4</div><div class="stat-label">DB Engines</div></div>
+            <div class="stat-card">
+<div class="stat-number">80%</div><div class="stat-label">Compression</div></div>
+        </section>
+        
+        <footer class="footer">
+            <p class="hongik">弘益人間 (홍익인간)</p>
+            <p>Benefit All Humanity · WIA AUTO-TOOLS</p>
+            <p><a href="https://github.com/WIA-Official/ISP" target="_blank">GitHub</a> · <a href="/">WIA Standards</a></p>
+        </footer>
+    </div>
+    
+    <script>
+        function copyCmd() { navigator.clipboard.writeText(document.getElementById('installCmd').textContent); const btn = document.querySelector('.copy-btn'); btn.textContent = '✅ Copied!'; btn.classList.add('copied'); setTimeout(() => { btn.textContent = '📋 Copy Command'; btn.classList.remove('copied'); }, 2000); }
+        function setLang(lang) { localStorage.setItem('wiaLang', lang); document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active')); document.querySelector(`.lang-btn:${lang === 'en' ? 'first-child' : 'last-child'}`).classList.add('active'); document.querySelectorAll('[data-en]').forEach(el => { el.textContent = el.getAttribute(`data-${lang}`); }); }
+        document.addEventListener('DOMContentLoaded', () => { setLang(localStorage.getItem('wiaLang') || 'en'); });
+    </script>
+</body>
+</html>

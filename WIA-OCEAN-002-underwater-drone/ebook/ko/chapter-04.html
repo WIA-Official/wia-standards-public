@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: 자율 항법</title>
+    <style>
+        :root{--bg:#0f172a;--bg-secondary:#1e293b;--bg-tertiary:#334155;--primary:#0EA5E9;--text:#f1f5f9;--text-secondary:#cbd5e1;--border:#475569;--success:#10b981;--warning:#f59e0b}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:2rem}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-secondary);padding:3rem;border-radius:10px}
+        header{margin-bottom:40px}
+        h1{color:var(--primary);font-size:2.5rem;margin-bottom:0.5rem}
+        h2{color:var(--primary);font-size:1.8rem;margin:2.5rem 0 1rem;padding-bottom:0.5rem;border-bottom:2px solid var(--border)}
+        h3{color:var(--primary);font-size:1.4rem;margin:2rem 0 1rem}
+        .subtitle{color:var(--text-secondary);font-size:1.1rem}
+        p{margin:1rem 0;text-align:justify}
+        .highlight-box{background:var(--bg-tertiary);border-left:4px solid var(--primary);padding:1.5rem;margin:2rem 0;border-radius:5px}
+        .warning-box{background:rgba(245,158,11,0.1);border-left:4px solid var(--warning);padding:1.5rem;margin:2rem 0;border-radius:5px}
+        ul,ol{margin:1rem 0 1rem 2rem}
+        li{margin:0.5rem 0}
+        table{width:100%;border-collapse:collapse;margin:2rem 0}
+        th,td{padding:1rem;text-align:left;border-bottom:1px solid var(--border)}
+        th{background:var(--bg-tertiary);color:var(--primary);font-weight:bold}
+        tr:hover{background:var(--bg-tertiary)}
+        code{background:var(--bg);padding:0.2rem 0.5rem;border-radius:3px;font-family:monospace;color:var(--success)}
+        pre{background:var(--bg);padding:1.5rem;border-radius:5px;overflow-x:auto;margin:1.5rem 0;border-left:4px solid var(--primary)}
+        .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.5rem;margin:2rem 0}
+        .stat-card{background:var(--bg);padding:1.5rem;border-radius:8px;text-align:center;border:2px solid var(--primary)}
+        .stat-number{font-size:2rem;color:var(--primary);font-weight:bold}
+        .stat-label{color:var(--text-secondary);margin-top:0.5rem}
+        .summary-box{background:var(--bg-tertiary);border:2px solid var(--primary);border-radius:12px;padding:25px;margin:30px 0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <p class="subtitle">제4장</p>
+            <h1>자율 항법</h1>
+            <p class="subtitle">GPS 없이 해양 심해를 항해하는 센서 융합, SLAM 알고리즘, 지능형 경로 계획으로 진정한 자율 수중 운영을 구현합니다.</p>
+        </header>
+
+        <main>
+            <h2>4.1 GPS 불가 환경의 도전</h2>
+            <p>GPS 신호는 해수면 아래 몇 센티미터만 침투하므로 위성 항법은 수중 드론에 무용합니다. 이 제약으로 관성 항법, 음향 위치 결정, 지형 상대 항법, SLAM 등 대안적 방법에 의존해야 합니다. WIA-OCEAN-002 표준은 수중 항법 시스템에 대한 정확도 요구사항과 테스트 프로토콜을 수립합니다.</p>
+
+            <div class="highlight-box">
+                <h3>학습 목표</h3>
+                <ul>
+                    <li>기존 항법 방법의 수중 한계 이해</li>
+                    <li>관성 항법과 드리프트 특성 숙달</li>
+                    <li>음향 위치 결정 시스템(LBL, USBL, SBL) 학습</li>
+                    <li>GPS 불가 항법을 위한 SLAM 알고리즘 탐구</li>
+                    <li>경로 계획 및 장애물 회피 전략 인식</li>
+                </ul>
+            </div>
+
+            <h2>4.2 관성 항법 시스템(INS)</h2>
+            <p>관성 측정 장치(IMU)는 가속도계와 자이로스코프로 가속도와 회전 속도를 측정합니다. 이를 적분하여 위치, 속도, 방향을 계산합니다. MEMS IMU는 기존 기계식 자이로의 1/10 비용과 크기로 적합한 성능을 제공합니다.</p>
+
+            <h3>드리프트 문제</h3>
+            <p>적분은 센서 오류를 증폭시킵니다. 1°/시간 자이로 드리프트의 전술 등급 IMU는 몇 시간 후 1km 위치 오류를 누적합니다.</p>
+
+            <table>
+                <thead>
+                    <tr><th>IMU 등급</th><th>자이로 드리프트</th><th>위치 오류</th><th>일반 용도</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>소비자 (MEMS)</td><td>10-100°/hr</td><td>10km/hr</td><td>취미용 드론</td></tr>
+                    <tr><td>전술</td><td>0.1-1°/hr</td><td>100m-1km/hr</td><td>대부분의 AUV</td></tr>
+                    <tr><td>항법</td><td>0.001-0.01°/hr</td><td>1-10m/hr</td><td>고정밀 조사</td></tr>
+                    <tr><td>전략 (FOG)</td><td>0.0001°/hr</td><td>&lt;1m/hr</td><td>군사, 과학</td></tr>
+                </tbody>
+            </table>
+
+            <h2>4.3 도플러 속도 로그(DVL)</h2>
+            <p>DVL은 해저에서 반사되는 음향 빔의 도플러 변이로 해저 대비 속도를 측정합니다. DVL+IMU 통합으로 위치 오류는 이동 거리의 0.1-0.5%로 감소합니다.</p>
+
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-number">0.2%</div>
+                    <div class="stat-label">DVL+IMU 위치 오류</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">600m</div>
+                    <div class="stat-label">일반 DVL 범위</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">±0.2cm/s</div>
+                    <div class="stat-label">DVL 속도 정확도</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">5Hz</div>
+                    <div class="stat-label">DVL 업데이트율</div>
+                </div>
+            </div>
+
+            <h2>4.4 음향 위치 결정 시스템</h2>
+            <p>수중 음향 시스템은 음파로 GPS 유사 기능을 제공합니다:</p>
+
+            <h3>장기선(LBL)</h3>
+            <p>해저 트랜스폰더 그리드가 차량 위치를 삼각 측량합니다. 최고 정확도(0.1-1m)지만 사전 배치 필요.</p>
+
+            <h3>초단기선(USBL)</h3>
+            <p>수면 선박이 수중 차량까지 거리와 방위를 측정합니다. 해저 인프라 불필요, 중간 정확도(0.5-5m).</p>
+
+            <table>
+                <thead>
+                    <tr><th>시스템</th><th>정확도</th><th>범위</th><th>최적 용도</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>LBL</td><td>0.1-1m</td><td>1-10km</td><td>정밀 지역 조사</td></tr>
+                    <tr><td>USBL</td><td>0.5-5m</td><td>500-5000m</td><td>심해 운영</td></tr>
+                    <tr><td>SBL</td><td>1-10m</td><td>100-1000m</td><td>항만/연안</td></tr>
+                </tbody>
+            </table>
+
+            <h2>4.5 동시 위치 결정 및 지도 작성(SLAM)</h2>
+            <p>SLAM 알고리즘은 미지의 환경 지도를 작성하면서 자신의 위치를 결정합니다. 외부 인프라 의존을 제거하여 심해 탐사와 빙하 아래 운영에 중요합니다.</p>
+
+            <h3>소나 기반 SLAM</h3>
+            <p>전방 주시 소나가 특징을 감지하고 매칭하여 움직임을 추정합니다.</p>
+
+            <h3>비전 기반 SLAM</h3>
+            <p>카메라로 시각적 특징을 추적합니다. 맑은 물에서 우수, 산호초 조사에 적합.</p>
+
+            <h2>4.6 경로 계획 및 장애물 회피</h2>
+            <ul>
+                <li><strong>웨이포인트 항법:</strong> 미리 프로그래밍된 경로, 간단하지만 예상치 못한 장애물에 취약</li>
+                <li><strong>반응형 회피:</strong> 전방 소나로 실시간 장애물 감지 및 회피</li>
+                <li><strong>전역 계획:</strong> A*, RRT 알고리즘으로 최적 경로 계산</li>
+            </ul>
+
+            <h2>4.7 한국의 자율 항법 기여</h2>
+            <p>KIOST는 Hemire ROV 및 ISiMI 자율 매핑 차량을 위한 고급 항법 알고리즘을 개발했습니다. KAIST와 서울대학교는 비전 기반 SLAM 및 다중 AUV 조정을 연구합니다.</p>
+
+            <div class="warning-box">
+                <h3>항법 실패 모드</h3>
+                <p>항법 실패는 값비싼 자산을 좌초시킬 수 있습니다. WIA-OCEAN-002는 페일세이프 동작을 의무화: 항법 손실 시 자동 수면 상승 또는 출발점 복귀. 비상 음향 비콘으로 복구 가능.</p>
+            </div>
+
+            <h2>4.8 장 요약</h2>
+            <div class="summary-box">
+                <h3>핵심 내용</h3>
+                <ul>
+                    <li><strong>GPS 불가:</strong> IMU, DVL, 음향 위치 결정 의존</li>
+                    <li><strong>IMU 드리프트:</strong> 전술 IMU 0.1-1°/hr, 주기적 수정 필요</li>
+                    <li><strong>DVL 중요:</strong> 위치 오류 10%에서 0.2%로 감소</li>
+                    <li><strong>SLAM 혁명:</strong> 외부 인프라 없이 항법 가능</li>
+                    <li><strong>한국 혁신:</strong> KIOST, KAIST 연구 선도</li>
+                    <li><strong>안전 우선:</strong> 페일세이프 동작 필수</li>
+                </ul>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

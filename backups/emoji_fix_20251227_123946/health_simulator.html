@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Health - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #F43F5E;
+            --primary-dark: #E11D48;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #FB7185); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .vitals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin: 20px 0; }
+        .vital-card { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 25px; text-align: center; position: relative; }
+        .vital-card.normal { border-color: var(--secondary); }
+        .vital-card.warning { border-color: var(--warning); }
+        .vital-card.danger { border-color: var(--danger); }
+        .vital-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .vital-value { font-size: 2.5rem; font-weight: bold; color: var(--primary); }
+        .vital-unit { font-size: 1rem; color: var(--text-muted); }
+        .vital-label { font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; }
+        .vital-status { position: absolute; top: 10px; right: 10px; font-size: 0.75rem; padding: 4px 8px; border-radius: 10px; }
+        .vital-status.normal { background: rgba(16, 185, 129, 0.2); color: var(--secondary); }
+        .vital-status.warning { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+
+        .biomarker-list { display: flex; flex-direction: column; gap: 15px; margin: 20px 0; }
+        .biomarker-item { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .biomarker-info { flex: 1; }
+        .biomarker-name { font-weight: 600; margin-bottom: 5px; }
+        .biomarker-range { font-size: 0.8rem; color: var(--text-muted); }
+        .biomarker-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); text-align: right; }
+        .biomarker-bar { width: 150px; height: 8px; background: var(--border); border-radius: 4px; margin-top: 5px; overflow: hidden; }
+        .biomarker-fill { height: 100%; background: var(--secondary); border-radius: 4px; }
+        .biomarker-fill.warning { background: var(--warning); }
+        .biomarker-fill.danger { background: var(--danger); }
+
+        .aging-display { text-align: center; padding: 40px; background: linear-gradient(135deg, #1a1a2e, #16213e); border-radius: 16px; margin: 20px 0; }
+        .aging-clock { font-size: 5rem; font-weight: bold; background: linear-gradient(90deg, var(--primary), #FB7185); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .aging-label { font-size: 1.2rem; color: var(--text-muted); margin-top: 10px; }
+        .aging-comparison { display: flex; justify-content: center; gap: 40px; margin-top: 30px; }
+        .aging-item { text-align: center; }
+        .aging-item .value { font-size: 2rem; font-weight: bold; }
+        .aging-item .label { font-size: 0.85rem; color: var(--text-muted); }
+        .aging-item.younger .value { color: var(--secondary); }
+        .aging-item.older .value { color: var(--warning); }
+
+        .profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0; }
+        .profile-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .profile-card h5 { color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .profile-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .profile-item:last-child { border-bottom: none; }
+
+        .goals-list { display: flex; flex-direction: column; gap: 15px; margin: 20px 0; }
+        .goal-item { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .goal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .goal-title { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .goal-progress { width: 100%; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
+        .goal-fill { height: 100%; background: var(--primary); border-radius: 5px; transition: width 0.5s; }
+        .goal-stats { display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .aging-clock { font-size: 3.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Health</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🏥 WIA Health</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Health & Longevity" data-ko="건강 & 장수">Health & Longevity</h1>
+            <p data-en="Biomarkers, aging clocks, digital health" data-ko="바이오마커, 에이징 클럭, 디지털 건강">Biomarkers, aging clocks, digital health</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="💓 Vitals" data-ko="💓 활력">💓 Vitals</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🧪 Biomarkers" data-ko="🧪 바이오마커">🧪 Biomarkers</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🧬 Aging" data-ko="🧬 에이징">🧬 Aging</div>
+            <div class="tab" onclick="showPanel(3)" data-en="📊 Profile" data-ko="📊 프로필">📊 Profile</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🎯 Goals" data-ko="🎯 목표">🎯 Goals</div>
+        </div>
+
+        <!-- Panel 0: Vitals -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="💓 Vital Signs" data-ko="💓 활력 징후">💓 Vital Signs</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Real-time vital sign monitoring" data-ko="실시간 활력 징후 모니터링">Real-time vital monitoring</p>
+
+            <div class="vitals-grid">
+                <div class="vital-card normal">
+                    <span class="vital-status normal">Normal</span>
+                    <div class="vital-icon">❤️</div>
+                    <div class="vital-value" id="heartRate">72</div>
+                    <div class="vital-unit">bpm</div>
+                    <div class="vital-label" data-en="Heart Rate" data-ko="심박수">Heart Rate</div>
+                </div>
+                <div class="vital-card normal">
+                    <span class="vital-status normal">Normal</span>
+                    <div class="vital-icon">🩸</div>
+                    <div class="vital-value" id="bloodPressure">120/80</div>
+                    <div class="vital-unit">mmHg</div>
+                    <div class="vital-label" data-en="Blood Pressure" data-ko="혈압">Blood Pressure</div>
+                </div>
+                <div class="vital-card normal">
+                    <span class="vital-status normal">Normal</span>
+                    <div class="vital-icon">🌡️</div>
+                    <div class="vital-value" id="bodyTemp">36.5</div>
+                    <div class="vital-unit">°C</div>
+                    <div class="vital-label" data-en="Body Temp" data-ko="체온">Body Temp</div>
+                </div>
+                <div class="vital-card normal">
+                    <span class="vital-status normal">Normal</span>
+                    <div class="vital-icon">💨</div>
+                    <div class="vital-value" id="spO2">98</div>
+                    <div class="vital-unit">%</div>
+                    <div class="vital-label" data-en="SpO2" data-ko="산소포화도">SpO2</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulateVitals()" data-en="🔄 Simulate Reading" data-ko="🔄 측정 시뮬레이션">🔄 Simulate</button>
+            </div>
+            <div class="output" id="vitalsOutput"></div>
+        </div>
+
+        <!-- Panel 1: Biomarkers -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🧪 Biomarkers" data-ko="🧪 바이오마커">🧪 Biomarkers</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Blood test results and health indicators" data-ko="혈액 검사 결과 및 건강 지표">Blood test results</p>
+
+            <div class="biomarker-list">
+                <div class="biomarker-item">
+                    <div class="biomarker-info">
+                        <div class="biomarker-name" data-en="Glucose (Fasting)" data-ko="공복 혈당">Glucose (Fasting)</div>
+                        <div class="biomarker-range" data-en="Reference: 70-100 mg/dL" data-ko="참고치: 70-100 mg/dL">Reference: 70-100 mg/dL</div>
+                    </div>
+                    <div>
+                        <div class="biomarker-value">92 <span style="font-size: 0.8rem; color: var(--text-muted);">mg/dL</span></div>
+                        <div class="biomarker-bar"><div class="biomarker-fill" style="width: 73%;"></div></div>
+                    </div>
+                </div>
+                <div class="biomarker-item">
+                    <div class="biomarker-info">
+                        <div class="biomarker-name">HbA1c</div>
+                        <div class="biomarker-range" data-en="Reference: 4.0-5.6%" data-ko="참고치: 4.0-5.6%">Reference: 4.0-5.6%</div>
+                    </div>
+                    <div>
+                        <div class="biomarker-value">5.4 <span style="font-size: 0.8rem; color: var(--text-muted);">%</span></div>
+                        <div class="biomarker-bar"><div class="biomarker-fill" style="width: 85%;"></div></div>
+                    </div>
+                </div>
+                <div class="biomarker-item">
+                    <div class="biomarker-info">
+                        <div class="biomarker-name" data-en="LDL Cholesterol" data-ko="LDL 콜레스테롤">LDL Cholesterol</div>
+                        <div class="biomarker-range" data-en="Reference: <100 mg/dL" data-ko="참고치: <100 mg/dL">Reference: &lt;100 mg/dL</div>
+                    </div>
+                    <div>
+                        <div class="biomarker-value">95 <span style="font-size: 0.8rem; color: var(--text-muted);">mg/dL</span></div>
+                        <div class="biomarker-bar"><div class="biomarker-fill" style="width: 95%;"></div></div>
+                    </div>
+                </div>
+                <div class="biomarker-item">
+                    <div class="biomarker-info">
+                        <div class="biomarker-name" data-en="Vitamin D" data-ko="비타민 D">Vitamin D</div>
+                        <div class="biomarker-range" data-en="Reference: 30-100 ng/mL" data-ko="참고치: 30-100 ng/mL">Reference: 30-100 ng/mL</div>
+                    </div>
+                    <div>
+                        <div class="biomarker-value">45 <span style="font-size: 0.8rem; color: var(--text-muted);">ng/mL</span></div>
+                        <div class="biomarker-bar"><div class="biomarker-fill" style="width: 50%;"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="analyzeBiomarkers()" data-en="📊 Analyze" data-ko="📊 분석">📊 Analyze</button>
+            </div>
+            <div class="output" id="biomarkerOutput"></div>
+        </div>
+
+        <!-- Panel 2: Aging -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🧬 Biological Age" data-ko="🧬 생물학적 나이">🧬 Biological Age</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Epigenetic aging clock analysis" data-ko="후성유전적 에이징 클럭 분석">Epigenetic aging clock</p>
+
+            <div class="aging-display">
+                <div class="aging-clock" id="bioAge">38.5</div>
+                <div class="aging-label" data-en="Biological Age (Years)" data-ko="생물학적 나이 (세)">Biological Age (Years)</div>
+                
+                <div class="aging-comparison">
+                    <div class="aging-item">
+                        <div class="value">42</div>
+                        <div class="label" data-en="Chronological Age" data-ko="실제 나이">Chronological Age</div>
+                    </div>
+                    <div class="aging-item younger">
+                        <div class="value">-3.5</div>
+                        <div class="label" data-en="Years Younger" data-ko="더 젊음">Years Younger</div>
+                    </div>
+                    <div class="aging-item">
+                        <div class="value">Top 15%</div>
+                        <div class="label" data-en="Percentile" data-ko="백분위">Percentile</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0;">
+                <div style="background: var(--bg); padding: 15px; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--secondary);">Horvath</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">37.2 years</div>
+                </div>
+                <div style="background: var(--bg); padding: 15px; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary);">GrimAge</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">39.1 years</div>
+                </div>
+                <div style="background: var(--bg); padding: 15px; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--warning);">PhenoAge</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">39.2 years</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="calculateAge()" data-en="🧬 Calculate Age" data-ko="🧬 나이 계산">🧬 Calculate</button>
+            </div>
+            <div class="output" id="agingOutput"></div>
+        </div>
+
+        <!-- Panel 3: Profile -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="📊 Health Profile" data-ko="📊 건강 프로필">📊 Health Profile</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Your comprehensive health profile" data-ko="종합 건강 프로필">Comprehensive health profile</p>
+
+            <div class="profile-grid">
+                <div class="profile-card">
+                    <h5>👤 <span data-en="Basic Info" data-ko="기본 정보">Basic Info</span></h5>
+                    <div class="profile-item"><span data-en="Age" data-ko="나이">Age</span><span>42</span></div>
+                    <div class="profile-item"><span data-en="Sex" data-ko="성별">Sex</span><span>Male</span></div>
+                    <div class="profile-item"><span data-en="Height" data-ko="키">Height</span><span>175 cm</span></div>
+                    <div class="profile-item"><span data-en="Weight" data-ko="체중">Weight</span><span>72 kg</span></div>
+                </div>
+                <div class="profile-card">
+                    <h5>📏 <span data-en="Body Metrics" data-ko="신체 지표">Body Metrics</span></h5>
+                    <div class="profile-item"><span>BMI</span><span>23.5</span></div>
+                    <div class="profile-item"><span data-en="Body Fat" data-ko="체지방">Body Fat</span><span>18.5%</span></div>
+                    <div class="profile-item"><span data-en="Muscle Mass" data-ko="근육량">Muscle</span><span>32.1 kg</span></div>
+                    <div class="profile-item"><span data-en="Bone Density" data-ko="골밀도">Bone</span><span>Normal</span></div>
+                </div>
+                <div class="profile-card">
+                    <h5>🧬 <span data-en="Genetic Risk" data-ko="유전적 위험">Genetic Risk</span></h5>
+                    <div class="profile-item"><span data-en="Heart Disease" data-ko="심장병">Heart</span><span style="color: var(--secondary);">Low</span></div>
+                    <div class="profile-item"><span data-en="Diabetes" data-ko="당뇨">Diabetes</span><span style="color: var(--warning);">Medium</span></div>
+                    <div class="profile-item"><span data-en="Alzheimer's" data-ko="알츠하이머">Alzheimer's</span><span style="color: var(--secondary);">Low</span></div>
+                    <div class="profile-item"><span data-en="Cancer" data-ko="암">Cancer</span><span style="color: var(--secondary);">Low</span></div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="exportProfile()" data-en="📥 Export Profile" data-ko="📥 프로필 내보내기">📥 Export</button>
+            </div>
+            <div class="output" id="profileOutput"></div>
+        </div>
+
+        <!-- Panel 4: Goals -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="🎯 Health Goals" data-ko="🎯 건강 목표">🎯 Health Goals</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Track your health interventions and goals" data-ko="건강 중재 및 목표 추적">Track interventions and goals</p>
+
+            <div class="goals-list">
+                <div class="goal-item">
+                    <div class="goal-header">
+                        <div class="goal-title">🏃 <span data-en="Exercise: 150 min/week" data-ko="운동: 주당 150분">Exercise: 150 min/week</span></div>
+                        <span style="color: var(--secondary);">85%</span>
+                    </div>
+                    <div class="goal-progress"><div class="goal-fill" style="width: 85%;"></div></div>
+                    <div class="goal-stats">
+                        <span data-en="128 / 150 minutes" data-ko="128 / 150분">128 / 150 minutes</span>
+                        <span data-en="22 min remaining" data-ko="22분 남음">22 min remaining</span>
+                    </div>
+                </div>
+                <div class="goal-item">
+                    <div class="goal-header">
+                        <div class="goal-title">😴 <span data-en="Sleep: 7-8 hours" data-ko="수면: 7-8시간">Sleep: 7-8 hours</span></div>
+                        <span style="color: var(--primary);">71%</span>
+                    </div>
+                    <div class="goal-progress"><div class="goal-fill" style="width: 71%;"></div></div>
+                    <div class="goal-stats">
+                        <span data-en="Avg 6.8 hours" data-ko="평균 6.8시간">Avg 6.8 hours</span>
+                        <span data-en="5/7 days on target" data-ko="7일 중 5일 달성">5/7 days on target</span>
+                    </div>
+                </div>
+                <div class="goal-item">
+                    <div class="goal-header">
+                        <div class="goal-title">💊 <span data-en="Supplements" data-ko="영양제">Supplements</span></div>
+                        <span style="color: var(--secondary);">100%</span>
+                    </div>
+                    <div class="goal-progress"><div class="goal-fill" style="width: 100%;"></div></div>
+                    <div class="goal-stats">
+                        <span data-en="Vitamin D, Omega-3, Magnesium" data-ko="비타민 D, 오메가-3, 마그네슘">Vitamin D, Omega-3, Mg</span>
+                        <span data-en="7/7 days" data-ko="7/7일">7/7 days</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="updateGoals()" data-en="✅ Update Progress" data-ko="✅ 진행 업데이트">✅ Update</button>
+            </div>
+            <div class="output" id="goalsOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Health: Live longer, live better" data-ko="WIA Health: 더 오래, 더 건강하게">WIA Health: Live longer, live better</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function simulateVitals() {
+            const hr = 65 + Math.floor(Math.random() * 20);
+            const sys = 110 + Math.floor(Math.random() * 20);
+            const dia = 70 + Math.floor(Math.random() * 15);
+            const temp = (36.2 + Math.random() * 0.8).toFixed(1);
+            const spo2 = 96 + Math.floor(Math.random() * 4);
+            
+            document.getElementById('heartRate').textContent = hr;
+            document.getElementById('bloodPressure').textContent = sys + '/' + dia;
+            document.getElementById('bodyTemp').textContent = temp;
+            document.getElementById('spO2').textContent = spo2;
+            
+            document.getElementById('vitalsOutput').textContent = JSON.stringify({
+                heartRate: { value: hr, unit: 'bpm', status: 'normal' },
+                bloodPressure: { systolic: sys, diastolic: dia, unit: 'mmHg' },
+                bodyTemperature: { value: parseFloat(temp), unit: '°C' },
+                spO2: { value: spo2, unit: '%' },
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function analyzeBiomarkers() {
+            document.getElementById('biomarkerOutput').textContent = JSON.stringify({
+                analysis: 'complete',
+                summary: { normal: 4, warning: 0, critical: 0 },
+                recommendations: [
+                    currentLang === 'ko' ? '전반적으로 양호한 상태입니다' : 'Overall healthy status',
+                    currentLang === 'ko' ? '비타민 D 수치 유지하세요' : 'Maintain Vitamin D levels'
+                ],
+                nextTest: '2025-03-14'
+            }, null, 2);
+        }
+
+        function calculateAge() {
+            const bioAge = (37 + Math.random() * 4).toFixed(1);
+            document.getElementById('bioAge').textContent = bioAge;
+            document.getElementById('agingOutput').textContent = JSON.stringify({
+                biologicalAge: parseFloat(bioAge),
+                chronologicalAge: 42,
+                ageDifference: (42 - parseFloat(bioAge)).toFixed(1),
+                clocks: { horvath: 37.2, grimAge: 39.1, phenoAge: 39.2 },
+                percentile: 'Top 15%',
+                message: currentLang === 'ko' ? '에이징 클럭 분석 완료' : 'Aging clock analysis complete'
+            }, null, 2);
+        }
+
+        function exportProfile() {
+            document.getElementById('profileOutput').textContent = JSON.stringify({
+                format: 'WIA-HEALTH-1.0',
+                exported: true,
+                sections: ['basicInfo', 'bodyMetrics', 'biomarkers', 'geneticRisk', 'agingClock'],
+                fhirCompatible: true,
+                message: currentLang === 'ko' ? '프로필 내보내기 준비됨' : 'Profile ready for export'
+            }, null, 2);
+        }
+
+        function updateGoals() {
+            document.getElementById('goalsOutput').textContent = JSON.stringify({
+                updated: true,
+                goals: [
+                    { name: 'Exercise', progress: 85, status: 'on_track' },
+                    { name: 'Sleep', progress: 71, status: 'needs_attention' },
+                    { name: 'Supplements', progress: 100, status: 'complete' }
+                ],
+                streak: 12,
+                message: currentLang === 'ko' ? '목표 진행 업데이트됨' : 'Goals progress updated'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang('en'));
+    </script>
+</body>
+</html>

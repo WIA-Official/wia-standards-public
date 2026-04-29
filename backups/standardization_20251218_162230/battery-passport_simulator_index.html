@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Battery Passport Simulator</title>
+    <style>
+        :root {
+            --primary: #059669;
+            --primary-dark: #047857;
+            --secondary: #0891b2;
+            --accent: #f59e0b;
+            --bg: #f0fdf4;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #d1fae5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --gradient: linear-gradient(135deg, #059669 0%, #0891b2 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--gradient);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .lang-switch {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .lang-btn {
+            padding: 0.5rem 1rem;
+            border: 2px solid white;
+            background: transparent;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: white;
+            color: var(--primary);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .simulator-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .panel {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .panel-header {
+            background: var(--gradient);
+            color: white;
+            padding: 1rem 1.5rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .panel-body {
+            padding: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #0e7490;
+        }
+
+        .btn-block {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .result-box {
+            background: #f0fdf4;
+            border: 2px solid var(--success);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .result-box.warning {
+            background: #fffbeb;
+            border-color: var(--warning);
+        }
+
+        .result-box.error {
+            background: #fef2f2;
+            border-color: var(--error);
+        }
+
+        .passport-card {
+            background: linear-gradient(135deg, #ecfdf5 0%, #e0f2fe 100%);
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .passport-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px dashed var(--primary);
+        }
+
+        .passport-id {
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .passport-field {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .passport-field:last-child {
+            border-bottom: none;
+        }
+
+        .passport-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .passport-value {
+            font-weight: 600;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .metric-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .metric-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .compliance-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        .compliance-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+
+        .compliance-icon.pass {
+            color: var(--success);
+        }
+
+        .compliance-icon.fail {
+            color: var(--error);
+        }
+
+        .qr-container {
+            text-align: center;
+            padding: 1.5rem;
+            background: white;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .qr-code {
+            width: 150px;
+            height: 150px;
+            background: #f1f5f9;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .lifecycle-bar {
+            height: 20px;
+            background: #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .lifecycle-fill {
+            height: 100%;
+            background: var(--gradient);
+            border-radius: 10px;
+            transition: width 0.5s;
+        }
+
+        .cta-section {
+            background: var(--gradient);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+            border-radius: 16px;
+            margin-top: 2rem;
+        }
+
+        .cta-section h2 {
+            margin-bottom: 1rem;
+        }
+
+        .cta-section p {
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-cta {
+            background: var(--accent);
+            color: white;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+        }
+
+        .btn-cta:hover {
+            background: #d97706;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid white;
+            color: white;
+        }
+
+        .btn-outline:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .status-badge.active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.recycled {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-badge.expired {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .simulator-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .cta-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">[BATTERY] WIA Battery Passport</div>
+        <div class="header-controls">
+            <div class="lang-switch">
+                <button class="lang-btn active" onclick="setLanguage('en')">EN</button>
+                <button class="lang-btn" onclick="setLanguage('ko')">KO</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="simulator-grid">
+            <!-- Create Battery Passport Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>[+] </span>
+                    <span data-en="Create Battery Passport" data-ko="배터리 여권 생성">Create Battery Passport</span>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label data-en="Battery ID" data-ko="배터리 ID">Battery ID</label>
+                        <input type="text" id="batteryId" placeholder="BAT-2024-001234" />
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Manufacturer" data-ko="제조사">Manufacturer</label>
+                        <input type="text" id="manufacturer" placeholder="Samsung SDI" />
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Battery Type" data-ko="배터리 유형">Battery Type</label>
+                        <select id="batteryType">
+                            <option value="ev" data-en="EV Battery" data-ko="전기차 배터리">EV Battery</option>
+                            <option value="industrial" data-en="Industrial Battery" data-ko="산업용 배터리">Industrial Battery</option>
+                            <option value="lmt" data-en="LMT Battery (e-bike)" data-ko="LMT 배터리 (전기자전거)">LMT Battery (e-bike)</option>
+                            <option value="stationary" data-en="Stationary Storage" data-ko="고정식 저장장치">Stationary Storage</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Capacity (kWh)" data-ko="용량 (kWh)">Capacity (kWh)</label>
+                        <input type="number" id="capacity" placeholder="75" />
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Chemistry" data-ko="화학 성분">Chemistry</label>
+                        <select id="chemistry">
+                            <option value="nmc">NMC (Nickel Manganese Cobalt)</option>
+                            <option value="lfp">LFP (Lithium Iron Phosphate)</option>
+                            <option value="nca">NCA (Nickel Cobalt Aluminum)</option>
+                            <option value="solid">Solid State</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary btn-block" onclick="createPassport()" data-en="[+] Create Passport" data-ko="[+] 여권 생성">
+                        [+] Create Passport
+                    </button>
+                    <div id="createResult"></div>
+                </div>
+            </div>
+
+            <!-- View Passport Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>[VIEW] </span>
+                    <span data-en="View Passport" data-ko="여권 조회">View Passport</span>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label data-en="Passport ID" data-ko="여권 ID">Passport ID</label>
+                        <input type="text" id="viewPassportId" placeholder="did:wia:battery:..." />
+                    </div>
+                    <button class="btn btn-secondary btn-block" onclick="viewPassport()" data-en="[SEARCH] View Passport" data-ko="[SEARCH] 여권 조회">
+                        [SEARCH] View Passport
+                    </button>
+                    <div id="passportView"></div>
+                </div>
+            </div>
+
+            <!-- Carbon Footprint Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>[CO2] </span>
+                    <span data-en="Carbon Footprint" data-ko="탄소 발자국">Carbon Footprint</span>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label data-en="Manufacturing Location" data-ko="제조 위치">Manufacturing Location</label>
+                        <select id="mfgLocation">
+                            <option value="eu" data-en="EU (Low Carbon)" data-ko="EU (저탄소)">EU (Low Carbon)</option>
+                            <option value="kr" data-en="South Korea" data-ko="대한민국">South Korea</option>
+                            <option value="cn" data-en="China" data-ko="중국">China</option>
+                            <option value="us" data-en="United States" data-ko="미국">United States</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Recycled Content (%)" data-ko="재활용 함량 (%)">Recycled Content (%)</label>
+                        <input type="number" id="recycledContent" placeholder="16" min="0" max="100" />
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Transport Distance (km)" data-ko="운송 거리 (km)">Transport Distance (km)</label>
+                        <input type="number" id="transportDistance" placeholder="5000" />
+                    </div>
+                    <button class="btn btn-primary btn-block" onclick="calculateCarbon()" data-en="[CALC] Calculate Footprint" data-ko="[CALC] 발자국 계산">
+                        [CALC] Calculate Footprint
+                    </button>
+                    <div id="carbonResult"></div>
+                </div>
+            </div>
+
+            <!-- EU Compliance Check Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>[EU] </span>
+                    <span data-en="EU Regulation Compliance" data-ko="EU 규정 준수">EU Regulation Compliance</span>
+                </div>
+                <div class="panel-body">
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;" data-en="Check compliance with EU Battery Regulation 2023/1542" data-ko="EU 배터리 규정 2023/1542 준수 여부 확인">
+                        Check compliance with EU Battery Regulation 2023/1542
+                    </p>
+                    <button class="btn btn-primary btn-block" onclick="checkCompliance()" data-en="[CHECK] Verify Compliance" data-ko="[CHECK] 준수 여부 확인">
+                        [CHECK] Verify Compliance
+                    </button>
+                    <div id="complianceResult"></div>
+                </div>
+            </div>
+
+            <!-- Battery Lifecycle Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>[CYCLE] </span>
+                    <span data-en="Battery Lifecycle" data-ko="배터리 수명주기">Battery Lifecycle</span>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label data-en="Current State of Health (%)" data-ko="현재 건강 상태 (%)">Current State of Health (%)</label>
+                        <input type="number" id="soh" placeholder="92" min="0" max="100" />
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Charge Cycles" data-ko="충전 사이클">Charge Cycles</label>
+                        <input type="number" id="cycles" placeholder="450" />
+                    </div>
+                    <button class="btn btn-secondary btn-block" onclick="analyzeLifecycle()" data-en="[ANALYZE] Lifecycle Analysis" data-ko="[ANALYZE] 수명주기 분석">
+                        [ANALYZE] Lifecycle Analysis
+                    </button>
+                    <div id="lifecycleResult"></div>
+                </div>
+            </div>
+
+            <!-- QR Code Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>[QR] </span>
+                    <span data-en="Digital Product Passport" data-ko="디지털 제품 여권">Digital Product Passport</span>
+                </div>
+                <div class="panel-body">
+                    <div class="qr-container">
+                        <div class="qr-code" id="qrCode">
+                            [QR CODE]<br/>
+                            Scan for DPP
+                        </div>
+                        <p style="color: var(--text-muted); font-size: 0.9rem;" data-en="Scan to access full battery passport data" data-ko="전체 배터리 여권 데이터에 액세스하려면 스캔하세요">
+                            Scan to access full battery passport data
+                        </p>
+                        <button class="btn btn-primary" onclick="generateQR()" data-en="[DOWNLOAD] Generate QR" data-ko="[DOWNLOAD] QR 생성">
+                            [DOWNLOAD] Generate QR
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CTA Section -->
+        <section class="cta-section">
+            <h2 data-en="[BOOK] Master EU Battery Passport Implementation" data-ko="[BOOK] EU 배터리 여권 구현 마스터하기">
+                [BOOK] Master EU Battery Passport Implementation
+            </h2>
+            <p data-en="Complete guide to implementing WIA Battery Passport standard with EU Regulation 2023/1542 compliance" data-ko="EU 규정 2023/1542 준수를 위한 WIA 배터리 여권 표준 구현 완벽 가이드">
+                Complete guide to implementing WIA Battery Passport standard with EU Regulation 2023/1542 compliance
+            </p>
+            <div class="cta-buttons">
+                <a href="../ebook/" class="btn btn-cta" data-en="[DOWNLOAD] Get Ebook - $99" data-ko="[DOWNLOAD] 이북 구매 - $99">
+                    [DOWNLOAD] Get Ebook - $99
+                </a>
+                <a href="https://wia.org/certification/battery-passport" class="btn btn-outline" data-en="[CERT] Get Certified" data-ko="[CERT] 인증 받기">
+                    [CERT] Get Certified
+                </a>
+            </div>
+        </section>
+    </div>
+
+    <footer class="footer">
+        <p data-en="[COPYRIGHT] 2024 World Interoperability Alliance (WIA)" data-ko="[COPYRIGHT] 2024 세계상호운용연합 (WIA)">
+            [COPYRIGHT] 2024 World Interoperability Alliance (WIA)
+        </p>
+        <p style="margin-top: 0.5rem;">Hong-ik In-gan - Benefit All Humanity</p>
+        <p style="margin-top: 0.5rem;">
+            <a href="../">Documentation</a> |
+            <a href="https://github.com/WIA-Official/wia-standards">GitHub</a>
+        </p>
+    </footer>
+
+    <script>
+        let currentLang = 'en';
+        let currentPassport = null;
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const text = el.getAttribute(`data-${lang}`);
+                if (text) {
+                    if (el.tagName === 'INPUT') {
+                        el.placeholder = text;
+                    } else if (el.tagName === 'OPTION') {
+                        el.textContent = text;
+                    } else {
+                        el.innerHTML = text;
+                    }
+                }
+            });
+
+            document.documentElement.lang = lang;
+        }
+
+        function createPassport() {
+            const batteryId = document.getElementById('batteryId').value || 'BAT-2024-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+            const manufacturer = document.getElementById('manufacturer').value || 'Samsung SDI';
+            const batteryType = document.getElementById('batteryType').value;
+            const capacity = document.getElementById('capacity').value || '75';
+            const chemistry = document.getElementById('chemistry').value;
+
+            const typeLabels = {
+                ev: currentLang === 'ko' ? '전기차 배터리' : 'EV Battery',
+                industrial: currentLang === 'ko' ? '산업용 배터리' : 'Industrial Battery',
+                lmt: currentLang === 'ko' ? 'LMT 배터리' : 'LMT Battery',
+                stationary: currentLang === 'ko' ? '고정식 저장장치' : 'Stationary Storage'
+            };
+
+            const did = `did:wia:battery:${batteryId.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+
+            currentPassport = {
+                did,
+                batteryId,
+                manufacturer,
+                type: typeLabels[batteryType],
+                capacity: `${capacity} kWh`,
+                chemistry: chemistry.toUpperCase()
+            };
+
+            document.getElementById('viewPassportId').value = did;
+
+            const resultHtml = `
+                <div class="result-box">
+                    <strong>[OK] ${currentLang === 'ko' ? '배터리 여권 생성됨' : 'Battery Passport Created'}</strong>
+                    <p style="margin-top: 0.5rem; font-family: monospace; font-size: 0.85rem;">${did}</p>
+                </div>
+            `;
+            document.getElementById('createResult').innerHTML = resultHtml;
+        }
+
+        function viewPassport() {
+            if (!currentPassport) {
+                document.getElementById('passportView').innerHTML = `
+                    <div class="result-box warning">
+                        <strong>[!] ${currentLang === 'ko' ? '먼저 여권을 생성하세요' : 'Please create a passport first'}</strong>
+                    </div>
+                `;
+                return;
+            }
+
+            const labels = currentLang === 'ko' ? {
+                id: '배터리 ID',
+                manufacturer: '제조사',
+                type: '유형',
+                capacity: '용량',
+                chemistry: '화학 성분',
+                status: '상태',
+                active: '활성'
+            } : {
+                id: 'Battery ID',
+                manufacturer: 'Manufacturer',
+                type: 'Type',
+                capacity: 'Capacity',
+                chemistry: 'Chemistry',
+                status: 'Status',
+                active: 'Active'
+            };
+
+            const html = `
+                <div class="passport-card">
+                    <div class="passport-header">
+                        <strong>[BATTERY] EU Battery Passport</strong>
+                        <span class="status-badge active">${labels.active}</span>
+                    </div>
+                    <p class="passport-id">${currentPassport.did}</p>
+                    <div class="passport-field">
+                        <span class="passport-label">${labels.id}</span>
+                        <span class="passport-value">${currentPassport.batteryId}</span>
+                    </div>
+                    <div class="passport-field">
+                        <span class="passport-label">${labels.manufacturer}</span>
+                        <span class="passport-value">${currentPassport.manufacturer}</span>
+                    </div>
+                    <div class="passport-field">
+                        <span class="passport-label">${labels.type}</span>
+                        <span class="passport-value">${currentPassport.type}</span>
+                    </div>
+                    <div class="passport-field">
+                        <span class="passport-label">${labels.capacity}</span>
+                        <span class="passport-value">${currentPassport.capacity}</span>
+                    </div>
+                    <div class="passport-field">
+                        <span class="passport-label">${labels.chemistry}</span>
+                        <span class="passport-value">${currentPassport.chemistry}</span>
+                    </div>
+                </div>
+            `;
+            document.getElementById('passportView').innerHTML = html;
+        }
+
+        function calculateCarbon() {
+            const location = document.getElementById('mfgLocation').value;
+            const recycled = parseFloat(document.getElementById('recycledContent').value) || 16;
+            const distance = parseFloat(document.getElementById('transportDistance').value) || 5000;
+
+            const baseCarbon = {
+                eu: 45,
+                kr: 55,
+                cn: 75,
+                us: 60
+            };
+
+            const locationLabels = {
+                eu: 'EU',
+                kr: currentLang === 'ko' ? '대한민국' : 'South Korea',
+                cn: currentLang === 'ko' ? '중국' : 'China',
+                us: currentLang === 'ko' ? '미국' : 'United States'
+            };
+
+            let carbonFootprint = baseCarbon[location];
+            carbonFootprint -= (recycled * 0.3);
+            carbonFootprint += (distance * 0.002);
+            carbonFootprint = Math.max(30, Math.round(carbonFootprint));
+
+            const rating = carbonFootprint < 50 ? 'A' : carbonFootprint < 65 ? 'B' : carbonFootprint < 80 ? 'C' : 'D';
+            const ratingColor = rating === 'A' ? 'var(--success)' : rating === 'B' ? 'var(--secondary)' : rating === 'C' ? 'var(--warning)' : 'var(--error)';
+
+            const labels = currentLang === 'ko' ? {
+                footprint: '탄소 발자국',
+                rating: '등급',
+                location: '제조 위치',
+                recycled: '재활용 함량',
+                unit: 'kg CO2eq/kWh'
+            } : {
+                footprint: 'Carbon Footprint',
+                rating: 'Rating',
+                location: 'Manufacturing Location',
+                recycled: 'Recycled Content',
+                unit: 'kg CO2eq/kWh'
+            };
+
+            const html = `
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">${carbonFootprint}</div>
+                        <div class="metric-label">${labels.unit}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" style="color: ${ratingColor};">${rating}</div>
+                        <div class="metric-label">${labels.rating}</div>
+                    </div>
+                </div>
+                <div class="result-box" style="margin-top: 1rem;">
+                    <p><strong>${labels.location}:</strong> ${locationLabels[location]}</p>
+                    <p><strong>${labels.recycled}:</strong> ${recycled}%</p>
+                </div>
+            `;
+            document.getElementById('carbonResult').innerHTML = html;
+        }
+
+        function checkCompliance() {
+            const recycled = parseFloat(document.getElementById('recycledContent').value) || 16;
+
+            const checks = [
+                { id: 'carbon', pass: true },
+                { id: 'recycled_cobalt', pass: recycled >= 16 },
+                { id: 'recycled_lithium', pass: recycled >= 6 },
+                { id: 'recycled_nickel', pass: recycled >= 6 },
+                { id: 'due_diligence', pass: true },
+                { id: 'qr_code', pass: true }
+            ];
+
+            const labels = currentLang === 'ko' ? {
+                carbon: '탄소 발자국 선언',
+                recycled_cobalt: '재활용 코발트 (>=16%)',
+                recycled_lithium: '재활용 리튬 (>=6%)',
+                recycled_nickel: '재활용 니켈 (>=6%)',
+                due_diligence: '공급망 실사',
+                qr_code: 'QR 코드 디지털 여권'
+            } : {
+                carbon: 'Carbon Footprint Declaration',
+                recycled_cobalt: 'Recycled Cobalt (>=16%)',
+                recycled_lithium: 'Recycled Lithium (>=6%)',
+                recycled_nickel: 'Recycled Nickel (>=6%)',
+                due_diligence: 'Supply Chain Due Diligence',
+                qr_code: 'QR Code Digital Passport'
+            };
+
+            const allPass = checks.every(c => c.pass);
+
+            let html = '';
+            checks.forEach(check => {
+                html += `
+                    <div class="compliance-item">
+                        <span class="compliance-icon ${check.pass ? 'pass' : 'fail'}">${check.pass ? '[OK]' : '[X]'}</span>
+                        <span>${labels[check.id]}</span>
+                    </div>
+                `;
+            });
+
+            html += `
+                <div class="result-box ${allPass ? '' : 'warning'}" style="margin-top: 1rem;">
+                    <strong>${allPass ? '[OK]' : '[!]'} ${currentLang === 'ko' ?
+                        (allPass ? 'EU 규정 2023/1542 준수' : '일부 요건 미충족') :
+                        (allPass ? 'EU Regulation 2023/1542 Compliant' : 'Some requirements not met')}</strong>
+                </div>
+            `;
+
+            document.getElementById('complianceResult').innerHTML = html;
+        }
+
+        function analyzeLifecycle() {
+            const soh = parseFloat(document.getElementById('soh').value) || 92;
+            const cycles = parseInt(document.getElementById('cycles').value) || 450;
+
+            const maxCycles = 1500;
+            const usedPercent = Math.min(100, (cycles / maxCycles) * 100);
+            const remainingCycles = Math.max(0, maxCycles - cycles);
+            const estimatedYears = Math.round((remainingCycles / 300) * 10) / 10;
+
+            const status = soh >= 80 ? 'active' : soh >= 70 ? 'second-life' : 'recycling';
+            const statusLabels = currentLang === 'ko' ? {
+                'active': '1차 사용',
+                'second-life': '2차 사용 권장',
+                'recycling': '재활용 권장'
+            } : {
+                'active': 'Primary Use',
+                'second-life': 'Second-Life Recommended',
+                'recycling': 'Recycling Recommended'
+            };
+
+            const labels = currentLang === 'ko' ? {
+                soh: '건강 상태',
+                remaining: '남은 사이클',
+                years: '예상 남은 수명',
+                lifecycle: '수명주기 사용량'
+            } : {
+                soh: 'State of Health',
+                remaining: 'Remaining Cycles',
+                years: 'Est. Remaining Life',
+                lifecycle: 'Lifecycle Usage'
+            };
+
+            const html = `
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">${soh}%</div>
+                        <div class="metric-label">${labels.soh}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${remainingCycles}</div>
+                        <div class="metric-label">${labels.remaining}</div>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <p style="margin-bottom: 0.5rem; font-weight: 500;">${labels.lifecycle}: ${Math.round(usedPercent)}%</p>
+                    <div class="lifecycle-bar">
+                        <div class="lifecycle-fill" style="width: ${usedPercent}%;"></div>
+                    </div>
+                </div>
+                <div class="result-box">
+                    <p><strong>${labels.years}:</strong> ${estimatedYears} ${currentLang === 'ko' ? '년' : 'years'}</p>
+                    <p style="margin-top: 0.5rem;">
+                        <span class="status-badge ${status === 'active' ? 'active' : status === 'second-life' ? 'recycled' : 'expired'}">
+                            ${statusLabels[status]}
+                        </span>
+                    </p>
+                </div>
+            `;
+            document.getElementById('lifecycleResult').innerHTML = html;
+        }
+
+        function generateQR() {
+            const qrElement = document.getElementById('qrCode');
+            if (currentPassport) {
+                qrElement.innerHTML = `[QR]<br/>${currentPassport.batteryId}<br/><span style="font-size: 0.6rem;">${currentPassport.did.substring(0, 25)}...</span>`;
+            } else {
+                qrElement.innerHTML = `[QR CODE]<br/>BAT-DEMO-001<br/><span style="font-size: 0.6rem;">did:wia:battery:demo</span>`;
+            }
+            qrElement.style.background = '#ecfdf5';
+            qrElement.style.borderColor = 'var(--primary)';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setLanguage('en');
+        });
+    </script>
+</body>
+</html>

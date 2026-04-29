@@ -1787,7 +1787,6 @@ This standard covers:
 2. FDA. (2022). Clinical Decision Support Software: Guidance for Industry and FDA Staff.
 3. NICE. (2018). Evidence standards framework for digital health technologies.
 4. WHO. (2019). Recommendations on digital interventions for health system strengthening.
-5. 선행 연구. Clinical review of user engagement with mental health smartphone apps. Psychiatric Services.
 
 ### Appendix D: Contact Information
 

@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: 위치 측정 및 내비게이션 시스템 - WIA-FARMING_ROBOT</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.8; color: #333; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 50px; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        .chapter-header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 3px solid #667eea; }
+        .chapter-number { color: #764ba2; font-size: 1.2em; font-weight: 600; margin-bottom: 10px; }
+        h1 { color: #667eea; font-size: 2.5em; margin-bottom: 20px; }
+        h2 { color: #667eea; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
+        h3 { color: #764ba2; font-size: 1.4em; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 15px; text-align: justify; }
+        .highlight-box { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 25px; border-radius: 10px; margin: 25px 0; border-left: 5px solid #667eea; }
+        .info-box { background: #e8f4f8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196F3; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        th { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; text-align: left; font-weight: 600; }
+        td { padding: 12px 15px; border-bottom: 1px solid #eee; }
+        tr:hover { background: #f8f9fa; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #2d2d2d; color: #f8f8f2; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; color: #f8f8f2; padding: 0; }
+        ul, ol { margin: 15px 0; padding-left: 30px; }
+        li { margin: 8px 0; }
+        .key-takeaways { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .key-takeaways h2 { color: white; border-bottom: 2px solid rgba(255,255,255,0.3); margin-top: 0; }
+        .key-takeaways ul { list-style: none; }
+        .key-takeaways li:before { content: "✓ "; font-weight: bold; margin-right: 10px; }
+        .review-questions { background: #f8f9fa; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions h2 { color: #667eea; margin-top: 0; }
+        .review-questions ol { counter-reset: question-counter; list-style: none; }
+        .review-questions li { counter-increment: question-counter; margin: 20px 0; padding-left: 40px; position: relative; }
+        .review-questions li:before { content: "Q" counter(question-counter); position: absolute; left: 0; top: 0; background: #667eea; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9em; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 30px; border-top: 2px solid #eee; }
+        .nav-button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; border-radius: 25px; text-decoration: none; font-weight: 600; transition: transform 0.3s ease; display: inline-block; }
+        .nav-button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); }
+        .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #eee; color: #999; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <div class="chapter-number">제3장</div>
+            <h1>위치 측정 및 내비게이션 시스템</h1>
+        </div>
+
+        <div class="highlight-box">
+            <h3>장 개요</h3>
+            <p>이 장에서는 자율 농업 로봇의 핵심인 정밀 위치 측정 및 내비게이션 시스템을 살펴봅니다. RTK-GPS, IMU 통합, 경로 추적 알고리즘 및 장애물 회피 전략을 다루며, 실제 구현 예제를 제공합니다.</p>
+        </div>
+
+        <h2>3.1 RTK-GPS 기술 심층 분석</h2>
+
+        <p>실시간 키네마틱(RTK) GPS는 자율 농업 작업에 필수적인 센티미터 수준의 위치 정확도를 제공하는 기술입니다. 전통적인 GPS가 제공하는 미터 단위 정확도와 달리, RTK는 ±2.5cm의 정밀도를 달성하여 정밀 파종, 행 추적 및 가변 비율 적용을 가능하게 합니다.</p>
+
+        <h3>3.1.1 RTK 작동 원리</h3>
+
+        <p>RTK 시스템은 두 가지 주요 구성 요소로 작동합니다:</p>
+
+        <ul>
+            <li><strong>기지국(Base Station):</strong> 정확히 알려진 위치에 설치된 정지 GPS 수신기. 자체 GPS 위치를 알려진 위치와 비교하여 오류를 계산합니다.</li>
+            <li><strong>이동국(Rover):</strong> 로봇에 탑재된 GPS 수신기. 기지국에서 보정 데이터를 수신하고 자체 GPS 측정에 적용하여 정밀 위치를 계산합니다.</li>
+        </ul>
+
+        <div class="info-box">
+            <h3>RTK 보정 데이터 전송</h3>
+            <p>보정 데이터는 여러 방법으로 전송될 수 있습니다: (1) 무선 링크(UHF, 2.4GHz), (2) 셀룰러 연결(NTRIP 프로토콜), (3) 위성 기반 보정(Starlink, Trimble RTX). 각 방법은 범위, 대역폭 및 지연 시간에서 trade-off가 있습니다.</p>
+        </div>
+
+        <h3>3.1.2 RTK 정확도 요인</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>요인</th>
+                    <th>영향</th>
+                    <th>완화 전략</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>기지국 거리</td>
+                    <td>10km마다 약 1cm 정확도 저하</td>
+                    <td>10-20km 이내의 기지국 사용</td>
+                </tr>
+                <tr>
+                    <td>보정 연령</td>
+                    <td>오래된 보정은 정확도 감소</td>
+                    <td><5초 보정 연령 유지</td>
+                </tr>
+                <tr>
+                    <td>위성 가시성</td>
+                    <td>장애물은 신호 차단</td>
+                    <td>다중 GNSS 별자리(GPS, GLONASS, Galileo, BeiDou)</td>
+                </tr>
+                <tr>
+                    <td>다중 경로 효과</td>
+                    <td>신호 반사로 오류 발생</td>
+                    <td>지상면 안테나, 신호 처리 알고리즘</td>
+                </tr>
+                <tr>
+                    <td>전리층/대류권 지연</td>
+                    <td>대기 조건에 따른 변동</td>
+                    <td>이중 주파수 수신기(L1+L2)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>3.2 관성 측정 장치(IMU) 통합</h2>
+
+        <p>IMU는 가속도계와 자이로스코프를 결합하여 로봇의 방향, 가속도 및 각속도를 측정합니다. GPS 신호가 일시적으로 손실되거나 업데이트 사이에 IMU 데이터가 위치를 추정하는 추측 항법(dead reckoning)을 가능하게 합니다.</p>
+
+        <h3>3.2.1 센서 융합: 칼만 필터</h3>
+
+        <p>칼만 필터는 GPS와 IMU 데이터를 융합하여 최적의 위치 추정을 제공하는 알고리즘입니다. 각 센서의 불확실성을 고려하여 가장 정확한 예측을 생성합니다.</p>
+
+        <pre><code>// 간소화된 칼만 필터 의사 코드
+class KalmanFilter {
+  constructor() {
+    this.state = { x: 0, y: 0, vx: 0, vy: 0 };  // 위치 및 속도
+    this.covariance = identityMatrix(4);         // 불확실성
+  }
+
+  predict(dt, imuData) {
+    // IMU 데이터로 상태 예측
+    this.state.x += this.state.vx * dt + 0.5 * imuData.ax * dt * dt;
+    this.state.y += this.state.vy * dt + 0.5 * imuData.ay * dt * dt;
+    this.state.vx += imuData.ax * dt;
+    this.state.vy += imuData.ay * dt;
+    
+    // 불확실성 증가
+    this.covariance = processNoise + stateTransition * this.covariance;
+  }
+
+  update(gpsData) {
+    // GPS 측정으로 상태 업데이트
+    const kalmanGain = calculateKalmanGain(this.covariance, gpsNoise);
+    const innovation = gpsData - this.state;
+    
+    this.state += kalmanGain * innovation;
+    this.covariance = (1 - kalmanGain) * this.covariance;
+  }
+}</code></pre>
+
+        <h2>3.3 경로 추적 알고리즘</h2>
+
+        <p>로봇이 계획된 경로를 따라가려면 정교한 제어 알고리즘이 필요합니다. WIA 표준은 여러 경로 추적 전략을 지원합니다.</p>
+
+        <h3>3.3.1 Pure Pursuit 알고리즘</h3>
+
+        <p>Pure Pursuit는 경로상의 목표 지점을 향해 조향하는 기하학적 경로 추적 알고리즘입니다. 구현이 간단하고 효과적이어서 농업 로봇에 널리 사용됩니다.</p>
+
+        <pre><code>function purePursuit(robotPosition, robotHeading, path, lookaheadDistance) {
+  // 1. 경로에서 lookahead 거리의 목표 지점 찾기
+  const targetPoint = findLookaheadPoint(path, robotPosition, lookaheadDistance);
+  
+  // 2. 로봇 좌표계에서 목표까지의 거리 계산
+  const dx = targetPoint.x - robotPosition.x;
+  const dy = targetPoint.y - robotPosition.y;
+  const alpha = Math.atan2(dy, dx) - robotHeading;
+  
+  // 3. 곡률 계산 (조향 명령)
+  const curvature = 2 * Math.sin(alpha) / lookaheadDistance;
+  
+  // 4. 조향각으로 변환
+  const steeringAngle = Math.atan(curvature * wheelbase);
+  
+  return steeringAngle;
+}</code></pre>
+
+        <div class="info-box">
+            <h3>Lookahead 거리 선택</h3>
+            <p>Lookahead 거리는 경로 추적 성능에 중요한 영향을 미칩니다. 짧은 거리(2-5m)는 민첩한 추적을 제공하지만 불안정할 수 있습니다. 긴 거리(10-15m)는 부드럽지만 코너를 잘라낼 수 있습니다. 많은 시스템이 속도에 따라 적응적으로 조정합니다: lookahead = k * speed + lookahead_min</p>
+        </div>
+
+        <h3>3.3.2 Stanley 제어기</h3>
+
+        <p>Stanley 알고리즘은 횡방향 오류(경로로부터의 거리)와 방향 오류(경로 각도와의 차이)를 모두 고려하는 더 정교한 접근 방식입니다.</p>
+
+        <pre><code>function stanleyControl(robotState, path, k = 1.0) {
+  // 경로에서 가장 가까운 지점 찾기
+  const closestPoint = findClosestPathPoint(path, robotState.position);
+  
+  // 횡방향 오류 (경로로부터의 수직 거리)
+  const lateralError = calculateLateralError(robotState.position, closestPoint);
+  
+  // 방향 오류 (경로 접선과 로봇 방향의 차이)
+  const headingError = closestPoint.heading - robotState.heading;
+  
+  // Stanley 제어 법칙
+  const steeringAngle = headingError + Math.atan(k * lateralError / robotState.speed);
+  
+  return steeringAngle;
+}</code></pre>
+
+        <h2>3.4 장애물 감지 및 회피</h2>
+
+        <p>안전한 자율 작동은 장애물을 감지하고 회피하는 능력이 필요합니다. WIA 표준은 다층 장애물 관리 전략을 정의합니다.</p>
+
+        <h3>3.4.1 장애물 감지 구역</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>구역</th>
+                    <th>거리</th>
+                    <th>동작</th>
+                    <th>응답 시간</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>즉시 정지 구역</strong></td>
+                    <td>0-5m</td>
+                    <td>비상 정지</td>
+                    <td><100ms</td>
+                </tr>
+                <tr>
+                    <td><strong>감속 구역</strong></td>
+                    <td>5-15m</td>
+                    <td>속도 50%로 감소</td>
+                    <td><500ms</td>
+                </tr>
+                <tr>
+                    <td><strong>주의 구역</strong></td>
+                    <td>15-30m</td>
+                    <td>속도 75%로 감소</td>
+                    <td><1000ms</td>
+                </tr>
+                <tr>
+                    <td><strong>모니터링 구역</strong></td>
+                    <td>30-50m</td>
+                    <td>모니터링 및 경고</td>
+                    <td>-</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>3.4.2 회피 경로 계획</h3>
+
+        <p>장애물이 감지되면 로봇은 회피 경로를 생성해야 합니다. 일반적인 전략에는 다음이 포함됩니다:</p>
+
+        <ul>
+            <li><strong>정지 및 대기:</strong> 장애물이 일시적인 경우(사람, 동물)</li>
+            <li><strong>측면 회피:</strong> 장애물 주위로 곡선 경로</li>
+            <li><strong>경로 재계획:</strong> 큰 장애물의 경우 완전히 새로운 경로</li>
+            <li><strong>운영자 알림:</strong> 자동 회피가 불가능한 경우</li>
+        </ul>
+
+        <pre><code>function obstacleAvoidance(obstacles, currentPath, robotState) {
+  for (const obstacle of obstacles) {
+    const distance = calculateDistance(robotState.position, obstacle.position);
+    const timeToCollision = distance / robotState.speed;
+    
+    if (timeToCollision < 2.0) {  // 2초 미만
+      if (obstacle.type === "HUMAN" || obstacle.type === "ANIMAL") {
+        return { action: "EMERGENCY_STOP", reason: "Human/Animal detected" };
+      } else if (distance < 5.0) {
+        return { action: "STOP", reason: "Obstacle too close" };
+      } else {
+        // 회피 경로 생성
+        const avoidancePath = generateAvoidancePath(
+          obstacle, currentPath, robotState
+        );
+        return { action: "FOLLOW_AVOIDANCE_PATH", path: avoidancePath };
+      }
+    }
+  }
+  
+  return { action: "CONTINUE", path: currentPath };
+}</code></pre>
+
+        <h2>3.5 지오펜싱 및 경계 관리</h2>
+
+        <p>지오펜싱은 로봇이 지정된 필드 경계 내에 머물도록 보장하는 가상 경계 시스템입니다. 이는 안전 및 규정 준수에 중요합니다.</p>
+
+        <h3>3.5.1 경계 정의</h3>
+
+        <pre><code>interface GeofenceBoundary {
+  fieldId: string;
+  boundary: GeoPolygon;        // 외부 경계
+  bufferZone: number;          // 경계로부터의 미터
+  action: "SOFT_STOP" | "HARD_STOP" | "ALERT";
+  alerts: string[];            // 알림 수신자
+}
+
+// 예제: 필드 경계
+const fieldBoundary = {
+  fieldId: "field-001",
+  boundary: {
+    type: "Polygon",
+    coordinates: [
+      [42.3601, -71.0589],
+      [42.3608, -71.0589],
+      [42.3608, -71.0582],
+      [42.3601, -71.0582],
+      [42.3601, -71.0589]  // 폐쇄 폴리곤
+    ]
+  },
+  bufferZone: 3.0,  // 경계로부터 3미터
+  action: "SOFT_STOP",
+  alerts: ["OPERATOR", "FLEET_MANAGER"]
+};</code></pre>
+
+        <h3>3.5.2 경계 위반 처리</h3>
+
+        <pre><code>function checkGeofence(robotPosition, boundary) {
+  const distanceToBoundary = calculateDistanceToPolygon(
+    robotPosition, boundary.boundary
+  );
+  
+  if (distanceToBoundary < 0) {
+    // 로봇이 경계 밖에 있음
+    return {
+      violation: "BREACH",
+      action: "EMERGENCY_STOP",
+      distance: Math.abs(distanceToBoundary)
+    };
+  } else if (distanceToBoundary < boundary.bufferZone) {
+    // 로봇이 버퍼 구역에 있음
+    return {
+      violation: "BUFFER_ZONE",
+      action: "SLOW_DOWN",
+      distance: distanceToBoundary
+    };
+  } else {
+    // 로봇이 안전 구역에 있음
+    return {
+      violation: "NONE",
+      action: "CONTINUE",
+      distance: distanceToBoundary
+    };
+  }
+}</code></pre>
+
+        <h2>3.6 필드 커버리지 최적화</h2>
+
+        <p>효율적인 필드 커버리지는 시간, 연료 및 중복을 최소화합니다. WIA 표준은 여러 커버리지 패턴을 지원합니다.</p>
+
+        <h3>3.6.1 커버리지 패턴</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>패턴</th>
+                    <th>설명</th>
+                    <th>장점</th>
+                    <th>단점</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>AB Line</strong></td>
+                    <td>평행한 직선</td>
+                    <td>간단, 효율적, 일반적</td>
+                    <td>불규칙한 필드에서 비효율적</td>
+                </tr>
+                <tr>
+                    <td><strong>Contour</strong></td>
+                    <td>등고선 따라</td>
+                    <td>경사면에서 침식 감소</td>
+                    <td>복잡한 계획, 더 많은 회전</td>
+                </tr>
+                <tr>
+                    <td><strong>Spiral</strong></td>
+                    <td>중심에서 바깥으로</td>
+                    <td>헤드랜드 회전 최소화</td>
+                    <td>좁은 통로에서 어려움</td>
+                </tr>
+                <tr>
+                    <td><strong>Adaptive</strong></td>
+                    <td>필드 형태에 적응</td>
+                    <td>불규칙한 필드에서 최적</td>
+                    <td>계산 집약적</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>3.6.2 회전 최적화</h3>
+
+        <p>헤드랜드(필드 끝)에서의 회전은 효율성의 주요 손실 지점입니다. 최적화 전략에는 다음이 포함됩니다:</p>
+
+        <ul>
+            <li><strong>최소 반경 회전:</strong> 로봇의 최소 회전 반경을 사용하여 공간 절약</li>
+            <li><strong>Dubins 경로:</strong> 가장 짧은 경로를 제공하는 곡선 세그먼트</li>
+            <li><strong>작업 중 회전:</strong> 회전하는 동안 작업 계속(가능한 경우)</li>
+            <li><strong>중복 최소화:</strong> 회전 영역에서 15% 중복 목표</li>
+        </ul>
+
+        <h2>3.7 날씨 및 지형 적응</h2>
+
+        <p>실제 조건에서 로봇은 다양한 지형과 날씨에 적응해야 합니다.</p>
+
+        <h3>3.7.1 경사 보상</h3>
+
+        <pre><code>function slopeCompensation(imuData, wheelbase, centerOfGravity) {
+  const pitch = imuData.pitch;  // 전후 경사
+  const roll = imuData.roll;    // 좌우 경사
+  
+  // 경사면에서 안정성 계산
+  const stabilityMargin = calculateStabilityMargin(pitch, roll, centerOfGravity);
+  
+  if (stabilityMargin < 0.2) {  // 20% 미만 안정성
+    return {
+      action: "STOP",
+      reason: "Unsafe slope angle",
+      pitch: pitch,
+      roll: roll
+    };
+  } else if (pitch > 15 || roll > 15) {
+    return {
+      action: "REDUCE_SPEED",
+      speedFactor: 0.5,
+      reason: "Steep slope"
+    };
+  } else {
+    return {
+      action: "CONTINUE",
+      adjustedSpeed: calculateSlopeAdjustedSpeed(pitch, roll)
+    };
+  }
+}</code></pre>
+
+        <h3>3.7.2 미끄럼 감지 및 보정</h3>
+
+        <p>젖은 토양이나 진흙탕에서 바퀴 미끄럼은 위치 오류를 일으킬 수 있습니다. IMU 가속도계 데이터와 GPS 속도를 비교하여 미끄럼을 감지할 수 있습니다.</p>
+
+        <pre><code>function detectSlippage(gpsSpeed, wheelSpeed, imuAcceleration) {
+  const expectedSpeed = wheelSpeed;
+  const actualSpeed = gpsSpeed;
+  const slippage = (expectedSpeed - actualSpeed) / expectedSpeed;
+  
+  if (slippage > 0.15) {  // 15% 이상 미끄럼
+    return {
+      slipping: true,
+      slippagePercentage: slippage * 100,
+      correctionAction: "REDUCE_THROTTLE",
+      recommendation: "Consider waiting for better soil conditions"
+    };
+  }
+  
+  return { slipping: false };
+}</code></pre>
+
+        <div class="key-takeaways">
+            <h2>핵심 요약</h2>
+            <ul>
+                <li>RTK-GPS는 ±2.5cm 정밀도를 제공하며, 정확도는 기지국 거리, 보정 연령 및 위성 가시성에 따라 달라집니다</li>
+                <li>IMU 통합 및 칼만 필터링은 GPS와 관성 데이터를 융합하여 GPS 중단 중에도 연속적인 위치 추정을 제공합니다</li>
+                <li>Pure Pursuit 및 Stanley 제어기는 계획된 경로를 따라가기 위한 효과적인 경로 추적 알고리즘입니다</li>
+                <li>장애물 감지는 거리 기반 응답 구역(즉시 정지, 감속, 주의, 모니터링)을 사용하는 다층 접근 방식을 사용합니다</li>
+                <li>지오펜싱은 로봇이 지정된 필드 경계 내에 머물도록 보장하며, 버퍼 구역 및 점진적 경고를 제공합니다</li>
+                <li>필드 커버리지 최적화는 다양한 패턴(AB Line, Contour, Spiral, Adaptive)을 사용하여 효율성을 최대화합니다</li>
+                <li>지형 및 날씨 적응은 경사 보상, 미끄럼 감지 및 조건 기반 속도 조정을 포함합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>RTK-GPS 시스템의 작동 원리를 설명하세요. 기지국과 이동국이 각각 어떤 역할을 하며, 센티미터 수준의 정확도를 어떻게 달성합니까?</li>
+                <li>RTK 정확도에 영향을 미치는 다섯 가지 주요 요인을 분석하고, 각 요인에 대한 완화 전략을 제시하세요.</li>
+                <li>칼만 필터가 GPS와 IMU 데이터를 어떻게 융합하는지 설명하세요. 예측 및 업데이트 단계의 목적은 무엇입니까?</li>
+                <li>Pure Pursuit 및 Stanley 제어 알고리즘을 비교하세요. 각각의 장단점은 무엇이며, 어떤 상황에서 하나를 다른 것보다 선호할 수 있습니까?</li>
+                <li>장애물 감지 구역 시스템(즉시 정지, 감속, 주의, 모니터링)을 설명하고, 각 구역의 거리 범위와 해당 동작을 정당화하세요.</li>
+                <li>지오펜싱이 농업 로봇에서 어떻게 구현되는지 논의하세요. 버퍼 구역의 목적은 무엇이며, 경계 위반은 어떻게 처리됩니까?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-02.html" class="nav-button">← 이전 장</a>
+            <a href="chapter-04.html" class="nav-button">다음 장: 센서 융합 및 인식 →</a>
+        </div>
+
+        </div>
+</body>
+</html>

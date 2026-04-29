@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Ocean Plastic Track - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #0EA5E9;
+            --primary-dark: #0284C7;
+            --secondary: #F59E0B;
+            --danger: #ef4444;
+            --success: #10b981;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #38BDF8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); border-radius: 8px; font-size: 1rem; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .metric-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .metric-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .metric-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .track-card { background: linear-gradient(135deg, rgba(14,165,233,0.2), rgba(56,189,248,0.1)); border: 2px solid var(--primary); border-radius: 12px; padding: 25px; margin: 20px 0; }
+        .track-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border); padding-bottom: 15px; margin-bottom: 15px; }
+        .track-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
+        .track-row:last-child { border-bottom: none; }
+        .track-label { color: var(--text-muted); }
+        .track-value { font-weight: 600; }
+
+        .journey-step { display: flex; align-items: center; gap: 15px; padding: 15px; background: var(--bg); border-radius: 8px; margin: 10px 0; }
+        .journey-icon { font-size: 1.5rem; width: 40px; text-align: center; }
+        .journey-content { flex: 1; }
+        .journey-time { font-size: 0.8rem; color: var(--text-muted); }
+
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+        .status-virgin { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .status-recycled { background: rgba(16,185,129,0.2); color: #10b981; }
+        .status-ocean { background: rgba(14,165,233,0.2); color: #0ea5e9; }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .form-grid { grid-template-columns: 1fr; }
+            .metric-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Ocean Plastic Track</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🌊 WIA Ocean Plastic Track</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Ocean Plastic Tracking" data-ko="해양 플라스틱 추적">Ocean Plastic Tracking</h1>
+            <p data-en="From production to ocean cleanup and recycling" data-ko="생산부터 해양 정화 및 재활용까지">Production to recycling</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📝 Register" data-ko="📝 등록">📝 Register</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🔍 Track" data-ko="🔍 추적">🔍 Track</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🌊 Cleanup" data-ko="🌊 정화">🌊 Cleanup</div>
+            <div class="tab" onclick="showPanel(3)" data-en="♻️ Recycle" data-ko="♻️ 재활용">♻️ Recycle</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🔌 API" data-ko="🔌 API">🔌 API</div>
+        </div>
+
+        <!-- Panel 0: Register -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="📝 Register Plastic Batch" data-ko="📝 플라스틱 배치 등록">📝 Register Batch</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Register new plastic production" data-ko="새 플라스틱 생산 등록">Register production</p>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-en="Producer ID" data-ko="생산자 ID">Producer ID</label>
+                    <input type="text" id="producerId" placeholder="PROD-001234">
+                </div>
+                <div class="form-group">
+                    <label data-en="Material Type" data-ko="재료 유형">Material Type</label>
+                    <select id="materialType">
+                        <option value="PET">PET</option>
+                        <option value="HDPE">HDPE</option>
+                        <option value="PP">PP</option>
+                        <option value="LDPE">LDPE</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Weight (kg)" data-ko="무게 (kg)">Weight (kg)</label>
+                    <input type="number" id="weight" value="5000">
+                </div>
+                <div class="form-group">
+                    <label data-en="Recycled Content (%)" data-ko="재활용 함량 (%)">Recycled Content (%)</label>
+                    <input type="number" id="recycledContent" value="50" min="0" max="100">
+                </div>
+                <div class="form-group">
+                    <label data-en="Ocean Plastic (%)" data-ko="해양 플라스틱 (%)">Ocean Plastic (%)</label>
+                    <input type="number" id="oceanPlastic" value="10" min="0" max="100">
+                </div>
+                <div class="form-group">
+                    <label data-en="Carbon Footprint (kg CO₂e)" data-ko="탄소 발자국 (kg CO₂e)">Carbon (kg CO₂e)</label>
+                    <input type="number" id="carbon" value="8500">
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="registerBatch()" data-en="📝 Register Batch" data-ko="📝 배치 등록">📝 Register</button>
+            </div>
+            <div class="output" id="registerOutput"></div>
+        </div>
+
+        <!-- Panel 1: Track -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🔍 Track Plastic Journey" data-ko="🔍 플라스틱 여정 추적">🔍 Track Journey</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="View complete lifecycle" data-ko="전체 수명주기 조회">View lifecycle</p>
+
+            <div class="track-card">
+                <div class="track-header">
+                    <strong>🏭 Batch: BATCH-2024-ABC123</strong>
+                    <span class="status-badge status-recycled">50% Recycled</span>
+                </div>
+                <div class="track-row"><span class="track-label">Material</span><span class="track-value">PET - 5,000 kg</span></div>
+                <div class="track-row"><span class="track-label">Ocean Plastic</span><span class="track-value">10% (500 kg)</span></div>
+                <div class="track-row"><span class="track-label">Carbon Footprint</span><span class="track-value">8,500 kg CO₂e</span></div>
+            </div>
+
+            <div class="journey-step">
+                <div class="journey-icon">🏭</div>
+                <div class="journey-content">
+                    <strong>Production</strong>
+                    <div class="journey-time">2024-01-15</div>
+                </div>
+            </div>
+            <div class="journey-step">
+                <div class="journey-icon">📦</div>
+                <div class="journey-content">
+                    <strong>Distribution</strong>
+                    <div class="journey-time">2024-01-20</div>
+                </div>
+            </div>
+            <div class="journey-step">
+                <div class="journey-icon">🛒</div>
+                <div class="journey-content">
+                    <strong>Retail</strong>
+                    <div class="journey-time">2024-02-01</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="trackBatch()" data-en="🔍 Track Batch" data-ko="🔍 배치 추적">🔍 Track</button>
+            </div>
+            <div class="output" id="trackOutput"></div>
+        </div>
+
+        <!-- Panel 2: Cleanup -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🌊 Ocean Cleanup Record" data-ko="🌊 해양 정화 기록">🌊 Cleanup Record</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Record ocean plastic collection" data-ko="해양 플라스틱 수거 기록">Record collection</p>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value">12.5</div>
+                    <div class="metric-label" data-en="Tons Collected" data-ko="수거량 (톤)">Tons</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">Pacific</div>
+                    <div class="metric-label" data-en="Location" data-ko="위치">Location</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">85%</div>
+                    <div class="metric-label" data-en="Recyclable" data-ko="재활용 가능">Recyclable</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" style="color: var(--success);">Verified</div>
+                    <div class="metric-label" data-en="Status" data-ko="상태">Status</div>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-en="Collection Location" data-ko="수거 위치">Collection Location</label>
+                    <select id="cleanupLocation">
+                        <option value="pacific">Pacific Ocean</option>
+                        <option value="atlantic">Atlantic Ocean</option>
+                        <option value="indian">Indian Ocean</option>
+                        <option value="coastal">Coastal Area</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Weight Collected (kg)" data-ko="수거량 (kg)">Weight Collected (kg)</label>
+                    <input type="number" id="cleanupWeight" value="12500">
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="recordCleanup()" data-en="🌊 Record Cleanup" data-ko="🌊 정화 기록">🌊 Record</button>
+            </div>
+            <div class="output" id="cleanupOutput"></div>
+        </div>
+
+        <!-- Panel 3: Recycle -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="♻️ Recycling Certificate" data-ko="♻️ 재활용 인증서">♻️ Recycling Certificate</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Issue recycling verification" data-ko="재활용 검증 발급">Issue verification</p>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value">5,000</div>
+                    <div class="metric-label" data-en="kg Recycled" data-ko="재활용량 kg">kg Recycled</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">-65%</div>
+                    <div class="metric-label" data-en="Carbon Saved" data-ko="탄소 절감">Carbon Saved</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">A+</div>
+                    <div class="metric-label" data-en="Rating" data-ko="등급">Rating</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" style="color: var(--success);">✓</div>
+                    <div class="metric-label" data-en="Certified" data-ko="인증됨">Certified</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="issueCertificate()" data-en="♻️ Issue Certificate" data-ko="♻️ 인증서 발급">♻️ Issue Certificate</button>
+            </div>
+            <div class="output" id="recycleOutput"></div>
+        </div>
+
+        <!-- Panel 4: API -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="🔌 API Reference" data-ko="🔌 API 레퍼런스">🔌 API Reference</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Integration endpoints" data-ko="연동 API">Integration endpoints</p>
+
+            <div class="form-group">
+                <label data-en="Endpoint" data-ko="엔드포인트">Endpoint</label>
+                <select id="apiEndpoint" onchange="showApiExample()">
+                    <option value="register">POST /api/v1/batch - Register</option>
+                    <option value="track">GET /api/v1/batch/{id} - Track</option>
+                    <option value="cleanup">POST /api/v1/cleanup - Record</option>
+                    <option value="certificate">POST /api/v1/certificate - Issue</option>
+                </select>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="testApi()" data-en="🔌 Test API" data-ko="🔌 API 테스트">🔌 Test API</button>
+            </div>
+            <div class="output" id="apiOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="Every piece of plastic tells a story" data-ko="모든 플라스틱에는 이야기가 있습니다">Every plastic tells a story</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.toLowerCase() === lang));
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const text = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+                if (el.tagName === 'INPUT') el.placeholder = text;
+                else el.textContent = text;
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function generateBatchId() {
+            return 'BATCH-2024-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+        }
+
+        function registerBatch() {
+            document.getElementById('registerOutput').textContent = JSON.stringify({
+                status: 'success',
+                batch: {
+                    id: generateBatchId(),
+                    producer: document.getElementById('producerId').value || 'PROD-001234',
+                    material: document.getElementById('materialType').value,
+                    weight: document.getElementById('weight').value + ' kg',
+                    recycledContent: document.getElementById('recycledContent').value + '%',
+                    oceanPlastic: document.getElementById('oceanPlastic').value + '%',
+                    carbonFootprint: document.getElementById('carbon').value + ' kg CO₂e',
+                    recyclabilityScore: 0.85,
+                    registeredAt: new Date().toISOString()
+                },
+                message: currentLang === 'ko' ? '배치 등록 완료' : 'Batch registered'
+            }, null, 2);
+        }
+
+        function trackBatch() {
+            document.getElementById('trackOutput').textContent = JSON.stringify({
+                batchId: 'BATCH-2024-ABC123',
+                journey: [
+                    { stage: 'Production', date: '2024-01-15', location: 'Seoul, KR' },
+                    { stage: 'Distribution', date: '2024-01-20', location: 'Busan, KR' },
+                    { stage: 'Retail', date: '2024-02-01', location: 'Consumer Market' }
+                ],
+                currentStatus: 'In Use',
+                message: currentLang === 'ko' ? '추적 완료' : 'Tracking complete'
+            }, null, 2);
+        }
+
+        function recordCleanup() {
+            document.getElementById('cleanupOutput').textContent = JSON.stringify({
+                status: 'success',
+                cleanup: {
+                    id: 'CLEANUP-' + Date.now(),
+                    location: document.getElementById('cleanupLocation').value,
+                    weight: document.getElementById('cleanupWeight').value + ' kg',
+                    recyclableRatio: '85%',
+                    verificationStatus: 'VERIFIED'
+                },
+                message: currentLang === 'ko' ? '정화 기록 완료' : 'Cleanup recorded'
+            }, null, 2);
+        }
+
+        function issueCertificate() {
+            document.getElementById('recycleOutput').textContent = JSON.stringify({
+                status: 'success',
+                certificate: {
+                    id: 'CERT-' + Date.now(),
+                    materialRecycled: '5000 kg',
+                    carbonSaved: '5525 kg CO₂e (-65%)',
+                    rating: 'A+',
+                    issuedAt: new Date().toISOString(),
+                    validUntil: new Date(Date.now() + 365*24*60*60*1000).toISOString()
+                },
+                message: currentLang === 'ko' ? '인증서 발급 완료' : 'Certificate issued'
+            }, null, 2);
+        }
+
+        function showApiExample() { testApi(); }
+
+        function testApi() {
+            const examples = {
+                register: { method: 'POST', path: '/api/v1/batch', request: { material: 'PET', weight: 5000 }, response: { batchId: 'BATCH-xxx' } },
+                track: { method: 'GET', path: '/api/v1/batch/{id}', response: { journey: [], status: 'In Use' } },
+                cleanup: { method: 'POST', path: '/api/v1/cleanup', request: { location: 'pacific', weight: 12500 }, response: { verified: true } },
+                certificate: { method: 'POST', path: '/api/v1/certificate', response: { certId: 'CERT-xxx', rating: 'A+' } }
+            };
+            document.getElementById('apiOutput').textContent = JSON.stringify(examples[document.getElementById('apiEndpoint').value], null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setLang(localStorage.getItem('wiaLang') || 'en');
+            testApi();
+        });
+    </script>
+</body>
+</html>

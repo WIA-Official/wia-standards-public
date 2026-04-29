@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Alert APIs and Emergency Notification Systems</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #6366F1;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: var(--bg);
+        }
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+        th {
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+        }
+        .summary {
+            background: var(--bg);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+        .summary h3 {
+            color: var(--primary);
+            margin-top: 0;
+        }
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        .nav-links {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+        .nav-links a {
+            color: var(--primary);
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            border: 1px solid var(--primary);
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        .nav-links a:hover {
+            background: var(--primary);
+            color: white;
+        }
+        code {
+            background: var(--bg);
+            color: var(--primary);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+        }
+        pre code {
+            padding: 0;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+        .callout {
+            background: rgba(99, 102, 241, 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .questions {
+            background: var(--bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 2rem 0;
+        }
+        .questions ol {
+            margin-left: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: Alert APIs and Emergency Notification Systems</h1>
+
+        <p>When fall detection algorithms identify genuine fall events, rapid and reliable communication with emergency responders becomes critical for protecting seniors and minimizing injury consequences. The WIA-SENIOR-003 standard defines comprehensive alert APIs and emergency notification protocols ensuring fall alerts reach appropriate responders with complete incident information regardless of device manufacturer or monitoring service provider. This chapter explores alert data formats, notification delivery mechanisms, escalation protocols, responder interfaces, and the integration patterns that enable seamless emergency response coordination across diverse fall detection ecosystems.</p>
+
+        <h2>The WIA-SENIOR-003 Alert Data Format</h2>
+
+        <p>Standardized alert formatting ensures emergency responders receive comprehensive, consistent incident information regardless of which fall detection device generated the alert. The WIA alert format balances completeness (providing all information responders need) with simplicity (enabling rapid parsing and display). All WIA-compliant devices must generate alerts conforming to this standard format when falls are detected.</p>
+
+        <h3>Core Alert Fields</h3>
+
+        <p>Every fall alert contains mandatory fields providing essential incident information. The alert ID uniquely identifies each incident, enabling tracking across multiple notification attempts and preventing duplicate responses. Timestamp fields capture both when the fall occurred and when the alert was generated, critical for understanding response timelines. Device and user identifiers link alerts to specific individuals and their medical records.</p>
+
+        <p>Fall characteristics fields describe the detected event: confidence level (algorithmic certainty that a fall occurred), impact magnitude (severity indicator), and detected fall type when algorithms can classify the specific fall pattern. Location information, when available, dramatically improves response efficiency by directing emergency services to the exact incident location rather than requiring searches of multi-room facilities or outdoor areas.</p>
+
+        <pre><code>// WIA-SENIOR-003 Standard Alert Format
+interface FallAlert {
+  // Identification and timing
+  alertId: string;                    // UUID for this specific alert
+  deviceId: string;                   // Unique device identifier
+  userId: string;                     // User identifier
+  fallTimestamp: number;              // Fall detection time (Unix ms)
+  alertTimestamp: number;             // Alert generation time (Unix ms)
+
+  // Fall characteristics
+  confidence: number;                 // 0-1 detection confidence
+  impactMagnitude: number;            // Peak acceleration in g
+  fallType?: 'forward' | 'backward' | 'lateral' | 'syncope' | 'unknown';
+
+  // Location information
+  location?: {
+    latitude?: number;
+    longitude?: number;
+    accuracy?: number;                // meters
+    address?: string;
+    floor?: number;
+    room?: string;
+    indoorLocation?: string;
+  };
+
+  // User information
+  userProfile: {
+    name: string;
+    age: number;
+    emergencyContacts: Contact[];
+    medicalInfo?: {
+      conditions: string[];
+      medications: string[];
+      allergies: string[];
+      bloodType?: string;
+      dnr?: boolean;                  // Do Not Resuscitate status
+    };
+    language: string;                 // ISO 639-1 code
+  };
+
+  // Device status
+  deviceStatus: {
+    batteryLevel: number;             // 0-100 percentage
+    signalStrength?: number;          // dBm or percentage
+    lastCheckin: number;              // Last device communication (Unix ms)
+  };
+
+  // Audio/video (if available)
+  audioStreamUrl?: string;            // Real-time audio from device
+  videoStreamUrl?: string;            // Camera feed if available
+
+  // Alert metadata
+  alertPriority: 'low' | 'medium' | 'high' | 'critical';
+  requiresAcknowledgment: boolean;
+  escalationPolicy?: string;          // ID of escalation policy
+  notificationHistory: NotificationAttempt[];
+}</code></pre>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 4.1: Alert Priority Levels</caption>
+            <thead>
+                <tr>
+                    <th>Priority</th>
+                    <th>Criteria</th>
+                    <th>Response Target</th>
+                    <th>Escalation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Low</td>
+                    <td>Low confidence (60-75%), user mobile</td>
+                    <td>5-10 minutes</td>
+                    <td>After 10 min</td>
+                </tr>
+                <tr>
+                    <td>Medium</td>
+                    <td>Medium confidence (75-85%), normal falls</td>
+                    <td>3-5 minutes</td>
+                    <td>After 5 min</td>
+                </tr>
+                <tr>
+                    <td>High</td>
+                    <td>High confidence (85-95%), high impact</td>
+                    <td>1-3 minutes</td>
+                    <td>After 3 min</td>
+                </tr>
+                <tr>
+                    <td>Critical</td>
+                    <td>Very high confidence (>95%), severe impact, no movement</td>
+                    <td><1 minute</td>
+                    <td>After 2 min</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Notification Delivery Mechanisms</h2>
+
+        <p>The WIA-SENIOR-003 standard defines multiple notification delivery channels ensuring alerts reach responders even when primary channels fail. Redundant multi-channel notification dramatically improves reliability compared to single-channel approaches, critical for life-safety applications where communication failures can have fatal consequences.</p>
+
+        <h3>Push Notifications</h3>
+
+        <p>Mobile push notifications provide immediate alert delivery to family caregivers and professional monitoring personnel through smartphone applications. Push notifications typically arrive within 1-3 seconds of alert generation, making them the fastest notification method. Modern push services (Apple Push Notification Service, Firebase Cloud Messaging) achieve >99.5% delivery reliability under normal network conditions.</p>
+
+        <p>Fall detection applications register with push notification services during installation, obtaining device tokens that identify specific smartphone installations. When falls occur, the fall detection backend sends notifications through these services, which handle delivery to devices regardless of network type or location. Rich push notifications can include alert details, location maps, and action buttons enabling immediate two-way communication.</p>
+
+        <h3>SMS and Voice Calls</h3>
+
+        <p>SMS text messages and automated voice calls provide alternative notification channels when smartphone applications aren't available or push delivery fails. SMS messages reach basic mobile phones without requiring app installation, important for elderly family members who may not use smartphones. Voice calls ensure notification even for users who might miss visual alerts.</p>
+
+        <p>The WIA standard specifies automated voice message format and content requirements. Messages clearly identify the nature of the alert, the affected person's name, approximate location, and actions the recipient should take. Text-to-speech systems support multiple languages based on user profiles, ensuring comprehension regardless of responder language.</p>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 4.2: Notification Channel Comparison</caption>
+            <thead>
+                <tr>
+                    <th>Channel</th>
+                    <th>Delivery Time</th>
+                    <th>Reliability</th>
+                    <th>Rich Content</th>
+                    <th>Two-Way</th>
+                    <th>Requirements</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Push Notification</td>
+                    <td>1-3 seconds</td>
+                    <td>99.5%</td>
+                    <td>Yes</td>
+                    <td>Yes</td>
+                    <td>Smartphone app</td>
+                </tr>
+                <tr>
+                    <td>SMS</td>
+                    <td>5-30 seconds</td>
+                    <td>98%</td>
+                    <td>Limited</td>
+                    <td>Yes</td>
+                    <td>Mobile phone</td>
+                </tr>
+                <tr>
+                    <td>Voice Call</td>
+                    <td>10-45 seconds</td>
+                    <td>95%</td>
+                    <td>No</td>
+                    <td>Yes</td>
+                    <td>Any phone</td>
+                </tr>
+                <tr>
+                    <td>Email</td>
+                    <td>10-120 seconds</td>
+                    <td>99%</td>
+                    <td>Yes</td>
+                    <td>Yes</td>
+                    <td>Email access</td>
+                </tr>
+                <tr>
+                    <td>API Webhook</td>
+                    <td>1-5 seconds</td>
+                    <td>99.9%</td>
+                    <td>Yes</td>
+                    <td>Yes</td>
+                    <td>Server integration</td>
+                </tr>
+                <tr>
+                    <td>911/Emergency</td>
+                    <td>5-60 seconds</td>
+                    <td>99%</td>
+                    <td>Limited</td>
+                    <td>Yes</td>
+                    <td>Certified integration</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>API Webhooks and System Integration</h3>
+
+        <p>For professional monitoring centers and integrated care facilities, API webhooks enable real-time alert delivery directly into monitoring dashboards and electronic health record systems. Webhooks push alert data to pre-configured HTTPS endpoints immediately when falls are detected, triggering automated workflows and updating centralized monitoring displays.</p>
+
+        <p>The WIA-SENIOR-003 webhook format uses standard HTTPS POST requests with JSON payloads containing the complete alert structure. Monitoring systems acknowledge receipt by returning HTTP 200 status codes, enabling the fall detection system to track successful deliveries and retry failed attempts. Webhook security requires mutual TLS authentication and request signing preventing unauthorized access to sensitive health information.</p>
+
+        <pre><code>// WIA-SENIOR-003 Webhook Integration
+class AlertNotificationService {
+  async notifyFall(alert: FallAlert): Promise<void> {
+    const notificationTasks = [];
+
+    // 1. Notify primary contacts via push notifications
+    for (const contact of alert.userProfile.emergencyContacts.filter(c => c.isPrimary)) {
+      notificationTasks.push(
+        this.sendPushNotification(contact.pushTokens, {
+          title: `Fall Detected: ${alert.userProfile.name}`,
+          body: `Fall detected at ${this.formatLocation(alert.location)}`,
+          data: alert,
+          priority: 'high',
+          sound: 'emergency.wav',
+          actions: [
+            { id: 'acknowledge', title: 'I\'m Responding' },
+            { id: 'call911', title: 'Call 911' },
+            { id: 'false', title: 'False Alarm' }
+          ]
+        })
+      );
+    }
+
+    // 2. Send SMS to contacts without app
+    for (const contact of alert.userProfile.emergencyContacts.filter(c => !c.hasApp)) {
+      notificationTasks.push(
+        this.sendSMS(contact.phone,
+          `FALL ALERT: ${alert.userProfile.name} has fallen at ` +
+          `${this.formatLocation(alert.location)}. ` +
+          `Respond immediately or call ${this.emergencyNumber}.`)
+      );
+    }
+
+    // 3. Voice call for critical alerts
+    if (alert.alertPriority === 'critical') {
+      for (const contact of alert.userProfile.emergencyContacts.slice(0, 2)) {
+        notificationTasks.push(
+          this.initiateVoiceCall(contact.phone, {
+            message: `This is an emergency alert. ${alert.userProfile.name} ` +
+                    `has experienced a severe fall and requires immediate assistance. ` +
+                    `Location: ${this.formatLocation(alert.location)}. ` +
+                    `Press 1 to acknowledge, press 2 to call emergency services.`,
+            language: alert.userProfile.language
+          })
+        );
+      }
+    }
+
+    // 4. Webhook to monitoring center
+    if (this.config.monitoringCenterWebhook) {
+      notificationTasks.push(
+        this.sendWebhook(this.config.monitoringCenterWebhook, alert)
+      );
+    }
+
+    // 5. Emergency services integration (if configured and criteria met)
+    if (this.shouldNotifyEmergencyServices(alert)) {
+      notificationTasks.push(
+        this.notifyEmergencyServices(alert)
+      );
+    }
+
+    // Execute all notifications in parallel
+    const results = await Promise.allSettled(notificationTasks);
+
+    // Log notification outcomes
+    alert.notificationHistory = results.map((result, index) => ({
+      timestamp: Date.now(),
+      channel: this.getChannelName(index),
+      status: result.status,
+      error: result.status === 'rejected' ? result.reason : undefined
+    }));
+
+    // Trigger escalation if critical notifications failed
+    const criticalFailures = results.filter((r, i) =>
+      r.status === 'rejected' && this.isCriticalChannel(i)
+    );
+
+    if (criticalFailures.length > 0) {
+      await this.escalateAlert(alert);
+    }
+  }
+
+  private async sendWebhook(url: string, alert: FallAlert): Promise<void> {
+    const signature = this.signPayload(alert, this.config.webhookSecret);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-WIA-Signature': signature,
+        'X-WIA-Timestamp': Date.now().toString(),
+        'X-WIA-Alert-Priority': alert.alertPriority
+      },
+      body: JSON.stringify(alert),
+      timeout: 5000
+    });
+
+    if (!response.ok) {
+      throw new Error(`Webhook delivery failed: ${response.status}`);
+    }
+  }
+}</code></pre>
+
+        <h2>Escalation Protocols</h2>
+
+        <p>Escalation protocols ensure emergency response even when primary notification recipients don't acknowledge alerts within acceptable timeframes. The WIA-SENIOR-003 standard defines escalation frameworks that balance rapid response with avoiding excessive false alarm responses.</p>
+
+        <h3>Time-Based Escalation</h3>
+
+        <p>Time-based escalation automatically expands the notification circle when initial recipients don't acknowledge alerts within specified periods. For high-priority falls, the system might notify primary contacts immediately, then escalate to secondary contacts after 2 minutes without acknowledgment, then to monitoring services after 5 minutes, and finally to emergency services after 10 minutes if no response occurs.</p>
+
+        <p>Escalation timelines vary based on alert priority, with critical alerts escalating much faster than low-priority notifications. Users configure escalation policies during system setup, defining contact sequences, timeout periods, and escalation endpoints that match their specific care situations and preferences.</p>
+
+        <h3>Response-Based Escalation</h3>
+
+        <p>Response-based escalation adapts notification strategies based on recipient actions. When primary contacts acknowledge alerts but indicate they cannot respond immediately, the system automatically escalates to alternative responders without waiting for full timeout periods. If recipients mark alerts as false alarms, escalation halts and the incident is logged for algorithm tuning.</p>
+
+        <p>Two-way communication enables sophisticated response tracking. Responders can indicate their estimated arrival time, request additional information, or coordinate with other responders through the notification interface. This coordination prevents duplicate responses (multiple family members rushing to help) while ensuring someone actually assists the fallen person.</p>
+
+        <div class="callout">
+            <strong>WIA-SENIOR-003 Escalation Philosophy - 弘益人間:</strong> The standard's escalation framework embodies 弘益人間 by ensuring no fall victim remains unassisted regardless of their social situation. Even isolated seniors without family contacts benefit from automatic professional monitoring and emergency service notification, while those with extensive support networks enjoy coordinated family response. Universal protection through standardized protocols benefits all humanity.
+        </div>
+
+        <h2>Monitoring Center Integration</h2>
+
+        <p>Professional monitoring centers provide 24/7 emergency response services for seniors who lack family support nearby or prefer professional assistance. The WIA-SENIOR-003 standard defines monitoring center integration protocols enabling fall detection devices from any manufacturer to work with any monitoring service, preventing vendor lock-in while ensuring consistent service quality.</p>
+
+        <h3>Monitoring Center Responsibilities</h3>
+
+        <p>When monitoring centers receive fall alerts, trained operators follow standardized response protocols. They attempt two-way communication with the fallen person through device speakers and microphones, assessing consciousness, injury severity, and immediate needs. Based on this assessment and pre-established user instructions, operators dispatch appropriate assistance: family members for minor falls, medical professionals for injuries requiring treatment, or emergency services for life-threatening situations.</p>
+
+        <p>Monitoring centers maintain comprehensive user profiles including medical histories, medication lists, emergency contact information, and response preferences. This information guides operator decision-making and gets communicated to emergency responders, ensuring appropriate care even for unconscious or cognitively impaired individuals who cannot communicate their needs.</p>
+
+        <h3>Certification Requirements</h3>
+
+        <p>The WIA standard establishes monitoring center certification requirements ensuring consistent service quality. Certified centers must maintain specified operator training levels, response time guarantees (acknowledgment within 30 seconds, assessment within 2 minutes), backup systems preventing outages, and regular auditing of response protocols. Certification provides users confidence that any WIA-certified monitoring service will deliver appropriate emergency response regardless of provider.</p>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">Table 4.3: WIA Monitoring Center Certification Requirements</caption>
+            <thead>
+                <tr>
+                    <th>Requirement Category</th>
+                    <th>Minimum Standard</th>
+                    <th>Verification Method</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Response Time (Initial)</td>
+                    <td>Alert acknowledgment <30 seconds</td>
+                    <td>Automated monitoring, quarterly audit</td>
+                </tr>
+                <tr>
+                    <td>Response Time (Assessment)</td>
+                    <td>Two-way communication <2 minutes</td>
+                    <td>Random call review, user surveys</td>
+                </tr>
+                <tr>
+                    <td>Operator Training</td>
+                    <td>40 hours initial + 8 hours annual</td>
+                    <td>Training records review</td>
+                </tr>
+                <tr>
+                    <td>System Redundancy</td>
+                    <td>99.95% uptime, zero data loss</td>
+                    <td>System monitoring, incident reports</td>
+                </tr>
+                <tr>
+                    <td>Security Compliance</td>
+                    <td>HIPAA, SOC 2, ISO 27001</td>
+                    <td>Third-party audits annually</td>
+                </tr>
+                <tr>
+                    <td>Language Support</td>
+                    <td>English + 10 languages minimum</td>
+                    <td>Operator assessment, test calls</td>
+                </tr>
+                <tr>
+                    <td>False Alarm Handling</td>
+                    <td>User-friendly cancellation <1 min</td>
+                    <td>User satisfaction surveys</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Emergency Services Integration</h2>
+
+        <p>Direct integration with 911/emergency medical services represents the ultimate escalation for severe falls requiring immediate professional medical response. The WIA-SENIOR-003 standard defines emergency service integration protocols enabling automatic 911 notification with comprehensive incident information when warranted by fall severity, user medical conditions, or lack of other responder availability.</p>
+
+        <h3>Automatic 911 Notification</h3>
+
+        <p>Automatic emergency service notification requires careful implementation balancing rapid response for genuine emergencies against avoiding false alarm dispatches that waste emergency resources. The WIA standard specifies criteria that should trigger automatic 911 calls: very high confidence falls (>95%) with severe impact, falls where the user doesn't respond to communication attempts within 60 seconds, or falls affecting users with pre-specified medical conditions requiring immediate professional care.</p>
+
+        <p>Emergency service integration uses specialized APIs and telecommunication services certified for E911 communication. These systems transmit caller location, callback numbers, and incident details to emergency dispatchers, enabling appropriate response even before emergency personnel arrive. Enhanced 911 protocols provide dispatchers with user medical information, improving response appropriateness and potentially life-saving treatment.</p>
+
+        <h3>Liability and Regulatory Considerations</h3>
+
+        <p>Automatic emergency service notification creates complex liability questions. What happens if the system calls 911 for a false alarm? What liability exists if the system fails to call 911 for a severe fall? The WIA standard addresses these concerns through comprehensive documentation requirements, user consent processes, and system reliability specifications that establish reasonable care standards for automatic emergency notification systems.</p>
+
+        <p>Regulatory requirements vary significantly across jurisdictions. Some regions prohibit automatic 911 calls without explicit user action, while others encourage or require such capabilities for medical alert systems. WIA-compliant devices and services must adapt to local regulations while maintaining standardized alerting protocols for international interoperability. The standard defines configuration parameters enabling regulatory compliance across diverse legal frameworks.</p>
+
+        <div class="summary">
+            <h3>Key Takeaways</h3>
+            <ol>
+                <li>The WIA-SENIOR-003 standard alert format ensures comprehensive, consistent incident information reaches emergency responders regardless of device manufacturer, including fall characteristics, location, user medical history, and device status for effective response coordination.</li>
+                <li>Multi-channel notification delivery (push notifications, SMS, voice calls, webhooks, emergency services) provides redundant communication paths ensuring alerts reach responders even when primary channels fail, critical for life-safety applications where communication failures can be fatal.</li>
+                <li>Push notifications deliver alerts within 1-3 seconds with >99.5% reliability, making them the fastest notification method, while SMS and voice calls provide fallback channels for users without smartphones or when app-based delivery fails.</li>
+                <li>Escalation protocols automatically expand notification circles when primary recipients don't acknowledge alerts, with time-based escalation (e.g., secondary contacts after 2 minutes, monitoring after 5 minutes, emergency services after 10 minutes) ensuring response even for isolated seniors.</li>
+                <li>WIA monitoring center certification requires <30 second alert acknowledgment, <2 minute two-way communication, 40+ hours initial operator training, 99.95% uptime, and comprehensive security compliance, ensuring consistent professional response quality across all certified providers.</li>
+                <li>Emergency services integration enables automatic 911 notification for severe falls meeting specified criteria (>95% confidence, severe impact, no user response), balanced against false alarm prevention through sophisticated triggering logic and user consent processes that comply with varying regional regulations.</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Describe the core fields in the WIA-SENIOR-003 alert format. Why is standardized formatting important for emergency response, and what specific information do responders need to provide appropriate assistance?</li>
+                <li>Compare the delivery time, reliability, and capabilities of different notification channels based on Table 4.2. Why does the standard specify multi-channel notification rather than relying on a single "best" channel?</li>
+                <li>Explain how time-based escalation protocols work. For a high-priority fall alert, describe the typical escalation sequence including timing and recipient groups at each escalation level.</li>
+                <li>What is response-based escalation, and how does it improve upon pure time-based escalation? Provide an example scenario where response-based escalation prevents delayed assistance.</li>
+                <li>Analyze the WIA monitoring center certification requirements in Table 4.3. Why does the standard mandate specific response time guarantees (<30s acknowledgment, <2min communication) rather than allowing centers to set their own performance targets?</li>
+                <li>Discuss the criteria that should trigger automatic 911 notification. How does the standard balance rapid emergency response for severe falls against avoiding false alarm dispatches that waste emergency resources?</li>
+                <li>Explain how the WIA-SENIOR-003 alert API embodies the 弘益人間 (Benefit All Humanity) philosophy. How do standardized protocols ensure emergency response for all seniors regardless of their social support situation or economic status?</li>
+            </ol>
+        </div>
+
+        <div class="callout">
+            <h3>Looking Ahead</h3>
+            <p>Chapter 5 examines emergency response protocols and integration with caregiving systems. We explore the procedures monitoring centers and family responders follow when receiving fall alerts, coordination between multiple responders, integration with electronic health records, and the communication tools that enable effective emergency response. Understanding these protocols completes the emergency response chain from fall detection through notification to actual assistance delivery.</p>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-03.html">← Previous Chapter</a>
+            <a href="chapter-05.html">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

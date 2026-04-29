@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: Phase 2 API 인터페이스 - WIA-ART-011</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #F59E0B; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; box-shadow: 0 10px 40px rgba(245, 158, 11, 0.1); }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; text-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        p { margin: 1rem 0; text-align: justify; color: var(--text-secondary); }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; color: var(--text-secondary); }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .philosophy { text-align: center; font-size: 1.5rem; color: var(--primary); margin: 2rem 0; padding: 1rem; background: rgba(245, 158, 11, 0.1); border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: rgba(245, 158, 11, 0.05); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; font-weight: bold; transition: all 0.3s; }
+        .btn:hover { background: #d97706; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(245, 158, 11, 0.3); }
+        .key-takeaways { background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.05) 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; border: 2px solid rgba(245, 158, 11, 0.3); }
+        .key-takeaways h3 { margin-top: 0; }
+        .review-questions { background: rgba(245, 158, 11, 0.05); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; }
+        .review-questions h3 { margin-top: 0; }
+        .review-questions ol { margin-left: 1.5rem; }
+        .review-questions li { margin: 1rem 0; line-height: 1.6; }
+        strong { color: var(--primary); }
+        code { background: var(--bg-tertiary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 0.9em; }
+        pre { background: var(--bg-tertiary); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; padding: 0; }
+        .case-study { background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10b981; padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제5장: Phase 2 - API 인터페이스</h1>
+
+        <div class="philosophy">
+            弘益人間 · 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>개요</h2>
+        <p>
+            Phase 1이 데이터의 "언어"를 정의했다면, Phase 2 API Interface는 그 언어로 "대화"하는 방법을 정의합니다.
+            파일 교환만으로는 진정한 상호운용성을 달성할 수 없습니다—개발자가 가상 전시를 프로그래밍 방식으로
+            생성, 수정, 쿼리, 렌더링할 수 있어야 합니다.
+        </p>
+
+        <p>
+            WIA Phase 2는 세 가지 주요 구성 요소를 제공합니다:
+        </p>
+        <ul>
+            <li><strong>RESTful API:</strong> HTTP 기반의 표준 엔드포인트</li>
+            <li><strong>SDK (Software Development Kits):</strong> JavaScript, Python, C# 라이브러리</li>
+            <li><strong>WebXR API 통합:</strong> 브라우저 기반 VR/AR 경험</li>
+        </ul>
+
+        <h2>REST API 아키텍처</h2>
+
+        <h3>핵심 엔드포인트</h3>
+        <p>
+            WIA-ART-011 REST API는 리소스 중심 설계를 따르며, 표준 HTTP 메서드를 사용합니다:
+        </p>
+
+        <pre><code>Base URL: https://api.wia.org/art-011/v1
+
+# 전시 관리
+GET    /exhibitions                    # 전시 목록
+GET    /exhibitions/{id}               # 전시 상세
+POST   /exhibitions                    # 전시 생성
+PUT    /exhibitions/{id}               # 전시 업데이트
+DELETE /exhibitions/{id}               # 전시 삭제
+
+# 작품 관리
+GET    /exhibitions/{id}/artworks      # 전시 내 작품 목록
+GET    /artworks/{id}                  # 작품 상세
+POST   /artworks                       # 작품 추가
+PUT    /artworks/{id}                  # 작품 수정
+DELETE /artworks/{id}                  # 작품 삭제
+
+# 3D 씬 관리
+GET    /exhibitions/{id}/scenes        # 갤러리 씬 목록
+POST   /scenes                         # 씬 업로드
+GET    /scenes/{id}/gltf               # GLTF 다운로드
+
+# 메타데이터 쿼리
+GET    /artworks/search?q={query}      # 작품 검색
+GET    /artists/{id}                   # 아티스트 정보
+GET    /artworks/{id}/provenance       # 출처 정보
+
+# 렌더링 및 미리보기
+GET    /exhibitions/{id}/preview       # 미리보기 이미지
+GET    /artworks/{id}/thumbnail        # 썸네일
+POST   /exhibitions/{id}/render        # 렌더링 요청
+</code></pre>
+
+        <h3>인증: OAuth 2.0</h3>
+        <p>
+            API 접근은 OAuth 2.0 프로토콜로 보호됩니다. 두 가지 플로우를 지원합니다:
+        </p>
+
+        <pre><code># 1. Authorization Code Flow (웹 앱)
+# 사용자를 인증 페이지로 리다이렉트
+https://auth.wia.org/oauth/authorize?
+    response_type=code&
+    client_id=YOUR_CLIENT_ID&
+    redirect_uri=https://yourapp.com/callback&
+    scope=exhibitions:read exhibitions:write
+
+# 콜백에서 인증 코드 받기
+# 코드를 액세스 토큰으로 교환
+POST https://auth.wia.org/oauth/token
+Content-Type: application/json
+
+{
+  "grant_type": "authorization_code",
+  "code": "AUTHORIZATION_CODE",
+  "client_id": "YOUR_CLIENT_ID",
+  "client_secret": "YOUR_CLIENT_SECRET",
+  "redirect_uri": "https://yourapp.com/callback"
+}
+
+# 응답
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "tGzv3JOkF0XG5Qx2TlKWIA",
+  "scope": "exhibitions:read exhibitions:write"
+}
+
+# 2. Client Credentials Flow (서버 간 통신)
+POST https://auth.wia.org/oauth/token
+Content-Type: application/json
+
+{
+  "grant_type": "client_credentials",
+  "client_id": "YOUR_CLIENT_ID",
+  "client_secret": "YOUR_CLIENT_SECRET",
+  "scope": "exhibitions:read"
+}
+</code></pre>
+
+        <h3>API 사용 예시: 전시 조회</h3>
+        <pre><code># 전시 목록 가져오기
+GET https://api.wia.org/art-011/v1/exhibitions
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+# 응답
+{
+  "data": [
+    {
+      "id": "exh-123",
+      "title": "Impressionism: Light and Color",
+      "curator": "Dr. Sophie Monet",
+      "artworksCount": 45,
+      "created": "2024-01-15T10:00:00Z",
+      "status": "published",
+      "url": "https://api.wia.org/art-011/v1/exhibitions/exh-123"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "perPage": 20,
+    "total": 156,
+    "totalPages": 8
+  }
+}
+
+# 전시 상세 정보
+GET https://api.wia.org/art-011/v1/exhibitions/exh-123
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+# 응답 (완전한 manifest.json 포함)
+{
+  "id": "exh-123",
+  "standard": "WIA-ART-011",
+  "version": "1.0",
+  "exhibition": {
+    "title": {"en": "Impressionism: Light and Color"},
+    "description": {"en": "A comprehensive exhibition..."},
+    ...
+  },
+  "venue": {...},
+  "artworks": [...],
+  "downloadUrl": "https://cdn.wia.org/exhibitions/exh-123.wex"
+}
+</code></pre>
+
+        <h2>JavaScript SDK</h2>
+
+        <h3>설치 및 초기화</h3>
+        <pre><code># npm으로 설치
+npm install @wia/art-011
+
+# 또는 yarn
+yarn add @wia/art-011
+
+# 또는 CDN (브라우저)
+&lt;script src="https://cdn.wia.org/sdk/art-011/v1/wia-art-011.min.js"&gt;&lt;/script&gt;
+</code></pre>
+
+        <pre><code>// ES6 모듈
+import { WIAClient, WIAGallery } from '@wia/art-011';
+
+// 클라이언트 초기화
+const client = new WIAClient({
+  apiKey: 'YOUR_API_KEY',
+  // 또는 OAuth 토큰
+  accessToken: 'YOUR_ACCESS_TOKEN'
+});
+</code></pre>
+
+        <h3>전시 로드 및 렌더링</h3>
+        <pre><code>// 전시 로드
+const exhibition = await client.exhibitions.get('exh-123');
+
+// 갤러리 뷰어 생성
+const gallery = new WIAGallery({
+  container: '#viewer-container',
+  vr: true,
+  ar: false,
+  quality: 'high',
+  controls: {
+    walk: true,
+    teleport: true,
+    fly: false
+  }
+});
+
+// 전시 렌더링
+await gallery.present(exhibition);
+
+// 이벤트 리스너
+gallery.on('ready', () => {
+  console.log('Gallery loaded');
+});
+
+gallery.on('artworkClick', (artwork) => {
+  console.log(`Clicked: ${artwork.title}`);
+  gallery.showArtworkDetails(artwork);
+});
+
+gallery.on('teleport', (position) => {
+  console.log(`Teleported to: ${position}`);
+});
+</code></pre>
+
+        <h3>작품 검색 및 필터링</h3>
+        <pre><code>// 텍스트 검색
+const results = await client.artworks.search({
+  q: 'Monet',
+  fields: ['title', 'artist', 'description'],
+  limit: 20
+});
+
+// 필터링
+const impressionistWorks = await client.artworks.list({
+  filter: {
+    tags: ['impressionism'],
+    yearMin: 1860,
+    yearMax: 1900,
+    medium: 'oil-on-canvas'
+  },
+  sort: 'year',
+  order: 'desc'
+});
+
+// 고급 쿼리
+const artworks = await client.artworks.query({
+  where: {
+    and: [
+      { artist: 'Claude Monet' },
+      { year: { gte: 1870, lte: 1880 } },
+      { tags: { contains: 'landscape' } }
+    ]
+  },
+  include: ['provenance', 'exhibitions'],
+  limit: 50
+});
+</code></pre>
+
+        <h3>실시간 전시 편집</h3>
+        <pre><code>// 새 전시 생성
+const newExhibition = await client.exhibitions.create({
+  title: { en: 'My Virtual Gallery' },
+  description: { en: 'A personal collection' },
+  curator: {
+    name: 'John Doe',
+    email: 'john@example.com'
+  }
+});
+
+// 작품 추가
+const artwork = await client.artworks.create({
+  title: 'Starry Night',
+  artist: 'Vincent van Gogh',
+  year: 1889,
+  image: await uploadFile('starry-night.jpg'),
+  position: {
+    wall: 'north',
+    coordinates: [0, 1.5, -10]
+  }
+});
+
+// 전시에 작품 연결
+await client.exhibitions.addArtwork(newExhibition.id, artwork.id);
+
+// 전시 게시
+await client.exhibitions.publish(newExhibition.id);
+</code></pre>
+
+        <h2>Python SDK</h2>
+
+        <h3>설치 및 사용</h3>
+        <pre><code># pip으로 설치
+pip install wia-art-011
+
+# Python 코드
+from wia_art_011 import WIAClient, WIAGallery
+
+# 클라이언트 초기화
+client = WIAClient(api_key='YOUR_API_KEY')
+
+# 전시 조회
+exhibition = client.exhibitions.get('exh-123')
+
+# 작품 목록
+artworks = client.artworks.list(
+    filter={'artist': 'Claude Monet'},
+    limit=50
+)
+
+# 각 작품 처리
+for artwork in artworks:
+    print(f"{artwork.title} ({artwork.year})")
+    print(f"  Medium: {artwork.medium}")
+    print(f"  Dimensions: {artwork.dimensions}")
+    
+# 데이터 분석 (pandas 통합)
+import pandas as pd
+
+df = client.artworks.to_dataframe(
+    filter={'tags': ['impressionism']},
+    fields=['title', 'artist', 'year', 'medium']
+)
+
+# 통계
+print(df.groupby('artist')['title'].count())
+print(df['year'].describe())
+</code></pre>
+
+        <h3>배치 작업</h3>
+        <pre><code># 대량 작품 업로드
+artworks_data = pd.read_csv('artworks.csv')
+
+for index, row in artworks_data.iterrows():
+    artwork = client.artworks.create({
+        'title': row['title'],
+        'artist': row['artist'],
+        'year': int(row['year']),
+        'image': client.upload_file(row['image_path']),
+        'metadata': {
+            'medium': row['medium'],
+            'dimensions': row['dimensions']
+        }
+    })
+    print(f"Created: {artwork.id}")
+
+# 진행 상황 추적
+from tqdm import tqdm
+
+with tqdm(total=len(artworks_data)) as pbar:
+    for index, row in artworks_data.iterrows():
+        # ... 업로드 ...
+        pbar.update(1)
+</code></pre>
+
+        <h2>GraphQL API (선택적)</h2>
+
+        <p>
+            복잡한 데이터 요구사항을 위해 WIA는 GraphQL 엔드포인트도 제공합니다:
+        </p>
+
+        <pre><code># GraphQL 엔드포인트
+POST https://api.wia.org/art-011/v1/graphql
+Content-Type: application/json
+Authorization: Bearer YOUR_ACCESS_TOKEN
+
+# 쿼리 예시
+{
+  "query": "
+    query GetExhibitionWithArtworks($id: ID!) {
+      exhibition(id: $id) {
+        id
+        title
+        curator {
+          name
+          institution
+        }
+        artworks {
+          edges {
+            node {
+              id
+              title
+              artist {
+                name
+                nationality
+                birthYear
+              }
+              image {
+                url
+                width
+                height
+              }
+              provenance {
+                blockchain
+                contractAddress
+                tokenId
+              }
+            }
+          }
+        }
+        statistics {
+          totalArtworks
+          totalVisitors
+          averageVisitDuration
+        }
+      }
+    }
+  ",
+  "variables": {
+    "id": "exh-123"
+  }
+}
+
+# 뮤테이션 (데이터 수정)
+{
+  "query": "
+    mutation CreateArtwork($input: ArtworkInput!) {
+      createArtwork(input: $input) {
+        id
+        title
+        createdAt
+      }
+    }
+  ",
+  "variables": {
+    "input": {
+      "title": "Starry Night",
+      "artist": "Vincent van Gogh",
+      "year": 1889
+    }
+  }
+}
+</code></pre>
+
+        <h2>WebXR API 통합</h2>
+
+        <h3>브라우저 기반 VR</h3>
+        <p>
+            WIA SDK는 W3C WebXR Device API와 완벽히 통합되어 VR 헤드셋 없이도 브라우저에서 VR 전시를 경험할 수 있습니다:
+        </p>
+
+        <pre><code>// WebXR 지원 확인
+if (navigator.xr) {
+  const vr supported = await navigator.xr.isSessionSupported('immersive-vr');
+  const arSupported = await navigator.xr.isSessionSupported('immersive-ar');
+  
+  console.log(`VR: ${vrSupported}, AR: ${arSupported}`);
+}
+
+// VR 세션 시작
+const gallery = new WIAGallery({
+  container: '#viewer',
+  xr: {
+    mode: 'immersive-vr',
+    requiredFeatures: ['local-floor'],
+    optionalFeatures: ['hand-tracking', 'eye-tracking']
+  }
+});
+
+await gallery.present(exhibition);
+
+// VR 모드 진입
+document.getElementById('enter-vr').addEventListener('click', async () => {
+  await gallery.enterVR();
+});
+
+// AR 모드 (모바일)
+document.getElementById('enter-ar').addEventListener('click', async () => {
+  await gallery.enterAR({
+    hitTest: true,  // 바닥 감지
+    anchors: true   // 공간 앵커
+  });
+});
+</code></pre>
+
+        <h3>컨트롤러 및 제스처</h3>
+        <pre><code>// VR 컨트롤러 이벤트
+gallery.on('controller.trigger', (controller) => {
+  const artwork = gallery.getIntersectedArtwork(controller);
+  if (artwork) {
+    gallery.highlightArtwork(artwork);
+  }
+});
+
+// 핸드 트래킹
+gallery.on('hand.pinch', (hand, position) => {
+  if (hand.isNear(artwork)) {
+    gallery.selectArtwork(artwork);
+  }
+});
+
+// 시선 추적 (옵션)
+gallery.on('gaze.dwell', (artwork, duration) => {
+  if (duration > 2000) {  // 2초 이상 응시
+    gallery.showArtworkInfo(artwork);
+  }
+});
+</code></pre>
+
+        <div class="case-study">
+            <h3>사례 연구: 테이트 모던의 SDK 통합</h3>
+            <p>
+                2024년, 테이트 모던은 WIA JavaScript SDK를 자체 웹사이트에 통합하여 100개 이상의 현대 미술 작품을
+                가상 전시로 제공했습니다. 프로젝트는 두 명의 프론트엔드 개발자가 3주 만에 완료했습니다.
+            </p>
+            <p><strong>기술 스택:</strong></p>
+            <ul>
+                <li>React 18 + TypeScript</li>
+                <li>@wia/art-011 SDK</li>
+                <li>Three.js (SDK 내부 사용)</li>
+                <li>WebXR Device API</li>
+            </ul>
+            <p><strong>구현 결과:</strong></p>
+            <ul>
+                <li>개발 시간 80% 단축: 예상 12주 → 3주 (SDK 덕분)</li>
+                <li>코드 라인 90% 감소: 순수 Three.js 대비 10,000줄 → 1,000줄</li>
+                <li>VR 지원 추가에 단 2일 소요: WebXR 통합이 SDK에 내장</li>
+                <li>모바일 성능 우수: iPhone 12에서 60fps 유지</li>
+            </ul>
+            <p><strong>사용자 반응:</strong></p>
+            <ul>
+                <li>가상 전시 방문자 월 8,000명 → 120,000명 (1400% 증가)</li>
+                <li>평균 체류 시간 12분 (물리적 전시는 8분)</li>
+                <li>모바일 사용자 65% (SDK의 반응형 디자인)</li>
+            </ul>
+        </div>
+
+        <h2>API 성능 최적화</h2>
+
+        <h3>캐싱 전략</h3>
+        <pre><code>// SDK 자동 캐싱
+const client = new WIAClient({
+  apiKey: 'YOUR_API_KEY',
+  cache: {
+    enabled: true,
+    ttl: 3600,  // 1시간
+    storage: 'localStorage'  // 또는 'memory', 'indexedDB'
+  }
+});
+
+// 캐시 무효화
+client.cache.clear('exhibitions');
+
+// 조건부 요청 (HTTP 304)
+const exhibition = await client.exhibitions.get('exh-123', {
+  cache: 'default',  // 'no-cache', 'reload', 'force-cache'
+  headers: {
+    'If-None-Match': lastETag
+  }
+});
+</code></pre>
+
+        <h3>Progressive Loading</h3>
+        <pre><code>// 낮은 품질 먼저, 점진적 업그레이드
+const gallery = new WIAGallery({
+  container: '#viewer',
+  progressive: {
+    enabled: true,
+    lodLevels: ['low', 'medium', 'high', 'ultra'],
+    strategy: 'bandwidth-adaptive'  // 네트워크 속도에 따라 자동 조정
+  }
+});
+
+// 로딩 진행 상황
+gallery.on('loading.progress', (progress) => {
+  console.log(`Loading: ${progress.percent}%`);
+  document.getElementById('progress').value = progress.percent;
+});
+
+gallery.on('loading.complete', () => {
+  console.log('All assets loaded');
+});
+</code></pre>
+
+        <h3>Rate Limiting</h3>
+        <p>
+            WIA API는 공정한 사용을 보장하기 위해 rate limiting을 적용합니다:
+        </p>
+        <ul>
+            <li><strong>무료 티어:</strong> 1,000 요청/시간, 10,000 요청/일</li>
+            <li><strong>Bronze:</strong> 5,000 요청/시간, 50,000 요청/일</li>
+            <li><strong>Silver:</strong> 20,000 요청/시간, 200,000 요청/일</li>
+            <li><strong>Gold:</strong> 무제한 (공정 사용 정책 적용)</li>
+        </ul>
+
+        <pre><code>// Rate limit 정보는 응답 헤더에 포함
+X-RateLimit-Limit: 5000
+X-RateLimit-Remaining: 4823
+X-RateLimit-Reset: 1640995200
+
+// SDK는 자동으로 rate limit을 처리
+const client = new WIAClient({
+  apiKey: 'YOUR_API_KEY',
+  rateLimit: {
+    autoRetry: true,  // 429 응답 시 자동 재시도
+    maxRetries: 3,
+    backoff: 'exponential'  // 지수 백오프
+  }
+});
+</code></pre>
+
+        <div class="key-takeaways">
+            <h3>핵심 요점</h3>
+            <ul>
+                <li><strong>RESTful API:</strong> 리소스 중심 설계로 exhibitions, artworks, scenes 등을 HTTP 메서드로 조작하며, OAuth 2.0으로 보안을 보장합니다.</li>
+                <li><strong>JavaScript SDK:</strong> @wia/art-011 패키지로 전시 로드, 렌더링, 실시간 편집을 간단한 API로 제공하며, 테이트 모던은 3주 만에 통합했습니다.</li>
+                <li><strong>Python SDK:</strong> 데이터 분석과 배치 작업에 최적화되어 pandas 통합, 대량 업로드, 통계 분석을 지원합니다.</li>
+                <li><strong>GraphQL API:</strong> 복잡한 쿼리와 효율적인 데이터 페칭을 위해 선택적으로 제공하며, 중첩된 리소스를 한 번의 요청으로 가져올 수 있습니다.</li>
+                <li><strong>WebXR 통합:</strong> W3C WebXR Device API와 완벽 호환되어 브라우저에서 VR/AR 경험을 제공하며, 핸드 트래킹과 시선 추적도 지원합니다.</li>
+                <li><strong>성능 최적화:</strong> 자동 캐싱, Progressive Loading, Rate Limiting으로 효율성과 공정성을 보장하며, 모바일에서도 60fps를 유지합니다.</li>
+                <li><strong>개발자 경험:</strong> TypeScript 타입 정의, 상세한 에러 메시지, 풍부한 이벤트 시스템으로 개발 시간을 80% 단축하고 코드 라인을 90% 감소시킵니다.</li>
+                <li><strong>다중 언어 지원:</strong> JavaScript, Python, C# SDK를 제공하며, REST API는 모든 언어에서 사용 가능하여 생태계 확장을 촉진합니다.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li><strong>WIA-ART-011 REST API의 핵심 엔드포인트(/exhibitions, /artworks, /scenes 등)를 설명하고, OAuth 2.0의 두 가지 플로우(Authorization Code, Client Credentials)가 어떻게 다른 사용 사례에 적합한지 분석하십시오.</strong></li>
+                <li><strong>JavaScript SDK의 WIAClient와 WIAGallery 클래스 사용법을 설명하고, 전시 로드부터 렌더링, 이벤트 처리까지의 전체 워크플로우를 코드 예시와 함께 제시하십시오.</strong></li>
+                <li><strong>Python SDK가 데이터 분석과 배치 작업에 어떻게 최적화되어 있는지 설명하십시오. pandas 통합, 대량 업로드, 진행 상황 추적 예시를 포함하십시오.</strong></li>
+                <li><strong>GraphQL API와 REST API의 차이를 설명하고, 어떤 상황에서 GraphQL이 더 효율적인지 구체적인 쿼리 예시와 함께 논의하십시오. 중첩된 데이터를 한 번의 요청으로 가져오는 예시를 작성하십시오.</strong></li>
+                <li><strong>WebXR Device API 통합을 설명하고, VR 세션 시작, 컨트롤러 이벤트, 핸드 트래킹, 시선 추적이 어떻게 구현되는지 코드 예시와 함께 제시하십시오. AR 모드는 VR과 어떻게 다릅니까?</strong></li>
+                <li><strong>테이트 모던 사례 연구를 분석하고, WIA SDK 사용이 개발 시간, 코드 복잡도, 성능에 미친 구체적인 영향을 설명하십시오. 왜 개발 시간이 80% 단축되었으며, 이것이 다른 박물관에 주는 시사점은 무엇입니까?</strong></li>
+            </ol>
+        </div>
+
+        <h2>다음 장 예고</h2>
+        <p>
+            제6장에서는 Phase 3 Protocol을 다룹니다. WebSocket 기반 실시간 동기화, WebRTC P2P 연결,
+            Adaptive Streaming, Spatial Audio 프로토콜, 다중 사용자 협업 등을 심층 분석합니다.
+            또한 VR 전시에서 500명이 동시 접속하는 아키텍처와 네트워크 최적화 전략을 학습합니다.
+        </p>
+</div>
+</body>
+</html>

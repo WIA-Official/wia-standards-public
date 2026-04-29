@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: Phase 2 - API 인터페이스 - WIA-ART-009</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #F59E0B; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; box-shadow: 0 10px 40px rgba(245, 158, 11, 0.1); }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; text-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        p { margin: 1rem 0; text-align: justify; color: var(--text-secondary); }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; color: var(--text-secondary); }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .philosophy { text-align: center; font-size: 1.5rem; color: var(--primary); margin: 2rem 0; padding: 1rem; background: rgba(245, 158, 11, 0.1); border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: rgba(245, 158, 11, 0.05); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; font-weight: bold; transition: all 0.3s; }
+        .btn:hover { background: #d97706; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(245, 158, 11, 0.3); }
+        .key-takeaways { background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.05) 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; border: 2px solid rgba(245, 158, 11, 0.3); }
+        .key-takeaways h3 { margin-top: 0; }
+        .review-questions { background: rgba(245, 158, 11, 0.05); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; }
+        .review-questions h3 { margin-top: 0; }
+        .review-questions ol { margin-left: 1.5rem; }
+        .review-questions li { margin: 1rem 0; line-height: 1.6; }
+        strong { color: var(--primary); }
+        code { background: var(--bg-tertiary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Consolas', monospace; }
+        pre { background: var(--bg-tertiary); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; padding: 0; }
+        .warning-box { background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제5장: Phase 2 - API 인터페이스</h1>
+
+        <div class="philosophy">
+            弘益人間 · 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>개요</h2>
+        <p>
+            2024년 5월, 브라질의 스타트업 SoundFlow는 독립 아티스트를 위한 음악 배포 플랫폼을 개발하고 있었습니다.
+            그들의 목표는 간단했습니다. 아티스트가 한 번의 업로드로 Spotify, Apple Music, YouTube Music 등
+            20개 이상의 플랫폼에 자동 배포하는 것이었습니다. 그러나 현실은 훨씬 복잡했습니다.
+        </p>
+
+        <p>
+            각 플랫폼은 고유한 API를 가지고 있었습니다. Spotify는 자체 Web API를, Apple Music은
+            MusicKit API를, Amazon Music은 완전히 다른 엔드포인트 구조를 사용했습니다. SoundFlow 팀은
+            20개의 서로 다른 API 클라이언트를 구현해야 했고, 각 API의 인증 방식(OAuth 2.0, JWT, API Key)도
+            달랐습니다. 오디오 업로드 형식도 제각각이었습니다. 어떤 플랫폼은 직접 파일 업로드를,
+            다른 플랫폼은 S3 pre-signed URL을 요구했습니다.
+        </p>
+
+        <p>
+            개발자 팀 리더 Carlos Silva는 6개월 간의 개발 후 이렇게 말했습니다. "우리 코드베이스의 70%가
+            플랫폼별 API 통합 코드입니다. 실제 비즈니스 로직은 30%에 불과합니다. 새로운 플랫폼 하나를
+            추가할 때마다 한 달이 걸립니다."
+        </p>
+
+        <p>
+            WIA-ART-009 Phase 2 API 인터페이스는 이러한 통합 지옥(Integration Hell)을 종결시키기 위해 설계되었습니다.
+            표준화된 RESTful API, 일관된 인증 메커니즘, 그리고 TypeScript와 Python SDK를 제공하여,
+            개발자는 하나의 API 인터페이스로 모든 WIA 호환 플랫폼과 통신할 수 있습니다.
+            본 장에서는 Phase 2의 API 설계, 엔드포인트, SDK 구현, 스트리밍 최적화를 상세히 다룹니다.
+        </p>
+
+        <h2>WIA API 아키텍처</h2>
+
+        <h3>1. RESTful 설계 원칙</h3>
+        <p>
+            WIA API는 REST(Representational State Transfer) 아키텍처 스타일을 따르며, 다음 원칙을 준수합니다:
+        </p>
+
+        <ul>
+            <li><strong>리소스 기반:</strong> 모든 엔드포인트는 명사(리소스)로 표현 (예: <code>/audio</code>, <code>/metadata</code>)</li>
+            <li><strong>HTTP 메서드:</strong> GET(조회), POST(생성), PUT(전체 수정), PATCH(부분 수정), DELETE(삭제) 명확한 사용</li>
+            <li><strong>상태 비저장:</strong> 각 요청은 독립적이며 서버는 클라이언트 상태를 저장하지 않음</li>
+            <li><strong>계층화:</strong> 로드 밸런서, 캐시, API 게이트웨이 등 중간 계층 지원</li>
+            <li><strong>표준 상태 코드:</strong> HTTP 상태 코드를 의미에 맞게 사용 (200 성공, 201 생성, 400 잘못된 요청, 404 찾을 수 없음)</li>
+        </ul>
+
+        <h3>2. API 버전 관리</h3>
+        <p>
+            WIA API는 URL 경로에 버전을 포함하여 하위 호환성을 보장합니다:
+        </p>
+
+        <pre><code>https://api.wia.global/v1/audio
+https://api.wia.global/v2/audio  (미래 버전)</code></pre>
+
+        <p>
+            버전 정책:
+        </p>
+        <ul>
+            <li><strong>Major 버전 (v1 → v2):</strong> 호환성이 깨지는 변경, 최소 2년 간 v1 병행 지원</li>
+            <li><strong>Minor 업데이트:</strong> 하위 호환 기능 추가, URL 경로 변경 없음</li>
+            <li><strong>Patch 업데이트:</strong> 버그 수정, API 동작 변경 없음</li>
+        </ul>
+
+        <h2>핵심 API 엔드포인트</h2>
+
+        <h3>1. 오디오 관리 API</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>엔드포인트</th>
+                    <th>메서드</th>
+                    <th>설명</th>
+                    <th>인증</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>/v1/audio</code></td>
+                    <td>POST</td>
+                    <td>새 오디오 업로드</td>
+                    <td>필수</td>
+                </tr>
+                <tr>
+                    <td><code>/v1/audio/{id}</code></td>
+                    <td>GET</td>
+                    <td>오디오 메타데이터 조회</td>
+                    <td>선택*</td>
+                </tr>
+                <tr>
+                    <td><code>/v1/audio/{id}</code></td>
+                    <td>PATCH</td>
+                    <td>메타데이터 부분 수정</td>
+                    <td>필수</td>
+                </tr>
+                <tr>
+                    <td><code>/v1/audio/{id}</code></td>
+                    <td>DELETE</td>
+                    <td>오디오 삭제</td>
+                    <td>필수</td>
+                </tr>
+                <tr>
+                    <td><code>/v1/audio/{id}/stream</code></td>
+                    <td>GET</td>
+                    <td>오디오 스트리밍</td>
+                    <td>선택*</td>
+                </tr>
+                <tr>
+                    <td><code>/v1/audio/{id}/download</code></td>
+                    <td>GET</td>
+                    <td>오디오 다운로드</td>
+                    <td>필수</td>
+                </tr>
+                <tr>
+                    <td><code>/v1/audio/search</code></td>
+                    <td>GET</td>
+                    <td>오디오 검색</td>
+                    <td>선택*</td>
+                </tr>
+            </tbody>
+        </table>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: -1rem;">* 공개 오디오는 인증 불필요, 비공개는 필수</p>
+
+        <h3>2. 오디오 업로드 예제</h3>
+
+        <pre><code>// TypeScript SDK 사용
+import { WIAClient } from '@wia/audio-sdk';
+
+const client = new WIAClient({
+  apiKey: 'wia_live_abc123...',
+  environment: 'production'
+});
+
+async function uploadAudio() {
+  const audioFile = await fs.readFile('./northern_lights.wia');
+
+  const result = await client.audio.upload({
+    file: audioFile,
+    metadata: {
+      title: 'Northern Lights Symphony',
+      artist: 'Emma Lindström',
+      album: 'Arctic Dreams',
+      genre: ['Classical', 'Electronic'],
+      license: 'CC-BY-SA-4.0'
+    },
+    visibility: 'public',
+    spatialAudio: true
+  });
+
+  console.log(`업로드 성공! ID: ${result.id}`);
+  console.log(`스트리밍 URL: ${result.streamUrl}`);
+  return result;
+}
+
+// Python SDK 사용
+from wia_audio import WIAClient
+
+client = WIAClient(api_key='wia_live_abc123...')
+
+def upload_audio():
+    with open('northern_lights.wia', 'rb') as f:
+        result = client.audio.upload(
+            file=f,
+            metadata={
+                'title': 'Northern Lights Symphony',
+                'artist': 'Emma Lindström',
+                'album': 'Arctic Dreams',
+                'genre': ['Classical', 'Electronic'],
+                'license': 'CC-BY-SA-4.0'
+            },
+            visibility='public',
+            spatial_audio=True
+        )
+
+    print(f"업로드 성공! ID: {result['id']}")
+    print(f"스트리밍 URL: {result['stream_url']}")
+    return result</code></pre>
+
+        <h3>3. 렌더링 및 변환 API</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>엔드포인트</th>
+                    <th>메서드</th>
+                    <th>설명</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>/v1/audio/{id}/render</code></td>
+                    <td>POST</td>
+                    <td>특정 포맷으로 렌더링</td>
+                </tr>
+                <tr>
+                    <td><code>/v1/audio/{id}/transcode</code></td>
+                    <td>POST</td>
+                    <td>코덱 변환</td>
+                </tr>
+                <tr>
+                    <td><code>/v1/audio/{id}/spatial/convert</code></td>
+                    <td>POST</td>
+                    <td>공간 오디오 포맷 변환</td>
+                </tr>
+                <tr>
+                    <td><code>/v1/audio/{id}/downmix</code></td>
+                    <td>POST</td>
+                    <td>채널 다운믹스 (예: 7.1 → 스테레오)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <pre><code>// 돌비 애트모스로 렌더링
+const atmosResult = await client.audio.render({
+  audioId: 'wia:audio:2024:abc123',
+  targetFormat: 'dolby-atmos',
+  quality: 'master',
+  deliveryMethod: 'presigned-url'
+});
+
+// 응답
+{
+  "jobId": "render-job-xyz789",
+  "status": "processing",
+  "estimatedTime": 45,  // 초
+  "pollUrl": "/v1/jobs/render-job-xyz789",
+  "callbackUrl": null
+}
+
+// 작업 완료 후
+{
+  "jobId": "render-job-xyz789",
+  "status": "completed",
+  "result": {
+    "format": "dolby-atmos",
+    "fileSize": 245810234,  // bytes
+    "duration": 342.5,      // 초
+    "downloadUrl": "https://cdn.wia.global/render/xyz789.atmos",
+    "expiresAt": "2024-06-22T14:30:00Z"
+  }
+}</code></pre>
+
+        <h2>인증 및 권한 관리</h2>
+
+        <h3>1. API 키 인증</h3>
+        <p>
+            WIA API는 두 가지 유형의 API 키를 제공합니다:
+        </p>
+
+        <ul>
+            <li><strong>Public Key (pk_live_...):</strong> 클라이언트 측 JavaScript에서 사용, 읽기 전용</li>
+            <li><strong>Secret Key (EXAMPLE_API_KEY_REPLACE_ME):</strong> 서버 측에서만 사용, 모든 권한</li>
+        </ul>
+
+        <pre><code>// HTTP 헤더로 API 키 전달
+GET /v1/audio/wia:audio:2024:abc123 HTTP/1.1
+Host: api.wia.global
+Authorization: Bearer EXAMPLE_API_KEY_REPLACE_ME
+Content-Type: application/json</code></pre>
+
+        <h3>2. OAuth 2.0 통합</h3>
+        <p>
+            써드파티 애플리케이션이 사용자를 대신하여 API에 접근할 때 OAuth 2.0을 사용합니다:
+        </p>
+
+        <pre><code>// 1. Authorization Code 요청
+https://auth.wia.global/oauth/authorize?
+  client_id=app_abc123&
+  redirect_uri=https://myapp.com/callback&
+  response_type=code&
+  scope=audio:read audio:write spatial:render
+
+// 2. Access Token 교환
+POST /oauth/token HTTP/1.1
+Host: auth.wia.global
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code&
+code=AUTH_CODE_HERE&
+client_id=app_abc123&
+client_secret=secret_xyz789&
+redirect_uri=https://myapp.com/callback
+
+// 3. 응답
+{
+  "access_token": "wia_at_abc123...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "wia_rt_xyz789...",
+  "scope": "audio:read audio:write spatial:render"
+}</code></pre>
+
+        <h3>3. 권한 범위 (Scopes)</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Scope</th>
+                    <th>권한</th>
+                    <th>사용 사례</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>audio:read</code></td>
+                    <td>오디오 메타데이터 읽기</td>
+                    <td>음악 플레이어 앱</td>
+                </tr>
+                <tr>
+                    <td><code>audio:write</code></td>
+                    <td>오디오 업로드, 수정, 삭제</td>
+                    <td>DAW 플러그인, 배포 서비스</td>
+                </tr>
+                <tr>
+                    <td><code>audio:stream</code></td>
+                    <td>오디오 스트리밍</td>
+                    <td>스트리밍 플랫폼</td>
+                </tr>
+                <tr>
+                    <td><code>spatial:read</code></td>
+                    <td>공간 오디오 데이터 읽기</td>
+                    <td>VR/AR 앱</td>
+                </tr>
+                <tr>
+                    <td><code>spatial:render</code></td>
+                    <td>공간 오디오 렌더링</td>
+                    <td>포맷 변환 서비스</td>
+                </tr>
+                <tr>
+                    <td><code>analytics:read</code></td>
+                    <td>재생 통계 조회</td>
+                    <td>아티스트 대시보드</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>스트리밍 최적화</h2>
+
+        <h3>1. 적응형 비트레이트 스트리밍 (ABR)</h3>
+        <p>
+            WIA API는 네트워크 상태에 따라 자동으로 품질을 조정하는 HLS(HTTP Live Streaming) 및
+            DASH(Dynamic Adaptive Streaming over HTTP)를 지원합니다:
+        </p>
+
+        <pre><code>// HLS 매니페스트 요청
+GET /v1/audio/{id}/stream.m3u8 HTTP/1.1
+
+// 응답: 마스터 재생 목록
+#EXTM3U
+#EXT-X-VERSION:6
+#EXT-X-STREAM-INF:BANDWIDTH=128000,CODECS="opus"
+stream-128k.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=256000,CODECS="opus"
+stream-256k.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=512000,CODECS="flac"
+stream-512k.m3u8
+
+// 클라이언트는 네트워크 상태에 따라 적절한 품질 선택</code></pre>
+
+        <h3>2. CDN 통합 및 캐싱</h3>
+        <p>
+            WIA API는 전 세계 200개 이상의 엣지 로케이션을 통해 낮은 지연시간으로 오디오를 전송합니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>지역</th>
+                    <th>엣지 로케이션</th>
+                    <th>평균 지연시간</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>북미</td>
+                    <td>60개</td>
+                    <td>15ms</td>
+                </tr>
+                <tr>
+                    <td>유럽</td>
+                    <td>45개</td>
+                    <td>20ms</td>
+                </tr>
+                <tr>
+                    <td>아시아-태평양</td>
+                    <td>55개</td>
+                    <td>25ms</td>
+                </tr>
+                <tr>
+                    <td>남미</td>
+                    <td>25개</td>
+                    <td>35ms</td>
+                </tr>
+                <tr>
+                    <td>아프리카</td>
+                    <td>15개</td>
+                    <td>45ms</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>3. 범위 요청 (Range Requests)</h3>
+        <p>
+            WIA API는 HTTP Range 헤더를 지원하여 오디오의 특정 부분만 요청할 수 있습니다:
+        </p>
+
+        <pre><code>// 처음 1MB만 요청
+GET /v1/audio/{id}/stream HTTP/1.1
+Range: bytes=0-1048575
+
+// 응답
+HTTP/1.1 206 Partial Content
+Content-Range: bytes 0-1048575/52428800
+Content-Length: 1048576
+Content-Type: audio/flac
+
+[오디오 데이터]
+
+// 사용 사례: 미리듣기, 시크(Seek) 기능</code></pre>
+
+        <h2>SDK 구현</h2>
+
+        <h3>1. TypeScript SDK</h3>
+
+        <pre><code>// @wia/audio-sdk
+import { WIAClient, AudioUploadOptions, SpatialAudioFormat } from '@wia/audio-sdk';
+
+const client = new WIAClient({
+  apiKey: process.env.WIA_API_KEY!,
+  environment: 'production',
+  timeout: 30000,  // 30초
+  retries: 3
+});
+
+// 오디오 업로드 (진행률 추적)
+async function uploadWithProgress(filePath: string) {
+  const result = await client.audio.upload({
+    file: fs.createReadStream(filePath),
+    metadata: {
+      title: 'My Track',
+      artist: 'Artist Name'
+    },
+    onProgress: (progress) => {
+      console.log(`업로드: ${progress.percentage}% (${progress.uploaded}/${progress.total} bytes)`);
+    }
+  });
+
+  return result;
+}
+
+// 공간 오디오 렌더링 (비동기 작업)
+async function renderSpatialAudio(audioId: string) {
+  const job = await client.spatial.render({
+    audioId,
+    targetFormat: SpatialAudioFormat.DolbyAtmos,
+    quality: 'master',
+    callback: 'https://myapp.com/webhooks/render-complete'
+  });
+
+  // 폴링 방식으로 작업 상태 확인
+  const result = await job.wait({
+    pollInterval: 5000,  // 5초마다 확인
+    timeout: 300000      // 5분 타임아웃
+  });
+
+  console.log(`렌더링 완료: ${result.downloadUrl}`);
+  return result;
+}
+
+// 스트리밍 URL 생성
+const streamUrl = client.audio.getStreamUrl('wia:audio:2024:abc123', {
+  format: 'hls',
+  quality: 'adaptive'
+});
+
+// 메타데이터 검색
+const searchResults = await client.audio.search({
+  query: 'northern lights',
+  filters: {
+    artist: 'Emma Lindström',
+    genre: ['Classical'],
+    spatialAudio: true
+  },
+  sort: 'relevance',
+  limit: 20
+});</code></pre>
+
+        <h3>2. Python SDK</h3>
+
+        <pre><code># wia-audio-sdk
+from wia_audio import WIAClient, SpatialAudioFormat
+import os
+
+client = WIAClient(
+    api_key=os.getenv('WIA_API_KEY'),
+    environment='production',
+    timeout=30,
+    retries=3
+)
+
+# 오디오 업로드 (진행률 콜백)
+def upload_with_progress(file_path: str):
+    def on_progress(progress):
+        print(f"업로드: {progress['percentage']}% "
+              f"({progress['uploaded']}/{progress['total']} bytes)")
+
+    with open(file_path, 'rb') as f:
+        result = client.audio.upload(
+            file=f,
+            metadata={
+                'title': 'My Track',
+                'artist': 'Artist Name'
+            },
+            on_progress=on_progress
+        )
+
+    return result
+
+# 공간 오디오 렌더링 (웹훅 콜백)
+def render_spatial_audio(audio_id: str):
+    job = client.spatial.render(
+        audio_id=audio_id,
+        target_format=SpatialAudioFormat.DOLBY_ATMOS,
+        quality='master',
+        callback='https://myapp.com/webhooks/render-complete'
+    )
+
+    # 동기 대기 (블로킹)
+    result = job.wait(poll_interval=5, timeout=300)
+
+    print(f"렌더링 완료: {result['download_url']}")
+    return result
+
+# 스트리밍 URL 생성
+stream_url = client.audio.get_stream_url(
+    'wia:audio:2024:abc123',
+    format='hls',
+    quality='adaptive'
+)
+
+# 메타데이터 검색
+search_results = client.audio.search(
+    query='northern lights',
+    filters={
+        'artist': 'Emma Lindström',
+        'genre': ['Classical'],
+        'spatial_audio': True
+    },
+    sort='relevance',
+    limit=20
+)</code></pre>
+
+        <div class="highlight-box">
+            <h3>실제 사례: SoundFlow의 API 통합</h3>
+            <p>
+                SoundFlow는 WIA API를 도입한 후 6개월 만에 다음과 같은 결과를 얻었습니다:
+            </p>
+            <ul>
+                <li><strong>개발 시간 단축:</strong> 새로운 플랫폼 통합 시간이 1개월에서 3일로 감소 (93% 감소)</li>
+                <li><strong>코드 간소화:</strong> API 통합 코드가 전체의 70%에서 15%로 감소</li>
+                <li><strong>오류율 감소:</strong> 플랫폼 간 업로드 실패율이 12%에서 0.3%로 감소</li>
+                <li><strong>비용 절감:</strong> 인프라 유지보수 비용 월 $8,000 → $1,200 (85% 절감)</li>
+                <li><strong>배포 속도:</strong> 평균 배포 시간이 48시간에서 15분으로 단축</li>
+            </ul>
+            <p>
+                Carlos Silva는 "WIA API는 게임 체인저입니다. 우리는 이제 플랫폼 통합 대신 사용자 경험 개선에
+                집중할 수 있습니다. TypeScript SDK 덕분에 타입 안정성도 확보되어 런타임 오류가 거의 사라졌습니다"라고 말했습니다.
+            </p>
+        </div>
+
+        <h2>오류 처리 및 재시도 로직</h2>
+
+        <h3>1. 표준 오류 응답</h3>
+
+        <pre><code>// 오류 응답 형식
+{
+  "error": {
+    "type": "validation_error",
+    "code": "INVALID_AUDIO_FORMAT",
+    "message": "지원되지 않는 오디오 코덱입니다. FLAC, Opus, AAC만 지원됩니다.",
+    "details": {
+      "field": "metadata.technical.codec",
+      "providedValue": "WMA",
+      "allowedValues": ["FLAC", "Opus", "AAC", "WAV", "DSD"]
+    },
+    "requestId": "req_abc123xyz789",
+    "timestamp": "2024-06-15T14:30:00Z"
+  }
+}</code></pre>
+
+        <h3>2. 오류 유형 및 처리</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>HTTP 코드</th>
+                    <th>오류 타입</th>
+                    <th>처리 방법</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>400</strong></td>
+                    <td>Bad Request</td>
+                    <td>요청 데이터 검증 후 재시도</td>
+                </tr>
+                <tr>
+                    <td><strong>401</strong></td>
+                    <td>Unauthorized</td>
+                    <td>API 키 확인 또는 토큰 갱신</td>
+                </tr>
+                <tr>
+                    <td><strong>403</strong></td>
+                    <td>Forbidden</td>
+                    <td>권한 확인, 재시도 불필요</td>
+                </tr>
+                <tr>
+                    <td><strong>404</strong></td>
+                    <td>Not Found</td>
+                    <td>리소스 ID 확인, 재시도 불필요</td>
+                </tr>
+                <tr>
+                    <td><strong>429</strong></td>
+                    <td>Rate Limit Exceeded</td>
+                    <td>지수 백오프로 재시도</td>
+                </tr>
+                <tr>
+                    <td><strong>500</strong></td>
+                    <td>Internal Server Error</td>
+                    <td>지수 백오프로 재시도 (최대 3회)</td>
+                </tr>
+                <tr>
+                    <td><strong>503</strong></td>
+                    <td>Service Unavailable</td>
+                    <td>Retry-After 헤더 확인 후 재시도</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>3. 자동 재시도 구현</h3>
+
+        <pre><code>// TypeScript: 지수 백오프 재시도
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: Error;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+
+      // 재시도 불가능한 오류는 즉시 throw
+      if (error.statusCode && [400, 401, 403, 404].includes(error.statusCode)) {
+        throw error;
+      }
+
+      if (attempt < maxRetries) {
+        // 지수 백오프: 1초, 2초, 4초, 8초...
+        const delay = baseDelay * Math.pow(2, attempt);
+        // 랜덤 지터 추가 (±25%)
+        const jitter = delay * (0.75 + Math.random() * 0.5);
+
+        console.log(`재시도 ${attempt + 1}/${maxRetries}, ${jitter}ms 후...`);
+        await new Promise(resolve => setTimeout(resolve, jitter));
+      }
+    }
+  }
+
+  throw lastError!;
+}
+
+// 사용 예
+const result = await retryWithBackoff(() =>
+  client.audio.upload({ file: audioData, metadata })
+);</code></pre>
+
+        <h2>웹훅 및 이벤트</h2>
+
+        <h3>1. 웹훅 구독</h3>
+        <p>
+            WIA API는 비동기 작업 완료, 오디오 재생, 메타데이터 변경 등의 이벤트를 웹훅으로 알려줍니다:
+        </p>
+
+        <pre><code>// 웹훅 엔드포인트 등록
+POST /v1/webhooks HTTP/1.1
+{
+  "url": "https://myapp.com/webhooks/wia",
+  "events": [
+    "audio.upload.completed",
+    "audio.render.completed",
+    "audio.playback.started",
+    "audio.metadata.updated"
+  ],
+  "secret": "whsec_abc123xyz789"
+}
+
+// 웹훅 페이로드 예시
+POST /webhooks/wia HTTP/1.1
+Host: myapp.com
+Content-Type: application/json
+X-WIA-Signature: t=1623456789,v1=abc123...
+X-WIA-Event: audio.render.completed
+
+{
+  "id": "evt_abc123xyz789",
+  "type": "audio.render.completed",
+  "created": "2024-06-15T14:30:00Z",
+  "data": {
+    "object": {
+      "id": "wia:audio:2024:abc123",
+      "jobId": "render-job-xyz789",
+      "format": "dolby-atmos",
+      "downloadUrl": "https://cdn.wia.global/render/xyz789.atmos",
+      "expiresAt": "2024-06-22T14:30:00Z"
+    }
+  }
+}</code></pre>
+
+        <h3>2. 웹훅 서명 검증</h3>
+
+        <pre><code>// Node.js: 웹훅 서명 검증
+import crypto from 'crypto';
+
+function verifyWebhookSignature(
+  payload: string,
+  signature: string,
+  secret: string
+): boolean {
+  const [timestamp, hash] = signature.split(',').map(s => s.split('=')[1]);
+
+  // 타임스탬프 검증 (5분 이내)
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - parseInt(timestamp)) > 300) {
+    return false;
+  }
+
+  // HMAC 서명 검증
+  const signedPayload = `${timestamp}.${payload}`;
+  const expectedHash = crypto
+    .createHmac('sha256', secret)
+    .update(signedPayload)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(hash),
+    Buffer.from(expectedHash)
+  );
+}
+
+// Express.js 미들웨어
+app.post('/webhooks/wia', express.raw({ type: 'application/json' }), (req, res) => {
+  const signature = req.headers['x-wia-signature'] as string;
+  const payload = req.body.toString('utf8');
+
+  if (!verifyWebhookSignature(payload, signature, process.env.WEBHOOK_SECRET!)) {
+    return res.status(401).send('Invalid signature');
+  }
+
+  const event = JSON.parse(payload);
+
+  // 이벤트 처리
+  switch (event.type) {
+    case 'audio.render.completed':
+      handleRenderCompleted(event.data.object);
+      break;
+    // ...
+  }
+
+  res.status(200).send('OK');
+});</code></pre>
+
+        <div class="key-takeaways">
+            <h3>핵심 요점</h3>
+            <ul>
+                <li><strong>RESTful 설계:</strong> WIA API는 REST 원칙을 따르며, 명확한 리소스 기반 엔드포인트와 HTTP 메서드를 사용합니다.</li>
+                <li><strong>표준 인증:</strong> API 키, OAuth 2.0, 세분화된 권한 범위(scopes)로 안전한 접근을 보장합니다.</li>
+                <li><strong>스트리밍 최적화:</strong> HLS/DASH 적응형 비트레이트, 전 세계 200개 CDN 엣지, Range Requests 지원으로 최적의 성능을 제공합니다.</li>
+                <li><strong>SDK 제공:</strong> TypeScript 및 Python SDK로 타입 안정성, 자동 재시도, 진행률 추적 등 개발자 경험을 향상시킵니다.</li>
+                <li><strong>오류 처리:</strong> 표준화된 오류 응답, 지수 백오프 재시도, 명확한 오류 코드로 안정성을 확보합니다.</li>
+                <li><strong>웹훅 지원:</strong> 비동기 작업 알림, HMAC 서명 검증으로 실시간 이벤트 처리를 가능하게 합니다.</li>
+                <li><strong>실전 검증:</strong> SoundFlow 사례에서 개발 시간 93% 단축, 오류율 97% 감소, 비용 85% 절감을 달성했습니다.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li><strong>SoundFlow의 API 통합 문제를 설명하고, WIA-ART-009 Phase 2 API가 어떻게 이 문제를 해결하는지 논의하십시오. 20개 플랫폼의 서로 다른 API와 인증 방식이 개발에 미친 영향을 분석하십시오.</strong></li>
+                <li><strong>WIA API의 5가지 RESTful 설계 원칙(리소스 기반, HTTP 메서드, 상태 비저장, 계층화, 표준 상태 코드)을 설명하고, 각 원칙이 API 설계에 미치는 장점을 논의하십시오. URL 경로 기반 버전 관리 전략의 이점은 무엇입니까?</strong></li>
+                <li><strong>WIA API의 인증 메커니즘을 비교하십시오: API 키(Public vs Secret), OAuth 2.0, 권한 범위(scopes). 각 방식이 적합한 사용 사례를 예를 들어 설명하고, OAuth 2.0의 Authorization Code 플로우를 단계별로 설명하십시오.</strong></li>
+                <li><strong>적응형 비트레이트 스트리밍(ABR)의 작동 원리를 HLS를 예로 설명하십시오. WIA API의 전 세계 CDN 분산(200개 엣지 로케이션)이 어떻게 지연시간을 줄이는지, 그리고 HTTP Range Requests가 시크(Seek) 기능에 어떻게 활용되는지 논의하십시오.</strong></li>
+                <li><strong>TypeScript SDK와 Python SDK의 주요 기능(진행률 추적, 비동기 작업 처리, 타입 안정성)을 비교하고, 제공된 코드 예제에서 uploadWithProgress와 renderSpatialAudio 함수의 구현 차이를 분석하십시오.</strong></li>
+                <li><strong>WIA API의 오류 처리 전략을 설명하십시오. 7가지 HTTP 상태 코드(400, 401, 403, 404, 429, 500, 503)별 처리 방법의 차이와, 지수 백오프 재시도 알고리즘이 어떻게 네트워크 혼잡을 완화하는지 논의하십시오. 제공된 retryWithBackoff 함수에서 지터(jitter)를 추가하는 이유는 무엇입니까?</strong></li>
+            </ol>
+        </div>
+
+        <h2>다음 장 예고</h2>
+        <p>
+            제6장에서는 WIA-ART-009 Phase 3 프로토콜을 탐구합니다. 실시간 오디오 스트리밍을 위한 WebRTC 통합,
+            저지연 전송 프로토콜(WIA-RTP), 다중 스트림 동기화(WIA-Sync), 그리고 원격 협업을 위한
+            WIA-Collaborate 프로토콜을 다룹니다. 또한 라이브 공연, 메타버스 오디오, 실시간 팟캐스팅 등
+            실전 사용 사례와 구현 가이드를 제시합니다.
+        </p>
+
+        <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);">
+        </div>
+</body>
+</html>

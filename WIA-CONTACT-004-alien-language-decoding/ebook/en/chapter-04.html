@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Pattern Recognition Algorithms | WIA-CONTACT-004</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-secondary:#cbd5e1;--contact-color:#6366F1;--border:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:800px;margin:0 auto;background:var(--bg-card);border:2px solid var(--contact-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--contact-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--contact-color);margin:40px 0 20px;border-bottom:2px solid var(--contact-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--contact-color);margin:30px 0 15px}
+        p{margin:15px 0;font-size:17px}
+        .philosophy{text-align:center;color:var(--contact-color);margin:20px 0;font-size:18px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--contact-color);text-decoration:none;font-size:16px}
+        .nav a:hover{text-decoration:underline}
+        ul{margin:15px 0 15px 30px}
+        li{margin:10px 0}
+        ol{margin:15px 0 15px 30px}
+        .highlight{background:rgba(99,102,241,0.1);padding:20px;border-radius:8px;margin:20px 0}
+        table{width:100%;border-collapse:collapse;margin:20px 0;font-size:15px}
+        th,td{padding:12px;text-align:left;border:1px solid var(--border)}
+        th{background:rgba(99,102,241,0.2);color:var(--contact-color)}
+        pre{background:rgba(0,0,0,0.3);padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;border:1px solid var(--border)}
+        code{font-family:'Courier New',monospace;font-size:14px;color:#a5b4fc}
+        .diagram{background:rgba(0,0,0,0.3);padding:25px;border-radius:8px;margin:25px 0;border:1px solid var(--contact-color);font-family:monospace;white-space:pre;overflow-x:auto;line-height:1.6}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="philosophy">弘益人間 · Benefit All Humanity</div>
+        <h1>Chapter 4: Pattern Recognition Algorithms</h1>
+
+        <h2>Overview</h2>
+        <p>Once alien signals have been processed and segmented, the critical task becomes identifying patterns within the data. This chapter explores algorithms that can recognize structure, repetition, hierarchy, and relationships in unknown communication systems. These pattern recognition techniques operate without requiring prior knowledge of the language structure, making them essential for first-contact scenarios.</p>
+
+        <p>The WIA-CONTACT-004 standard emphasizes unsupervised learning approaches—algorithms that discover patterns without being told what to look for. This is crucial because we cannot make assumptions about alien linguistic structures.</p>
+
+        <h2>Clustering Algorithms for Symbol Discovery</h2>
+
+        <h3>K-Means and Hierarchical Clustering</h3>
+        <p>Clustering algorithms group similar signal segments together, potentially revealing the symbol inventory of an alien language:</p>
+
+        <pre><code>// K-means clustering for symbol discovery
+class SymbolClusterer {
+  constructor(numClusters) {
+    this.k = numClusters;
+    this.centroids = [];
+  }
+
+  cluster(symbols) {
+    // Initialize centroids randomly
+    this.centroids = this.initializeCentroids(symbols, this.k);
+
+    let assignments = new Array(symbols.length);
+    let iterations = 0;
+    const maxIterations = 100;
+
+    while (iterations < maxIterations) {
+      // Assignment step
+      let changed = false;
+      for (let i = 0; i < symbols.length; i++) {
+        const newAssignment = this.findNearestCentroid(symbols[i]);
+        if (assignments[i] !== newAssignment) {
+          assignments[i] = newAssignment;
+          changed = true;
+        }
+      }
+
+      if (!changed) break;
+
+      // Update step
+      this.updateCentroids(symbols, assignments);
+      iterations++;
+    }
+
+    return {
+      clusters: this.groupByCluster(symbols, assignments),
+      centroids: this.centroids,
+      interpretation: `Found ${this.k} distinct symbol classes`
+    };
+  }
+
+  findNearestCentroid(symbol) {
+    let minDist = Infinity;
+    let nearest = 0;
+
+    for (let i = 0; i < this.centroids.length; i++) {
+      const dist = this.distance(symbol, this.centroids[i]);
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = i;
+      }
+    }
+
+    return nearest;
+  }
+
+  distance(a, b) {
+    // Dynamic Time Warping for variable-length symbols
+    const n = a.length;
+    const m = b.length;
+    const dtw = Array(n + 1).fill(null)
+      .map(() => Array(m + 1).fill(Infinity));
+
+    dtw[0][0] = 0;
+
+    for (let i = 1; i <= n; i++) {
+      for (let j = 1; j <= m; j++) {
+        const cost = Math.abs(a[i-1] - b[j-1]);
+        dtw[i][j] = cost + Math.min(
+          dtw[i-1][j],    // insertion
+          dtw[i][j-1],    // deletion
+          dtw[i-1][j-1]   // match
+        );
+      }
+    }
+
+    return dtw[n][m];
+  }
+
+  updateCentroids(symbols, assignments) {
+    for (let k = 0; k < this.k; k++) {
+      const clusterSymbols = symbols.filter((_, i) => assignments[i] === k);
+
+      if (clusterSymbols.length > 0) {
+        // Compute centroid as median length exemplar
+        this.centroids[k] = this.computeExemplar(clusterSymbols);
+      }
+    }
+  }
+
+  computeExemplar(symbols) {
+    // Return symbol with minimum average distance to all others
+    let minAvgDist = Infinity;
+    let exemplar = symbols[0];
+
+    for (const candidate of symbols) {
+      const avgDist = symbols
+        .map(s => this.distance(candidate, s))
+        .reduce((a, b) => a + b, 0) / symbols.length;
+
+      if (avgDist < minAvgDist) {
+        minAvgDist = avgDist;
+        exemplar = candidate;
+      }
+    }
+
+    return exemplar;
+  }
+}</code></pre>
+
+        <h3>Density-Based Clustering (DBSCAN)</h3>
+        <p>DBSCAN doesn't require specifying the number of clusters in advance, making it ideal when we don't know how many distinct symbols exist:</p>
+
+        <div class="diagram">
+Clustering Visualization:
+
+K-Means (requires K):        DBSCAN (automatic):
+   ●●●   ○○○   ■■■           ●●●       ○○○
+   ●●●   ○○○   ■■■           ●●●       ○○○
+   ●●●   ○○○   ■■■
+                               ■■■   ▲▲▲
+   3 clusters                 4 clusters
+   (predetermined)            (discovered)
+        </div>
+
+        <table>
+            <tr>
+                <th>Algorithm</th>
+                <th>Advantages</th>
+                <th>Best For</th>
+            </tr>
+            <tr>
+                <td>K-Means</td>
+                <td>Fast, scalable, well-understood</td>
+                <td>Spherical clusters, known symbol count</td>
+            </tr>
+            <tr>
+                <td>Hierarchical</td>
+                <td>Reveals cluster relationships</td>
+                <td>Hierarchical symbol systems</td>
+            </tr>
+            <tr>
+                <td>DBSCAN</td>
+                <td>Finds arbitrary shapes, automatic K</td>
+                <td>Unknown symbol count, noise tolerance</td>
+            </tr>
+            <tr>
+                <td>GMM</td>
+                <td>Probabilistic, soft assignments</td>
+                <td>Overlapping symbol variants</td>
+            </tr>
+        </table>
+
+        <h2>Hidden Markov Models for Sequence Analysis</h2>
+
+        <h3>Modeling Symbol Transitions</h3>
+        <p>Hidden Markov Models (HMMs) can discover the statistical structure of symbol sequences, revealing grammar-like patterns:</p>
+
+        <pre><code>// Hidden Markov Model for alien language structure
+class AlienLanguageHMM {
+  constructor(numStates) {
+    this.states = numStates;
+    this.transitions = null;  // State transition probabilities
+    this.emissions = null;    // Symbol emission probabilities
+    this.initial = null;      // Initial state probabilities
+  }
+
+  // Baum-Welch algorithm for unsupervised learning
+  train(observations, iterations = 50) {
+    // Initialize parameters randomly
+    this.initializeParameters(observations);
+
+    for (let iter = 0; iter < iterations; iter++) {
+      // E-step: Forward-backward algorithm
+      const { forward, backward } = this.forwardBackward(observations);
+
+      // M-step: Update parameters
+      this.updateParameters(observations, forward, backward);
+
+      // Check convergence
+      const logLikelihood = this.computeLogLikelihood(forward);
+      console.log(`Iteration ${iter}: Log-likelihood = ${logLikelihood}`);
+    }
+
+    return this.analyzeModel();
+  }
+
+  forwardBackward(observations) {
+    const T = observations.length;
+    const forward = Array(T).fill(null)
+      .map(() => new Array(this.states));
+    const backward = Array(T).fill(null)
+      .map(() => new Array(this.states));
+
+    // Forward pass
+    for (let s = 0; s < this.states; s++) {
+      forward[0][s] = this.initial[s] *
+        this.emissions[s][observations[0]];
+    }
+
+    for (let t = 1; t < T; t++) {
+      for (let s = 0; s < this.states; s++) {
+        forward[t][s] = 0;
+        for (let prev = 0; prev < this.states; prev++) {
+          forward[t][s] += forward[t-1][prev] *
+            this.transitions[prev][s];
+        }
+        forward[t][s] *= this.emissions[s][observations[t]];
+      }
+    }
+
+    // Backward pass
+    for (let s = 0; s < this.states; s++) {
+      backward[T-1][s] = 1;
+    }
+
+    for (let t = T - 2; t >= 0; t--) {
+      for (let s = 0; s < this.states; s++) {
+        backward[t][s] = 0;
+        for (let next = 0; next < this.states; next++) {
+          backward[t][s] += this.transitions[s][next] *
+            this.emissions[next][observations[t+1]] *
+            backward[t+1][next];
+        }
+      }
+    }
+
+    return { forward, backward };
+  }
+
+  analyzeModel() {
+    // Extract insights from learned model
+    const stateEntropy = this.calculateStateEntropy();
+    const transitionGraph = this.buildTransitionGraph();
+
+    return {
+      stateCount: this.states,
+      entropy: stateEntropy,
+      transitionGraph: transitionGraph,
+      interpretation: this.interpretStructure()
+    };
+  }
+
+  interpretStructure() {
+    // Analyze learned transition matrix for linguistic insights
+    const insights = [];
+
+    // Check for start/end states
+    const startStates = this.initial.map((p, i) => ({ state: i, prob: p }))
+      .filter(x => x.prob > 0.5);
+
+    if (startStates.length > 0) {
+      insights.push("Identified sentence-initial patterns");
+    }
+
+    // Check for absorbing states (sentence endings)
+    for (let s = 0; s < this.states; s++) {
+      if (this.transitions[s][s] > 0.9) {
+        insights.push(`State ${s} appears to be terminal`);
+      }
+    }
+
+    // Check for cyclic patterns
+    const cycles = this.detectCycles();
+    if (cycles.length > 0) {
+      insights.push(`Found ${cycles.length} cyclic patterns (potential recursive structures)`);
+    }
+
+    return insights;
+  }
+
+  detectCycles() {
+    const cycles = [];
+    const visited = new Set();
+
+    function dfs(state, path) {
+      if (path.includes(state)) {
+        // Found a cycle
+        const cycleStart = path.indexOf(state);
+        cycles.push(path.slice(cycleStart));
+        return;
+      }
+
+      if (visited.has(state)) return;
+      visited.add(state);
+
+      // Explore high-probability transitions
+      for (let next = 0; next < this.states; next++) {
+        if (this.transitions[state][next] > 0.3) {
+          dfs.call(this, next, [...path, state]);
+        }
+      }
+    }
+
+    for (let s = 0; s < this.states; s++) {
+      dfs.call(this, s, []);
+    }
+
+    return cycles;
+  }
+}</code></pre>
+
+        <h2>Suffix Trees and Suffix Arrays</h2>
+
+        <h3>Efficient Pattern Discovery</h3>
+        <p>Suffix trees enable rapid identification of all repeated substrings in a signal—crucial for discovering frequently used phrases or grammatical constructs:</p>
+
+        <pre><code>// Suffix tree for finding repeated patterns
+class SuffixTree {
+  constructor(text) {
+    this.text = text;
+    this.root = { children: {}, indices: [] };
+    this.build();
+  }
+
+  build() {
+    for (let i = 0; i < this.text.length; i++) {
+      this.addSuffix(this.text.slice(i), i);
+    }
+  }
+
+  addSuffix(suffix, index) {
+    let node = this.root;
+    node.indices.push(index);
+
+    for (const symbol of suffix) {
+      if (!node.children[symbol]) {
+        node.children[symbol] = { children: {}, indices: [] };
+      }
+      node = node.children[symbol];
+      node.indices.push(index);
+    }
+  }
+
+  findRepeatedPatterns(minLength = 3, minOccurrences = 2) {
+    const patterns = [];
+
+    function traverse(node, path) {
+      if (path.length >= minLength && node.indices.length >= minOccurrences) {
+        patterns.push({
+          pattern: path,
+          count: node.indices.length,
+          positions: node.indices
+        });
+      }
+
+      for (const [symbol, child] of Object.entries(node.children)) {
+        traverse(child, [...path, symbol]);
+      }
+    }
+
+    traverse(this.root, []);
+
+    // Sort by frequency * length (importance score)
+    patterns.sort((a, b) =>
+      (b.count * b.pattern.length) - (a.count * a.pattern.length)
+    );
+
+    return patterns;
+  }
+
+  findLongestRepeat() {
+    let longest = { pattern: [], count: 0 };
+
+    function traverse(node, path) {
+      if (node.indices.length >= 2 && path.length > longest.pattern.length) {
+        longest = {
+          pattern: path,
+          count: node.indices.length,
+          positions: node.indices
+        };
+      }
+
+      for (const [symbol, child] of Object.entries(node.children)) {
+        traverse(child, [...path, symbol]);
+      }
+    }
+
+    traverse(this.root, []);
+    return longest;
+  }
+}
+
+// Example usage
+function analyzeRepeatedPatterns(alienMessage) {
+  const tree = new SuffixTree(alienMessage);
+  const patterns = tree.findRepeatedPatterns(3, 3);
+
+  const analysis = {
+    totalPatterns: patterns.length,
+    topPatterns: patterns.slice(0, 10),
+    longestRepeat: tree.findLongestRepeat(),
+    interpretation: []
+  };
+
+  // Interpret findings
+  if (patterns.length > 100) {
+    analysis.interpretation.push("High pattern density suggests structured language");
+  }
+
+  const avgPatternLength = patterns.reduce((sum, p) =>
+    sum + p.pattern.length, 0) / patterns.length;
+
+  if (avgPatternLength > 5) {
+    analysis.interpretation.push("Long repeated phrases may indicate idioms or common constructions");
+  }
+
+  return analysis;
+}</code></pre>
+
+        <h3>Maximal Repeats and Supermaximal Repeats</h3>
+        <p>These specialized patterns reveal the most significant repeated structures:</p>
+
+        <div class="highlight">
+            <strong>Definitions:</strong>
+            <ul>
+                <li><strong>Repeat:</strong> Any substring appearing at least twice</li>
+                <li><strong>Maximal Repeat:</strong> Cannot be extended left or right while maintaining repeat property</li>
+                <li><strong>Supermaximal Repeat:</strong> Doesn't occur as substring of any other repeat</li>
+            </ul>
+        </div>
+
+        <h2>Graph-Based Pattern Analysis</h2>
+
+        <h3>Symbol Co-occurrence Networks</h3>
+        <p>Building graphs where symbols are nodes and edges represent sequential relationships reveals language structure:</p>
+
+        <pre><code>// Build symbol co-occurrence graph
+class SymbolGraph {
+  constructor() {
+    this.graph = new Map();
+  }
+
+  buildFromSequence(symbols, windowSize = 2) {
+    for (let i = 0; i < symbols.length - windowSize + 1; i++) {
+      const window = symbols.slice(i, i + windowSize);
+
+      for (let j = 0; j < window.length - 1; j++) {
+        this.addEdge(window[j], window[j + 1]);
+      }
+    }
+  }
+
+  addEdge(from, to) {
+    if (!this.graph.has(from)) {
+      this.graph.set(from, new Map());
+    }
+    const edges = this.graph.get(from);
+    edges.set(to, (edges.get(to) || 0) + 1);
+  }
+
+  analyze() {
+    const metrics = {
+      nodes: this.graph.size,
+      edges: this.countEdges(),
+      density: this.calculateDensity(),
+      hubs: this.findHubs(),
+      communities: this.detectCommunities(),
+      entropy: this.calculateGraphEntropy()
+    };
+
+    return {
+      ...metrics,
+      interpretation: this.interpretGraph(metrics)
+    };
+  }
+
+  findHubs(threshold = 0.8) {
+    const hubs = [];
+    const degrees = new Map();
+
+    for (const [node, edges] of this.graph.entries()) {
+      const outDegree = edges.size;
+      degrees.set(node, outDegree);
+    }
+
+    const maxDegree = Math.max(...degrees.values());
+
+    for (const [node, degree] of degrees.entries()) {
+      if (degree > maxDegree * threshold) {
+        hubs.push({
+          symbol: node,
+          outDegree: degree,
+          interpretation: "Highly connected symbol - possibly function word or frequent morpheme"
+        });
+      }
+    }
+
+    return hubs;
+  }
+
+  detectCommunities() {
+    // Louvain algorithm for community detection
+    // Communities might represent semantic or syntactic categories
+
+    const communities = [];
+    const visited = new Set();
+
+    for (const node of this.graph.keys()) {
+      if (!visited.has(node)) {
+        const community = this.expandCommunity(node, visited);
+        if (community.size > 2) {
+          communities.push({
+            members: Array.from(community),
+            size: community.size
+          });
+        }
+      }
+    }
+
+    return communities;
+  }
+
+  expandCommunity(startNode, visited) {
+    const community = new Set([startNode]);
+    const queue = [startNode];
+    visited.add(startNode);
+
+    while (queue.length > 0) {
+      const node = queue.shift();
+      const edges = this.graph.get(node);
+
+      if (!edges) continue;
+
+      for (const [neighbor, weight] of edges.entries()) {
+        // Add to community if strong connection
+        if (!visited.has(neighbor) && weight > 5) {
+          community.add(neighbor);
+          queue.push(neighbor);
+          visited.add(neighbor);
+        }
+      }
+    }
+
+    return community;
+  }
+
+  calculateGraphEntropy() {
+    // Measure uncertainty in symbol transitions
+    let totalEntropy = 0;
+    let nodeCount = 0;
+
+    for (const [node, edges] of this.graph.entries()) {
+      const total = Array.from(edges.values()).reduce((a, b) => a + b, 0);
+      let nodeEntropy = 0;
+
+      for (const count of edges.values()) {
+        const p = count / total;
+        nodeEntropy -= p * Math.log2(p);
+      }
+
+      totalEntropy += nodeEntropy;
+      nodeCount++;
+    }
+
+    return nodeCount > 0 ? totalEntropy / nodeCount : 0;
+  }
+
+  interpretGraph(metrics) {
+    const insights = [];
+
+    if (metrics.density < 0.1) {
+      insights.push("Sparse graph: Language has strict constraints on symbol sequences");
+    } else if (metrics.density > 0.5) {
+      insights.push("Dense graph: Few restrictions on symbol combinations (possible error)");
+    }
+
+    if (metrics.hubs.length > 0) {
+      insights.push(`Identified ${metrics.hubs.length} hub symbols that frequently connect to others`);
+    }
+
+    if (metrics.communities.length > 1) {
+      insights.push(`Found ${metrics.communities.length} symbol communities (potential word classes)`);
+    }
+
+    if (metrics.entropy > 3) {
+      insights.push("High transition entropy: Flexible language with many possible continuations");
+    } else if (metrics.entropy < 1) {
+      insights.push("Low transition entropy: Rigid structure or limited vocabulary");
+    }
+
+    return insights;
+  }
+}</code></pre>
+
+        <h2>Compression-Based Pattern Discovery</h2>
+
+        <h3>Normalized Compression Distance</h3>
+        <p>The principle: if two sequences can be compressed well together, they share patterns. The Normalized Compression Distance (NCD) quantifies this:</p>
+
+        <div class="highlight">
+            <strong>NCD Formula:</strong><br>
+            NCD(x,y) = (C(xy) - min(C(x), C(y))) / max(C(x), C(y))<br><br>
+            Where C(s) is the compressed size of string s, and xy is the concatenation.
+        </div>
+
+        <pre><code>// Compression-based similarity detection
+class CompressionAnalyzer {
+  compress(data) {
+    // Simple LZ77-style compression
+    const dictionary = [];
+    const output = [];
+
+    for (let i = 0; i < data.length; i++) {
+      let longestMatch = { length: 0, offset: 0 };
+
+      // Look for longest match in dictionary
+      for (let j = 0; j < Math.min(i, 1000); j++) {
+        const matchLength = this.matchLength(
+          data, i - j - 1, i, data.length - i
+        );
+
+        if (matchLength > longestMatch.length) {
+          longestMatch = { length: matchLength, offset: j + 1 };
+        }
+      }
+
+      if (longestMatch.length > 3) {
+        output.push({ type: 'ref', ...longestMatch });
+        i += longestMatch.length - 1;
+      } else {
+        output.push({ type: 'literal', value: data[i] });
+      }
+    }
+
+    return output;
+  }
+
+  matchLength(data, pos1, pos2, maxLen) {
+    let len = 0;
+    while (len < maxLen && data[pos1 + len] === data[pos2 + len]) {
+      len++;
+    }
+    return len;
+  }
+
+  ncd(seq1, seq2) {
+    const c1 = this.compress(seq1).length;
+    const c2 = this.compress(seq2).length;
+    const c12 = this.compress([...seq1, ...seq2]).length;
+
+    const ncd = (c12 - Math.min(c1, c2)) / Math.max(c1, c2);
+
+    return {
+      distance: ncd,
+      interpretation: ncd < 0.3
+        ? "Very similar sequences - likely same language or dialect"
+        : ncd < 0.7
+        ? "Moderate similarity - may share some patterns"
+        : "Dissimilar - different languages or random"
+    };
+  }
+
+  findSimilarSegments(segments) {
+    const similarities = [];
+
+    for (let i = 0; i < segments.length; i++) {
+      for (let j = i + 1; j < segments.length; j++) {
+        const ncd = this.ncd(segments[i], segments[j]);
+        if (ncd.distance < 0.5) {
+          similarities.push({
+            segment1: i,
+            segment2: j,
+            similarity: 1 - ncd.distance,
+            interpretation: ncd.interpretation
+          });
+        }
+      }
+    }
+
+    return similarities.sort((a, b) => b.similarity - a.similarity);
+  }
+}</code></pre>
+
+        <h2>Motif Discovery Algorithms</h2>
+
+        <h3>MEME Algorithm for Motif Finding</h3>
+        <p>Motifs are recurring patterns with variations—like the same word in different grammatical forms:</p>
+
+        <table>
+            <tr>
+                <th>Algorithm</th>
+                <th>Strength</th>
+                <th>Application to Alien Languages</th>
+            </tr>
+            <tr>
+                <td>MEME</td>
+                <td>Finds variable-length motifs</td>
+                <td>Discover morphological patterns</td>
+            </tr>
+            <tr>
+                <td>PROJECTION</td>
+                <td>Very fast, scales well</td>
+                <td>Initial screening of large datasets</td>
+            </tr>
+            <tr>
+                <td>Gibbs Sampling</td>
+                <td>Handles overlapping motifs</td>
+                <td>Complex nested structures</td>
+            </tr>
+            <tr>
+                <td>SAX (Symbolic Aggregate approXimation)</td>
+                <td>Works on continuous signals</td>
+                <td>Analog or multi-valued symbols</td>
+            </tr>
+        </table>
+
+        <h2>Information-Theoretic Measures</h2>
+
+        <h3>Mutual Information and Transfer Entropy</h3>
+        <p>These measures quantify how much information one symbol provides about another:</p>
+
+        <pre><code>// Mutual information between symbol pairs
+function mutualInformation(symbols1, symbols2) {
+  const joint = new Map();
+  const marginal1 = new Map();
+  const marginal2 = new Map();
+  const n = Math.min(symbols1.length, symbols2.length);
+
+  // Build probability distributions
+  for (let i = 0; i < n; i++) {
+    const s1 = symbols1[i];
+    const s2 = symbols2[i];
+    const pair = `${s1}|${s2}`;
+
+    joint.set(pair, (joint.get(pair) || 0) + 1);
+    marginal1.set(s1, (marginal1.get(s1) || 0) + 1);
+    marginal2.set(s2, (marginal2.get(s2) || 0) + 1);
+  }
+
+  // Calculate MI
+  let mi = 0;
+
+  for (const [pair, count] of joint.entries()) {
+    const [s1, s2] = pair.split('|');
+    const pJoint = count / n;
+    const p1 = marginal1.get(s1) / n;
+    const p2 = marginal2.get(s2) / n;
+
+    mi += pJoint * Math.log2(pJoint / (p1 * p2));
+  }
+
+  return {
+    mutualInformation: mi,
+    interpretation: mi > 1.0
+      ? "Strong dependency between symbol sequences"
+      : mi > 0.3
+      ? "Moderate correlation"
+      : "Weak or no relationship"
+  };
+}</code></pre>
+
+        <h2>Summary</h2>
+
+        <p>This chapter has explored advanced pattern recognition algorithms for alien language decoding:</p>
+
+        <ul>
+            <li><strong>Clustering algorithms</strong> discover symbol inventories without prior knowledge</li>
+            <li><strong>Hidden Markov Models</strong> reveal statistical transition patterns suggesting grammar</li>
+            <li><strong>Suffix trees</strong> efficiently identify all repeated substrings</li>
+            <li><strong>Graph analysis</strong> exposes structural relationships between symbols</li>
+            <li><strong>Compression-based methods</strong> detect similarity through information content</li>
+            <li><strong>Motif discovery</strong> finds recurring patterns with variations</li>
+            <li><strong>Information-theoretic measures</strong> quantify dependencies and correlations</li>
+        </ul>
+
+        <p>These algorithms work together to transform processed signals into structured knowledge about the alien language's grammar, vocabulary, and syntax. The next chapter builds on these patterns to extract semantic meaning.</p>
+
+        <div class="highlight">
+            <p><strong>Key Takeaway:</strong> Pattern recognition bridges the gap between signal processing and semantic understanding. By discovering structure without assumptions, these algorithms can handle truly alien communication systems that may differ radically from human languages.</p>
+        </div>
+
+        </div>
+</body>
+</html>

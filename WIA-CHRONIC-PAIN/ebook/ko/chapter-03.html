@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 3: 통증 모니터링 및 패턴 인식 | WIA-CHRONIC-PAIN</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 3: 통증 모니터링 및 패턴 인식</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong> 지속적인 통증 모니터링 시스템을 구현하고, 패턴 인식 알고리즘을 개발하며, 개인화된 통증 관리를 위한 트리거 식별 메커니즘을 구축합니다.
+    </div>
+
+    <h2>지속적인 통증 모니터링</h2>
+
+    <p>효과적인 만성 통증 관리는 간헐적인 임상 평가를 넘어 지속적인 모니터링으로 나아가야 합니다. WIA-CHRONIC-PAIN 표준은 환자 자가 보고, 웨어러블 센서 데이터, 맥락 정보를 포함한 여러 채널을 통해 통증 데이터를 캡처하는 포괄적인 접근 방식을 정의합니다.</p>
+
+    <p>지속적인 모니터링은 환자의 통증 경험에 대한 완전한 그림을 제공하며, 간헐적 평가에서 놓칠 수 있는 패턴과 트리거를 드러냅니다. 이러한 풍부한 종단 데이터는 더 개인화된 치료 접근 방식과 더 나은 결과 예측을 가능하게 합니다.</p>
+
+    <h3>다중 모달 데이터 수집</h3>
+
+    <pre><code>interface MonitoringDataStream {
+  patient_reported: {
+    pain_logs: PainLogEntry[];
+    mood_assessments: MoodEntry[];
+    activity_reports: ActivityEntry[];
+    sleep_diaries: SleepEntry[];
+  };
+  passive_sensing: {
+    wearable_metrics: WearableDataPoint[];
+    smartphone_sensors: {
+      accelerometer: AccelerometerData[];
+      location_context: LocationContext[];
+      app_usage: AppUsageData[];
+    };
+    environmental: {
+      weather: WeatherData[];
+      air_quality: AirQualityData[];
+    };
+  };
+  clinical_data: {
+    vital_signs: VitalSign[];
+    lab_results: LabResult[];
+    imaging: ImagingStudy[];
+  };
+}
+
+class PainMonitoringEngine {
+  private dataStreams: Map<string, DataStream>;
+  private patternDetector: PatternDetector;
+  private alertManager: AlertManager;
+
+  async processDataPoint(data: MonitoringDataPoint): Promise<void> {
+    // 수신 데이터 검증 및 정규화
+    const normalized = await this.normalizeData(data);
+
+    // 시계열 데이터베이스에 저장
+    await this.storage.insert(normalized);
+
+    // 실시간 집계 업데이트
+    await this.updateAggregations(data.patientId, normalized);
+
+    // 패턴 및 이상 확인
+    const patterns = await this.patternDetector.analyze(data.patientId);
+
+    // 필요시 알림 생성
+    if (patterns.alertWorthy) {
+      await this.alertManager.notify(data.patientId, patterns);
+    }
+  }
+}</code></pre>
+
+    <h2>생태학적 순간 평가</h2>
+
+    <p>생태학적 순간 평가(EMA)는 자연 환경에서 실시간으로 환자 경험을 캡처하는 연구 방법론입니다. WIA-CHRONIC-PAIN 표준은 환자 부담을 최소화하면서 고품질 통증 데이터를 수집하기 위해 EMA 원칙을 통합합니다.</p>
+
+    <div class="highlight">
+        <strong>EMA의 이점:</strong> 실시간 데이터 수집은 회상 편향을 제거하고, 통증에 영향을 미치는 맥락을 캡처하며, 임상 평가가 일치시킬 수 없는 생태학적 타당성을 제공합니다. 디지털 플랫폼은 대규모 구현에서 EMA를 실용적으로 만듭니다.
+    </div>
+
+    <h3>적응형 샘플링 전략</h3>
+
+    <p>시스템은 데이터 품질과 환자 부담 사이의 균형을 맞추기 위해 적응형 샘플링을 사용합니다. 샘플링 빈도는 통증 패턴, 환자 선호도 및 연구 필요에 따라 조정됩니다.</p>
+
+    <pre><code>class AdaptiveSampler {
+  private baseFrequency: number = 4; // 하루 프롬프트 수
+
+  calculateSamplingSchedule(patientId: string): SamplingSchedule {
+    const history = this.getPatientHistory(patientId);
+    const preferences = this.getPatientPreferences(patientId);
+
+    // 고변동성 기간 동안 샘플링 증가
+    const variabilityMultiplier = this.calculateVariability(history) > 0.5 ? 1.5 : 1.0;
+
+    // 환자의 조용한 시간 선호도 존중
+    const activeHours = preferences.activeHours || { start: 8, end: 22 };
+
+    // 시간 계층화된 무작위 일정 생성
+    const schedule = this.generateStratifiedSchedule({
+      frequency: Math.round(this.baseFrequency * variabilityMultiplier),
+      startHour: activeHours.start,
+      endHour: activeHours.end,
+      minimumInterval: 90, // 프롬프트 간 분
+      randomization: 0.3   // 30% 무작위화 창
+    });
+
+    return schedule;
+  }
+
+  async triggerAssessment(patientId: string, type: AssessmentType): Promise<void> {
+    // 푸시 알림 전송
+    await this.notifications.send(patientId, {
+      title: '통증 체크인',
+      body: '지금 기분이 어떠세요?',
+      data: { assessmentType: type },
+      priority: 'high',
+      ttl: 1800 // 응답까지 30분
+    });
+
+    // 프롬프트 전달 추적
+    await this.analytics.track('assessment_prompted', {
+      patientId,
+      type,
+      scheduledTime: new Date()
+    });
+  }
+}</code></pre>
+
+    <h2>패턴 인식 알고리즘</h2>
+
+    <p>패턴 인식은 디지털 통증 관리의 가치 제안의 핵심입니다. 종단 데이터를 분석함으로써 시스템은 환자와 제공자가 통증 에피소드를 이해하고 예측하는 데 도움이 되는 반복 패턴을 식별할 수 있습니다.</p>
+
+    <h3>시계열 분석</h3>
+
+    <p>통증 데이터는 통계적 및 머신러닝 기술을 사용하여 분석할 수 있는 시계열을 형성합니다. WIA-CHRONIC-PAIN 표준은 시간적 패턴 감지를 위한 접근 방식을 지정합니다.</p>
+
+    <pre><code>interface TimeSeriesAnalysis {
+  trend: {
+    direction: 'improving' | 'stable' | 'worsening';
+    slope: number;
+    confidence: number;
+  };
+  seasonality: {
+    daily: CyclicPattern;
+    weekly: CyclicPattern;
+    monthly: CyclicPattern;
+  };
+  changePoints: ChangePoint[];
+  forecasts: PainForecast[];
+}
+
+class PainPatternAnalyzer {
+  async analyzePainPatterns(patientId: string, window: TimeWindow): Promise<PatternAnalysis> {
+    const painData = await this.fetchPainData(patientId, window);
+
+    // 시계열 분해
+    const decomposition = this.decomposeTimeSeries(painData, {
+      frequency: 'daily',
+      model: 'additive'
+    });
+
+    // 추세 감지
+    const trend = this.analyzeTrend(decomposition.trend, {
+      minDays: 14,
+      significanceLevel: 0.05
+    });
+
+    // 주기적 패턴 찾기
+    const dailyPattern = this.detectDailyPattern(painData);
+    const weeklyPattern = this.detectWeeklyPattern(painData);
+
+    // 변화점 식별
+    const changePoints = this.detectChangePoints(painData, {
+      algorithm: 'PELT',
+      minSegmentLength: 7
+    });
+
+    return {
+      trend,
+      dailyPattern,
+      weeklyPattern,
+      changePoints,
+      summary: this.generateSummary(trend, dailyPattern, weeklyPattern)
+    };
+  }
+}</code></pre>
+
+    <h3>머신러닝 모델</h3>
+
+    <p>고급 패턴 인식은 환자 데이터로 훈련된 머신러닝 모델을 사용합니다. 이러한 모델은 전통적인 통계 방법이 놓칠 수 있는 복잡한 비선형 패턴을 식별할 수 있습니다.</p>
+
+    <table>
+        <tr>
+            <th>모델 유형</th>
+            <th>사용 사례</th>
+            <th>특징</th>
+        </tr>
+        <tr>
+            <td>LSTM 네트워크</td>
+            <td>순차 패턴 인식</td>
+            <td>통증 이력, 시간 특징, 생리학적 데이터</td>
+        </tr>
+        <tr>
+            <td>랜덤 포레스트</td>
+            <td>트리거 식별</td>
+            <td>활동, 수면, 날씨, 약물</td>
+        </tr>
+        <tr>
+            <td>그래디언트 부스팅</td>
+            <td>통증 강도 예측</td>
+            <td>다중 모달 특징 세트</td>
+        </tr>
+        <tr>
+            <td>클러스터링</td>
+            <td>환자 표현형 분류</td>
+            <td>통증 패턴, 인구통계, 치료</td>
+        </tr>
+    </table>
+
+    <pre><code>import tensorflow as tf
+from tensorflow.keras import layers
+
+class PainPredictionModel:
+    def __init__(self, config):
+        self.sequence_length = config.sequence_length
+        self.feature_dim = config.feature_dim
+        self.model = self._build_model()
+
+    def _build_model(self):
+        inputs = layers.Input(shape=(self.sequence_length, self.feature_dim))
+
+        # 시간적 패턴을 위한 LSTM 레이어
+        x = layers.LSTM(64, return_sequences=True)(inputs)
+        x = layers.Dropout(0.2)(x)
+        x = layers.LSTM(32)(x)
+        x = layers.Dropout(0.2)(x)
+
+        # 예측을 위한 Dense 레이어
+        x = layers.Dense(16, activation='relu')(x)
+        outputs = layers.Dense(1, activation='sigmoid')(x)
+
+        model = tf.keras.Model(inputs, outputs)
+        model.compile(
+            optimizer='adam',
+            loss='mse',
+            metrics=['mae']
+        )
+        return model
+
+    def predict_pain(self, patient_data, horizon=24):
+        """다음 'horizon' 시간 동안의 통증 수준 예측"""
+        features = self.prepare_features(patient_data)
+        predictions = []
+
+        for h in range(horizon):
+            pred = self.model.predict(features)
+            predictions.append({
+                'hour': h,
+                'predicted_pain': float(pred[0][0] * 10),
+                'confidence': self.calculate_confidence(features)
+            })
+            features = self.update_features(features, pred)
+
+        return predictions</code></pre>
+
+    <h2>트리거 식별</h2>
+
+    <p>만성 통증을 악화시키는 트리거를 식별하는 것은 디지털 시스템이 제공할 수 있는 가장 가치 있는 통찰력 중 하나입니다. WIA-CHRONIC-PAIN 표준은 잠재적 트리거와 통증 에피소드 간의 상관관계를 분석하는 포괄적인 트리거 감지 알고리즘을 정의합니다.</p>
+
+    <div class="highlight">
+        <strong>트리거 범주:</strong> 신체 활동, 감정 상태, 수면 품질, 식이 요인, 날씨 조건, 약물 타이밍, 사회적 상호작용은 모두 시스템이 모니터링하고 분석하는 잠재적 통증 트리거입니다.
+    </div>
+
+    <h3>트리거 분석 프레임워크</h3>
+
+    <pre><code>interface TriggerAnalysis {
+  trigger: {
+    category: TriggerCategory;
+    specific: string;
+    description: string;
+  };
+  association: {
+    correlation: number;
+    temporalLag: number; // 통증 증가 전 시간
+    doseResponse: boolean;
+    confidence: number;
+  };
+  evidence: {
+    occurrences: number;
+    pain_increase_avg: number;
+    last_occurrence: string;
+    examples: TriggerExample[];
+  };
+}
+
+class TriggerDetector {
+  async identifyTriggers(patientId: string): Promise<TriggerAnalysis[]> {
+    const painData = await this.fetchPainHistory(patientId);
+    const contextData = await this.fetchContextHistory(patientId);
+
+    const triggers: TriggerAnalysis[] = [];
+
+    // 활동 트리거 분석
+    const activityTriggers = await this.analyzeActivityTriggers(
+      painData,
+      contextData.activities
+    );
+    triggers.push(...activityTriggers);
+
+    // 수면 트리거 분석
+    const sleepTriggers = await this.analyzeSleepTriggers(
+      painData,
+      contextData.sleep
+    );
+    triggers.push(...sleepTriggers);
+
+    // 날씨 트리거 분석
+    const weatherTriggers = await this.analyzeWeatherTriggers(
+      painData,
+      contextData.weather
+    );
+    triggers.push(...weatherTriggers);
+
+    // 강도와 신뢰도로 순위 매기기
+    return this.rankTriggers(triggers);
+  }
+}</code></pre>
+
+    <h2>실시간 알림</h2>
+
+    <p>모니터링 시스템에는 주의가 필요한 중요한 이벤트에 대해 환자와 제공자에게 알리는 실시간 알림 기능이 포함됩니다. 알림은 개별 기준선 및 선호도에 따라 개인화됩니다.</p>
+
+    <pre><code>class AlertManager {
+  private alertRules: AlertRule[];
+  private notificationService: NotificationService;
+
+  async evaluateAlerts(patientId: string, currentData: MonitoringData): Promise<void> {
+    const baseline = await this.getPatientBaseline(patientId);
+    const preferences = await this.getAlertPreferences(patientId);
+
+    for (const rule of this.alertRules) {
+      if (this.shouldTriggerAlert(rule, currentData, baseline)) {
+        await this.sendAlert({
+          patientId,
+          rule,
+          data: currentData,
+          baseline,
+          preferences
+        });
+      }
+    }
+  }
+
+  private shouldTriggerAlert(
+    rule: AlertRule,
+    current: MonitoringData,
+    baseline: PatientBaseline
+  ): boolean {
+    switch (rule.type) {
+      case 'PAIN_SPIKE':
+        return current.painLevel > baseline.averagePain + (2 * baseline.painStdDev);
+
+      case 'MISSED_MEDICATION':
+        return current.medicationAdherence < 0.8 && rule.adherenceWindow;
+
+      case 'PATTERN_CHANGE':
+        return this.detectPatternDeviation(current, baseline) > rule.threshold;
+
+      case 'FLARE_PREDICTION':
+        return current.flareRisk > rule.riskThreshold;
+
+      default:
+        return false;
+    }
+  }
+}</code></pre>
+
+    <h2>시각화 및 통찰력</h2>
+
+    <p>효과적인 시각화는 환자와 제공자가 복잡한 통증 패턴을 이해하는 데 도움이 됩니다. WIA-CHRONIC-PAIN 표준은 모니터링 데이터를 제시하기 위한 시각화 요구 사항을 지정합니다.</p>
+
+    <pre><code>interface PainVisualization {
+  type: 'timeline' | 'calendar' | 'heatmap' | 'correlation' | 'trend';
+  config: VisualizationConfig;
+  data: ProcessedData;
+  insights: Insight[];
+}
+
+const visualizationSpecs = {
+  painTimeline: {
+    type: 'timeline',
+    xAxis: { field: 'timestamp', label: '날짜' },
+    yAxis: { field: 'intensity', label: '통증 수준 (0-10)' },
+    layers: [
+      { type: 'line', field: 'intensity', color: '#3b82f6' },
+      { type: 'area', field: 'confidence', opacity: 0.2 },
+      { type: 'markers', field: 'medications', shape: 'pill' },
+      { type: 'markers', field: 'activities', shape: 'activity' }
+    ],
+    annotations: {
+      triggers: true,
+      treatments: true,
+      flares: true
+    }
+  },
+
+  dailyHeatmap: {
+    type: 'heatmap',
+    xAxis: { field: 'dayOfWeek', labels: ['월', '화', '수', '목', '금', '토', '일'] },
+    yAxis: { field: 'hourOfDay', range: [0, 23] },
+    color: {
+      field: 'averageIntensity',
+      scale: 'sequential',
+      scheme: 'blues'
+    }
+  }
+};</code></pre>
+
+    <p>이 챕터에서는 지속적인 통증 모니터링 및 패턴 인식의 필수 측면을 다루었습니다. 이러한 기능은 WIA-CHRONIC-PAIN 표준의 분석 핵심을 형성하여 반응적 치료에서 사전 예방적 케어로 만성 통증 관리를 변화시키는 개인화된 통찰력을 가능하게 합니다.</p>
+</body>
+</html>

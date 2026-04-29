@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>제06장: Phase 3 - 프로토콜 | WIA-HERITAGE-002</title>
+<style>:root{--bg:#0f172a;--surface:#1e293b;--surface-2:#283548;--primary:#D97706;--text:#f1f5f9;--text-dim:#94a3b8;--border:#334155;--gold:#ffd700;--success:#10b981}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);line-height:1.8}.container{max-width:900px;margin:0 auto;padding:2rem}header{text-align:center;padding:3rem 0;border-bottom:2px solid var(--primary);margin-bottom:2rem}.badge{display:inline-block;background:var(--primary);color:var(--bg);padding:0.5rem 1.5rem;border-radius:2rem;font-weight:600;margin-bottom:1rem}h1{font-size:2.2rem;color:var(--primary)}h2{color:var(--primary);font-size:1.6rem;margin:2rem 0 1rem;border-bottom:1px solid var(--border);padding-bottom:0.5rem}h3{color:var(--gold);font-size:1.3rem;margin:1.5rem 0 1rem}p{margin-bottom:1rem}.callout{background:var(--surface);border-left:4px solid var(--primary);padding:1.5rem;margin:1.5rem 0;border-radius:0 0.5rem 0.5rem 0}.callout-title{font-weight:600;margin-bottom:0.5rem}ul,ol{margin:1rem 0 1rem 1.5rem}li{margin-bottom:0.5rem}table{width:100%;border-collapse:collapse;margin:1.5rem 0;background:var(--surface)}th,td{padding:0.75rem;text-align:left;border-bottom:1px solid var(--border)}th{background:var(--surface-2);color:var(--primary)}.nav{display:flex;justify-content:space-between;padding:2rem 0;border-top:1px solid var(--border);margin-top:2rem}.nav a{color:var(--primary);text-decoration:none;padding:0.75rem 1.5rem;background:var(--surface);border-radius:0.5rem}.philosophy{text-align:center;padding:2rem;background:var(--surface);border-radius:1rem;margin:2rem 0}.philosophy-text{font-size:1.5rem;color:var(--gold)}footer{text-align:center;padding:2rem;color:var(--text-dim)}pre{background:var(--surface-2);padding:1rem;border-radius:0.5rem;overflow-x:auto;margin:1rem 0}code{font-family:'Consolas','Monaco',monospace;font-size:0.9em}</style>
+</head>
+<body>
+<div class="container">
+<header><div class="badge">제06장 / 8</div><h1>Phase 3: 프로토콜</h1><p style="color:var(--text-dim)">WIA-HERITAGE-002: Archaeological Data Standards</p></header>
+
+<section>
+<h2>06.1 실시간 통신 프로토콜의 필요성</h2>
+<p>Phase 2의 RESTful API는 정적인 데이터 조회와 업데이트에는 탁월하지만, 실시간 협업과 대용량 3D 모델 스트리밍에는 한계가 있습니다. 고고학자 3명이 서로 다른 대륙에서 동시에 같은 유물의 3D 모델을 회전시키고 주석을 달면서 토론한다고 상상해보세요. 이를 위해서는 밀리초 단위의 지연시간으로 데이터를 양방향 전송할 수 있는 프로토콜이 필요합니다.</p>
+
+<p>WIA-HERITAGE-002 Phase 3는 세 가지 핵심 프로토콜을 정의합니다: WebSocket을 이용한 실시간 메시징, WebRTC를 이용한 P2P 3D 스트리밍, 그리고 QUIC 기반 대용량 파일 전송입니다. 이러한 프로토콜들은 현대 고고학의 글로벌 협업 요구사항을 충족시킵니다.</p>
+
+<div class="callout">
+<div class="callout-title">🌐 프로토콜 계층 구조</div>
+<ul>
+<li><strong>WebSocket</strong>: 실시간 양방향 메시징 (채팅, 알림, 커서 동기화)</li>
+<li><strong>WebRTC</strong>: P2P 비디오/오디오 및 데이터 채널 (화상회의, 3D 협업)</li>
+<li><strong>QUIC/HTTP3</strong>: 고속 대용량 전송 (gigapixel 이미지, 4K 스캔)</li>
+<li><strong>MQTT</strong>: IoT 센서 데이터 수집 (발굴지 환경 모니터링)</li>
+<li><strong>GraphQL Subscriptions</strong>: 선택적 데이터 구독 (특정 필드 변경 감지)</li>
+</ul>
+</div>
+
+<h3>프로토콜 선택 기준</h3>
+<p>각 프로토콜은 특정 사용 사례에 최적화되어 있습니다. 적절한 프로토콜 선택은 성능과 사용자 경험에 직접적인 영향을 미칩니다:</p>
+
+<table>
+<tr><th>사용 사례</th><th>권장 프로토콜</th><th>이유</th><th>대역폭</th></tr>
+<tr><td>실시간 채팅</td><td>WebSocket</td><td>낮은 지연, 양방향 통신</td><td>~10 KB/s</td></tr>
+<tr><td>3D 모델 스트리밍</td><td>WebRTC Data Channel</td><td>P2P, 낮은 지연</td><td>1-5 MB/s</td></tr>
+<tr><td>대용량 파일 다운로드</td><td>HTTP/3 (QUIC)</td><td>손실 복구, 멀티플렉싱</td><td>10-100 MB/s</td></tr>
+<tr><td>발굴지 센서</td><td>MQTT</td><td>저전력, 불안정한 네트워크</td><td>~1 KB/s</td></tr>
+<tr><td>데이터 구독</td><td>GraphQL Subscriptions</td><td>선택적 필드, 효율적</td><td>~5 KB/s</td></tr>
+</table>
+</section>
+
+<section>
+<h2>06.2 WebSocket 기반 실시간 협업</h2>
+<p>WebSocket은 단일 TCP 연결을 통해 클라이언트와 서버 간 전이중(full-duplex) 통신을 제공하는 프로토콜입니다. HTTP 요청-응답 모델과 달리, 한 번 연결이 맺어지면 어느 쪽이든 언제든지 메시지를 보낼 수 있습니다.</p>
+
+<h3>연결 수립 과정</h3>
+<p>WebSocket은 HTTP 핸드셰이크로 시작하여 프로토콜을 업그레이드합니다:</p>
+
+<pre><code># 클라이언트 요청 (HTTP)
+GET /ws/artifact/12345 HTTP/1.1
+Host: api.heritage.wia.org
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+Sec-WebSocket-Version: 13
+Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
+
+# 서버 응답 (프로토콜 업그레이드)
+HTTP/1.1 101 Switching Protocols
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
+
+# 이후 WebSocket 프레임으로 통신</code></pre>
+
+<h3>메시지 형식: Heritage Protocol Messages (HPM)</h3>
+<p>WIA-HERITAGE-002는 WebSocket 메시지의 표준 구조를 정의합니다. 모든 메시지는 JSON 형식이며 다음 필드를 포함합니다:</p>
+
+<pre><code>{
+  "type": "cursor.move",           // 메시지 타입
+  "artifact_id": "12345",          // 대상 유물 ID
+  "user_id": "researcher-987",     // 발신자 ID
+  "timestamp": 1709654478123,      // Unix 밀리초
+  "data": {                        // 타입별 페이로드
+    "x": 0.534,
+    "y": 0.721,
+    "rotation": 45.3
+  },
+  "metadata": {                    // 선택적 메타데이터
+    "client_version": "2.1.4",
+    "network_latency": 23
+  }
+}</code></pre>
+
+<h3>지원되는 메시지 타입</h3>
+<table>
+<tr><th>타입</th><th>방향</th><th>설명</th><th>빈도</th></tr>
+<tr><td>cursor.move</td><td>C→S→C</td><td>3D 뷰어 커서 위치</td><td>~60 fps</td></tr>
+<tr><td>annotation.add</td><td>C→S→C</td><td>3D 모델에 주석 추가</td><td>이벤트</td></tr>
+<tr><td>chat.message</td><td>C→S→C</td><td>텍스트 채팅 메시지</td><td>이벤트</td></tr>
+<tr><td>model.update</td><td>S→C</td><td>3D 모델 메타데이터 변경</td><td>이벤트</td></tr>
+<tr><td>user.join</td><td>S→C</td><td>새 사용자 세션 참여</td><td>이벤트</td></tr>
+<tr><td>user.leave</td><td>S→C</td><td>사용자 세션 종료</td><td>이벤트</td></tr>
+<tr><td>heartbeat</td><td>C↔S</td><td>연결 유지 (ping/pong)</td><td>30초마다</td></tr>
+</table>
+
+<h3>JavaScript 클라이언트 예제</h3>
+<pre><code>import { HeritageWebSocket } from '@wia/heritage';
+
+const ws = new HeritageWebSocket({
+  url: 'wss://api.heritage.wia.org/ws',
+  artifactId: '12345',
+  apiKey: 'your-api-key'
+});
+
+// 연결 이벤트
+ws.on('connected', () => {
+  console.log('실시간 협업 세션 시작');
+});
+
+// 다른 사용자의 커서 움직임 수신
+ws.on('cursor.move', (data) => {
+  updateCursor(data.user_id, data.data.x, data.data.y);
+});
+
+// 3D 뷰어에서 커서 이동 시 브로드캐스트
+viewer.on('mousemove', (x, y, rotation) => {
+  ws.send('cursor.move', { x, y, rotation });
+});
+
+// 주석 추가
+ws.send('annotation.add', {
+  position: { x: 0.5, y: 0.3, z: 0.8 },
+  text: '이 부분에 금박 흔적이 보입니다',
+  type: 'observation'
+});</code></pre>
+</section>
+
+<section>
+<h2>06.3 3D 모델 프로그레시브 스트리밍</h2>
+<p>고고학 3D 모델은 종종 수 기가바이트에 달하는 고해상도 메쉬와 4K/8K 텍스처를 포함합니다. 사용자가 모델을 보기 전에 전체 파일을 다운로드하도록 강요하는 것은 비현실적입니다. WIA-HERITAGE-002는 프로그레시브 스트리밍을 통해 즉각적인 시각화를 가능하게 합니다.</p>
+
+<h3>Level of Detail (LoD) 계층</h3>
+<p>3D 모델은 여러 해상도 버전으로 사전 처리됩니다. 클라이언트는 먼저 저해상도 모델을 받아 즉시 표시하고, 백그라운드에서 고해상도 데이터를 점진적으로 다운로드합니다:</p>
+
+<table>
+<tr><th>LoD 레벨</th><th>폴리곤 수</th><th>텍스처 해상도</th><th>파일 크기</th><th>로딩 시간 (4G)</th></tr>
+<tr><td>LoD 0 (프리뷰)</td><td>1K</td><td>256×256</td><td>50 KB</td><td>0.1초</td></tr>
+<tr><td>LoD 1 (저화질)</td><td>10K</td><td>1024×1024</td><td>500 KB</td><td>1초</td></tr>
+<tr><td>LoD 2 (중화질)</td><td>100K</td><td>2048×2048</td><td>5 MB</td><td>10초</td></tr>
+<tr><td>LoD 3 (고화질)</td><td>1M</td><td>4096×4096</td><td>50 MB</td><td>100초</td></tr>
+<tr><td>LoD 4 (원본)</td><td>10M+</td><td>8192×8192</td><td>500 MB+</td><td>1000초+</td></tr>
+</table>
+
+<h3>glTF Draco 압축</h3>
+<p>WIA-HERITAGE-002는 Google의 Draco 기하학 압축을 필수로 요구합니다. Draco는 손실 또는 무손실 방식으로 3D 메쉬를 10:1 ~ 100:1 비율로 압축합니다:</p>
+
+<pre><code>{
+  "asset": { "version": "2.0" },
+  "extensionsUsed": ["KHR_draco_mesh_compression"],
+  "buffers": [{
+    "uri": "model.bin",
+    "byteLength": 1234567
+  }],
+  "meshes": [{
+    "primitives": [{
+      "attributes": {
+        "POSITION": 0,
+        "NORMAL": 1,
+        "TEXCOORD_0": 2
+      },
+      "extensions": {
+        "KHR_draco_mesh_compression": {
+          "bufferView": 0,
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          }
+        }
+      }
+    }]
+  }]
+}</code></pre>
+
+<h3>Adaptive Bitrate Streaming (ABS)</h3>
+<p>네트워크 상태에 따라 동적으로 품질을 조정합니다. 클라이언트는 현재 대역폭을 측정하고 최적의 LoD 레벨을 요청합니다:</p>
+
+<pre><code>// 대역폭 측정
+const bandwidth = await measureBandwidth();
+
+// 적절한 LoD 선택
+let lod;
+if (bandwidth > 10_000_000) lod = 4;       // 10 Mbps: 원본
+else if (bandwidth > 5_000_000) lod = 3;   // 5 Mbps: 고화질
+else if (bandwidth > 1_000_000) lod = 2;   // 1 Mbps: 중화질
+else if (bandwidth > 500_000) lod = 1;     // 500 Kbps: 저화질
+else lod = 0;                              // 프리뷰
+
+// 해당 LoD 스트림 요청
+const stream = await client.models.stream({
+  id: 'model-12345',
+  lod: lod,
+  format: 'glb'
+});</code></pre>
+</section>
+
+<section>
+<h2>06.4 WebRTC P2P 데이터 채널</h2>
+<p>WebRTC(Web Real-Time Communication)는 원래 화상회의를 위해 설계되었지만, 데이터 채널 기능을 통해 임의의 바이너리 데이터를 P2P로 전송할 수 있습니다. 이는 중앙 서버의 대역폭 부담을 줄이고 지연시간을 최소화하는 데 이상적입니다.</p>
+
+<h3>연결 수립: STUN/TURN 서버</h3>
+<p>대부분의 사용자는 NAT와 방화벽 뒤에 있어 직접 연결이 불가능합니다. STUN 서버는 공인 IP를 찾고, TURN 서버는 직접 연결이 실패할 때 릴레이 역할을 합니다:</p>
+
+<pre><code>const configuration = {
+  iceServers: [
+    { urls: 'stun:stun.heritage.wia.org:3478' },
+    {
+      urls: 'turn:turn.heritage.wia.org:3478',
+      username: 'heritage-user',
+      credential: 'temporary-password'
+    }
+  ]
+};
+
+const peerConnection = new RTCPeerConnection(configuration);
+
+// 데이터 채널 생성 (3D 모델 청크 전송용)
+const dataChannel = peerConnection.createDataChannel('3d-models', {
+  ordered: false,          // 순서 보장 안 함 (속도 우선)
+  maxRetransmits: 3        // 최대 3회 재전송
+});
+
+dataChannel.onopen = () => {
+  console.log('P2P 데이터 채널 오픈');
+  sendModelChunk(modelData);
+};
+
+dataChannel.onmessage = (event) => {
+  const chunk = event.data;
+  assembleModel(chunk);
+};</code></pre>
+
+<h3>시그널링 프로토콜</h3>
+<p>WebRTC 연결을 맺기 위해서는 시그널링 서버를 통해 SDP(Session Description Protocol) offer/answer를 교환해야 합니다. WIA-HERITAGE-002는 이를 WebSocket으로 구현합니다:</p>
+
+<pre><code># 연구자 A가 연구자 B에게 연결 요청
+{
+  "type": "webrtc.offer",
+  "from": "researcher-A",
+  "to": "researcher-B",
+  "data": {
+    "sdp": "v=0\r\no=- 123456789 2 IN IP4 127.0.0.1\r\n...",
+    "type": "offer"
+  }
+}
+
+# 연구자 B의 응답
+{
+  "type": "webrtc.answer",
+  "from": "researcher-B",
+  "to": "researcher-A",
+  "data": {
+    "sdp": "v=0\r\no=- 987654321 2 IN IP4 127.0.0.1\r\n...",
+    "type": "answer"
+  }
+}
+
+# ICE 후보 교환
+{
+  "type": "webrtc.ice-candidate",
+  "from": "researcher-A",
+  "to": "researcher-B",
+  "data": {
+    "candidate": "candidate:1 1 UDP 2130706431 192.168.1.5 54321 typ host",
+    "sdpMLineIndex": 0
+  }
+}</code></pre>
+
+<h3>멀티파티 협업: Mesh vs SFU</h3>
+<p>3명 이상이 협업할 때는 두 가지 토폴로지가 가능합니다:</p>
+
+<table>
+<tr><th>방식</th><th>구조</th><th>장점</th><th>단점</th><th>적합한 인원</th></tr>
+<tr><td>Mesh</td><td>모든 참여자가 서로 직접 연결</td><td>지연 최소, 서버 불필요</td><td>N² 연결 필요, 대역폭 多</td><td>2-4명</td></tr>
+<tr><td>SFU</td><td>중앙 서버가 스트림 라우팅</td><td>클라이언트 부담 적음</td><td>서버 대역폭 필요</td><td>5-50명</td></tr>
+</table>
+
+<p>WIA-HERITAGE-002는 5명 미만일 때 Mesh, 그 이상일 때 SFU를 권장합니다.</p>
+</section>
+
+<section>
+<h2>06.5 MQTT를 이용한 IoT 센서 통합</h2>
+<p>현대 발굴 현장은 온도, 습도, 조도, 토양 pH, 진동 등을 실시간으로 모니터링하는 수십 개의 센서로 구성됩니다. 이러한 센서 데이터는 유물의 보존 상태를 이해하고 최적의 발굴 시기를 결정하는 데 중요합니다.</p>
+
+<h3>MQTT 프로토콜 개요</h3>
+<p>MQTT(Message Queuing Telemetry Transport)는 IoT 환경에 최적화된 경량 발행-구독 프로토콜입니다. HTTP에 비해 10배 이상 적은 대역폭을 사용하며, 불안정한 네트워크에서도 안정적으로 작동합니다.</p>
+
+<div class="callout">
+<div class="callout-title">🌡️ 발굴지 센서 토픽 구조</div>
+<pre><code>wia/heritage/{site_id}/{sensor_type}/{sensor_id}
+
+예시:
+wia/heritage/gyeongju-147/temperature/temp-01
+wia/heritage/gyeongju-147/humidity/hum-01
+wia/heritage/gyeongju-147/vibration/vib-03
+wia/heritage/gyeongju-147/photo/img-camera-02</code></pre>
+</div>
+
+<h3>센서 데이터 메시지 형식</h3>
+<pre><code>{
+  "sensor_id": "temp-01",
+  "timestamp": 1709654478123,
+  "value": 23.7,
+  "unit": "celsius",
+  "location": {
+    "lat": 35.8562,
+    "lon": 129.2247,
+    "depth": -2.3  // 지하 2.3m
+  },
+  "battery": 87,   // 배터리 잔량 (%)
+  "quality": "good"  // good, fair, poor
+}</code></pre>
+
+<h3>Python으로 센서 데이터 구독</h3>
+<pre><code>import paho.mqtt.client as mqtt
+
+def on_message(client, userdata, message):
+    data = json.loads(message.payload)
+
+    # 온도 임계값 체크
+    if data['value'] > 30:
+        alert(f"경고: {data['sensor_id']} 온도 {data['value']}°C 초과!")
+
+    # 데이터베이스 저장
+    save_to_db(data)
+
+client = mqtt.Client()
+client.username_pw_set("heritage-monitor", "password")
+client.on_message = on_message
+
+client.connect("mqtt.heritage.wia.org", 1883)
+client.subscribe("wia/heritage/gyeongju-147/+/+")  # 모든 센서 구독
+
+client.loop_forever()</code></pre>
+
+<h3>QoS (Quality of Service) 레벨</h3>
+<p>MQTT는 3단계 QoS를 제공하여 메시지 전달 보장 수준을 조정할 수 있습니다:</p>
+
+<table>
+<tr><th>QoS</th><th>보장</th><th>사용 사례</th><th>오버헤드</th></tr>
+<tr><td>0</td><td>최대 1회 (At most once)</td><td>주기적 온도 측정 (데이터 손실 허용)</td><td>최소</td></tr>
+<tr><td>1</td><td>최소 1회 (At least once)</td><td>습도 경보 (중복 허용)</td><td>보통</td></tr>
+<tr><td>2</td><td>정확히 1회 (Exactly once)</td><td>진동 감지 (중요 이벤트)</td><td>최대</td></tr>
+</table>
+</section>
+
+<section>
+<h2>06.6 GraphQL Subscriptions</h2>
+<p>RESTful API는 정적 데이터 조회에 적합하지만, 특정 필드의 변경을 실시간으로 감지하려면 비효율적인 폴링이 필요합니다. GraphQL Subscriptions는 선언적 방식으로 정확히 원하는 데이터의 변경만 구독할 수 있습니다.</p>
+
+<h3>Subscription 쿼리 예제</h3>
+<pre><code>subscription WatchArtifact($id: ID!) {
+  artifactUpdated(id: $id) {
+    id
+    name
+    conservationStatus
+    location {
+      museum
+      exhibition
+    }
+    analysis {
+      carbonDating {
+        date
+        uncertainty
+      }
+    }
+  }
+}</code></pre>
+
+<h3>서버 구현 (Node.js)</h3>
+<p>GraphQL Subscriptions는 내부적으로 WebSocket을 사용하지만, 클라이언트는 GraphQL 쿼리 문법만 알면 됩니다:</p>
+
+<pre><code>const { PubSub } = require('graphql-subscriptions');
+const pubsub = new PubSub();
+
+const resolvers = {
+  Subscription: {
+    artifactUpdated: {
+      subscribe: (_, { id }) => {
+        return pubsub.asyncIterator([`ARTIFACT_UPDATED_${id}`]);
+      }
+    }
+  },
+  Mutation: {
+    updateArtifact: async (_, { id, input }) => {
+      const artifact = await updateArtifactInDB(id, input);
+
+      // 구독자들에게 알림
+      pubsub.publish(`ARTIFACT_UPDATED_${id}`, {
+        artifactUpdated: artifact
+      });
+
+      return artifact;
+    }
+  }
+};</code></pre>
+
+<h3>클라이언트 구독 (React)</h3>
+<pre><code>import { useSubscription } from '@apollo/client';
+
+function ArtifactMonitor({ artifactId }) {
+  const { data, loading } = useSubscription(WATCH_ARTIFACT, {
+    variables: { id: artifactId }
+  });
+
+  if (loading) return <div>연결 중...</div>;
+
+  return (
+    <div>
+      <h2>{data.artifactUpdated.name}</h2>
+      <p>보존 상태: {data.artifactUpdated.conservationStatus}</p>
+      <p>위치: {data.artifactUpdated.location.museum}</p>
+      {data.artifactUpdated.analysis?.carbonDating && (
+        <p>연대: {data.artifactUpdated.analysis.carbonDating.date}</p>
+      )}
+    </div>
+  );
+}</code></pre>
+</section>
+
+<section>
+<h2>06.7 네트워크 복원력과 오프라인 지원</h2>
+<p>발굴 현장은 종종 원격지에 위치하여 네트워크가 불안정하거나 완전히 끊어질 수 있습니다. WIA-HERITAGE-002는 이러한 환경에서도 작업을 계속할 수 있는 메커니즘을 제공합니다.</p>
+
+<h3>자동 재연결 전략</h3>
+<pre><code>class ResilientWebSocket {
+  constructor(url, options = {}) {
+    this.url = url;
+    this.reconnectDelay = options.reconnectDelay || 1000;
+    this.maxReconnectDelay = options.maxReconnectDelay || 30000;
+    this.currentDelay = this.reconnectDelay;
+    this.connect();
+  }
+
+  connect() {
+    this.ws = new WebSocket(this.url);
+
+    this.ws.onopen = () => {
+      console.log('연결됨');
+      this.currentDelay = this.reconnectDelay;  // 지수 백오프 리셋
+    };
+
+    this.ws.onclose = (event) => {
+      if (!event.wasClean) {
+        console.log(`연결 끊김. ${this.currentDelay}ms 후 재시도...`);
+        setTimeout(() => this.connect(), this.currentDelay);
+
+        // 지수 백오프
+        this.currentDelay = Math.min(
+          this.currentDelay * 2,
+          this.maxReconnectDelay
+        );
+      }
+    };
+  }
+}</code></pre>
+
+<h3>오프라인 큐와 동기화</h3>
+<p>네트워크가 끊긴 동안의 작업은 로컬에 큐잉되었다가 연결 복구 시 자동으로 업로드됩니다:</p>
+
+<pre><code>class OfflineQueue {
+  constructor() {
+    this.queue = JSON.parse(localStorage.getItem('offline_queue') || '[]');
+    this.processing = false;
+  }
+
+  add(operation) {
+    this.queue.push({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      operation: operation
+    });
+    localStorage.setItem('offline_queue', JSON.stringify(this.queue));
+  }
+
+  async process() {
+    if (this.processing || this.queue.length === 0) return;
+
+    this.processing = true;
+
+    while (this.queue.length > 0) {
+      const item = this.queue[0];
+
+      try {
+        await executeOperation(item.operation);
+        this.queue.shift();  // 성공 시 제거
+        localStorage.setItem('offline_queue', JSON.stringify(this.queue));
+      } catch (error) {
+        if (error.network) {
+          console.log('네트워크 오류. 나중에 재시도...');
+          break;  // 네트워크 오류면 중단
+        } else {
+          console.error('작업 실패:', error);
+          this.queue.shift();  // 영구 오류면 스킵
+        }
+      }
+    }
+
+    this.processing = false;
+  }
+}
+
+// 네트워크 상태 감지
+window.addEventListener('online', () => {
+  console.log('온라인 복구. 대기 중인 작업 처리 중...');
+  offlineQueue.process();
+});</code></pre>
+</section>
+
+<section>
+<h2>06.8 장 요약</h2>
+<div class="callout" style="border-color:var(--success)">
+<div class="callout-title">✅ 핵심 내용</div>
+<ol>
+<li><strong>WebSocket 프로토콜</strong>을 통해 실시간 양방향 메시징과 협업 기능(커서 동기화, 채팅, 주석)을 구현합니다.</li>
+<li><strong>프로그레시브 3D 스트리밍</strong>은 LoD 계층과 Draco 압축을 활용하여 대용량 모델을 즉시 시각화합니다.</li>
+<li><strong>WebRTC P2P 데이터 채널</strong>은 중앙 서버 부담 없이 낮은 지연시간으로 연구자 간 직접 데이터 전송을 가능하게 합니다.</li>
+<li><strong>MQTT 프로토콜</strong>로 발굴 현장의 IoT 센서 데이터를 경량하고 안정적으로 수집합니다.</li>
+<li><strong>GraphQL Subscriptions</strong>는 특정 데이터 필드의 변경만 선택적으로 구독하여 효율적인 실시간 업데이트를 제공합니다.</li>
+<li><strong>자동 재연결과 오프라인 큐</strong>로 불안정한 네트워크 환경에서도 데이터 손실 없이 작업을 지속할 수 있습니다.</li>
+</ol>
+</div>
+
+<div class="philosophy">
+<div class="philosophy-text">弘益人間</div>
+<p>시공간을 초월한 연결로 인류의 지식을 하나로 엮습니다</p>
+</div>
+</section>
+
+<section>
+<h2>06.9 복습 문제</h2>
+<ol>
+<li>WebSocket과 HTTP 폴링을 비교하고, 실시간 협업 시나리오에서 WebSocket이 유리한 이유를 설명하세요.</li>
+<li>3D 모델의 LoD(Level of Detail) 계층 구조가 사용자 경험 향상에 어떻게 기여하는지 설명하세요.</li>
+<li>WebRTC에서 STUN과 TURN 서버의 역할을 설명하고, 각각이 필요한 네트워크 상황을 제시하세요.</li>
+<li>MQTT의 QoS 레벨 0, 1, 2의 차이를 설명하고, 발굴 현장 센서 데이터에서 각 레벨의 적절한 사용 사례를 예를 들어 설명하세요.</li>
+<li>GraphQL Subscriptions가 REST API 폴링에 비해 가지는 장점을 네트워크 효율성과 개발자 경험 측면에서 논하세요.</li>
+<li>오프라인 큐 메커니즘이 없다면 발굴 현장에서 어떤 문제가 발생할 수 있는지 구체적인 시나리오를 제시하세요.</li>
+</ol>
+</section>
+
+<section>
+<h2>06.10 다음 장 예고</h2>
+<p>제7장에서는 Phase 4: 통합으로 진입하여 블록체인 기반 출처 추적, AI 기반 유물 분석, 가상 박물관 구축 등 첨단 기술을 고고학 워크플로에 통합하는 방법을 탐구합니다. 이더리움 스마트 컨트랙트로 유물의 진위를 검증하고, 머신러닝으로 파손된 유물을 복원하며, WebXR로 누구나 접근할 수 있는 가상 전시관을 만드는 실제 구현을 살펴봅니다.</p>
+<hr>
+<p><strong>제6장 완료</strong> | 예상 독서 시간: 24분</p>
+<p><a href="chapter-07.html" style="color:var(--primary)">다음: 제7장 - Phase 4: 통합</a></p>
+</section>
+
+</div>
+</body>
+</html>

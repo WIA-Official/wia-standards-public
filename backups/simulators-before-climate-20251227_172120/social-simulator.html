@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-SOCIAL Simulator</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <style>
+        :root {
+            --primary: #8B5CF6;
+            --primary-dark: #7C3AED;
+            --secondary: #F59E0B;
+            --danger: #ef4444;
+            --success: #10b981;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        header { text-align: center; padding: 2rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary); }
+        .subtitle { color: var(--text-muted); }
+        .lang-toggle { position: absolute; top: 1rem; right: 1rem; }
+        .lang-toggle button {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+        }
+        .lang-toggle button:hover { background: var(--bg-input); }
+        .lang-toggle button.active { background: var(--primary); border-color: var(--primary); }
+        .tabs { display: flex; gap: 0.25rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .tab {
+            padding: 0.75rem 1.25rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 0.5rem 0.5rem 0 0;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        .tab:hover { color: var(--text); background: var(--bg-input); }
+        .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .panel { display: none; }
+        .panel.active { display: block; }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .card h3 { color: var(--primary); margin-bottom: 1rem; font-size: 1.1rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            color: var(--text);
+            font-size: 1rem;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary { background: var(--secondary); color: black; }
+        .btn-secondary:hover { opacity: 0.9; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { opacity: 0.9; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { opacity: 0.9; }
+        .output {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            color: #7ee787;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .status-success { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .status-error { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .status-warning { background: rgba(245, 158, 11, 0.2); color: var(--secondary); }
+        .status-info { background: rgba(139, 92, 246, 0.2); color: var(--primary); }
+        .grid { display: grid; gap: 1rem; }
+        .grid-2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+        .grid-3 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+        .platform-list { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+        .platform-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-input);
+            border-radius: 2rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        .platform-tag.connected { border-color: var(--success); background: rgba(16, 185, 129, 0.1); }
+        .platform-tag:hover { background: var(--border); }
+        .platform-icon { font-size: 1.2rem; }
+        .identity-card {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 1rem;
+            padding: 1.5rem;
+            color: white;
+            text-align: center;
+        }
+        .identity-avatar { font-size: 4rem; margin-bottom: 0.5rem; }
+        .identity-name { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.25rem; }
+        .identity-id { font-family: monospace; opacity: 0.8; font-size: 0.9rem; }
+        .feed-item {
+            background: var(--bg-input);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        .feed-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+        .feed-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .feed-author { font-weight: 600; }
+        .feed-platform { font-size: 0.8rem; color: var(--text-muted); }
+        .feed-content { margin-bottom: 0.75rem; line-height: 1.5; }
+        .feed-actions { display: flex; gap: 1rem; color: var(--text-muted); font-size: 0.9rem; }
+        .feed-action { cursor: pointer; transition: color 0.2s; }
+        .feed-action:hover { color: var(--primary); }
+        .privacy-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: var(--bg-input);
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .privacy-option label { display: flex; align-items: center; gap: 0.75rem; cursor: pointer; }
+        .privacy-option input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--primary); }
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+            background: var(--border);
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .toggle-switch.active { background: var(--success); }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+        .toggle-switch.active::after { transform: translateX(24px); }
+        footer { text-align: center; padding: 2rem 0; margin-top: 2rem; border-top: 1px solid var(--border); color: var(--text-muted); }
+        footer a { color: var(--primary); text-decoration: none; }
+        @media (max-width: 768px) {
+            .tabs { flex-direction: column; }
+            .tab { border-radius: 0.5rem; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="lang-toggle">
+        <button id="btn-en" class="active" onclick="setLang('en')">EN</button>
+        <button id="btn-ko" onclick="setLang('ko')">KO</button>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>WIA-SOCIAL Simulator</h1>
+            <p class="subtitle"><span data-en="Nephew's Connection - All Connected Through Me!" data-ko="조카의 연결 - 나를 통해 모든 것이 연결됩니다!">Nephew's Connection - All Connected Through Me!</span></p>
+            <p style="margin-top: 0.5rem; color: var(--secondary);"><span data-en="Philosophy: Hongik Ingan - Connect humanity through social bonds" data-ko="철학: 弘益人間(홍익인간) - 사회적 유대를 통해 인류를 연결">Philosophy: Hongik Ingan - Connect humanity through social bonds</span></p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('identity')"><span data-en="Identity" data-ko="아이덴티티">Identity</span></button>
+            <button class="tab" onclick="showTab('post')"><span data-en="Cross-Post" data-ko="크로스 포스트">Cross-Post</span></button>
+            <button class="tab" onclick="showTab('feed')"><span data-en="Unified Feed" data-ko="통합 피드">Unified Feed</span></button>
+            <button class="tab" onclick="showTab('privacy')"><span data-en="Privacy" data-ko="개인정보">Privacy</span></button>
+            <button class="tab" onclick="showTab('api')"><span data-en="API Test" data-ko="API 테스트">API Test</span></button>
+        </div>
+
+        <div id="panel-identity" class="panel active">
+            <div class="grid grid-2">
+                <div class="card">
+                    <h3><span data-en="Create Universal Identity" data-ko="통합 아이덴티티 생성">Create Universal Identity</span></h3>
+                    <div class="form-group">
+                        <label><span data-en="Display Name" data-ko="표시 이름">Display Name</span></label>
+                        <input type="text" id="displayName" value="Hong Gildong">
+                    </div>
+                    <div class="form-group">
+                        <label><span data-en="Email" data-ko="이메일">Email</span></label>
+                        <input type="email" id="email" value="hong@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label><span data-en="Bio" data-ko="소개">Bio</span></label>
+                        <textarea id="bio" rows="3" placeholder="Tell the world about yourself...">Connecting the world through WIA-SOCIAL</textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="createIdentity()"><span data-en="Create Identity" data-ko="아이덴티티 생성">Create Identity</span></button>
+                </div>
+
+                <div class="card">
+                    <h3><span data-en="Your WIA Identity" data-ko="나의 WIA 아이덴티티">Your WIA Identity</span></h3>
+                    <div class="identity-card" id="identityCard" style="display: none;">
+                        <div class="identity-avatar">👤</div>
+                        <div class="identity-name" id="identityName">Hong Gildong</div>
+                        <div class="identity-id" id="identityId">wia:social:hong_gildong_abc123</div>
+                    </div>
+                    <div id="identityPlaceholder" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                        <span data-en="Create your identity to see it here" data-ko="여기에 아이덴티티를 생성하세요">Create your identity to see it here</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3><span data-en="Connect Platforms" data-ko="플랫폼 연결">Connect Platforms</span></h3>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;"><span data-en="Click to connect your social media accounts" data-ko="소셜 미디어 계정을 연결하려면 클릭하세요">Click to connect your social media accounts</span></p>
+                <div class="platform-list" id="platformList">
+                    <div class="platform-tag" onclick="togglePlatform(this, 'instagram')">
+                        <span class="platform-icon">📷</span> Instagram
+                    </div>
+                    <div class="platform-tag" onclick="togglePlatform(this, 'twitter')">
+                        <span class="platform-icon">🐦</span> Twitter/X
+                    </div>
+                    <div class="platform-tag" onclick="togglePlatform(this, 'tiktok')">
+                        <span class="platform-icon">🎵</span> TikTok
+                    </div>
+                    <div class="platform-tag" onclick="togglePlatform(this, 'facebook')">
+                        <span class="platform-icon">👤</span> Facebook
+                    </div>
+                    <div class="platform-tag" onclick="togglePlatform(this, 'threads')">
+                        <span class="platform-icon">🧵</span> Threads
+                    </div>
+                    <div class="platform-tag" onclick="togglePlatform(this, 'linkedin')">
+                        <span class="platform-icon">💼</span> LinkedIn
+                    </div>
+                    <div class="platform-tag" onclick="togglePlatform(this, 'mastodon')">
+                        <span class="platform-icon">🐘</span> Mastodon
+                    </div>
+                    <div class="platform-tag" onclick="togglePlatform(this, 'bluesky')">
+                        <span class="platform-icon">🦋</span> Bluesky
+                    </div>
+                    <div class="platform-tag" onclick="togglePlatform(this, 'youtube')">
+                        <span class="platform-icon">📺</span> YouTube
+                    </div>
+                    <div class="platform-tag" onclick="togglePlatform(this, 'discord')">
+                        <span class="platform-icon">💬</span> Discord
+                    </div>
+                </div>
+                <div id="connectionStatus" style="color: var(--success);"></div>
+            </div>
+        </div>
+
+        <div id="panel-post" class="panel">
+            <div class="card">
+                <h3><span data-en="Create Cross-Platform Post" data-ko="크로스 플랫폼 포스트 작성">Create Cross-Platform Post</span></h3>
+                <div class="form-group">
+                    <label><span data-en="Post Content" data-ko="포스트 내용">Post Content</span></label>
+                    <textarea id="postContent" rows="4" placeholder="What's on your mind?"></textarea>
+                </div>
+                <div class="form-group">
+                    <label><span data-en="Attach Media (optional)" data-ko="미디어 첨부 (선택사항)">Attach Media (optional)</span></label>
+                    <input type="file" accept="image/*,video/*" style="padding: 0.5rem;">
+                </div>
+                <div class="form-group">
+                    <label><span data-en="Post to Platforms" data-ko="플랫폼에 게시">Post to Platforms</span></label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="post_instagram" checked> 📷 Instagram
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="post_twitter" checked> 🐦 Twitter/X
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="post_threads"> 🧵 Threads
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="post_bluesky"> 🦋 Bluesky
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="post_mastodon"> 🐘 Mastodon
+                        </label>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="crossPost()"><span data-en="Post to All" data-ko="모든 플랫폼에 게시">Post to All</span></button>
+            </div>
+
+            <div class="card">
+                <h3><span data-en="Post Status" data-ko="게시 상태">Post Status</span></h3>
+                <div class="output" id="postOutput">[Cross-Post] Ready to post...</div>
+            </div>
+        </div>
+
+        <div id="panel-feed" class="panel">
+            <div class="card">
+                <h3><span data-en="Unified Feed" data-ko="통합 피드">Unified Feed</span></h3>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;"><span data-en="All your social media in one place" data-ko="모든 소셜 미디어를 한 곳에서">All your social media in one place</span></p>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                    <button class="btn btn-primary" onclick="refreshFeed()"><span data-en="Refresh Feed" data-ko="피드 새로고침">Refresh Feed</span></button>
+                    <select id="feedFilter" style="padding: 0.5rem 1rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 0.5rem; color: var(--text);">
+                        <option value="all">All Platforms</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="twitter">Twitter/X</option>
+                        <option value="threads">Threads</option>
+                        <option value="bluesky">Bluesky</option>
+                    </select>
+                </div>
+                <div id="feedContainer">
+                    <div class="feed-item">
+                        <div class="feed-header">
+                            <div class="feed-avatar">📷</div>
+                            <div>
+                                <div class="feed-author">@travel_adventures</div>
+                                <div class="feed-platform">Instagram · 2h ago</div>
+                            </div>
+                        </div>
+                        <div class="feed-content">Just landed in Tokyo! 🗼✨ The cherry blossoms are absolutely magical this time of year. #Tokyo #Travel #CherryBlossom</div>
+                        <div class="feed-actions">
+                            <span class="feed-action">❤️ 1.2k</span>
+                            <span class="feed-action">💬 89</span>
+                            <span class="feed-action">🔄 234</span>
+                        </div>
+                    </div>
+                    <div class="feed-item">
+                        <div class="feed-header">
+                            <div class="feed-avatar">🐦</div>
+                            <div>
+                                <div class="feed-author">@tech_insider</div>
+                                <div class="feed-platform">Twitter/X · 4h ago</div>
+                            </div>
+                        </div>
+                        <div class="feed-content">Breaking: New AI model achieves unprecedented reasoning capabilities. The future of technology is here! 🤖 #AI #Tech #Future</div>
+                        <div class="feed-actions">
+                            <span class="feed-action">❤️ 5.6k</span>
+                            <span class="feed-action">💬 423</span>
+                            <span class="feed-action">🔄 1.8k</span>
+                        </div>
+                    </div>
+                    <div class="feed-item">
+                        <div class="feed-header">
+                            <div class="feed-avatar">🦋</div>
+                            <div>
+                                <div class="feed-author">@opensource_dev</div>
+                                <div class="feed-platform">Bluesky · 6h ago</div>
+                            </div>
+                        </div>
+                        <div class="feed-content">Just released a new open-source library for decentralized identity! Check it out on GitHub 🚀 Love building for the open web.</div>
+                        <div class="feed-actions">
+                            <span class="feed-action">❤️ 892</span>
+                            <span class="feed-action">💬 56</span>
+                            <span class="feed-action">🔄 321</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel-privacy" class="panel">
+            <div class="card">
+                <h3><span data-en="Privacy Settings" data-ko="개인정보 설정">Privacy Settings</span></h3>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;"><span data-en="Control how your data is shared across platforms" data-ko="플랫폼 간 데이터 공유 방식을 제어하세요">Control how your data is shared across platforms</span></p>
+
+                <div class="privacy-option">
+                    <label>
+                        <span data-en="Share profile across platforms" data-ko="플랫폼 간 프로필 공유">Share profile across platforms</span>
+                    </label>
+                    <div class="toggle-switch active" onclick="togglePrivacy(this)"></div>
+                </div>
+                <div class="privacy-option">
+                    <label>
+                        <span data-en="Sync followers/following lists" data-ko="팔로워/팔로잉 목록 동기화">Sync followers/following lists</span>
+                    </label>
+                    <div class="toggle-switch active" onclick="togglePrivacy(this)"></div>
+                </div>
+                <div class="privacy-option">
+                    <label>
+                        <span data-en="Enable cross-platform messaging" data-ko="크로스 플랫폼 메시징 활성화">Enable cross-platform messaging</span>
+                    </label>
+                    <div class="toggle-switch" onclick="togglePrivacy(this)"></div>
+                </div>
+                <div class="privacy-option">
+                    <label>
+                        <span data-en="Allow analytics tracking" data-ko="분석 추적 허용">Allow analytics tracking</span>
+                    </label>
+                    <div class="toggle-switch" onclick="togglePrivacy(this)"></div>
+                </div>
+                <div class="privacy-option">
+                    <label>
+                        <span data-en="Public profile visibility" data-ko="공개 프로필 표시">Public profile visibility</span>
+                    </label>
+                    <div class="toggle-switch active" onclick="togglePrivacy(this)"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3><span data-en="Data Portability" data-ko="데이터 이동성">Data Portability</span></h3>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;"><span data-en="Export or delete your data across all connected platforms" data-ko="연결된 모든 플랫폼에서 데이터를 내보내거나 삭제하세요">Export or delete your data across all connected platforms</span></p>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" onclick="exportData()"><span data-en="Export All Data" data-ko="모든 데이터 내보내기">Export All Data</span></button>
+                    <button class="btn btn-danger" onclick="deleteData()"><span data-en="Delete All Data" data-ko="모든 데이터 삭제">Delete All Data</span></button>
+                </div>
+                <div class="output" id="privacyOutput" style="margin-top: 1rem;">[Privacy] Data management ready...</div>
+            </div>
+        </div>
+
+        <div id="panel-api" class="panel">
+            <div class="card">
+                <h3><span data-en="API Endpoints" data-ko="API 엔드포인트">API Endpoints</span></h3>
+                <div class="form-group">
+                    <label><span data-en="Select Endpoint" data-ko="엔드포인트 선택">Select Endpoint</span></label>
+                    <select id="apiEndpoint">
+                        <option value="identity.create">POST /api/identity/create</option>
+                        <option value="identity.get">GET /api/identity/{id}</option>
+                        <option value="platform.connect">POST /api/platform/connect</option>
+                        <option value="post.crosspost">POST /api/post/crosspost</option>
+                        <option value="feed.unified">GET /api/feed/unified</option>
+                        <option value="privacy.export">POST /api/privacy/export</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="testApi()"><span data-en="Test API" data-ko="API 테스트">Test API</span></button>
+            </div>
+
+            <div class="card">
+                <h3><span data-en="Response" data-ko="응답">Response</span></h3>
+                <div class="output" id="apiOutput">{
+  "message": "Select an endpoint and click Test API"
+}</div>
+            </div>
+        </div>
+
+        <footer>
+            <p><strong>WIA-SOCIAL</strong> - <span data-en="All Connected Through Me!" data-ko="나를 통해 모든 것이 연결됩니다!">All Connected Through Me!</span></p>
+            <p style="margin-top: 0.5rem;"><span data-en="Philosophy" data-ko="철학">Philosophy</span>: 弘益人間 (Hongik Ingan) · <span data-en="Benefit All Humanity" data-ko="널리 인간을 이롭게">Benefit All Humanity</span></p>
+            <p style="margin-top: 0.5rem;"><a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a></p>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+        let connectedPlatforms = new Set();
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+            document.getElementById('btn-ko').classList.toggle('active', lang === 'ko');
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang);
+            });
+        }
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            event.target.closest('.tab').classList.add('active');
+            document.getElementById('panel-' + tabId).classList.add('active');
+        }
+
+        function createIdentity() {
+            const name = document.getElementById('displayName').value;
+            const email = document.getElementById('email').value;
+            const id = 'wia:social:' + name.toLowerCase().replace(/\s+/g, '_') + '_' + Math.random().toString(36).substr(2, 6);
+
+            document.getElementById('identityCard').style.display = 'block';
+            document.getElementById('identityPlaceholder').style.display = 'none';
+            document.getElementById('identityName').textContent = name;
+            document.getElementById('identityId').textContent = id;
+        }
+
+        function togglePlatform(el, platform) {
+            if (connectedPlatforms.has(platform)) {
+                connectedPlatforms.delete(platform);
+                el.classList.remove('connected');
+            } else {
+                connectedPlatforms.add(platform);
+                el.classList.add('connected');
+            }
+            document.getElementById('connectionStatus').textContent = connectedPlatforms.size + ' platform(s) connected';
+        }
+
+        function crossPost() {
+            const content = document.getElementById('postContent').value || 'Hello from WIA-SOCIAL!';
+            const output = document.getElementById('postOutput');
+            const platforms = [];
+
+            if (document.getElementById('post_instagram').checked) platforms.push('Instagram');
+            if (document.getElementById('post_twitter').checked) platforms.push('Twitter/X');
+            if (document.getElementById('post_threads').checked) platforms.push('Threads');
+            if (document.getElementById('post_bluesky').checked) platforms.push('Bluesky');
+            if (document.getElementById('post_mastodon').checked) platforms.push('Mastodon');
+
+            output.textContent = '[Cross-Post] Starting cross-platform post...\n';
+            output.textContent += '[Cross-Post] Content: "' + content.substring(0, 50) + '..."\n\n';
+
+            let delay = 0;
+            platforms.forEach((p, i) => {
+                setTimeout(() => {
+                    output.textContent += '[' + p + '] Posting... ✓ Success!\n';
+                    if (i === platforms.length - 1) {
+                        output.textContent += '\n[Cross-Post] All posts completed successfully!';
+                    }
+                }, delay += 500);
+            });
+        }
+
+        function refreshFeed() {
+            const newPosts = [
+                { platform: '🧵', author: '@fashion_daily', source: 'Threads', time: 'Just now', content: 'Summer collection preview! 👗✨ What do you think?', likes: '456', comments: '23', shares: '78' },
+                { platform: '🐘', author: '@fediverse_news', source: 'Mastodon', time: '1h ago', content: 'The open web continues to grow! Join the decentralized revolution. #Fediverse', likes: '1.2k', comments: '89', shares: '543' }
+            ];
+
+            const container = document.getElementById('feedContainer');
+            newPosts.forEach(post => {
+                const item = document.createElement('div');
+                item.className = 'feed-item';
+                item.innerHTML = '<div class="feed-header"><div class="feed-avatar">' + post.platform + '</div><div><div class="feed-author">' + post.author + '</div><div class="feed-platform">' + post.source + ' · ' + post.time + '</div></div></div><div class="feed-content">' + post.content + '</div><div class="feed-actions"><span class="feed-action">❤️ ' + post.likes + '</span><span class="feed-action">💬 ' + post.comments + '</span><span class="feed-action">🔄 ' + post.shares + '</span></div>';
+                container.insertBefore(item, container.firstChild);
+            });
+        }
+
+        function togglePrivacy(el) {
+            el.classList.toggle('active');
+        }
+
+        function exportData() {
+            const output = document.getElementById('privacyOutput');
+            output.textContent = '[Privacy] Initiating data export...\n';
+            output.textContent += '[Privacy] Collecting data from 5 platforms...\n';
+            setTimeout(() => {
+                output.textContent += '[Privacy] Compiling posts, messages, and media...\n';
+            }, 500);
+            setTimeout(() => {
+                output.textContent += '[Privacy] Export complete!\n';
+                output.textContent += '[Privacy] Download: wia-social-export-2025.zip (15.3 MB)';
+            }, 1500);
+        }
+
+        function deleteData() {
+            if (confirm('Are you sure you want to delete all data? This cannot be undone.')) {
+                const output = document.getElementById('privacyOutput');
+                output.textContent = '[Privacy] Data deletion initiated...\n';
+                output.textContent += '[Privacy] This action is irreversible.\n';
+                setTimeout(() => {
+                    output.textContent += '[Privacy] All data has been deleted across connected platforms.';
+                }, 1000);
+            }
+        }
+
+        function testApi() {
+            const endpoint = document.getElementById('apiEndpoint').value;
+            const responses = {
+                'identity.create': { success: true, identity: { id: 'wia:social:hong_gildong_abc123', name: 'Hong Gildong', created: '2025-01-15T10:30:00Z' } },
+                'identity.get': { id: 'wia:social:hong_gildong_abc123', name: 'Hong Gildong', bio: 'Connecting the world', platforms: ['instagram', 'twitter', 'bluesky'] },
+                'platform.connect': { success: true, platform: 'instagram', username: '@hong_gildong', connected_at: '2025-01-15T10:35:00Z' },
+                'post.crosspost': { success: true, post_id: 'post_xyz789', platforms: { instagram: { id: 'ig_123' }, twitter: { id: 'tw_456' } } },
+                'feed.unified': { posts: [{ id: 'post_1', platform: 'instagram', content: 'Hello world!' }], next_cursor: 'abc123' },
+                'privacy.export': { job_id: 'export_456', status: 'processing', estimated_time: '5 minutes' }
+            };
+            document.getElementById('apiOutput').textContent = JSON.stringify(responses[endpoint], null, 2);
+        }
+
+        setLang(currentLang);
+    </script>
+</body>
+</html>

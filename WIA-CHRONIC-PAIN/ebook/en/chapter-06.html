@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Healthcare System Integration | WIA-CHRONIC-PAIN</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 6: Healthcare System Integration</h1>
+
+    <div class="highlight">
+        <strong>Learning Objectives:</strong> Implement EHR integration using FHIR standards, connect with telehealth platforms, build provider dashboards, and design APIs that enable ecosystem connectivity for chronic pain management.
+    </div>
+
+    <h2>Healthcare Interoperability Overview</h2>
+
+    <p>The WIA-CHRONIC-PAIN standard specifies integration requirements enabling care coordination across multiple providers.</p>
+
+    <h3>Integration Architecture</h3>
+
+    <pre><code>{
+  "integration_architecture": {
+    "standards_supported": {
+      "fhir": {
+        "version": "R4",
+        "profiles": ["US Core", "Pain Management IG"],
+        "operations": ["read", "search", "create", "update", "batch"]
+      },
+      "hl7v2": {
+        "versions": ["2.5.1", "2.7"],
+        "messages": ["ADT", "ORM", "ORU", "MDM"]
+      },
+      "cda": {
+        "version": "R2",
+        "templates": ["CCD", "Pain Assessment"]
+      }
+    },
+    "integration_patterns": {
+      "synchronous": "RESTful APIs for real-time queries",
+      "asynchronous": "Message queues for bulk data",
+      "subscription": "Webhooks for event notifications"
+    },
+    "security": {
+      "authentication": "SMART on FHIR",
+      "authorization": "OAuth 2.0 scopes",
+      "encryption": "TLS 1.3"
+    }
+  }
+}</code></pre>
+
+    <h2>FHIR Integration</h2>
+
+    <h3>Pain-Related FHIR Resources</h3>
+
+    <table>
+        <tr>
+            <th>Resource</th>
+            <th>Pain Management Use</th>
+            <th>Key Elements</th>
+        </tr>
+        <tr>
+            <td>Observation</td>
+            <td>Pain intensity assessments</td>
+            <td>code, valueInteger, bodySite, effectiveDateTime</td>
+        </tr>
+        <tr>
+            <td>Condition</td>
+            <td>Chronic pain diagnoses</td>
+            <td>code, bodySite, onset, severity</td>
+        </tr>
+        <tr>
+            <td>MedicationStatement</td>
+            <td>Current pain medications</td>
+            <td>medication, dosage, status, reasonCode</td>
+        </tr>
+        <tr>
+            <td>CarePlan</td>
+            <td>Pain management plans</td>
+            <td>activity, goal, addresses</td>
+        </tr>
+        <tr>
+            <td>Questionnaire/Response</td>
+            <td>Pain assessments (BPI, etc.)</td>
+            <td>item, answer, questionnaire reference</td>
+        </tr>
+    </table>
+
+    <h3>FHIR Pain Observation Resource</h3>
+
+    <pre><code>{
+  "resourceType": "Observation",
+  "id": "pain-intensity-12345",
+  "meta": {
+    "profile": ["http://wia.org/fhir/StructureDefinition/pain-intensity"]
+  },
+  "status": "final",
+  "category": [{
+    "coding": [{
+      "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+      "code": "survey",
+      "display": "Survey"
+    }]
+  }],
+  "code": {
+    "coding": [{
+      "system": "http://loinc.org",
+      "code": "72514-3",
+      "display": "Pain severity - 0-10 verbal numeric rating"
+    }]
+  },
+  "subject": {
+    "reference": "Patient/patient-12345"
+  },
+  "effectiveDateTime": "2024-01-15T14:30:00Z",
+  "valueInteger": 6,
+  "bodySite": {
+    "coding": [{
+      "system": "http://snomed.info/sct",
+      "code": "182343007",
+      "display": "Lumbar spine structure"
+    }]
+  },
+  "component": [
+    {
+      "code": {
+        "coding": [{
+          "system": "http://wia.org/fhir/CodeSystem/pain-quality",
+          "code": "aching"
+        }]
+      },
+      "valueBoolean": true
+    },
+    {
+      "code": {
+        "coding": [{
+          "system": "http://wia.org/fhir/CodeSystem/pain-quality",
+          "code": "throbbing"
+        }]
+      },
+      "valueBoolean": true
+    }
+  ]
+}</code></pre>
+
+    <h3>SMART on FHIR Integration</h3>
+
+    <pre><code>class SMARTAuthClient {
+  private config: SMARTConfig;
+
+  async launchFromEHR(launchParams: LaunchParams): Promise&lt;AuthResult&gt; {
+    // Extract launch context
+    const { iss, launch } = launchParams;
+
+    // Discover authorization endpoints
+    const metadata = await this.getConformance(iss);
+    const authEndpoint = metadata.rest[0].security.extension
+      .find(e => e.url.includes('authorize')).valueUri;
+    const tokenEndpoint = metadata.rest[0].security.extension
+      .find(e => e.url.includes('token')).valueUri;
+
+    // Build authorization request
+    const authUrl = new URL(authEndpoint);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('client_id', this.config.clientId);
+    authUrl.searchParams.set('redirect_uri', this.config.redirectUri);
+    authUrl.searchParams.set('scope', this.config.scopes.join(' '));
+    authUrl.searchParams.set('state', this.generateState());
+    authUrl.searchParams.set('aud', iss);
+    authUrl.searchParams.set('launch', launch);
+
+    // Redirect to authorization
+    return { authorizationUrl: authUrl.toString() };
+  }
+
+  async exchangeCodeForToken(
+    code: string,
+    tokenEndpoint: string
+  ): Promise&lt;TokenResponse&gt; {
+    const response = await fetch(tokenEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: this.config.redirectUri,
+        client_id: this.config.clientId
+      })
+    });
+
+    const tokens = await response.json();
+
+    return {
+      accessToken: tokens.access_token,
+      tokenType: tokens.token_type,
+      expiresIn: tokens.expires_in,
+      scope: tokens.scope,
+      patient: tokens.patient,
+      encounter: tokens.encounter
+    };
+  }
+}</code></pre>
+
+    <h2>EHR System Integration</h2>
+
+    <div class="highlight">
+        <strong>Supported EHR Platforms:</strong> Integration guides for Epic, Cerner, Allscripts, athenahealth, and other major EHR platforms.
+    </div>
+
+    <h3>EHR Integration Service</h3>
+
+    <pre><code>interface EHRIntegration {
+  platform: EHRPlatform;
+  capabilities: EHRCapability[];
+  connection: ConnectionConfig;
+  mapping: DataMapping;
+}
+
+class EHRIntegrationService {
+  private adapters: Map&lt;EHRPlatform, EHRAdapter&gt;;
+
+  async syncPatientData(
+    patientId: string,
+    ehrConnection: EHRConnection
+  ): Promise&lt;SyncResult&gt; {
+    const adapter = this.adapters.get(ehrConnection.platform);
+
+    // Fetch patient data from EHR
+    const ehrData = await adapter.fetchPatientData(
+      ehrConnection,
+      patientId,
+      {
+        resources: ['Condition', 'MedicationStatement', 'Observation'],
+        dateRange: { start: '2023-01-01', end: 'now' }
+      }
+    );
+
+    // Transform to internal format
+    const transformedData = this.transformEHRData(ehrData, adapter.mapping);
+
+    // Reconcile with existing data
+    const reconciled = await this.reconcileData(patientId, transformedData);
+
+    // Store synchronized data
+    await this.storage.savePatientData(reconciled);
+
+    return {
+      status: 'success',
+      resourcesSynced: reconciled.resources.length,
+      conflicts: reconciled.conflicts,
+      lastSyncTime: new Date().toISOString()
+    };
+  }
+
+  async pushPainData(
+    patientId: string,
+    ehrConnection: EHRConnection,
+    painData: PainData[]
+  ): Promise&lt;PushResult&gt; {
+    const adapter = this.adapters.get(ehrConnection.platform);
+
+    // Transform pain data to FHIR observations
+    const observations = painData.map(pd =>
+      this.createPainObservation(pd, adapter.mapping)
+    );
+
+    // Create bundle for batch submission
+    const bundle = {
+      resourceType: 'Bundle',
+      type: 'batch',
+      entry: observations.map(obs => ({
+        resource: obs,
+        request: {
+          method: 'POST',
+          url: 'Observation'
+        }
+      }))
+    };
+
+    // Submit to EHR
+    const result = await adapter.submitBundle(ehrConnection, bundle);
+
+    return {
+      status: 'success',
+      submitted: observations.length,
+      accepted: result.entry.filter(e => e.response.status.startsWith('2')).length
+    };
+  }
+}</code></pre>
+
+    <h2>Telehealth Platform Integration</h2>
+
+    <pre><code>interface TelehealthIntegration {
+  platform: TelehealthPlatform;
+  capabilities: {
+    videoVisits: boolean;
+    asyncMessaging: boolean;
+    remoteMonitoring: boolean;
+    ePrescribing: boolean;
+  };
+  scheduling: SchedulingConfig;
+  dataSharing: DataSharingConfig;
+}
+
+class TelehealthService {
+  async scheduleVisit(
+    patientId: string,
+    providerId: string,
+    visitType: VisitType
+  ): Promise&lt;ScheduledVisit&gt; {
+    // Check provider availability
+    const availability = await this.getProviderAvailability(
+      providerId,
+      visitType.duration
+    );
+
+    // Get patient preferences
+    const preferences = await this.getPatientPreferences(patientId);
+
+    // Find optimal slot
+    const slot = this.findOptimalSlot(availability, preferences);
+
+    // Create visit in telehealth platform
+    const visit = await this.telehealthAdapter.createVisit({
+      patientId,
+      providerId,
+      startTime: slot.start,
+      duration: visitType.duration,
+      visitType: visitType.code,
+      prepareInstructions: this.getPrepareInstructions(visitType)
+    });
+
+    // Pre-populate visit context with recent pain data
+    await this.prepareVisitContext(visit.id, patientId);
+
+    return visit;
+  }
+
+  async prepareVisitContext(visitId: string, patientId: string): Promise&lt;void&gt; {
+    const recentPain = await this.getPainSummary(patientId, { days: 14 });
+    const medications = await this.getCurrentMedications(patientId);
+
+    await this.telehealthAdapter.attachVisitContext(visitId, {
+      painTrend: recentPain.trend,
+      averagePain: recentPain.average,
+      currentMedications: medications
+    });
+  }
+}</code></pre>
+
+    <h2>Provider Dashboard</h2>
+
+    <h3>Dashboard Components</h3>
+
+    <pre><code>interface ProviderDashboard {
+  patientPanel: {
+    totalPatients: number;
+    activePatients: number;
+    patientsNeedingAttention: PatientAlert[];
+  };
+  populationMetrics: {
+    averagePainScore: number;
+    adherenceRate: number;
+    responseRate: number;
+    outcomeDistribution: OutcomeDistribution;
+  };
+  tasks: {
+    pendingReviews: PendingReview[];
+    messageQueue: PatientMessage[];
+    refillRequests: RefillRequest[];
+    scheduledVisits: ScheduledVisit[];
+  };
+  analytics: {
+    painTrends: TrendData[];
+    treatmentEffectiveness: EffectivenessData[];
+    riskScores: RiskScore[];
+  };
+}
+
+const dashboardApiSpec = {
+  '/api/v1/provider/dashboard': {
+    get: {
+      summary: 'Get provider dashboard data',
+      security: [{ bearerAuth: [], scope: ['provider:dashboard'] }],
+      responses: {
+        200: {
+          description: 'Dashboard data',
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ProviderDashboard' }
+            }
+          }
+        }
+      }
+    }
+  },
+  '/api/v1/provider/patients/{patientId}/summary': {
+    get: {
+      summary: 'Get patient pain management summary',
+      parameters: [
+        { name: 'patientId', in: 'path', required: true },
+        { name: 'period', in: 'query', schema: { type: 'string', default: '30d' } }
+      ]
+    }
+  }
+};</code></pre>
+
+    <h3>Patient Alert System</h3>
+
+    <pre><code>class ProviderAlertSystem {
+  async evaluatePatientAlerts(providerId: string): Promise&lt;PatientAlert[]&gt; {
+    const patients = await this.getProviderPatients(providerId);
+    const alerts: PatientAlert[] = [];
+
+    for (const patient of patients) {
+      const painSpike = await this.checkPainSpike(patient.id);
+      if (painSpike) {
+        alerts.push({
+          patientId: patient.id,
+          alertType: 'PAIN_SPIKE',
+          severity: 'high',
+          message: `Pain increased to ${painSpike.current}`
+        });
+      }
+
+      const adherence = await this.getAdherence(patient.id);
+      if (adherence.overall < 0.7) {
+        alerts.push({
+          patientId: patient.id,
+          alertType: 'LOW_ADHERENCE',
+          severity: 'medium'
+        });
+      }
+    }
+
+    return alerts.sort((a, b) =>
+      this.severityOrder(b.severity) - this.severityOrder(a.severity)
+    );
+  }
+}</code></pre>
+
+    <h2>Pharmacy Integration</h2>
+
+    <pre><code>interface PharmacyIntegration {
+  network: PharmacyNetwork;
+  capabilities: {
+    ePrescribing: boolean;
+    pdmp: boolean;
+    refillRequests: boolean;
+    medicationHistory: boolean;
+  };
+}
+
+class PharmacyService {
+  async submitPrescription(
+    prescription: Prescription
+  ): Promise&lt;PrescriptionResult&gt; {
+    // Validate prescription
+    await this.validatePrescription(prescription);
+
+    // Check PDMP for controlled substances
+    if (prescription.isControlled) {
+      const pdmpCheck = await this.checkPDMP(
+        prescription.patientId,
+        prescription.medication
+      );
+
+      if (pdmpCheck.alerts.length > 0) {
+        return {
+          status: 'requires_review',
+          alerts: pdmpCheck.alerts
+        };
+      }
+    }
+
+    // Submit via NCPDP SCRIPT
+    const result = await this.scriptAdapter.sendNewRx({
+      prescriber: prescription.prescriberId,
+      patient: prescription.patientId,
+      medication: this.formatMedication(prescription),
+      pharmacy: prescription.pharmacyId,
+      sig: prescription.instructions
+    });
+
+    return {
+      status: 'submitted',
+      trackingNumber: result.trackingId,
+      estimatedReady: result.estimatedFillTime
+    };
+  }
+}</code></pre>
+
+    <h2>API Gateway and Developer Portal</h2>
+
+    <div class="highlight">
+        <strong>API First Design:</strong> All capabilities are exposed through well-documented APIs for integration partners.
+    </div>
+
+    <pre><code>const apiGatewayConfig = {
+  routes: [
+    {
+      path: '/api/v1/patients',
+      service: 'patient-service',
+      rateLimit: { requests: 100, window: '1m' },
+      authentication: 'required',
+      scopes: ['patient:read', 'patient:write']
+    },
+    {
+      path: '/api/v1/pain-logs',
+      service: 'pain-tracking-service',
+      rateLimit: { requests: 200, window: '1m' },
+      authentication: 'required',
+      scopes: ['pain:read', 'pain:write']
+    },
+    {
+      path: '/api/v1/integrations/fhir',
+      service: 'fhir-facade',
+      rateLimit: { requests: 500, window: '1m' },
+      authentication: 'required',
+      scopes: ['fhir:*']
+    }
+  ],
+  security: {
+    cors: {
+      origins: ['https://*.healthcare.org'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      headers: ['Authorization', 'Content-Type']
+    },
+    rateLimit: {
+      global: { requests: 10000, window: '1h' }
+    }
+  }
+};</code></pre>
+</body>
+</html>

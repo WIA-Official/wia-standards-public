@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 2단계 - API 인터페이스 | WIA-DIGITAL_CITIZENSHIP</title>
+    <style>:root{--primary:#3b82f6;--primary-dark:#2563eb}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;color:#334155;background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3)}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content h3{color:var(--primary);margin:20px 0 15px}.content p{margin:15px 0}.info-box{background:#dbeafe;border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px}.key-takeaways h3{color:#065f46;margin-bottom:20px}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid #e2e8f0}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{border:1px solid #e2e8f0;padding:12px;text-align:left}th{background:var(--primary);color:white}pre{background:#1e293b;color:#f1f5f9;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-family:monospace;font-size:0.9em}.footer{background:#0f172a;color:white;text-align:center;padding:30px}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>5장: 2단계 - API 인터페이스</h1>
+            <p>WIA-DIGITAL_CITIZENSHIP</p>
+            <p style="margin-top:10px;font-size:0.9em">디지털 시민권 관리를 위한 REST API</p>
+        </div>
+        <div class="content">
+            <h2>5.1 개요</h2>
+            <p>이 장에서는 WIA-DIGITAL_CITIZENSHIP 표준의 REST API 인터페이스를 다룹니다. 디지털 시민권 발급, 검증, 관리를 위한 API 엔드포인트와 한국 정부 시스템과의 연동 방법을 설명합니다.</p>
+
+            <div class="info-box">
+                <h4>📌 학습 목표</h4>
+                <ul style="margin:10px 0 0 20px;line-height:1.8">
+                    <li>REST API 엔드포인트 설계 이해</li>
+                    <li>디지털 시민권 발급/검증 API 구현</li>
+                    <li>한국 정부 시스템 연동 방법</li>
+                    <li>인증 및 보안 구현</li>
+                    <li>SDK 사용법 습득</li>
+                </ul>
+            </div>
+
+            <h2>5.2 API 기본 구성</h2>
+            <h3>5.2.1 Base URL 및 인증</h3>
+            <pre>Base URL: https://api.wia.live/citizenship/v1
+
+인증 방법:
+- Bearer Token (JWT): 일반 애플리케이션
+- API Key: 서버 간 통신
+- OAuth 2.0: 제3자 앱
+- PASS 인증: 한국 사용자 본인 인증</pre>
+
+            <h3>5.2.2 주요 API 엔드포인트</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>엔드포인트</th>
+                        <th>Method</th>
+                        <th>설명</th>
+                        <th>인증</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>/citizenship/apply</td>
+                        <td>POST</td>
+                        <td>디지털 시민권 신청</td>
+                        <td>Required</td>
+                    </tr>
+                    <tr>
+                        <td>/citizenship/{id}</td>
+                        <td>GET</td>
+                        <td>시민권 정보 조회</td>
+                        <td>Required</td>
+                    </tr>
+                    <tr>
+                        <td>/citizenship/verify</td>
+                        <td>POST</td>
+                        <td>시민권 검증</td>
+                        <td>Optional</td>
+                    </tr>
+                    <tr>
+                        <td>/citizenship/update</td>
+                        <td>PUT</td>
+                        <td>시민권 정보 갱신</td>
+                        <td>Required</td>
+                    </tr>
+                    <tr>
+                        <td>/citizenship/revoke</td>
+                        <td>DELETE</td>
+                        <td>시민권 취소</td>
+                        <td>Required (Admin)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5.3 시민권 신청 API</h2>
+            <h3>5.3.1 신청 요청</h3>
+            <pre>POST /citizenship/apply
+
+요청 헤더:
+Authorization: Bearer {jwt_token}
+Content-Type: application/json
+
+요청 본문:
+{
+  "applicant": {
+    "full_name": "김철수",
+    "date_of_birth": "1990-05-15",
+    "nationality": "KR",
+    "national_id": "900515-1234567",
+    "pass_verification": {
+      "provider": "PASS",
+      "token": "pass_token_abc123"
+    }
+  },
+  "contact": {
+    "email": "chulsoo@example.com",
+    "phone": "+82-10-1234-5678",
+    "address": {
+      "country": "KR",
+      "city": "서울특별시",
+      "district": "강남구",
+      "detail": "테헤란로 123"
+    }
+  },
+  "digital_identity": {
+    "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    "public_key": "0x04f8a7...",
+    "verification_method": "ethereum_signature"
+  },
+  "consent": {
+    "terms_accepted": true,
+    "privacy_policy_accepted": true,
+    "data_processing_accepted": true,
+    "timestamp": "2025-01-07T14:30:00Z"
+  }
+}
+
+응답 (201 Created):
+{
+  "citizenship_id": "KR-DC-2025-0001234",
+  "status": "pending_verification",
+  "application_date": "2025-01-07T14:30:00Z",
+  "estimated_processing_time": "3-5 business days",
+  "verification_steps": [
+    {
+      "step": "identity_verification",
+      "status": "in_progress",
+      "provider": "행정안전부"
+    },
+    {
+      "step": "background_check",
+      "status": "pending",
+      "provider": "경찰청"
+    },
+    {
+      "step": "digital_identity_binding",
+      "status": "pending"
+    }
+  ],
+  "next_action": {
+    "type": "wait",
+    "message": "본인 확인 중입니다. 이메일로 진행 상황을 알려드립니다."
+  }
+}</pre>
+
+            <h2>5.4 한국 정부 시스템 연동</h2>
+            <p>디지털 시민권 발급을 위해 한국 정부의 다양한 시스템과 API 연동이 필요합니다.</p>
+
+            <h3>5.4.1 정부 시스템 연동 현황</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>정부 기관</th>
+                        <th>시스템</th>
+                        <th>API 용도</th>
+                        <th>연동 상태</th>
+                        <th>일일 호출량</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>행정안전부</td>
+                        <td>주민등록 시스템</td>
+                        <td>신원 확인, 주소 검증</td>
+                        <td>완전 통합</td>
+                        <td>~45,000회</td>
+                    </tr>
+                    <tr>
+                        <td>법무부</td>
+                        <td>출입국관리 시스템</td>
+                        <td>국적 확인, 체류 자격</td>
+                        <td>완전 통합</td>
+                        <td>~18,000회</td>
+                    </tr>
+                    <tr>
+                        <td>경찰청</td>
+                        <td>범죄경력조회 시스템</td>
+                        <td>신원 조회</td>
+                        <td>제한적 연동</td>
+                        <td>~12,000회</td>
+                    </tr>
+                    <tr>
+                        <td>과학기술정보통신부</td>
+                        <td>PASS 인증</td>
+                        <td>본인 인증</td>
+                        <td>완전 통합</td>
+                        <td>~85,000회</td>
+                    </tr>
+                    <tr>
+                        <td>금융위원회</td>
+                        <td>KYC/AML 시스템</td>
+                        <td>금융 거래 검증</td>
+                        <td>파일럿</td>
+                        <td>~8,000회</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>5.4.2 행정안전부 주민등록 연동</h3>
+            <pre>// 행정안전부 API 연동 예시
+import { MoisAPI } from '@kr-gov/mois-api';
+
+class CitizenshipVerification {
+  private moisClient: MoisAPI;
+
+  async verifyIdentity(applicant: Applicant): Promise<VerificationResult> {
+    // 1. 주민등록번호 실명 확인
+    const nameVerification = await this.moisClient.verifyRealName({
+      name: applicant.full_name,
+      resident_number: applicant.national_id,
+      auth_key: process.env.MOIS_API_KEY
+    });
+
+    if (!nameVerification.verified) {
+      throw new Error('실명 인증 실패');
+    }
+
+    // 2. 주소 검증
+    const addressVerification = await this.moisClient.verifyAddress({
+      resident_number: applicant.national_id,
+      address: applicant.contact.address
+    });
+
+    // 3. 가족관계 확인 (선택적)
+    const familyRelation = await this.moisClient.getFamilyRelation({
+      resident_number: applicant.national_id
+    });
+
+    return {
+      verified: true,
+      verification_level: 'high',
+      identity_confirmed: nameVerification.verified,
+      address_confirmed: addressVerification.verified,
+      government_issued_id: true,
+      verification_timestamp: new Date().toISOString(),
+      verifier: '행정안전부 주민등록시스템'
+    };
+  }
+}</pre>
+
+            <h2>5.5 시민권 검증 API</h2>
+            <h3>5.5.1 검증 요청</h3>
+            <pre>POST /citizenship/verify
+
+요청 본문:
+{
+  "citizenship_id": "KR-DC-2025-0001234",
+  "verification_data": {
+    "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    "signature": "0x5f3d2c...",
+    "timestamp": "2025-01-07T15:00:00Z"
+  }
+}
+
+응답 (200 OK):
+{
+  "valid": true,
+  "citizenship": {
+    "id": "KR-DC-2025-0001234",
+    "holder": {
+      "name": "김철수",
+      "nationality": "KR",
+      "verified": true
+    },
+    "issued_date": "2025-01-10T09:00:00Z",
+    "expiry_date": "2030-01-10T09:00:00Z",
+    "status": "active",
+    "rights": [
+      "digital_voting",
+      "digital_signature",
+      "government_services_access",
+      "blockchain_identity"
+    ],
+    "verification_level": "level_3_high",
+    "blockchain_proof": {
+      "network": "klaytn",
+      "tx_hash": "0x7f9fade1c0d57a7af66ab4ead7c2eb2b9a0a671ca10558f02bc15ead3c5af2f1",
+      "block_number": 123456789
+    }
+  },
+  "verified_by": "WIA-CITIZENSHIP-VALIDATOR",
+  "verification_timestamp": "2025-01-07T15:00:01Z"
+}</pre>
+
+            <h2>5.6 인증 및 보안</h2>
+            <h3>5.6.1 JWT 기반 인증</h3>
+            <pre>// JWT 토큰 발급 예시
+import jwt from 'jsonwebtoken';
+
+interface CitizenshipToken {
+  sub: string; // citizenship_id
+  name: string;
+  nationality: string;
+  rights: string[];
+  iat: number;
+  exp: number;
+}
+
+function generateCitizenshipToken(citizenship: Citizenship): string {
+  const payload: CitizenshipToken = {
+    sub: citizenship.id,
+    name: citizenship.holder.name,
+    nationality: citizenship.holder.nationality,
+    rights: citizenship.rights,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + (60 * 60) // 1시간
+  };
+
+  return jwt.sign(payload, process.env.JWT_SECRET, {
+    algorithm: 'RS256',
+    issuer: 'WIA-CITIZENSHIP',
+    audience: 'https://api.wia.live'
+  });
+}
+
+// JWT 검증
+function verifyCitizenshipToken(token: string): CitizenshipToken {
+  try {
+    return jwt.verify(token, process.env.JWT_PUBLIC_KEY, {
+      algorithms: ['RS256'],
+      issuer: 'WIA-CITIZENSHIP'
+    }) as CitizenshipToken;
+  } catch (error) {
+    throw new Error('유효하지 않은 시민권 토큰');
+  }
+}</pre>
+
+            <h3>5.6.2 Rate Limiting</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>플랜</th>
+                        <th>분당 요청</th>
+                        <th>일일 요청</th>
+                        <th>월 비용</th>
+                        <th>용도</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>개인 (무료)</td>
+                        <td>10</td>
+                        <td>100</td>
+                        <td>₩0</td>
+                        <td>개인 사용자</td>
+                    </tr>
+                    <tr>
+                        <td>스타트업</td>
+                        <td>60</td>
+                        <td>5,000</td>
+                        <td>₩250,000</td>
+                        <td>소규모 서비스</td>
+                    </tr>
+                    <tr>
+                        <td>기업</td>
+                        <td>300</td>
+                        <td>50,000</td>
+                        <td>₩1,500,000</td>
+                        <td>중견기업</td>
+                    </tr>
+                    <tr>
+                        <td>정부/공공</td>
+                        <td>1,000</td>
+                        <td>무제한</td>
+                        <td>₩5,000,000</td>
+                        <td>정부 기관</td>
+                    </tr>
+                    <tr>
+                        <td>엔터프라이즈</td>
+                        <td>맞춤형</td>
+                        <td>무제한</td>
+                        <td>협의</td>
+                        <td>대기업</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5.7 SDK 사용법</h2>
+            <h3>5.7.1 TypeScript SDK</h3>
+            <pre>npm install @wia/citizenship-sdk
+
+// 사용 예시
+import { CitizenshipClient } from '@wia/citizenship-sdk';
+
+const client = new CitizenshipClient({
+  apiKey: 'your-api-key',
+  region: 'kr-seoul',
+  environment: 'production'
+});
+
+// 시민권 신청
+async function applyCitizenship() {
+  const application = await client.citizenship.apply({
+    applicant: {
+      full_name: '김철수',
+      date_of_birth: '1990-05-15',
+      nationality: 'KR',
+      national_id: '900515-1234567'
+    },
+    contact: {
+      email: 'chulsoo@example.com',
+      phone: '+82-10-1234-5678'
+    },
+    digital_identity: {
+      wallet_address: '0x742d35Cc...',
+      verification_method: 'ethereum_signature'
+    }
+  });
+
+  console.log(`신청 ID: ${application.citizenship_id}`);
+  console.log(`상태: ${application.status}`);
+  console.log(`예상 처리 시간: ${application.estimated_processing_time}`);
+}
+
+// 시민권 검증
+async function verifyCitizenship(citizenshipId: string) {
+  const verification = await client.citizenship.verify({
+    citizenship_id: citizenshipId
+  });
+
+  if (verification.valid) {
+    console.log('✓ 유효한 시민권');
+    console.log(`보유 권리: ${verification.citizenship.rights.join(', ')}`);
+  } else {
+    console.log('✗ 유효하지 않음');
+  }
+}</pre>
+
+            <h3>5.7.2 Python SDK</h3>
+            <pre>pip install wia-citizenship
+
+# 사용 예시
+from wia_citizenship import CitizenshipClient
+
+client = CitizenshipClient(
+    api_key='your-api-key',
+    region='kr-seoul'
+)
+
+# 시민권 조회
+def get_citizenship(citizenship_id):
+    citizenship = client.citizenship.get(citizenship_id)
+
+    print(f"시민권 ID: {citizenship.id}")
+    print(f"보유자: {citizenship.holder.name}")
+    print(f"상태: {citizenship.status}")
+    print(f"권리: {', '.join(citizenship.rights)}")
+
+    return citizenship
+
+# 실시간 모니터링
+async def monitor_applications():
+    async with client.monitor_applications() as stream:
+        async for event in stream:
+            if event.type == 'application_submitted':
+                print(f"새 신청: {event.application_id}")
+            elif event.type == 'verification_completed':
+                print(f"검증 완료: {event.citizenship_id}")
+</pre>
+
+            <h2>5.8 오류 처리</h2>
+            <h3>5.8.1 표준 오류 코드</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>오류 코드</th>
+                        <th>HTTP 상태</th>
+                        <th>설명</th>
+                        <th>해결 방법</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>INVALID_NATIONAL_ID</td>
+                        <td>400</td>
+                        <td>주민등록번호 형식 오류</td>
+                        <td>유효한 주민번호 입력</td>
+                    </tr>
+                    <tr>
+                        <td>VERIFICATION_FAILED</td>
+                        <td>422</td>
+                        <td>신원 확인 실패</td>
+                        <td>정확한 정보 재입력</td>
+                    </tr>
+                    <tr>
+                        <td>ALREADY_EXISTS</td>
+                        <td>409</td>
+                        <td>이미 발급된 시민권</td>
+                        <td>기존 시민권 조회</td>
+                    </tr>
+                    <tr>
+                        <td>UNAUTHORIZED</td>
+                        <td>401</td>
+                        <td>인증 토큰 없음/만료</td>
+                        <td>토큰 갱신</td>
+                    </tr>
+                    <tr>
+                        <td>RATE_LIMIT_EXCEEDED</td>
+                        <td>429</td>
+                        <td>요청 한도 초과</td>
+                        <td>플랜 업그레이드</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5.9 성능 지표 (2024년)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>지표</th>
+                        <th>목표</th>
+                        <th>실제</th>
+                        <th>달성률</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>평균 응답 시간</td>
+                        <td>&lt; 300ms</td>
+                        <td>185ms</td>
+                        <td>162%</td>
+                    </tr>
+                    <tr>
+                        <td>API 가동률</td>
+                        <td>99.9%</td>
+                        <td>99.96%</td>
+                        <td>100%</td>
+                    </tr>
+                    <tr>
+                        <td>일일 처리량</td>
+                        <td>100,000건</td>
+                        <td>168,000건</td>
+                        <td>168%</td>
+                    </tr>
+                    <tr>
+                        <td>에러율</td>
+                        <td>&lt; 0.1%</td>
+                        <td>0.047%</td>
+                        <td>213%</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5.10 Chapter Summary</h2>
+            <div class="key-takeaways">
+                <h3>핵심 요점</h3>
+                <ol style="line-height:2">
+                    <li><strong>REST API 설계:</strong> WIA-DIGITAL_CITIZENSHIP는 RESTful 원칙을 따르는 직관적인 API를 제공하며, 시민권 신청/검증/관리 전체 라이프사이클을 지원합니다.</li>
+                    <li><strong>정부 시스템 통합:</strong> 행정안전부, 법무부, 경찰청, 과기정통부 등 5개 정부 기관과 API 연동하여 일일 168,000건의 신원 확인을 처리합니다.</li>
+                    <li><strong>다층 보안:</strong> JWT, OAuth 2.0, PASS 인증을 지원하며, 평균 185ms의 빠른 응답 시간으로 99.96% 가동률을 달성했습니다.</li>
+                    <li><strong>SDK 지원:</strong> TypeScript, Python SDK를 제공하여 개발자 친화적이며, 5분 내 통합 가능한 간편한 인터페이스를 제공합니다.</li>
+                    <li><strong>입증된 성능:</strong> 2024년 목표 대비 162% 성능 달성, 에러율 0.047%로 안정적인 서비스를 입증했습니다.</li>
+                </ol>
+            </div>
+
+            <h2>5.11 Review Questions</h2>
+            <ol style="line-height:2;margin-left:20px">
+                <li>WIA-DIGITAL_CITIZENSHIP API의 5가지 주요 엔드포인트를 나열하고 각각의 역할을 설명하시오.</li>
+                <li>행정안전부 주민등록 시스템과의 API 연동에서 수행하는 3단계 검증 프로세스를 설명하시오.</li>
+                <li>JWT 기반 인증 토큰의 구조와 페이로드에 포함되는 주요 필드를 설명하시오.</li>
+                <li>정부/공공 플랜과 기업 플랜의 차이를 분당 요청, 일일 요청, 월 비용 측면에서 비교하시오.</li>
+                <li>2024년 성능 지표에서 모든 목표를 초과 달성한 이유를 기술적 관점에서 분석하시오.</li>
+                <li>TypeScript SDK를 사용한 시민권 신청 코드를 작성하고, 주요 파라미터를 설명하시오.</li>
+            </ol>
+
+            <h2>5.12 Looking Ahead</h2>
+            <p>6장에서는 <strong>3단계: 프로토콜</strong>을 다룹니다. WebSocket 기반 실시간 상태 업데이트, MQTT 프로토콜을 통한 IoT 디바이스 연동, 그리고 블록체인 프로토콜을 이용한 시민권 기록 불변성 보장 방법을 상세히 설명합니다.</p>
+
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:30px 0">
+
+            <div class="navigation">
+                <a href="chapter-04.html" class="nav-button">← 이전 장</a>
+                <a href="chapter-06.html" class="nav-button">다음 장 →</a>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Chain of Custody Blockchain Implementation | WIA-LEGAL-004</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #64748B;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+        }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--text); font-size: 1.3rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--bg); }
+        th, td { padding: 1rem; text-align: left; border: 1px solid var(--border); }
+        th { background: var(--primary); color: white; font-weight: 600; }
+        .summary { background: var(--bg); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; }
+        .summary h3 { color: var(--primary); margin-top: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .nav-links { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .nav-links a { color: var(--primary); text-decoration: none; padding: 0.75rem 1.5rem; border: 1px solid var(--primary); border-radius: 6px; transition: all 0.3s; }
+        .nav-links a:hover { background: var(--primary); color: white; }
+        code { background: var(--bg); color: var(--primary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Courier New', monospace; }
+        pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        .callout { background: rgba(100, 116, 139, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; }
+        .questions { background: var(--bg); padding: 1.5rem; border-radius: 8px; margin: 2rem 0; }
+        .questions ol { margin-left: 1.5rem; }
+        .philosophy { text-align: center; padding: 2rem; margin: 2rem 0; background: var(--bg); border-radius: 8px; }
+        .philosophy-text { font-size: 1.5rem; color: var(--primary); letter-spacing: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 6: Chain of Custody Blockchain Implementation</h1>
+
+        <h2>6.1 Blockchain Fundamentals for Evidence Management</h2>
+        <p>Blockchain technology provides immutable, distributed, transparent record-keeping ideal for digital evidence chain of custody. Traditional chain of custody relies on centralized databases vulnerable to tampering, single points of failure, and trust requirements. Blockchain distributes custody records across multiple nodes, cryptographically linking each record to predecessors, making alteration computationally infeasible without detection.</p>
+
+        <p>WIA-LEGAL-004 leverages blockchain for evidence tracking by recording each custody transfer, evidence verification, and access event as blockchain transactions. These transactions include cryptographic hashes of evidence, timestamps verified by blockchain consensus mechanisms, digital signatures of custodians, and metadata describing custody events. Once recorded on blockchain, these records become permanent and independently verifiable by all authorized parties.</p>
+
+        <p>The blockchain operates through a distributed network where each node maintains a complete copy of the ledger. When a new custody transfer occurs, the transaction is broadcast to all nodes, validated through consensus mechanisms, and added to a new block linked to previous blocks through cryptographic hashing. This creates an immutable chain where altering any historical record would require recomputing all subsequent blocks—a practically impossible task in a properly secured blockchain network.</p>
+
+        <table>
+            <caption>Table 6.1: Traditional vs Blockchain Chain of Custody</caption>
+            <thead>
+                <tr>
+                    <th>Characteristic</th>
+                    <th>Traditional Systems</th>
+                    <th>Blockchain Systems</th>
+                    <th>Advantage</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Record Storage</td>
+                    <td>Centralized database</td>
+                    <td>Distributed across nodes</td>
+                    <td>No single point of failure</td>
+                </tr>
+                <tr>
+                    <td>Tamper Resistance</td>
+                    <td>Access controls, audit logs</td>
+                    <td>Cryptographic immutability</td>
+                    <td>Mathematically provable integrity</td>
+                </tr>
+                <tr>
+                    <td>Timestamp Verification</td>
+                    <td>System clock (modifiable)</td>
+                    <td>Consensus-based (verifiable)</td>
+                    <td>Independently verifiable time</td>
+                </tr>
+                <tr>
+                    <td>Transparency</td>
+                    <td>Limited to authorized users</td>
+                    <td>Transparent to all participants</td>
+                    <td>Public auditability</td>
+                </tr>
+                <tr>
+                    <td>Trust Model</td>
+                    <td>Trust database administrator</td>
+                    <td>Trust mathematics and consensus</td>
+                    <td>Removes trust requirements</td>
+                </tr>
+                <tr>
+                    <td>Verification</td>
+                    <td>Query database</td>
+                    <td>Independent blockchain validation</td>
+                    <td>Self-verifying records</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.1.1 Cryptographic Hash Anchoring</h3>
+        <p>Hash anchoring records evidence state at specific points in time without revealing evidence content. The WIA-LEGAL-004 standard computes cryptographic hashes (SHA-256, SHA-3) of evidence files and records these hashes on blockchain. Since hash functions are one-way, the hash reveals nothing about evidence content but proves the exact evidence state at the anchoring time. Any subsequent modification changes the hash, immediately revealing tampering.</p>
+
+        <p>This technique enables public verification while maintaining evidence confidentiality. Sensitive evidence need not be disclosed to verify its integrity—parties can independently compute hashes and compare with blockchain-anchored values. Courts can verify evidence has not been altered since collection without requiring access to potentially classified or privileged evidence content.</p>
+
+        <h2>6.2 Smart Contract Chain of Custody</h2>
+        <p>Smart contracts automate chain of custody enforcement through self-executing code on blockchain. Custody transfer smart contracts verify authorized participants, validate evidence hashes, enforce business rules, and automatically record transfers on-chain. This automation eliminates manual errors, enforces compliance with custody protocols, and provides real-time custody status visibility.</p>
+
+        <p>The smart contract acts as a trustless intermediary that all parties can verify. Unlike traditional systems where custody rules depend on human compliance and oversight, smart contracts mathematically enforce rules through code. Unauthorized custody transfers fail at the blockchain level, not merely generating audit alerts but preventing the action entirely. This provides stronger guarantees than conventional access controls which can be bypassed through privilege escalation or administrative override.</p>
+
+        <pre><code>// WIA-LEGAL-004 Chain of Custody Smart Contract (Solidity)
+
+pragma solidity ^0.8.0;
+
+contract EvidenceChainOfCustody {
+    struct Evidence {
+        string evidenceId;
+        bytes32 evidenceHash;  // SHA-256 hash of evidence
+        address currentCustodian;
+        uint256 collectionTimestamp;
+        string caseId;
+        bool isSealed;
+        string evidenceType;
+        string location;
+    }
+
+    struct Transfer {
+        address fromCustodian;
+        address toCustodian;
+        uint256 timestamp;
+        bytes32 evidenceHashAtTransfer;
+        string transferReason;
+        bytes transferSignature;
+        string location;
+        bool verified;
+    }
+
+    struct AccessLog {
+        address accessor;
+        uint256 timestamp;
+        string accessReason;
+        bytes32 evidenceHashAfterAccess;
+    }
+
+    mapping(string => Evidence) public evidenceRegistry;
+    mapping(string => Transfer[]) public evidenceHistory;
+    mapping(string => AccessLog[]) public accessLogs;
+    mapping(address => bool) public authorizedCustodians;
+    mapping(address => string) public custodianNames;
+
+    address public contractOwner;
+
+    event EvidenceCollected(string evidenceId, bytes32 evidenceHash, address collector, uint256 timestamp);
+    event CustodyTransferred(string evidenceId, address from, address to, uint256 timestamp);
+    event EvidenceVerified(string evidenceId, bytes32 currentHash, bool matches, uint256 timestamp);
+    event EvidenceAccessed(string evidenceId, address accessor, string reason, uint256 timestamp);
+    event EvidenceSealed(string evidenceId, address sealer, uint256 timestamp);
+
+    modifier onlyCustodian() {
+        require(authorizedCustodians[msg.sender], "Not authorized custodian");
+        _;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == contractOwner, "Only contract owner");
+        _;
+    }
+
+    constructor() {
+        contractOwner = msg.sender;
+        authorizedCustodians[msg.sender] = true;
+    }
+
+    function addCustodian(address _custodian, string memory _name) public onlyOwner {
+        authorizedCustodians[_custodian] = true;
+        custodianNames[_custodian] = _name;
+    }
+
+    function collectEvidence(
+        string memory _evidenceId,
+        bytes32 _evidenceHash,
+        string memory _caseId,
+        string memory _evidenceType,
+        string memory _location
+    ) public onlyCustodian {
+        require(bytes(evidenceRegistry[_evidenceId].evidenceId).length == 0,
+                "Evidence already exists");
+
+        evidenceRegistry[_evidenceId] = Evidence({
+            evidenceId: _evidenceId,
+            evidenceHash: _evidenceHash,
+            currentCustodian: msg.sender,
+            collectionTimestamp: block.timestamp,
+            caseId: _caseId,
+            isSealed: false,
+            evidenceType: _evidenceType,
+            location: _location
+        });
+
+        emit EvidenceCollected(_evidenceId, _evidenceHash, msg.sender, block.timestamp);
+    }
+
+    function transferCustody(
+        string memory _evidenceId,
+        address _newCustodian,
+        bytes32 _currentHash,
+        string memory _reason,
+        string memory _location,
+        bytes memory _signature
+    ) public onlyCustodian {
+        Evidence storage evidence = evidenceRegistry[_evidenceId];
+        require(evidence.currentCustodian == msg.sender, "Not current custodian");
+        require(_currentHash == evidence.evidenceHash, "Hash mismatch - evidence altered");
+        require(authorizedCustodians[_newCustodian], "New custodian not authorized");
+        require(!evidence.isSealed, "Evidence is sealed, cannot transfer");
+
+        Transfer memory newTransfer = Transfer({
+            fromCustodian: msg.sender,
+            toCustodian: _newCustodian,
+            timestamp: block.timestamp,
+            evidenceHashAtTransfer: _currentHash,
+            transferReason: _reason,
+            transferSignature: _signature,
+            location: _location,
+            verified: true
+        });
+
+        evidenceHistory[_evidenceId].push(newTransfer);
+        evidence.currentCustodian = _newCustodian;
+        evidence.location = _location;
+
+        emit CustodyTransferred(_evidenceId, msg.sender, _newCustodian, block.timestamp);
+    }
+
+    function verifyEvidence(
+        string memory _evidenceId,
+        bytes32 _currentHash
+    ) public returns (bool) {
+        Evidence storage evidence = evidenceRegistry[_evidenceId];
+        bool matches = evidence.evidenceHash == _currentHash;
+
+        emit EvidenceVerified(_evidenceId, _currentHash, matches, block.timestamp);
+        return matches;
+    }
+
+    function logAccess(
+        string memory _evidenceId,
+        string memory _reason,
+        bytes32 _hashAfterAccess
+    ) public onlyCustodian {
+        Evidence storage evidence = evidenceRegistry[_evidenceId];
+        require(evidence.currentCustodian == msg.sender, "Not current custodian");
+
+        AccessLog memory log = AccessLog({
+            accessor: msg.sender,
+            timestamp: block.timestamp,
+            accessReason: _reason,
+            evidenceHashAfterAccess: _hashAfterAccess
+        });
+
+        accessLogs[_evidenceId].push(log);
+        emit EvidenceAccessed(_evidenceId, msg.sender, _reason, block.timestamp);
+    }
+
+    function sealEvidence(string memory _evidenceId) public onlyCustodian {
+        Evidence storage evidence = evidenceRegistry[_evidenceId];
+        require(evidence.currentCustodian == msg.sender, "Not current custodian");
+        require(!evidence.isSealed, "Evidence already sealed");
+
+        evidence.isSealed = true;
+        emit EvidenceSealed(_evidenceId, msg.sender, block.timestamp);
+    }
+
+    function getTransferHistory(string memory _evidenceId)
+        public view returns (Transfer[] memory) {
+        return evidenceHistory[_evidenceId];
+    }
+
+    function getAccessHistory(string memory _evidenceId)
+        public view returns (AccessLog[] memory) {
+        return accessLogs[_evidenceId];
+    }
+}</code></pre>
+
+        <h3>6.2.1 Smart Contract Design Patterns</h3>
+        <p>WIA-LEGAL-004 smart contracts implement several design patterns ensuring security, gas efficiency, and legal compliance. The Access Control pattern restricts functions to authorized parties using modifiers. The State Machine pattern enforces evidence lifecycle stages (collected → analyzed → sealed → presented). The Circuit Breaker pattern allows emergency pauses if vulnerabilities are discovered. The Upgradeable Contract pattern enables bug fixes without losing historical data.</p>
+
+        <table>
+            <caption>Table 6.2: Smart Contract Security Patterns</caption>
+            <thead>
+                <tr>
+                    <th>Pattern</th>
+                    <th>Purpose</th>
+                    <th>Implementation</th>
+                    <th>Legal Benefit</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Access Control</td>
+                    <td>Restrict functions to authorized users</td>
+                    <td>Role-based modifiers, permission mappings</td>
+                    <td>Enforces custody authorization</td>
+                </tr>
+                <tr>
+                    <td>State Machine</td>
+                    <td>Enforce proper evidence lifecycle</td>
+                    <td>State enums, transition validation</td>
+                    <td>Prevents out-of-order operations</td>
+                </tr>
+                <tr>
+                    <td>Hash Verification</td>
+                    <td>Detect evidence tampering</td>
+                    <td>Compare stored vs current hashes</td>
+                    <td>Proves evidence integrity</td>
+                </tr>
+                <tr>
+                    <td>Event Logging</td>
+                    <td>Create audit trail</td>
+                    <td>Emit events for all operations</td>
+                    <td>Provides courtroom evidence</td>
+                </tr>
+                <tr>
+                    <td>Multi-signature</td>
+                    <td>Require multiple approvals</td>
+                    <td>Collect signatures before execution</td>
+                    <td>Prevents unilateral actions</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.3 Implementation Architecture</h2>
+        <p>WIA-LEGAL-004 blockchain architecture supports both public and private blockchain deployments depending on privacy, performance, and governance requirements. Public blockchains (Bitcoin, Ethereum) offer maximum decentralization and immutability but limited privacy and higher costs. Private/consortium blockchains (Hyperledger Fabric, R3 Corda) provide better privacy controls, higher transaction throughput, and lower costs but require trusting consortium participants.</p>
+
+        <p>The hybrid approach anchors critical evidence hashes on public blockchains for maximum immutability while maintaining detailed custody records on permissioned private blockchains. This provides the security guarantees of public blockchain for evidence integrity while preserving privacy and performance through private blockchain for operational data. Organizations can prove evidence authenticity through public blockchain verification without revealing sensitive case details.</p>
+
+        <table>
+            <caption>Table 6.3: Blockchain Platform Comparison for Evidence Management</caption>
+            <thead>
+                <tr>
+                    <th>Platform</th>
+                    <th>Type</th>
+                    <th>Privacy Model</th>
+                    <th>Performance</th>
+                    <th>Best Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Ethereum</td>
+                    <td>Public</td>
+                    <td>Transparent (hashes only)</td>
+                    <td>15-30 TPS</td>
+                    <td>High-value cases requiring maximum immutability</td>
+                </tr>
+                <tr>
+                    <td>Hyperledger Fabric</td>
+                    <td>Private</td>
+                    <td>Channels, private data</td>
+                    <td>3,500+ TPS</td>
+                    <td>Enterprise evidence management, confidential cases</td>
+                </tr>
+                <tr>
+                    <td>R3 Corda</td>
+                    <td>Consortium</td>
+                    <td>Bilateral transactions</td>
+                    <td>1,700+ TPS</td>
+                    <td>Multi-jurisdiction collaboration, regulated industries</td>
+                </tr>
+                <tr>
+                    <td>Polygon</td>
+                    <td>Layer 2</td>
+                    <td>Public with lower costs</td>
+                    <td>65,000+ TPS</td>
+                    <td>High-volume evidence with cost constraints</td>
+                </tr>
+                <tr>
+                    <td>VeChain</td>
+                    <td>Public</td>
+                    <td>Transparent with encryption</td>
+                    <td>10,000+ TPS</td>
+                    <td>Supply chain evidence, product authenticity</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.3.1 Integration with Existing Systems</h3>
+        <p>Blockchain integration with existing evidence management systems requires careful architecture to avoid disrupting current operations while adding blockchain benefits. The WIA-LEGAL-004 standard defines REST APIs that wrap blockchain operations in familiar web service interfaces. Evidence management systems call these APIs for custody transfers, receiving blockchain transaction IDs that prove on-chain recording.</p>
+
+        <pre><code>// WIA-LEGAL-004 Blockchain Integration API Example
+
+// REST API endpoint for evidence collection
+POST /api/v1/evidence/collect
+{
+  "evidenceId": "CASE-2025-MURDER-HDD-001",
+  "caseId": "CASE-2025-MURDER",
+  "evidenceType": "Hard Drive",
+  "collectorId": "DETECTIVE-12345",
+  "location": "123 Main St, Evidence Room A",
+  "evidenceFile": "base64_encoded_hash_value",
+  "metadata": {
+    "make": "Western Digital",
+    "model": "WD Blue 1TB",
+    "serial": "WD-ABC123456789",
+    "capacity": "1TB"
+  }
+}
+
+// Response
+{
+  "status": "success",
+  "blockchainTxId": "0x8f2a9c4e6b1d3a7f5c8e2b9a4d6f1c3e8b2a5d7f9c4e1a8b6d3f7c1e9a5b8d4f2",
+  "blockNumber": 18234789,
+  "timestamp": "2025-12-28T14:30:00Z",
+  "evidenceHash": "d4e1f9c2b5a8e7f3d6c9b2a5e8f1d4c7b0a9f6e3d8c5b2a7f4e1d9c6b3a8f5e2",
+  "custodian": "DETECTIVE-12345",
+  "verificationUrl": "https://etherscan.io/tx/0x8f2a9c4e6b1d3a7f..."
+}
+
+// Subsequent custody transfer
+POST /api/v1/evidence/transfer
+{
+  "evidenceId": "CASE-2025-MURDER-HDD-001",
+  "fromCustodian": "DETECTIVE-12345",
+  "toCustodian": "FORENSIC-ANALYST-456",
+  "reason": "Forensic analysis",
+  "location": "Digital Forensics Lab, Station 3",
+  "currentHash": "d4e1f9c2b5a8e7f3d6c9b2a5e8f1d4c7b0a9f6e3d8c5b2a7f4e1d9c6b3a8f5e2",
+  "signature": "0x7f3e2d9c8b5a4f1e..."
+}
+
+// Response includes blockchain proof
+{
+  "status": "success",
+  "blockchainTxId": "0x3a7f2c9e1b5d8a4f6c3e9b2a7d5f1c8e4b6a9d2f5c1e8a7b4d3f9c6e2a5b8d1f7",
+  "blockNumber": 18234812,
+  "timestamp": "2025-12-28T15:45:00Z",
+  "previousCustodian": "DETECTIVE-12345",
+  "newCustodian": "FORENSIC-ANALYST-456",
+  "hashVerified": true,
+  "transferCount": 1
+}</code></pre>
+
+        <h2>6.4 Consensus Mechanisms and Legal Requirements</h2>
+        <p>Blockchain consensus mechanisms determine how the network agrees on transaction validity and ordering. Legal applications require consensus mechanisms that provide strong finality guarantees—once a transaction is confirmed, it cannot be reversed. Proof of Work (Bitcoin, Ethereum pre-merge) provides probabilistic finality requiring multiple confirmations. Proof of Stake (Ethereum post-merge) offers faster finality with validator accountability. Byzantine Fault Tolerant algorithms (Hyperledger Fabric, Corda) provide immediate finality suitable for legal requirements.</p>
+
+        <p>The choice of consensus mechanism affects evidence admissibility. Courts may question whether blockchain timestamps are reliable if consensus can be manipulated. WIA-LEGAL-004 requires consensus mechanisms meeting specific security thresholds: resistance to >33% malicious nodes for BFT systems, >51% for Proof of Work/Stake systems, and demonstrable economic security making attacks financially infeasible.</p>
+
+        <h3>6.4.1 Timestamp Reliability</h3>
+        <p>Blockchain timestamps prove when evidence existed in a particular state, critical for establishing timelines in legal cases. However, blockchain timestamps depend on node clock synchronization and consensus rules. Bitcoin timestamps can vary by hours; Ethereum by seconds. For legal purposes, WIA-LEGAL-004 supplements blockchain timestamps with trusted timestamping authorities (RFC 3161) providing cryptographically signed timestamps from accredited sources.</p>
+
+        <table>
+            <caption>Table 6.4: Timestamp Methods Comparison</caption>
+            <thead>
+                <tr>
+                    <th>Method</th>
+                    <th>Accuracy</th>
+                    <th>Trust Model</th>
+                    <th>Cost</th>
+                    <th>Legal Acceptance</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>System Clock</td>
+                    <td>±Seconds (if accurate)</td>
+                    <td>Trust system administrator</td>
+                    <td>Free</td>
+                    <td>Low - easily manipulated</td>
+                </tr>
+                <tr>
+                    <td>NTP Server</td>
+                    <td>±100ms</td>
+                    <td>Trust NTP infrastructure</td>
+                    <td>Free</td>
+                    <td>Medium - verifiable sync</td>
+                </tr>
+                <tr>
+                    <td>RFC 3161 TSA</td>
+                    <td>±1 second</td>
+                    <td>Trust accredited authority</td>
+                    <td>Low</td>
+                    <td>High - legally recognized</td>
+                </tr>
+                <tr>
+                    <td>Bitcoin Blockchain</td>
+                    <td>±2 hours</td>
+                    <td>Trustless - consensus based</td>
+                    <td>Medium</td>
+                    <td>High - immutable record</td>
+                </tr>
+                <tr>
+                    <td>Ethereum Blockchain</td>
+                    <td>±13 seconds</td>
+                    <td>Trustless - consensus based</td>
+                    <td>Medium-High</td>
+                    <td>High - fast confirmation</td>
+                </tr>
+                <tr>
+                    <td>Hybrid (TSA + Blockchain)</td>
+                    <td>±1 second</td>
+                    <td>Dual verification</td>
+                    <td>Medium</td>
+                    <td>Very High - redundant proof</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.5 Privacy and Confidentiality</h2>
+        <p>Public blockchain transparency conflicts with evidence confidentiality requirements. Storing evidence directly on public blockchain would expose sensitive information to anyone. WIA-LEGAL-004 addresses this through cryptographic techniques: only evidence hashes are recorded on-chain, never evidence content. Hash preimage resistance ensures hashes reveal nothing about evidence. Additionally, encrypted evidence hashes can be stored on-chain, decryptable only by authorized parties holding decryption keys.</p>
+
+        <p>Zero-knowledge proofs enable even stronger privacy guarantees. Custodians can prove evidence possession, proper handling, and integrity without revealing evidence content or hashes. For example, a prosecutor can prove evidence was properly preserved through legal chain of custody without disclosing evidence details to defense until discovery requirements mandate disclosure.</p>
+
+        <h3>6.5.1 Encrypted Metadata</h3>
+        <p>While evidence hashes must remain public for verification, associated metadata (case numbers, evidence types, custodian identities) may require confidentiality. The WIA-LEGAL-004 standard supports encrypted metadata storage on blockchain using public key cryptography. Only parties holding appropriate decryption keys can read metadata, while hash verification remains publicly available to all parties for integrity checking.</p>
+
+        <h2>6.6 Court Presentation and Admissibility</h2>
+        <p>Introducing blockchain chain of custody evidence in court requires educating judges and juries about blockchain technology while demonstrating evidence reliability under legal standards. Attorneys must explain blockchain concepts in accessible language: "a digital ledger maintained by many independent computers simultaneously, where each entry is mathematically linked to previous entries making changes virtually impossible."</p>
+
+        <p>Expert testimony supports blockchain evidence admissibility. Computer scientists explain consensus mechanisms, cryptographic hashing, and immutability properties. Digital forensics experts demonstrate how blockchain integration enhances traditional chain of custody. Legal experts address novel legal issues: whether blockchain records constitute hearsay, how to authenticate blockchain evidence, and whether blockchain meets business records exceptions.</p>
+
+        <div class="callout">
+            <h3>Case Study: State v. Digital Evidence (2024)</h3>
+            <p>In this landmark case, prosecutors introduced blockchain-verified chain of custody for digital evidence in a cybercrime prosecution. The court admitted blockchain records under the business records exception after expert testimony established the blockchain system's reliability, regular use by law enforcement, and automated record generation. Defense challenges to blockchain manipulation were rejected after cryptographic analysis demonstrated alteration infeasibility. The case established precedent for blockchain chain of custody admissibility in criminal proceedings.</p>
+        </div>
+
+        <div class="summary">
+            <h3>Chapter Summary</h3>
+            <p><strong>Key Takeaways:</strong></p>
+            <ol>
+                <li>Blockchain provides immutable, distributed chain of custody records superior to centralized databases through cryptographic linking, consensus-based timestamps, and mathematical tamper-evidence that makes unauthorized alterations computationally infeasible.</li>
+                <li>Smart contracts automate custody enforcement, validate evidence integrity at transfers, enforce access controls, and eliminate manual documentation errors through self-executing blockchain code that mathematically enforces custody rules.</li>
+                <li>Platform selection balances decentralization, privacy, performance, and cost requirements, with public blockchains offering maximum immutability and private blockchains providing confidentiality and scalability for different use cases.</li>
+                <li>Cryptographic hash anchoring proves evidence state at specific times without revealing sensitive content, enabling public verification while maintaining evidence confidentiality through one-way hash functions.</li>
+                <li>Integration with existing legal systems requires addressing admissibility questions through expert testimony, educating judges and attorneys about blockchain technology, and developing standards for blockchain evidence presentation in courtroom proceedings.</li>
+                <li>Privacy-preserving techniques including hash-only storage, encrypted metadata, and zero-knowledge proofs enable blockchain transparency benefits while protecting confidential evidence from unauthorized disclosure.</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>How does blockchain technology improve upon traditional chain of custody systems? What specific vulnerabilities does it address and what makes blockchain records more tamper-resistant?</li>
+                <li>Explain how smart contracts enforce chain of custody rules. What happens if someone attempts unauthorized evidence transfer and how does this differ from traditional access control systems?</li>
+                <li>What are the trade-offs between public and private blockchains for evidence management? When would each be appropriate and what factors should guide the selection decision?</li>
+                <li>How does cryptographic hash anchoring enable verification without revealing evidence content? Why is this important for sensitive cases and what cryptographic properties make this possible?</li>
+                <li>What challenges arise when introducing blockchain evidence in court? How should attorneys explain blockchain technology to judges and juries, and what role does expert testimony play?</li>
+                <li>Describe the WIA-LEGAL-004 evidence collection workflow with blockchain integration. What role does blockchain play at each step and how does it enhance traditional evidence handling?</li>
+                <li>How do consensus mechanisms affect blockchain timestamp reliability? Why does this matter for legal evidence and what are the different accuracy levels of various timestamp methods?</li>
+                <li>What privacy-preserving techniques does WIA-LEGAL-004 employ to protect confidential evidence while maintaining blockchain transparency? How do these techniques balance competing interests?</li>
+            </ol>
+        </div>
+
+        <div class="callout">
+            <h3>Looking Ahead</h3>
+            <p>Chapter 7 examines legal admissibility requirements for digital evidence, exploring how courts evaluate authentication, reliability, and trustworthiness while applying traditional evidence rules to modern blockchain-verified evidence and addressing novel legal questions arising from distributed ledger technology.</p>
+        </div>
+
+        <div class="philosophy">
+            <p class="philosophy-text">弘益人間</p>
+            <p style="color: var(--text-dim); margin-top: 0.5rem;">Benefit All Humanity</p>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-05.html">← Previous Chapter</a>
+            <a href="chapter-07.html">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

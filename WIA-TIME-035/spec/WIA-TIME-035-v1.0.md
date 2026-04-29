@@ -2023,7 +2023,7 @@ CERTIFICATION_PROCESS:
 ### 12.2 Academic References
 
 1. **Temporal Cryptography:**
-   - 선행 연구. "Cryptographic Protocols for Temporal Communication"
+   - 관련 분야 자료. "Cryptographic Protocols for Temporal Communication"
    - Chen, L. (2024). "Timeline-Bound Encryption Schemes"
    - Quantum Temporal Cryptography Symposium Proceedings 2024
 

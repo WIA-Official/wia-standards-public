@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제6장: Phase 3 - 프로토콜과 분산 저장 - WIA-ART-012</title>
+<style>
+:root{--bg:#0f172a;--surface:#1e293b;--surface-2:#283548;--primary:#F59E0B;--text:#f1f5f9;--text-dim:#94a3b8;--border:#334155;--gold:#ffd700;--success:#10b981}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Malgun Gothic',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.9}.container{max-width:900px;margin:0 auto;padding:2rem}header{text-align:center;padding:3rem 0;border-bottom:2px solid var(--primary);margin-bottom:2rem}.badge{display:inline-block;background:var(--primary);color:var(--bg);padding:0.5rem 1.5rem;border-radius:2rem;font-weight:600;margin-bottom:1rem}h1{font-size:2.2rem;color:var(--primary);margin-bottom:1rem}h2{color:var(--primary);font-size:1.6rem;margin:2rem 0 1rem;border-bottom:1px solid var(--border);padding-bottom:0.5rem}h3{color:var(--gold);font-size:1.3rem;margin:1.5rem 0 1rem}p{margin-bottom:1rem;word-break:keep-all;text-align:justify}.callout{background:var(--surface);border-left:4px solid var(--primary);padding:1.5rem;margin:1.5rem 0;border-radius:0 0.5rem 0.5rem 0}.callout-title{font-weight:600;margin-bottom:0.5rem;color:var(--gold)}ul,ol{margin:1rem 0 1rem 1.5rem}li{margin-bottom:0.5rem}table{width:100%;border-collapse:collapse;margin:1.5rem 0;background:var(--surface)}th,td{padding:0.75rem;text-align:left;border-bottom:1px solid var(--border)}th{background:var(--surface-2);color:var(--primary);font-weight:600}tr:hover{background:rgba(245,158,11,0.05)}.nav{display:flex;justify-content:space-between;padding:2rem 0;border-top:1px solid var(--border);margin-top:2rem}.nav a{color:var(--primary);text-decoration:none;padding:0.75rem 1.5rem;background:var(--surface);border-radius:0.5rem;transition:all 0.3s}.nav a:hover{background:var(--primary);color:var(--bg)}.philosophy{text-align:center;padding:2rem;background:var(--surface);border-radius:1rem;margin:2rem 0}.philosophy-text{font-size:1.5rem;color:var(--gold);margin-bottom:0.5rem}footer{text-align:center;padding:2rem;color:var(--text-dim)}pre{background:var(--surface-2);padding:1.5rem;border-radius:0.5rem;overflow-x:auto;margin:1.5rem 0;border:1px solid var(--border)}code{font-family:'Consolas','Monaco',monospace;font-size:0.9rem;color:var(--text)}strong{color:var(--primary)}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<div class="badge">제6장 / 8장</div>
+<h1>Phase 3: 프로토콜과 분산 저장</h1>
+<p style="color:var(--text-dim)">WIA-ART-012-art-preservation</p>
+</header>
+
+<section>
+<h2>6.1 탈중앙화 보존의 필요성</h2>
+<p>
+Phase 3 Protocol은 중앙 서버에 대한 의존성을 제거하고, P2P(Peer-to-Peer) 네트워크를 통한 탈중앙화 보존을 가능하게 합니다. 단일 기관이나 회사가 파산하거나 서비스를 종료해도 작품이 네트워크에 계속 존재합니다.
+</p>
+
+<div class="callout">
+<div class="callout-title">🎯 Phase 3의 목표</div>
+<ul>
+<li><strong>영구성:</strong> IPFS/Arweave로 콘텐츠 주소 지정 및 영구 저장</li>
+<li><strong>탈중앙화:</strong> 단일 장애점(Single Point of Failure) 제거</li>
+<li><strong>실시간 동기화:</strong> WebSocket으로 여러 노드 간 즉시 동기화</li>
+<li><strong>고성능:</strong> gRPC를 통한 빠른 데이터 전송</li>
+<li><strong>검열 저항:</strong> 중앙 권한 없이 콘텐츠 보존</li>
+</ul>
+</div>
+</section>
+
+<section>
+<h2>6.2 IPFS (InterPlanetary File System)</h2>
+<p>
+IPFS는 콘텐츠 주소 지정(Content Addressing)을 사용하는 분산 파일 시스템입니다. 파일 위치(URL)가 아닌 파일 내용(해시)으로 식별합니다.
+</p>
+
+<table>
+<tr>
+<th>개념</th>
+<th>설명</th>
+<th>예시</th>
+</tr>
+<tr>
+<td><strong>CID (Content Identifier)</strong></td>
+<td>파일 내용의 암호화 해시</td>
+<td>QmT5NvU...</td>
+</tr>
+<tr>
+<td><strong>Pinning</strong></td>
+<td>파일을 로컬에 유지</td>
+<td>ipfs pin add QmT5NvU...</td>
+</tr>
+<tr>
+<td><strong>DHT (Distributed Hash Table)</strong></td>
+<td>파일 위치 검색</td>
+<td>누가 이 파일을 가지고 있나?</td>
+</tr>
+<tr>
+<td><strong>Gateway</strong></td>
+<td>HTTP로 IPFS 접근</td>
+<td>https://ipfs.io/ipfs/QmT5NvU...</td>
+</tr>
+</table>
+
+<h3>6.2.1 IPFS로 작품 저장하기</h3>
+<pre><code>// JavaScript (ipfs-http-client)
+import { create } from 'ipfs-http-client';
+
+const ipfs = create({ url: 'https://ipfs.infura.io:5001/api/v0' });
+
+// 작품 업로드
+const artwork = {
+  path: 'artwork/index.html',
+  content: await fs.readFile('./dist/index.html')
+};
+
+const result = await ipfs.add(artwork);
+console.log(`IPFS CID: ${result.cid}`);
+// QmT5NvUtoM5pQ8Y28v8VgEz6GEJLj3RbJZ9M2F5zNX9aB3
+
+// WIA 메타데이터 업데이트
+const metadata = {
+  artwork: { id: 'art-2024-001' },
+  preservation: {
+    primary_storage: 'ipfs',
+    ipfs_cid: result.cid.toString(),
+    ipfs_gateways: [
+      'https://ipfs.io/ipfs/' + result.cid,
+      'https://gateway.pinata.cloud/ipfs/' + result.cid
+    ]
+  }
+};
+
+// 영구 핀 서비스 (Pinata, NFT.Storage)
+await pinataSDK.pinByHash(result.cid);</code></pre>
+
+<h3>6.2.2 IPFS 조회 및 검증</h3>
+<pre><code>// IPFS에서 파일 읽기
+const chunks = [];
+for await (const chunk of ipfs.cat('QmT5NvUtoM5...')) {
+  chunks.push(chunk);
+}
+const fileContent = Buffer.concat(chunks);
+
+// 체크섬 검증
+import crypto from 'crypto';
+const calculatedHash = crypto.createHash('sha256').update(fileContent).digest('hex');
+
+if (calculatedHash === metadata.preservation.checksum_sha256) {
+  console.log('✅ IPFS 파일 무결성 검증 완료');
+} else {
+  console.error('❌ 체크섬 불일치!');
+}</code></pre>
+</section>
+
+<section>
+<h2>6.3 Arweave: 영구 저장소</h2>
+<p>
+Arweave는 "영원히 저장"을 목표로 하는 블록체인 기반 스토리지입니다. 한 번 지불하면 최소 200년간 저장을 보장합니다.
+</p>
+
+<table>
+<tr>
+<th>특징</th>
+<th>IPFS</th>
+<th>Arweave</th>
+<th>전통적 서버</th>
+</tr>
+<tr>
+<td><strong>비용 모델</strong></td>
+<td>핀 서비스 월 구독</td>
+<td>1회 지불</td>
+<td>월간 요금</td>
+</tr>
+<tr>
+<td><strong>영구성</strong></td>
+<td>핀 유지 필요</td>
+<td>✅ 200년+ 보장</td>
+<td>서비스 종료 시 손실</td>
+</tr>
+<tr>
+<td><strong>변조 불가능</strong></td>
+<td>✅ CID로 보장</td>
+<td>✅ 블록체인 기록</td>
+<td>❌ 변조 가능</td>
+</tr>
+<tr>
+<td><strong>검색 속도</strong></td>
+<td>중간-빠름</td>
+<td>중간</td>
+<td>빠름</td>
+</tr>
+<tr>
+<td><strong>1GB 저장 비용</strong></td>
+<td>~$2/월</td>
+<td>~$5 (1회)</td>
+<td>~$0.10/월</td>
+</tr>
+</table>
+
+<h3>6.3.1 Arweave에 작품 업로드</h3>
+<pre><code>// Arweave SDK
+import Arweave from 'arweave';
+import fs from 'fs';
+
+const arweave = Arweave.init({
+  host: 'arweave.net',
+  port: 443,
+  protocol: 'https'
+});
+
+// 지갑 로드 (AR 토큰 필요)
+const wallet = JSON.parse(await fs.readFile('wallet.json', 'utf8'));
+
+// 트랜잭션 생성
+const data = await fs.readFile('./artwork.html');
+const transaction = await arweave.createTransaction({ data }, wallet);
+
+// WIA 메타데이터를 Arweave 태그로 추가
+transaction.addTag('Content-Type', 'text/html');
+transaction.addTag('WIA-Standard', '1.0');
+transaction.addTag('WIA-Artwork-ID', 'art-2024-001');
+transaction.addTag('Artist', 'Jane Doe');
+transaction.addTag('Creation-Date', '2024-01-15');
+
+// 서명 및 업로드
+await arweave.transactions.sign(transaction, wallet);
+await arweave.transactions.post(transaction);
+
+console.log(`Arweave TX: ${transaction.id}`);
+console.log(`URL: https://arweave.net/${transaction.id}`);</code></pre>
+</section>
+
+<section>
+<h2>6.4 Bit Rot 감지 및 자동 복구</h2>
+<p>
+Bit rot은 저장 매체의 물리적 노화로 데이터가 손상되는 현상입니다. WIA-ART-012는 정기적 스캔과 자동 복구를 지원합니다.
+</p>
+
+<pre><code>// 월간 Bit Rot 스캔 스크립트
+async function bitRotScan() {
+  const artworks = await client.artworks.list({ limit: 1000 });
+
+  for (const artwork of artworks) {
+    const localPath = `/archive/${artwork.id}`;
+
+    // 로컬 파일 체크섬 계산
+    const localChecksum = await calculateSHA256(localPath);
+
+    if (localChecksum !== artwork.preservation.checksum_sha256) {
+      console.error(`❌ Bit rot detected: ${artwork.id}`);
+
+      // IPFS에서 복구 시도
+      if (artwork.preservation.ipfs_cid) {
+        await restoreFromIPFS(artwork.preservation.ipfs_cid, localPath);
+        console.log(`✅ Restored from IPFS`);
+      }
+
+      // 복구 로그
+      await client.events.log({
+        event_type: 'bit_rot_detected_and_recovered',
+        artwork_id: artwork.id,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+}</code></pre>
+</section>
+
+<section>
+<h2>6.5 WebSocket 실시간 동기화</h2>
+<p>
+여러 아카이브 노드가 실시간으로 메타데이터 변경을 동기화합니다.
+</p>
+
+<pre><code>// WebSocket 클라이언트
+const ws = new WebSocket('wss://sync.wia-archive.org/v1/stream');
+
+ws.on('message', (data) => {
+  const event = JSON.parse(data);
+
+  if (event.type === 'artwork.updated') {
+    console.log(`Artwork ${event.artwork_id} updated`);
+    // 로컬 메타데이터 동기화
+    syncLocalMetadata(event.artwork_id, event.changes);
+  }
+});</code></pre>
+</section>
+
+<section>
+<h2>6.6 장 요약</h2>
+<div class="callout" style="border-color:var(--success)">
+<div class="callout-title">✅ 핵심 요점</div>
+<ol>
+<li><strong>IPFS:</strong> 콘텐츠 주소 지정으로 변조 불가능한 저장</li>
+<li><strong>Arweave:</strong> 1회 지불로 200년+ 영구 저장</li>
+<li><strong>Bit Rot 감지:</strong> 정기 스캔 및 자동 복구</li>
+<li><strong>실시간 동기화:</strong> WebSocket으로 여러 노드 즉시 동기화</li>
+<li><strong>탈중앙화:</strong> 단일 장애점 제거, 검열 저항</li>
+</ol>
+</div>
+</section>
+
+<section>
+<h2>6.7 복습 질문</h2>
+<ol>
+<li><strong>IPFS의 콘텐츠 주소 지정(Content Addressing)과 전통적 위치 주소 지정(Location Addressing)의 차이를 설명하고, 보존 관점에서 장점을 논의하십시오.</strong></li>
+<li><strong>Arweave의 1회 지불 모델과 IPFS의 핀 구독 모델을 비교하고, 각각 어떤 상황에 적합한지 분석하십시오.</strong></li>
+<li><strong>Bit rot의 원인과 증상을 설명하고, 정기 스캔 및 IPFS 복구를 통한 자동 대응 전략을 코드로 구현하십시오.</strong></li>
+<li><strong>WebSocket 기반 실시간 동기화가 REST API 폴링보다 효율적인 이유를 네트워크 트래픽과 지연 시간 관점에서 설명하십시오.</strong></li>
+<li><strong>IPFS CID(Content Identifier)가 어떻게 생성되는지 설명하고, 동일한 파일이 항상 동일한 CID를 가지는 이유를 논의하십시오.</strong></li>
+<li><strong>탈중앙화 저장의 장점(검열 저항, 단일 장애점 제거)과 단점(속도, 비용)을 비교하고, 어떤 예술 작품에 적합한지 제시하십시오.</strong></li>
+</ol>
+</section>
+
+<section>
+<h2>6.8 다음 장 예고</h2>
+<p>
+제7장에서는 Phase 4 Integration의 상세 사양을 다룹니다. AWS Glacier, Google Cloud Coldline과 같은 클라우드 아카이브 스토리지, 블록체인 타임스탬프, CDN 통합, 그리고 기존 갤러리 시스템과의 엔터프라이즈 통합 전략을 배우게 됩니다.
+</p>
+<hr style="margin:2rem 0;border:none;border-top:1px solid var(--border)">
+<p><a href="chapter-07.html" style="color:var(--primary)">다음: 제7장 - Phase 4: 통합</a></p>
+</section>
+
+<div class="philosophy">
+<div class="philosophy-text">弘益人間</div>
+<p>탈중앙화로 영원한 예술을</p>
+</div>
+
+</div>
+</body>
+</html>
+
+<section>
+<h2>6.6 gRPC: 고성능 데이터 전송</h2>
+<p>
+gRPC는 Google에서 개발한 고성능 RPC 프레임워크입니다. Protocol Buffers를 사용하여 REST API보다 최대 7배 빠른 데이터 전송을 제공합니다.
+</p>
+
+<h3>6.6.1 REST vs gRPC 성능 비교</h3>
+<table>
+<tr>
+<th>측정 항목</th>
+<th>REST (JSON)</th>
+<th>gRPC (Protobuf)</th>
+<th>개선율</th>
+</tr>
+<tr>
+<td><strong>요청 크기</strong></td>
+<td>500 bytes</td>
+<td>150 bytes</td>
+<td>70% 감소</td>
+</tr>
+<tr>
+<td><strong>응답 크기</strong></td>
+<td>2,500 bytes</td>
+<td>800 bytes</td>
+<td>68% 감소</td>
+</tr>
+<tr>
+<td><strong>지연 시간</strong></td>
+<td>50ms</td>
+<td>15ms</td>
+<td>70% 감소</td>
+</tr>
+<tr>
+<td><strong>처리량</strong></td>
+<td>1,000 req/s</td>
+<td>7,000 req/s</td>
+<td>7배 증가</td>
+</tr>
+</table>
+</section>
+
+<section>
+<h2>6.7 P2P 네트워크 및 LibP2P</h2>
+<p>
+LibP2P는 IPFS의 기반이 되는 모듈식 P2P 네트워킹 라이브러리입니다. WIA-ART-012는 LibP2P를 사용하여 분산 보존 네트워크를 구축할 수 있습니다.
+</p>
+
+<h3>6.7.1 분산 검증 프로토콜</h3>
+<p>
+여러 피어가 협력하여 작품 무결성을 검증합니다:
+</p>
+<ul>
+<li><strong>1단계:</strong> 노드 A가 검증 요청 브로드캐스트</li>
+<li><strong>2단계:</strong> 노드 B, C, D가 각자 체크섬 계산</li>
+<li><strong>3단계:</strong> 다수결로 정상 체크섬 결정</li>
+<li><strong>4단계:</strong> 불일치 노드는 자동 복구</li>
+</ul>
+</section>
+
+<section>
+<h2>6.8 Internet Archive Wayback Machine 통합</h2>
+<p>
+Internet Archive의 Wayback Machine은 1996년부터 웹 페이지를 아카이브해왔습니다. WIA-ART-012는 CDX API를 통해 과거 버전을 검색할 수 있습니다.
+</p>
+
+<h3>6.8.1 Wayback Machine 스냅샷 검색</h3>
+<p>
+CDX API를 사용하여 특정 URL의 모든 아카이브 스냅샷을 검색할 수 있습니다. 이는 작품의 과거 버전을 추적하고 변경 이력을 문서화하는 데 유용합니다.
+</p>
+
+<div class="callout">
+<div class="callout-title">📅 Wayback Machine 통계</div>
+<ul>
+<li>2024년 기준 800+ 억 개의 웹 페이지 아카이브</li>
+<li>매일 약 5천만 개의 새 페이지 수집</li>
+<li>25년 이상의 웹 역사 보존</li>
+<li>무료 공개 접근 제공</li>
+</ul>
+</div>
+</section>
+
+<section>
+<h2>6.9 콘텐츠 주소 지정의 철학</h2>
+<p>
+IPFS와 Arweave가 사용하는 콘텐츠 주소 지정은 디지털 보존의 패러다임 전환입니다.
+</p>
+
+<table>
+<tr>
+<th>측면</th>
+<th>위치 주소 지정 (HTTP)</th>
+<th>콘텐츠 주소 지정 (IPFS)</th>
+</tr>
+<tr>
+<td><strong>식별자</strong></td>
+<td>URL (위치)</td>
+<td>CID (내용 해시)</td>
+</tr>
+<tr>
+<td><strong>변조 감지</strong></td>
+<td>불가능</td>
+<td>자동 (해시 불일치)</td>
+</tr>
+<tr>
+<td><strong>중복 제거</strong></td>
+<td>수동</td>
+<td>자동 (같은 내용 = 같은 CID)</td>
+</tr>
+<tr>
+<td><strong>중앙화</strong></td>
+<td>서버 의존</td>
+<td>분산 네트워크</td>
+</tr>
+<tr>
+<td><strong>404 오류</strong></td>
+<td>서버 종료 시 발생</td>
+<td>1개 노드라도 있으면 접근 가능</td>
+</tr>
+</table>
+
+<div class="callout">
+<div class="callout-title">🌐 콘텐츠 주소 지정의 이점</div>
+<ul>
+<li><strong>영구성:</strong> 내용이 바뀌지 않으면 주소도 바뀌지 않음</li>
+<li><strong>검증 가능:</strong> 받은 데이터가 요청한 것과 일치하는지 자동 검증</li>
+<li><strong>효율성:</strong> 중복 저장 없이 동일 콘텐츠 재사용</li>
+<li><strong>분산화:</strong> 단일 실패 지점 제거</li>
+</ul>
+</div>
+
+<h3>6.9.1 실제 사례: NFT.Storage</h3>
+<p>
+NFT.Storage는 Protocol Labs에서 제공하는 무료 IPFS 핀 서비스입니다. NFT 메타데이터와 이미지를 영구히 저장합니다.
+</p>
+
+<ul>
+<li><strong>무료 저장:</strong> 최대 31GB 무료 (NFT 용도)</li>
+<li><strong>자동 핀:</strong> Filecoin 네트워크에 자동 백업</li>
+<li><strong>고가용성:</strong> 여러 IPFS 게이트웨이 제공</li>
+<li><strong>API 접근:</strong> 간단한 REST API</li>
+</ul>
+</section>
+
+<section>
+<h2>6.10 분산 보존의 미래</h2>
+<p>
+WIA-ART-012의 Phase 3 Protocol은 디지털 예술 보존을 완전히 탈중앙화된 미래로 이끌고 있습니다. 중앙 서버가 사라져도, 단일 기관이 폐업해도, 작품은 P2P 네트워크에서 계속 살아남습니다.
+</p>
+
+<div class="callout" style="border-color:var(--gold)">
+<div class="callout-title">🚀 미래 로드맵</div>
+<ul>
+<li><strong>2025 Q2:</strong> Filecoin 통합 (경제적 인센티브로 영구 저장)</li>
+<li><strong>2025 Q4:</strong> WebRTC 기반 브라우저 간 직접 전송</li>
+<li><strong>2026:</strong> 양자 내성 암호화로 장기 보안 보장</li>
+<li><strong>2027:</strong> 탈중앙화 자율 조직(DAO)으로 거버넌스 전환</li>
+</ul>
+</div>
+</section>
+
+<section>
+<h2>6.11 Filecoin: 경제적 인센티브 기반 저장</h2>
+<p>
+Filecoin은 IPFS의 인센티브 레이어로, 스토리지 제공자에게 FIL 토큰으로 보상합니다. 이는 장기 보존을 경제적으로 지속 가능하게 만듭니다.
+</p>
+
+<table>
+<tr>
+<th>특징</th>
+<th>IPFS (무료 핀)</th>
+<th>Filecoin</th>
+</tr>
+<tr>
+<td><strong>비용</strong></td>
+<td>핀 서비스 월 구독</td>
+<td>스토리지 거래 (FIL)</td>
+</tr>
+<tr>
+<td><strong>보장</strong></td>
+<td>서비스 지속성에 의존</td>
+<td>스마트 컨트랙트 보장</td>
+</tr>
+<tr>
+<td><strong>검증</strong></td>
+<td>수동</td>
+<td>자동 (Proof-of-Replication)</td>
+</tr>
+<tr>
+<td><strong>인센티브</strong></td>
+<td>없음</td>
+<td>FIL 보상</td>
+</tr>
+</table>
+
+<h3>6.11.1 Filecoin 거래 생성</h3>
+<p>
+Filecoin 네트워크에 데이터를 저장하는 과정:
+</p>
+<ol>
+<li><strong>데이터 준비:</strong> CAR (Content Addressable aRchive) 파일 생성</li>
+<li><strong>거래 제안:</strong> 스토리지 제공자에게 거래 제안</li>
+<li><strong>거래 체결:</strong> 스마트 컨트랙트로 조건 합의</li>
+<li><strong>데이터 전송:</strong> 제공자에게 데이터 전송</li>
+<li><strong>증명 제출:</strong> 정기적으로 저장 증명 제출</li>
+</ol>
+
+<div class="callout">
+<div class="callout-title">💰 비용 예시 (2024년 기준)</div>
+<ul>
+<li><strong>1GB, 1년 저장:</strong> 약 0.001 FIL (~$0.005)</li>
+<li><strong>100GB, 3년 저장:</strong> 약 0.3 FIL (~$1.50)</li>
+<li><strong>1TB, 10년 저장:</strong> 약 10 FIL (~$50)</li>
+</ul>
+<p><strong>참고:</strong> AWS Glacier Deep Archive와 비슷한 가격대, 하지만 탈중앙화</p>
+</div>
+</section>
+
+<section>
+<h2>6.12 신뢰할 수 있는 디지털 저장소 (TDR)</h2>
+<p>
+ISO 16363은 신뢰할 수 있는 디지털 저장소(Trustworthy Digital Repository)의 국제 표준입니다. WIA-ART-012 Phase 3는 TDR 요구사항과 호환됩니다.
+</p>
+
+<table>
+<tr>
+<th>TDR 요구사항</th>
+<th>WIA Phase 3 구현</th>
+</tr>
+<tr>
+<td><strong>조직 인프라</strong></td>
+<td>분산 거버넌스, DAO 구조</td>
+</tr>
+<tr>
+<td><strong>디지털 객체 관리</strong></td>
+<td>IPFS CID로 영구 식별</td>
+</tr>
+<tr>
+<td><strong>보안 및 기술 인프라</strong></td>
+<td>블록체인 타임스탬프, 암호화</td>
+</tr>
+<tr>
+<td><strong>지속가능성</strong></td>
+<td>Filecoin 인센티브 모델</td>
+</tr>
+</table>
+</section>

@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA AI-City - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #0EA5E9;
+            --primary-dark: #0284C7;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 10px;
+        }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text);
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 20px; align-items: center; }
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: var(--primary); }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+        header {
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+        .hero {
+            text-align: center;
+            padding: 40px 0;
+        }
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .tab {
+            padding: 12px 24px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+        .panel {
+            display: none;
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 30px;
+            border: 1px solid var(--border);
+        }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); }
+        .form-group { margin-bottom: 20px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .city-card {
+            background: linear-gradient(135deg, #0c4a6e, #0f172a);
+            border-radius: 16px;
+            padding: 30px;
+            border: 2px solid var(--primary);
+            margin-top: 20px;
+        }
+        .city-header {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+        .output {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .meter {
+            height: 20px;
+            background: var(--bg);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .meter-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s;
+        }
+        .meter-fill.green { background: var(--secondary); }
+        .meter-fill.yellow { background: var(--warning); }
+        .meter-fill.red { background: var(--danger); }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        .stat-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .stat-label { font-size: 0.85rem; color: var(--text-muted); }
+        footer {
+            margin-top: 60px;
+            padding: 30px 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+        }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            margin: 0 10px;
+        }
+        footer .links a:hover { color: var(--primary); }
+        .btn-center {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .sharing-breakdown {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .sharing-item {
+            background: var(--bg);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        .sharing-icon { font-size: 1.5rem; }
+        .sharing-percent { color: var(--secondary); font-weight: bold; }
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; text-align: center; }
+            .nav-left { flex-direction: column; gap: 10px; }
+            .nav-links { flex-wrap: wrap; justify-content: center; gap: 10px; }
+            .tabs { flex-direction: column; align-items: center; }
+            .tab { width: 100%; text-align: center; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .sharing-breakdown { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home">WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com">Home</a>
+                    <span class="sep">></span>
+                    <a href="https://wiastandards.com/#standards">Standards</a>
+                    <span class="sep">></span>
+                    <span class="current">AI-CITY Simulator</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank">Certification</a>
+                    <a href="https://wiabook.com/reader/simulators/" target="_blank">109+ Simulators</a>
+                    <a href="https://wiabook.com" target="_blank">Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">WIA-AI-CITY</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="🏙️ AI-City Platform Simulator" data-ko="🏙️ AI-City 플랫폼 시뮬레이터">🏙️ AI-City Platform Simulator</h1>
+            <p data-en="Rust-Core control, 1% sharing engine, citizen data sovereignty, and AIDC-Link protocol" data-ko="Rust-Core 제어, 1% 나눔 엔진, 시민 데이터 주권, AIDC-Link 프로토콜">Rust-Core control, 1% sharing engine, citizen data sovereignty, and AIDC-Link protocol</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📊 Data Format" data-ko="📊 데이터 형식">📊 Data Format</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🔢 Algorithms" data-ko="🔢 알고리즘">🔢 Algorithms</div>
+            <div class="tab" onclick="showPanel(2)" data-en="📡 Protocol" data-ko="📡 프로토콜">📡 Protocol</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🔗 Integration" data-ko="🔗 통합">🔗 Integration</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📱 QR & VC" data-ko="📱 QR & VC">📱 QR & VC</div>
+        </div>
+
+        <!-- Panel 0: Data Format -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="Create AI-City Instance" data-ko="AI-City 인스턴스 생성">Create AI-City Instance</h2>
+
+            <div class="form-group">
+                <label data-en="City Name" data-ko="도시 이름">City Name</label>
+                <input type="text" id="cityName" placeholder="Enter city name">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Population" data-ko="인구">Population</label>
+                <input type="number" id="population" placeholder="e.g., 1000000" min="10000">
+            </div>
+
+            <div class="form-group">
+                <label data-en="AI-City Type" data-ko="AI-City 유형">AI-City Type</label>
+                <select id="cityType">
+                    <option value="smart">Smart City (General Purpose)</option>
+                    <option value="industrial">Industrial Hub</option>
+                    <option value="eco">Eco City (Carbon Neutral)</option>
+                    <option value="innovation">Innovation District</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label data-en="Rust-Core Configuration" data-ko="Rust-Core 구성">Rust-Core Configuration</label>
+                <select id="rustCore">
+                    <option value="standard">Standard (8GB HBM, 500W)</option>
+                    <option value="enhanced">Enhanced (16GB HBM, 1000W)</option>
+                    <option value="premium">Premium (32GB HBM, 2000W)</option>
+                </select>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="generateCity()" data-en="Generate AI-City" data-ko="AI-City 생성">Generate AI-City</button>
+            </div>
+
+            <div id="cityOutput"></div>
+        </div>
+
+        <!-- Panel 1: Algorithms -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="Rust-Core Power & Thermal Calculator" data-ko="Rust-Core 전력 & 열관리 계산기">Rust-Core Power & Thermal Calculator</h2>
+
+            <div class="form-group">
+                <label data-en="HBM Capacity (GB)" data-ko="HBM 용량 (GB)">HBM Capacity (GB)</label>
+                <input type="number" id="hbmCapacity" value="16" min="4" max="128">
+            </div>
+
+            <div class="form-group">
+                <label data-en="Power Budget (Watts)" data-ko="전력 예산 (W)">Power Budget (Watts)</label>
+                <input type="number" id="powerBudget" value="1000" min="100" max="10000">
+            </div>
+
+            <div class="form-group">
+                <label data-en="AI Workload (%)" data-ko="AI 작업부하 (%)">AI Workload (%)</label>
+                <input type="range" id="aiWorkload" min="0" max="100" value="70" oninput="updateWorkloadDisplay()">
+                <span id="workloadValue">70%</span>
+            </div>
+
+            <div class="form-group">
+                <label data-en="Ambient Temperature (°C)" data-ko="주변 온도 (°C)">Ambient Temperature (°C)</label>
+                <input type="number" id="ambientTemp" value="25" min="0" max="50">
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="calculateRustCore()" data-en="Calculate" data-ko="계산">Calculate</button>
+            </div>
+
+            <div id="rustCoreOutput"></div>
+        </div>
+
+        <!-- Panel 2: Protocol -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="AIDC-Link Protocol Simulator" data-ko="AIDC-Link 프로토콜 시뮬레이터">AIDC-Link Protocol Simulator</h2>
+
+            <div class="form-group">
+                <label data-en="Protocol Layer" data-ko="프로토콜 레이어">Protocol Layer</label>
+                <select id="protocolLayer">
+                    <option value="1">Layer 1: Physical (Fiber/5G/Quantum)</option>
+                    <option value="2">Layer 2: Data (JSON-LD/Zstd/AES)</option>
+                    <option value="3">Layer 3: Intelligence (Edge AI/Central AI)</option>
+                    <option value="4">Layer 4: Application (City Services API)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label data-en="Message Type" data-ko="메시지 유형">Message Type</label>
+                <select id="messageType">
+                    <option value="sensor_data">Sensor Data</option>
+                    <option value="control_command">Control Command</option>
+                    <option value="alert">Alert/Notification</option>
+                    <option value="analytics">Analytics Result</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label data-en="Source Node ID" data-ko="소스 노드 ID">Source Node ID</label>
+                <input type="text" id="sourceNode" placeholder="e.g., AIDC-NODE-001">
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulateProtocol()" data-en="Simulate" data-ko="시뮬레이션">Simulate</button>
+            </div>
+
+            <div class="output" id="protocolOutput"></div>
+        </div>
+
+        <!-- Panel 3: Integration -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="1% Sharing Engine & Data Sovereignty" data-ko="1% 나눔 엔진 & 데이터 주권">1% Sharing Engine & Data Sovereignty</h2>
+
+            <h3 data-en="Sharing Engine Calculator" data-ko="나눔 엔진 계산기">Sharing Engine Calculator</h3>
+
+            <div class="form-group">
+                <label data-en="Transaction Amount ($)" data-ko="거래 금액 ($)">Transaction Amount ($)</label>
+                <input type="number" id="transactionAmount" value="10000" min="1">
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="calculateSharing()" data-en="Calculate Contribution" data-ko="기여금 계산">Calculate Contribution</button>
+            </div>
+
+            <div id="sharingOutput"></div>
+
+            <hr style="margin: 30px 0; border-color: var(--border);">
+
+            <h3 data-en="Citizen Data Sovereignty Check" data-ko="시민 데이터 주권 확인">Citizen Data Sovereignty Check</h3>
+
+            <div class="form-group">
+                <label data-en="Data Type" data-ko="데이터 유형">Data Type</label>
+                <select id="dataType">
+                    <option value="L1">L1: Identity (Strict Control)</option>
+                    <option value="L2">L2: Location (Protected)</option>
+                    <option value="L3">L3: Behavior (Optional)</option>
+                    <option value="L4">L4: Public (Open)</option>
+                </select>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="checkSovereignty()" data-en="Check Rights" data-ko="권리 확인">Check Rights</button>
+            </div>
+
+            <div id="sovereigntyOutput"></div>
+        </div>
+
+        <!-- Panel 4: QR & VC -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="AI-City Credential Generator" data-ko="AI-City 자격증명 생성기">AI-City Credential Generator</h2>
+
+            <div class="form-group">
+                <label data-en="Citizen Data (JSON)" data-ko="시민 데이터 (JSON)">Citizen Data (JSON)</label>
+                <textarea id="qrData" rows="6" placeholder='{"citizenId": "AIC-2024-001", "city": "Seoul AI-City", "status": "active"}'></textarea>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="generateQR()" data-en="Generate QR & VC" data-ko="QR & VC 생성">Generate QR & VC</button>
+            </div>
+
+            <div id="qrOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 - Benefit All Humanity" data-ko="弘益人間 - 널리 인간을 이롭게 하라">弘益人間 - Benefit All Humanity</p>
+            <p data-en="Building AI-powered cities for the benefit of all citizens." data-ko="모든 시민의 이익을 위한 AI 기반 도시 구축.">Building AI-powered cities for the benefit of all citizens.</p>
+            <p style="margin-top: 15px;">WIA - World Certification Industry Association</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="Home" data-ko="홈">Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="All Standards" data-ko="전체 표준">All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="Ebook" data-ko="전자책">Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        function setLang(lang) {
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang);
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => {
+                p.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((t, i) => {
+                t.classList.toggle('active', i === index);
+            });
+        }
+
+        function updateWorkloadDisplay() {
+            document.getElementById('workloadValue').textContent = document.getElementById('aiWorkload').value + '%';
+        }
+
+        function generateCity() {
+            const cityName = document.getElementById('cityName').value || 'Unnamed City';
+            const population = parseInt(document.getElementById('population').value) || 1000000;
+            const cityType = document.getElementById('cityType').value;
+            const rustCore = document.getElementById('rustCore').value;
+
+            const rustCoreSpecs = {
+                standard: { hbm: 8, power: 500 },
+                enhanced: { hbm: 16, power: 1000 },
+                premium: { hbm: 32, power: 2000 }
+            };
+
+            const specs = rustCoreSpecs[rustCore];
+
+            const data = {
+                id: 'AIC-' + new Date().getFullYear() + '-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
+                city: {
+                    name: cityName,
+                    population: population,
+                    type: cityType
+                },
+                rustCore: {
+                    hbm_gb: specs.hbm,
+                    power_watts: specs.power,
+                    thermal_target: 25
+                },
+                sharingEngine: {
+                    contribution_rate: 0.01,
+                    education: 0.003,
+                    healthcare: 0.003,
+                    environment: 0.002,
+                    emergency: 0.002
+                },
+                dataSovereignty: {
+                    enabled: true,
+                    consent_required: true,
+                    portability: true,
+                    right_to_erasure: true
+                },
+                aidcLink: {
+                    version: "1.0",
+                    layers: 4,
+                    encryption: "AES-256-GCM"
+                },
+                metadata: {
+                    created: new Date().toISOString(),
+                    status: 'active'
+                }
+            };
+
+            const output = `
+                <div class="city-card">
+                    <div class="city-header">
+                        <h3>🏙️ ${data.city.name}</h3>
+                        <p style="color: var(--secondary);">Status: ${data.metadata.status}</p>
+                    </div>
+                    <p><strong>AI-City ID:</strong> ${data.id}</p>
+                    <p><strong>Population:</strong> ${population.toLocaleString()}</p>
+                    <p><strong>Type:</strong> ${cityType}</p>
+                    <p><strong>Rust-Core:</strong> ${specs.hbm}GB HBM, ${specs.power}W</p>
+                    <p><strong>AIDC-Link:</strong> v${data.aidcLink.version} (${data.aidcLink.layers} layers)</p>
+                    <p><strong>Sharing Engine:</strong> 1% contribution active</p>
+                </div>
+                <div class="output">
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                </div>
+            `;
+
+            document.getElementById('cityOutput').innerHTML = output;
+        }
+
+        function calculateRustCore() {
+            const hbm = parseFloat(document.getElementById('hbmCapacity').value);
+            const power = parseFloat(document.getElementById('powerBudget').value);
+            const workload = parseFloat(document.getElementById('aiWorkload').value) / 100;
+            const ambient = parseFloat(document.getElementById('ambientTemp').value);
+
+            const aiPower = power * 0.7;
+            const infraPower = power * 0.2;
+            const reservePower = power * 0.1;
+
+            const bandwidth = hbm * 1.2; // TB/s estimate
+            const activeBandwidth = bandwidth * workload;
+
+            const heatGenerated = power * workload * 0.85;
+            const coreTemp = ambient + (heatGenerated / 50);
+            const throttleLevel = coreTemp > 80 ? 'HIGH' : coreTemp > 65 ? 'MEDIUM' : 'NONE';
+
+            const tempClass = coreTemp > 80 ? 'red' : coreTemp > 65 ? 'yellow' : 'green';
+            const tempWidth = Math.min((coreTemp / 100) * 100, 100);
+
+            const output = `
+                <div class="city-card">
+                    <h3>🦀 Rust-Core Analysis</h3>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value">${hbm} GB</div>
+                            <div class="stat-label">HBM Capacity</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${bandwidth.toFixed(1)} TB/s</div>
+                            <div class="stat-label">Max Bandwidth</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${activeBandwidth.toFixed(1)} TB/s</div>
+                            <div class="stat-label">Active Bandwidth</div>
+                        </div>
+                    </div>
+
+                    <h4>Power Distribution</h4>
+                    <p>AI Processing: ${aiPower.toFixed(0)}W (70%)</p>
+                    <p>Infrastructure: ${infraPower.toFixed(0)}W (20%)</p>
+                    <p>Reserve: ${reservePower.toFixed(0)}W (10%)</p>
+
+                    <h4 style="margin-top: 20px;">Thermal Status</h4>
+                    <p>Core Temperature: <strong>${coreTemp.toFixed(1)}°C</strong></p>
+                    <div class="meter">
+                        <div class="meter-fill ${tempClass}" style="width: ${tempWidth}%"></div>
+                    </div>
+                    <p>Throttle Level: <span style="color: ${throttleLevel === 'HIGH' ? 'var(--danger)' : throttleLevel === 'MEDIUM' ? 'var(--warning)' : 'var(--secondary)'};">${throttleLevel}</span></p>
+                </div>
+            `;
+
+            document.getElementById('rustCoreOutput').innerHTML = output;
+        }
+
+        function simulateProtocol() {
+            const layer = document.getElementById('protocolLayer').value;
+            const messageType = document.getElementById('messageType').value;
+            const sourceNode = document.getElementById('sourceNode').value || 'AIDC-NODE-001';
+
+            const payloads = {
+                sensor_data: { vehicle_count: 1247, average_speed: 35.5, congestion_level: 'moderate' },
+                control_command: { action: 'adjust_signal', target: 'traffic_light_042', parameters: { green_duration: 45 } },
+                alert: { level: 'warning', type: 'traffic_jam', affected_area: 'zone-A7' },
+                analytics: { prediction: 'peak_traffic', confidence: 0.92, eta: '17:30' }
+            };
+
+            const message = {
+                aidc_version: "1.0",
+                layer: parseInt(layer),
+                message_type: messageType.toUpperCase(),
+                source: {
+                    node_id: sourceNode,
+                    type: "city_sensor",
+                    location: { lat: 37.5665, lng: 126.9780 }
+                },
+                payload: payloads[messageType],
+                encryption: "AES-256-GCM",
+                timestamp: new Date().toISOString(),
+                signature: "Ed25519:" + Math.random().toString(36).substr(2, 64)
+            };
+
+            const layerNames = {
+                1: 'Physical Layer (Fiber/5G/Quantum)',
+                2: 'Data Layer (JSON-LD/Zstd/AES)',
+                3: 'Intelligence Layer (Edge AI/Central AI)',
+                4: 'Application Layer (City Services API)'
+            };
+
+            const output = `
+                <strong>AIDC-Link Message Simulation</strong><br>
+                <strong>Layer:</strong> ${layerNames[layer]}<br>
+                <strong>Type:</strong> ${messageType}<br><br>
+                <strong>Message:</strong>
+                <pre>${JSON.stringify(message, null, 2)}</pre>
+            `;
+
+            document.getElementById('protocolOutput').innerHTML = output;
+        }
+
+        function calculateSharing() {
+            const amount = parseFloat(document.getElementById('transactionAmount').value) || 10000;
+            const total = amount * 0.01;
+            const education = amount * 0.003;
+            const healthcare = amount * 0.003;
+            const environment = amount * 0.002;
+            const emergency = amount * 0.002;
+
+            const output = `
+                <div class="city-card">
+                    <h3>🎁 1% Sharing Engine Result</h3>
+                    <p><strong>Transaction:</strong> $${amount.toLocaleString()}</p>
+                    <p style="font-size: 1.3rem; color: var(--secondary); margin: 15px 0;">
+                        <strong>Total Contribution:</strong> $${total.toFixed(2)}
+                    </p>
+
+                    <div class="sharing-breakdown">
+                        <div class="sharing-item">
+                            <div class="sharing-icon">📚</div>
+                            <div class="sharing-percent">0.3%</div>
+                            <div>Education</div>
+                            <div style="color: var(--primary);">$${education.toFixed(2)}</div>
+                        </div>
+                        <div class="sharing-item">
+                            <div class="sharing-icon">🏥</div>
+                            <div class="sharing-percent">0.3%</div>
+                            <div>Healthcare</div>
+                            <div style="color: var(--primary);">$${healthcare.toFixed(2)}</div>
+                        </div>
+                        <div class="sharing-item">
+                            <div class="sharing-icon">🌱</div>
+                            <div class="sharing-percent">0.2%</div>
+                            <div>Environment</div>
+                            <div style="color: var(--primary);">$${environment.toFixed(2)}</div>
+                        </div>
+                        <div class="sharing-item">
+                            <div class="sharing-icon">🚨</div>
+                            <div class="sharing-percent">0.2%</div>
+                            <div>Emergency</div>
+                            <div style="color: var(--primary);">$${emergency.toFixed(2)}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('sharingOutput').innerHTML = output;
+        }
+
+        function checkSovereignty() {
+            const dataType = document.getElementById('dataType').value;
+
+            const rights = {
+                L1: {
+                    level: 'L1: Identity',
+                    control: 'Strict',
+                    examples: 'Name, National ID, Biometrics',
+                    consent: 'Required for ALL access',
+                    erasure: 'Guaranteed within 24 hours',
+                    portability: 'Full export available',
+                    sharing: 'Never shared without explicit consent'
+                },
+                L2: {
+                    level: 'L2: Location',
+                    control: 'Protected',
+                    examples: 'GPS, Home Address, Work Location',
+                    consent: 'Required for tracking',
+                    erasure: 'Guaranteed within 48 hours',
+                    portability: 'Full export available',
+                    sharing: 'Anonymized for city planning only'
+                },
+                L3: {
+                    level: 'L3: Behavior',
+                    control: 'Optional',
+                    examples: 'Shopping patterns, Travel history',
+                    consent: 'Opt-in only',
+                    erasure: 'Available on request',
+                    portability: 'Export available',
+                    sharing: 'Aggregated for analytics'
+                },
+                L4: {
+                    level: 'L4: Public',
+                    control: 'Open',
+                    examples: 'Traffic data, Weather, Public events',
+                    consent: 'Not required',
+                    erasure: 'N/A (Public data)',
+                    portability: 'Open API access',
+                    sharing: 'Freely available'
+                }
+            };
+
+            const r = rights[dataType];
+
+            const output = `
+                <div class="city-card">
+                    <h3>🔐 Data Sovereignty Rights</h3>
+                    <p><strong>Level:</strong> ${r.level}</p>
+                    <p><strong>Control:</strong> ${r.control}</p>
+                    <p><strong>Examples:</strong> ${r.examples}</p>
+                    <hr style="margin: 15px 0; border-color: var(--border);">
+                    <p><strong>Consent:</strong> ${r.consent}</p>
+                    <p><strong>Right to Erasure:</strong> ${r.erasure}</p>
+                    <p><strong>Portability:</strong> ${r.portability}</p>
+                    <p><strong>Sharing Policy:</strong> ${r.sharing}</p>
+                </div>
+            `;
+
+            document.getElementById('sovereigntyOutput').innerHTML = output;
+        }
+
+        function generateQR() {
+            const data = document.getElementById('qrData').value;
+
+            try {
+                JSON.parse(data);
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(data)}`;
+
+                const vc = {
+                    '@context': ['https://www.w3.org/2018/credentials/v1'],
+                    type: ['VerifiableCredential', 'AICityCredential'],
+                    issuer: 'did:wia:ai-city:authority',
+                    issuanceDate: new Date().toISOString(),
+                    credentialSubject: JSON.parse(data),
+                    proof: {
+                        type: 'Ed25519Signature2020',
+                        created: new Date().toISOString(),
+                        proofPurpose: 'assertionMethod',
+                        verificationMethod: 'did:wia:ai-city:authority#key-1'
+                    }
+                };
+
+                const output = `
+                    <div class="city-card">
+                        <h3>QR Code</h3>
+                        <img src="${qrUrl}" alt="QR Code" style="display: block; margin: 20px auto; border: 3px solid var(--primary); border-radius: 8px;">
+                    </div>
+                    <div class="output">
+                        <strong>Verifiable Credential (W3C Standard):</strong>
+                        <pre>${JSON.stringify(vc, null, 2)}</pre>
+                    </div>
+                `;
+
+                document.getElementById('qrOutput').innerHTML = output;
+            } catch (e) {
+                document.getElementById('qrOutput').innerHTML = '<div style="color: var(--danger);">Invalid JSON format</div>';
+            }
+        }
+    </script>
+</body>
+</html>

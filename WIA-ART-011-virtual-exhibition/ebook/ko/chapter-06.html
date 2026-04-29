@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: Phase 3 프로토콜 - WIA-ART-011</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #F59E0B; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; box-shadow: 0 10px 40px rgba(245, 158, 11, 0.1); }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; text-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        p { margin: 1rem 0; text-align: justify; color: var(--text-secondary); }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; color: var(--text-secondary); }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .philosophy { text-align: center; font-size: 1.5rem; color: var(--primary); margin: 2rem 0; padding: 1rem; background: rgba(245, 158, 11, 0.1); border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: rgba(245, 158, 11, 0.05); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; font-weight: bold; transition: all 0.3s; }
+        .btn:hover { background: #d97706; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(245, 158, 11, 0.3); }
+        .key-takeaways { background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.05) 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; border: 2px solid rgba(245, 158, 11, 0.3); }
+        .key-takeaways h3 { margin-top: 0; }
+        .review-questions { background: rgba(245, 158, 11, 0.05); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; }
+        .review-questions h3 { margin-top: 0; }
+        .review-questions ol { margin-left: 1.5rem; }
+        .review-questions li { margin: 1rem 0; line-height: 1.6; }
+        strong { color: var(--primary); }
+        code { background: var(--bg-tertiary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 0.9em; }
+        pre { background: var(--bg-tertiary); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; padding: 0; }
+        .case-study { background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10b981; padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제6장: Phase 3 - 프로토콜</h1>
+
+        <div class="philosophy">
+            弘益人間 · 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>개요</h2>
+        <p>
+            Phase 3 Protocol은 WIA-ART-011의 "사회적 차원"입니다. 데이터 형식(Phase 1)과 API(Phase 2)가
+            단일 사용자 경험을 다룬다면, Protocol은 다중 사용자 실시간 협업을 가능하게 합니다.
+            메타버스 가상 전시의 핵심은 여러 관람객이 동시에 같은 공간에서 만나고, 대화하며, 예술을 함께 감상하는 것입니다.
+        </p>
+
+        <p>
+            WIA Phase 3는 네 가지 핵심 프로토콜을 정의합니다:
+        </p>
+        <ul>
+            <li><strong>WebSocket 실시간 동기화:</strong> 아바타 위치, 상태, 채팅 메시지</li>
+            <li><strong>WebRTC P2P:</strong> 음성/비디오 채팅, 저지연 데이터 전송</li>
+            <li><strong>Adaptive Streaming:</strong> 네트워크 상태 기반 품질 조정</li>
+            <li><strong>Spatial Audio:</strong> 3D 위치 기반 오디오</li>
+        </ul>
+
+        <h2>WebSocket 실시간 동기화</h2>
+
+        <h3>프로토콜 개요</h3>
+        <p>
+            WIA는 WebSocket(RFC 6455) 위에 메시지 프로토콜을 정의합니다:
+        </p>
+
+        <pre><code>// WebSocket 연결
+wss://realtime.wia.org/art-011/v1/exhibitions/{exhibitionId}?token={JWT}
+
+// 메시지 형식 (JSON)
+{
+  "type": "message_type",     // presence, position, chat, action 등
+  "from": "user_id",
+  "timestamp": 1640995200000,
+  "data": {...}
+}
+</code></pre>
+
+        <h3>Presence (존재) 프로토콜</h3>
+        <pre><code>// 사용자 입장
+{
+  "type": "presence.join",
+  "from": "user-123",
+  "timestamp": 1640995200000,
+  "data": {
+    "userId": "user-123",
+    "displayName": "Alice",
+    "avatar": {
+      "model": "https://cdn.wia.org/avatars/default-female.glb",
+      "color": "#FF5733"
+    },
+    "capabilities": ["voice", "vr-headset"],
+    "location": {
+      "position": [0, 1.6, 10],
+      "rotation": [0, 0, 0]
+    }
+  }
+}
+
+// 사용자 퇴장
+{
+  "type": "presence.leave",
+  "from": "user-123",
+  "timestamp": 1640995800000,
+  "data": {
+    "userId": "user-123",
+    "reason": "disconnect"  // "disconnect", "timeout", "kick"
+  }
+}
+
+// 현재 참가자 목록 요청
+{
+  "type": "presence.list",
+  "from": "user-123",
+  "timestamp": 1640995200000
+}
+
+// 응답
+{
+  "type": "presence.list.response",
+  "to": "user-123",
+  "timestamp": 1640995200000,
+  "data": {
+    "participants": [
+      {"userId": "user-456", "displayName": "Bob", ...},
+      {"userId": "user-789", "displayName": "Carol", ...}
+    ],
+    "total": 42
+  }
+}
+</code></pre>
+
+        <h3>Position (위치) 동기화</h3>
+        <pre><code>// 위치 업데이트 (throttled, 최대 20Hz)
+{
+  "type": "position.update",
+  "from": "user-123",
+  "timestamp": 1640995200050,
+  "data": {
+    "position": [-5.2, 1.6, -8.4],
+    "rotation": [0, 1.57, 0],  // 라디안
+    "velocity": [0.5, 0, 0],   // 보간을 위한 속도
+    "animation": "walking"     // "idle", "walking", "running"
+  }
+}
+
+// 텔레포트 (즉시 이동)
+{
+  "type": "position.teleport",
+  "from": "user-123",
+  "timestamp": 1640995200000,
+  "data": {
+    "position": [10, 1.6, -15],
+    "rotation": [0, 3.14, 0],
+    "effect": "fade"  // "fade", "portal", "instant"
+  }
+}
+</code></pre>
+
+        <h3>Chat (채팅)</h3>
+        <pre><code>// 텍스트 메시지
+{
+  "type": "chat.message",
+  "from": "user-123",
+  "timestamp": 1640995200000,
+  "data": {
+    "text": "이 작품 정말 아름답네요!",
+    "language": "ko",
+    "to": "all"  // "all", "nearby", "user-456"
+  }
+}
+
+// 이모티콘/제스처
+{
+  "type": "chat.emote",
+  "from": "user-123",
+  "timestamp": 1640995200000,
+  "data": {
+    "emote": "wave",  // "wave", "clap", "thumbsup", "think"
+    "duration": 2000
+  }
+}
+</code></pre>
+
+        <h3>Actions (상호작용)</h3>
+        <pre><code>// 작품 클릭/선택
+{
+  "type": "action.select.artwork",
+  "from": "user-123",
+  "timestamp": 1640995200000,
+  "data": {
+    "artworkId": "artwork-001",
+    "highlightColor": "#FFD700"
+  }
+}
+
+// 큐레이터 가이드 시작
+{
+  "type": "action.guide.start",
+  "from": "curator-456",  // 권한 필요
+  "timestamp": 1640995200000,
+  "data": {
+    "tourId": "impressionism-tour",
+    "stops": [
+      {"artworkId": "artwork-001", "duration": 180},
+      {"artworkId": "artwork-005", "duration": 240}
+    ]
+  }
+}
+
+// 팔로우 모드
+{
+  "type": "action.follow",
+  "from": "user-123",
+  "timestamp": 1640995200000,
+  "data": {
+    "targetUserId": "curator-456",
+    "distance": 2.0  // 미터
+  }
+}
+</code></pre>
+
+        <h2>WebRTC P2P 통신</h2>
+
+        <h3>음성 채팅 연결</h3>
+        <p>
+            저지연 음성 통신을 위해 WIA는 WebRTC를 사용합니다:
+        </p>
+
+        <pre><code>// Signaling (WebSocket을 통해)
+// 1. Offer 생성
+const pc = new RTCPeerConnection(configuration);
+const offer = await pc.createOffer({
+  offerToReceiveAudio: true,
+  offerToReceiveVideo: false
+});
+
+await pc.setLocalDescription(offer);
+
+// WebSocket으로 전송
+ws.send({
+  type: "webrtc.offer",
+  from: "user-123",
+  to: "user-456",
+  data: {
+    sdp: offer.sdp,
+    type: offer.type
+  }
+});
+
+// 2. Answer 수신
+ws.on('message', async (msg) => {
+  if (msg.type === 'webrtc.answer') {
+    await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
+  }
+  if (msg.type === 'webrtc.ice-candidate') {
+    await pc.addIceCandidate(new RTCIceCandidate(msg.data));
+  }
+});
+
+// 3. 오디오 스트림 추가
+const stream = await navigator.mediaDevices.getUserMedia({
+  audio: {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true
+  }
+});
+
+stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+// 4. 원격 스트림 수신
+pc.ontrack = (event) => {
+  const remoteAudio = new Audio();
+  remoteAudio.srcObject = event.streams[0];
+  remoteAudio.play();
+  
+  // Spatial Audio 적용 (Web Audio API)
+  applySpatialAudio(remoteAudio, user456Position);
+};
+</code></pre>
+
+        <h3>Mesh vs. SFU 토폴로지</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>특성</th>
+                    <th>Mesh (P2P)</th>
+                    <th>SFU (Server)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>최대 참가자</strong></td>
+                    <td>~10명</td>
+                    <td>수백 명</td>
+                </tr>
+                <tr>
+                    <td><strong>지연시간</strong></td>
+                    <td>매우 낮음 (50-100ms)</td>
+                    <td>낮음 (100-200ms)</td>
+                </tr>
+                <tr>
+                    <td><strong>대역폭 사용</strong></td>
+                    <td>N*(N-1) 연결 (높음)</td>
+                    <td>N 연결 (낮음)</td>
+                </tr>
+                <tr>
+                    <td><strong>서버 비용</strong></td>
+                    <td>낮음</td>
+                    <td>높음</td>
+                </tr>
+                <tr>
+                    <td><strong>사용 사례</strong></td>
+                    <td>소규모 그룹 투어</td>
+                    <td>대형 이벤트, 강연</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>
+            WIA는 참가자 수에 따라 자동으로 토폴로지를 전환합니다:
+        </p>
+        <ul>
+            <li>≤ 8명: Full Mesh (모두가 모두와 직접 연결)</li>
+            <li>9-30명: Partial Mesh (근처 사용자만 P2P, 나머지는 서버)</li>
+            <li>> 30명: 완전 SFU 모드</li>
+        </ul>
+
+        <h2>Adaptive Streaming</h2>
+
+        <h3>네트워크 감지 및 품질 조정</h3>
+        <pre><code>// Network Information API 활용
+const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+
+function getQualityLevel() {
+  const bandwidth = connection.downlink;  // Mbps
+  const rtt = connection.rtt;            // ms
+  const effectiveType = connection.effectiveType;  // '4g', '3g', '2g', 'slow-2g'
+  
+  if (bandwidth > 10 && rtt < 100) {
+    return 'ultra';  // 8K 텍스처, 높은 폴리곤
+  } else if (bandwidth > 5 && rtt < 200) {
+    return 'high';   // 4K 텍스처, 중간 폴리곤
+  } else if (bandwidth > 2) {
+    return 'medium'; // 2K 텍스처, 낮은 폴리곤
+  } else {
+    return 'low';    // 1K 텍스처, 최소 폴리곤
+  }
+}
+
+// 품질 변경 시 점진적 전환
+gallery.on('quality.change', (from, to) => {
+  console.log(`Quality: ${from} → ${to}`);
+  // 부드러운 LOD 전환 (crossfade)
+});
+
+// 사용자 수동 오버라이드 허용
+gallery.setQuality('high', { userPreference: true });
+</code></pre>
+
+        <h3>Bandwidth Estimation</h3>
+        <pre><code>// WebRTC Stats를 활용한 실시간 대역폭 측정
+async function estimateBandwidth(peerConnection) {
+  const stats = await peerConnection.getStats();
+  let bytesReceived = 0;
+  let timestamp = 0;
+  
+  stats.forEach(report => {
+    if (report.type === 'inbound-rtp' && report.mediaType === 'video') {
+      bytesReceived = report.bytesReceived;
+      timestamp = report.timestamp;
+    }
+  });
+  
+  // 이전 측정과 비교하여 Mbps 계산
+  const bandwidth = calculateBandwidth(bytesReceived, timestamp);
+  
+  if (bandwidth < 2) {
+    gallery.setQuality('low');
+  } else if (bandwidth < 5) {
+    gallery.setQuality('medium');
+  }
+}
+
+// 5초마다 측정
+setInterval(() => estimateBandwidth(pc), 5000);
+</code></pre>
+
+        <h2>Spatial Audio Protocol</h2>
+
+        <h3>3D 위치 기반 오디오</h3>
+        <pre><code>// Web Audio API Panner Node
+const audioContext = new AudioContext();
+const panner = audioContext.createPanner();
+
+// 청취자 위치 (카메라/아바타)
+audioContext.listener.positionX.value = myPosition.x;
+audioContext.listener.positionY.value = myPosition.y;
+audioContext.listener.positionZ.value = myPosition.z;
+
+// 청취자 방향
+audioContext.listener.forwardX.value = myForward.x;
+audioContext.listener.forwardY.value = myForward.y;
+audioContext.listener.forwardZ.value = myForward.z;
+
+// 음원 위치 (다른 사용자 또는 작품 오디오 가이드)
+panner.positionX.value = sourcePosition.x;
+panner.positionY.value = sourcePosition.y;
+panner.positionZ.value = sourcePosition.z;
+
+// 거리 감쇠 모델
+panner.distanceModel = 'inverse';  // 'linear', 'exponential'
+panner.refDistance = 1;     // 1미터에서 원음량
+panner.maxDistance = 20;    // 20미터 이상에서 무음
+panner.rolloffFactor = 1;   // 감쇠 속도
+
+// 방향성 (콘 모델)
+panner.coneInnerAngle = 60;   // 내부 각도
+panner.coneOuterAngle = 120;  // 외부 각도
+panner.coneOuterGain = 0.3;   // 외부 음량
+
+// 오디오 연결
+source.connect(panner).connect(audioContext.destination);
+</code></pre>
+
+        <h3>Room Acoustics (방 음향)</h3>
+        <pre><code>// Convolution Reverb로 갤러리 음향 시뮬레이션
+const convolver = audioContext.createConvolver();
+
+// 임펄스 응답 로드 (실제 갤러리 녹음 또는 시뮬레이션)
+const response = await fetch('gallery-impulse-response.wav');
+const arrayBuffer = await response.arrayBuffer();
+const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+convolver.buffer = audioBuffer;
+
+// 건식/습식 믹스
+const dry = audioContext.createGain();
+const wet = audioContext.createGain();
+dry.gain.value = 0.6;
+wet.gain.value = 0.4;
+
+source.connect(dry).connect(destination);
+source.connect(convolver).connect(wet).connect(destination);
+
+// 재질별 흡음률 (manifest.json에서)
+{
+  "acousticModel": {
+    "materials": {
+      "floor": {"absorption": 0.15, "scattering": 0.05},  // 대리석
+      "walls": {"absorption": 0.25, "scattering": 0.15},  // 회반죽
+      "ceiling": {"absorption": 0.60, "scattering": 0.40}, // 흡음 패널
+      "artworks": {"absorption": 0.10, "scattering": 0.05} // 캔버스
+    },
+    "reverbTime": 1.8,  // 초
+    "roomVolume": 6000  // 세제곱미터
+  }
+}
+</code></pre>
+
+        <div class="case-study">
+            <h3>사례 연구: MoMA의 500명 동시 접속 VR 강연</h3>
+            <p>
+                2023년 5월, 뉴욕 현대미술관(MoMA)는 WIA Phase 3 프로토콜을 사용하여 "현대 미술의 미래"
+                VR 강연을 개최했습니다. 전 세계에서 500명이 동시 접속하여 큐레이터의 실시간 가이드를 들었습니다.
+            </p>
+            <p><strong>기술 아키텍처:</strong></p>
+            <ul>
+                <li><strong>WebSocket 서버:</strong> AWS ELB 뒤의 10개 인스턴스, Redis Pub/Sub로 메시지 라우팅</li>
+                <li><strong>WebRTC SFU:</strong> Mediasoup 기반, 3개 리전(미국, 유럽, 아시아)에 배포</li>
+                <li><strong>CDN:</strong> Cloudflare for 3D 자산, 엣지 캐싱으로 로딩 시간 80% 감소</li>
+                <li><strong>Adaptive Streaming:</strong> 5단계 품질(ultra/high/medium/low/minimum)</li>
+            </ul>
+            <p><strong>성능 결과:</strong></p>
+            <ul>
+                <li>평균 WebSocket 지연시간: 45ms (서버 간 Redis 통신 포함)</li>
+                <li>WebRTC 음성 지연: 120ms (글로벌 평균)</li>
+                <li>대역폭 사용: 사용자당 평균 2.5Mbps (adaptive로 1-8Mbps 범위)</li>
+                <li>동시 접속 500명, 피크 메시지 처리율 15,000 msg/sec</li>
+                <li>99%ile 응답 시간: 200ms 미만</li>
+            </ul>
+            <p><strong>사용자 경험:</strong></p>
+            <ul>
+                <li>참가자 만족도: 4.7/5.0</li>
+                <li>음성 품질 평가: 4.5/5.0 (약간의 에코 보고)</li>
+                <li>88%가 "물리적 강연만큼 몰입적"이라고 응답</li>
+                <li>평균 체류 시간: 52분 (계획된 45분 강연 초과)</li>
+            </ul>
+            <p><strong>교훈:</strong></p>
+            <ul>
+                <li>지역별 SFU 배치가 글로벌 지연시간 감소에 결정적</li>
+                <li>Adaptive quality가 모바일 사용자(35%) 참여 가능하게 함</li>
+                <li>Spatial audio가 혼란 감소 및 몰입감 증가</li>
+                <li>텍스트 채팅(15,000 메시지)이 음성 보완 및 접근성 향상</li>
+            </ul>
+        </div>
+
+        <h2>프로토콜 보안</h2>
+
+        <h3>메시지 인증</h3>
+        <pre><code>// JWT 기반 WebSocket 인증
+wss://realtime.wia.org/art-011/v1/exhibitions/exh-123?token=eyJhbGci...
+
+// 서버 측 검증 (개념)
+const jwt = extractTokenFromQuery(request);
+const payload = verifyJWT(jwt, publicKey);
+
+if (!payload.exhibitionId === exhibitionId) {
+  socket.close(4403, 'Forbidden');
+}
+
+// 사용자 권한 확인
+const permissions = payload.permissions;  // ['read', 'write', 'moderate']
+
+if (message.type === 'action.kick' && !permissions.includes('moderate')) {
+  socket.send({type: 'error', message: 'Insufficient permissions'});
+}
+</code></pre>
+
+        <h3>Rate Limiting & Anti-Spam</h3>
+        <pre><code>// 메시지 타입별 rate limit
+const limits = {
+  'position.update': 20,   // 20 msg/sec
+  'chat.message': 1,       // 1 msg/sec
+  'action.emote': 0.2      // 1 msg/5sec
+};
+
+// 서버 측 토큰 버킷 알고리즘
+class RateLimiter {
+  constructor(rate, capacity) {
+    this.tokens = capacity;
+    this.rate = rate;
+    this.lastRefill = Date.now();
+  }
+  
+  tryConsume() {
+    this.refill();
+    if (this.tokens >= 1) {
+      this.tokens -= 1;
+      return true;
+    }
+    return false;
+  }
+  
+  refill() {
+    const now = Date.now();
+    const elapsed = (now - this.lastRefill) / 1000;
+    this.tokens = Math.min(
+      this.capacity,
+      this.tokens + elapsed * this.rate
+    );
+    this.lastRefill = now;
+  }
+}
+
+// 스팸 감지
+if (containsProfanity(message.text) || isRepetitive(message.text)) {
+  warnUser(userId);
+  // 3회 경고 후 자동 음소거
+}
+</code></pre>
+
+        <div class="key-takeaways">
+            <h3>핵심 요점</h3>
+            <ul>
+                <li><strong>WebSocket 프로토콜:</strong> Presence, Position, Chat, Actions 메시지 타입으로 실시간 동기화하며, JSON 기반 표준 형식을 사용합니다.</li>
+                <li><strong>WebRTC P2P:</strong> 저지연 음성 채팅을 위해 Mesh (≤8명)와 SFU (>30명) 토폴로지를 참가자 수에 따라 자동 전환합니다.</li>
+                <li><strong>Adaptive Streaming:</strong> Network Information API로 대역폭을 측정하고 ultra/high/medium/low 품질로 자동 조정하여 모든 네트워크 환경을 지원합니다.</li>
+                <li><strong>Spatial Audio:</strong> Web Audio API Panner Node로 3D 위치 기반 오디오를 구현하며, Convolution Reverb로 갤러리 음향을 시뮬레이션합니다.</li>
+                <li><strong>확장성:</strong> MoMA 사례에서 500명 동시 접속, 15,000 msg/sec 처리, 평균 45ms 지연시간을 달성했습니다.</li>
+                <li><strong>보안:</strong> JWT 인증, 권한 기반 접근 제어, 메시지 타입별 rate limiting, 스팸 감지로 안전한 환경을 보장합니다.</li>
+                <li><strong>사용자 경험:</strong> Spatial audio와 adaptive quality로 88%가 물리적 강연만큼 몰입적이라고 평가했으며, 모바일 사용자 35%도 참여 가능했습니다.</li>
+                <li><strong>인프라:</strong> 지역별 SFU 배치, Redis Pub/Sub, CDN 엣지 캐싱으로 글로벌 성능을 최적화하고 대역폭 사용을 최소화합니다.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li><strong>WIA WebSocket 프로토콜의 4가지 메시지 타입(Presence, Position, Chat, Actions)을 각각 설명하고, 각 타입의 JSON 구조와 사용 사례를 예시 코드와 함께 제시하십시오.</strong></li>
+                <li><strong>WebRTC의 Mesh와 SFU 토폴로지를 최대 참가자, 지연시간, 대역폭, 서버 비용 측면에서 비교하십시오. WIA가 참가자 수에 따라 토폴로지를 자동 전환하는 전략(≤8명, 9-30명, >30명)을 설명하십시오.</strong></li>
+                <li><strong>Adaptive Streaming이 Network Information API를 활용하여 품질을 조정하는 방법을 설명하고, downlink, rtt, effectiveType 파라미터가 품질 레벨(ultra/high/medium/low) 결정에 어떻게 사용되는지 코드 예시와 함께 논의하십시오.</strong></li>
+                <li><strong>Web Audio API를 사용한 Spatial Audio 구현을 설명하십시오. Panner Node의 파라미터(distanceModel, refDistance, maxDistance, rolloffFactor, cone settings)와 Convolution Reverb를 활용한 갤러리 음향 시뮬레이션 방법을 제시하십시오.</strong></li>
+                <li><strong>MoMA 500명 동시 접속 사례 연구를 분석하고, 기술 아키텍처(WebSocket, WebRTC SFU, CDN), 성능 결과(지연시간, 대역폭, 처리율), 사용자 경험 평가를 상세히 설명하십시오. 지역별 SFU 배치가 왜 중요했습니까?</strong></li>
+                <li><strong>프로토콜 보안을 설명하십시오. JWT 기반 WebSocket 인증, 권한 확인, Rate Limiting (토큰 버킷 알고리즘), 스팸 감지가 어떻게 구현되며, 각각이 어떤 위협을 방어하는지 논의하십시오.</strong></li>
+            </ol>
+        </div>
+
+        <h2>다음 장 예고</h2>
+        <p>
+            제7장에서는 Phase 4 Integration을 다룹니다. AWS, Google Cloud, Azure로의 배포, Spatial.io,
+            Mozilla Hubs, Decentraland 플랫폼 통합, NFT 마켓플레이스 연동, 그리고 다른 WIA 표준
+            (WIA-SOCIAL, WIA-INTENT)과의 생태계 연계를 학습합니다.
+        </p>
+</div>
+</body>
+</html>

@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Security - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --primary-dark: #DC2626;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #F87171); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .scan-viz { background: linear-gradient(135deg, #1e1e2e, #2d1f1f); border-radius: 12px; padding: 30px; margin: 20px 0; text-align: center; }
+        .scan-progress { width: 100%; height: 20px; background: var(--bg); border-radius: 10px; overflow: hidden; margin: 20px 0; }
+        .scan-bar { width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--warning)); transition: width 0.5s; }
+        .scan-status { font-size: 1.2rem; color: var(--primary); }
+
+        .vuln-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .vuln-card { background: var(--bg); border-left: 4px solid var(--primary); border-radius: 8px; padding: 15px; }
+        .vuln-card.critical { border-color: #dc2626; }
+        .vuln-card.high { border-color: #f59e0b; }
+        .vuln-card.medium { border-color: #eab308; }
+        .vuln-card.low { border-color: #22c55e; }
+        .vuln-severity { font-size: 0.75rem; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; }
+        .vuln-name { font-weight: 600; }
+        .vuln-id { font-size: 0.8rem; color: var(--text-muted); }
+
+        .shield-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }
+        .shield-card { background: var(--bg); border: 2px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .shield-card:hover { border-color: var(--secondary); }
+        .shield-card.active { border-color: var(--secondary); background: rgba(16, 185, 129, 0.1); }
+        .shield-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .shield-name { font-weight: 600; }
+        .shield-status { font-size: 0.8rem; color: var(--secondary); margin-top: 5px; }
+
+        .alert-list { max-height: 300px; overflow-y: auto; }
+        .alert-item { display: flex; align-items: center; gap: 15px; padding: 15px; background: var(--bg); border-radius: 8px; margin-bottom: 10px; border-left: 4px solid var(--primary); }
+        .alert-item.critical { border-color: #dc2626; }
+        .alert-item.warning { border-color: #f59e0b; }
+        .alert-item.info { border-color: #3b82f6; }
+        .alert-icon { font-size: 1.5rem; }
+        .alert-content { flex: 1; }
+        .alert-title { font-weight: 600; }
+        .alert-time { font-size: 0.8rem; color: var(--text-muted); }
+
+        .crypto-demo { background: var(--bg); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .crypto-input { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); color: var(--text); margin-bottom: 15px; }
+        .crypto-output { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 15px; font-family: monospace; word-break: break-all; }
+
+        .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .metric-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .metric-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .metric-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .toggle-row:last-child { border-bottom: none; }
+        .toggle-switch { position: relative; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 26px; transition: 0.3s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background: var(--secondary); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(24px); }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .shield-grid { grid-template-columns: 1fr; }
+            .metric-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Security</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🛡️ WIA Security</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Cybersecurity Standard" data-ko="사이버보안 표준">Cybersecurity Standard</h1>
+            <p data-en="Vulnerability scanning, threat detection, encryption" data-ko="취약점 스캔, 위협 감지, 암호화">Security for all</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🔍 Scan" data-ko="🔍 스캔">🔍 Scan</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🛡️ Shield" data-ko="🛡️ 방어">🛡️ Shield</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🚨 Alert" data-ko="🚨 경고">🚨 Alert</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🔐 Crypto" data-ko="🔐 암호화">🔐 Crypto</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📊 Audit" data-ko="📊 감사">📊 Audit</div>
+        </div>
+
+        <!-- Panel 0: Scan -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🔍 Vulnerability Scanner" data-ko="🔍 취약점 스캐너">🔍 Vulnerability Scanner</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Detect security vulnerabilities" data-ko="보안 취약점 탐지">Detect vulnerabilities</p>
+
+            <div class="scan-viz">
+                <div class="scan-status" id="scanStatus" data-en="Ready to scan" data-ko="스캔 준비">Ready to scan</div>
+                <div class="scan-progress">
+                    <div class="scan-bar" id="scanBar"></div>
+                </div>
+            </div>
+
+            <div class="vuln-grid" id="vulnResults">
+                <div class="vuln-card critical">
+                    <div class="vuln-severity" style="color: #dc2626;">Critical</div>
+                    <div class="vuln-name">SQL Injection</div>
+                    <div class="vuln-id">CVE-2024-1234</div>
+                </div>
+                <div class="vuln-card high">
+                    <div class="vuln-severity" style="color: #f59e0b;">High</div>
+                    <div class="vuln-name">XSS</div>
+                    <div class="vuln-id">CVE-2024-5678</div>
+                </div>
+                <div class="vuln-card medium">
+                    <div class="vuln-severity" style="color: #eab308;">Medium</div>
+                    <div class="vuln-name">CSRF</div>
+                    <div class="vuln-id">CVE-2024-9012</div>
+                </div>
+                <div class="vuln-card low">
+                    <div class="vuln-severity" style="color: #22c55e;">Low</div>
+                    <div class="vuln-name">Info Disclosure</div>
+                    <div class="vuln-id">CVE-2024-3456</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runScan()" data-en="🔍 Start Scan" data-ko="🔍 스캔 시작">🔍 Start Scan</button>
+            </div>
+            <div class="output" id="scanOutput"></div>
+        </div>
+
+        <!-- Panel 1: Shield -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🛡️ Defense Systems" data-ko="🛡️ 방어 시스템">🛡️ Defense Systems</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Configure security defenses" data-ko="보안 방어 설정">Configure defenses</p>
+
+            <div class="shield-grid">
+                <div class="shield-card active">
+                    <div class="shield-icon">🔥</div>
+                    <div class="shield-name">Firewall</div>
+                    <div class="shield-status">✅ Active</div>
+                </div>
+                <div class="shield-card active">
+                    <div class="shield-icon">🦠</div>
+                    <div class="shield-name" data-en="Antivirus" data-ko="백신">Antivirus</div>
+                    <div class="shield-status">✅ Active</div>
+                </div>
+                <div class="shield-card">
+                    <div class="shield-icon">🕵️</div>
+                    <div class="shield-name">IDS/IPS</div>
+                    <div class="shield-status">⚠️ Disabled</div>
+                </div>
+                <div class="shield-card active">
+                    <div class="shield-icon">🔒</div>
+                    <div class="shield-name">WAF</div>
+                    <div class="shield-status">✅ Active</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="activateShields()" data-en="🛡️ Activate All" data-ko="🛡️ 모두 활성화">🛡️ Activate All</button>
+            </div>
+            <div class="output" id="shieldOutput"></div>
+        </div>
+
+        <!-- Panel 2: Alert -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🚨 Threat Alerts" data-ko="🚨 위협 경고">🚨 Threat Alerts</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Real-time security alerts" data-ko="실시간 보안 경고">Real-time alerts</p>
+
+            <div class="alert-list">
+                <div class="alert-item critical">
+                    <div class="alert-icon">🔴</div>
+                    <div class="alert-content">
+                        <div class="alert-title" data-en="Brute Force Attack Detected" data-ko="무차별 대입 공격 감지">Brute Force Attack</div>
+                        <div class="alert-time">2 minutes ago • IP: 192.168.1.100</div>
+                    </div>
+                </div>
+                <div class="alert-item warning">
+                    <div class="alert-icon">🟠</div>
+                    <div class="alert-content">
+                        <div class="alert-title" data-en="Suspicious Login Attempt" data-ko="의심스러운 로그인 시도">Suspicious Login</div>
+                        <div class="alert-time">15 minutes ago • User: admin</div>
+                    </div>
+                </div>
+                <div class="alert-item info">
+                    <div class="alert-icon">🔵</div>
+                    <div class="alert-content">
+                        <div class="alert-title" data-en="SSL Certificate Expiring" data-ko="SSL 인증서 만료 예정">SSL Expiring</div>
+                        <div class="alert-time">1 hour ago • 7 days remaining</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="dismissAlerts()" data-en="🚨 Acknowledge All" data-ko="🚨 모두 확인">🚨 Acknowledge</button>
+            </div>
+            <div class="output" id="alertOutput"></div>
+        </div>
+
+        <!-- Panel 3: Crypto -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🔐 Encryption Tools" data-ko="🔐 암호화 도구">🔐 Encryption</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Encrypt and hash data" data-ko="데이터 암호화 및 해시">Encrypt & hash</p>
+
+            <div class="crypto-demo">
+                <input type="text" class="crypto-input" id="cryptoInput" placeholder="Enter text to encrypt..." data-en-placeholder="Enter text to encrypt..." data-ko-placeholder="암호화할 텍스트 입력...">
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button class="btn btn-secondary" onclick="encryptAES()">AES-256</button>
+                    <button class="btn btn-secondary" onclick="hashSHA()">SHA-256</button>
+                    <button class="btn btn-secondary" onclick="hashBcrypt()">bcrypt</button>
+                </div>
+                <div class="crypto-output" id="cryptoOutput" data-en="Output will appear here..." data-ko="결과가 여기에 표시됩니다...">Output will appear here...</div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="generateKeys()" data-en="🔐 Generate Keys" data-ko="🔐 키 생성">🔐 Generate Keys</button>
+            </div>
+            <div class="output" id="cryptoFullOutput"></div>
+        </div>
+
+        <!-- Panel 4: Audit -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="📊 Security Audit" data-ko="📊 보안 감사">📊 Security Audit</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Compliance and audit reports" data-ko="규정 준수 및 감사 보고서">Compliance & audit</p>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value" style="color: #22c55e;">A+</div>
+                    <div class="metric-label" data-en="Security Score" data-ko="보안 점수">Score</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">98%</div>
+                    <div class="metric-label" data-en="Compliance" data-ko="규정 준수">Compliance</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">3</div>
+                    <div class="metric-label" data-en="Open Issues" data-ko="미해결">Issues</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">24h</div>
+                    <div class="metric-label" data-en="Last Audit" data-ko="최근 감사">Last Audit</div>
+                </div>
+            </div>
+
+            <div style="background: var(--bg); border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <div class="toggle-row">
+                    <span>SOC 2 Type II</span>
+                    <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="toggle-row">
+                    <span>ISO 27001</span>
+                    <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="toggle-row">
+                    <span>GDPR</span>
+                    <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="toggle-row">
+                    <span>PCI DSS</span>
+                    <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runAudit()" data-en="📊 Run Audit" data-ko="📊 감사 실행">📊 Run Audit</button>
+            </div>
+            <div class="output" id="auditOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Security: Protecting digital assets" data-ko="WIA Security: 디지털 자산 보호">Protecting digital assets</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.toLowerCase() === lang));
+            document.querySelectorAll('[data-en]').forEach(el => el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en'));
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function runScan() {
+            const bar = document.getElementById('scanBar');
+            const status = document.getElementById('scanStatus');
+            bar.style.width = '0%';
+            status.textContent = currentLang === 'ko' ? '스캔 중...' : 'Scanning...';
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                bar.style.width = progress + '%';
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    status.textContent = currentLang === 'ko' ? '스캔 완료!' : 'Scan Complete!';
+                    document.getElementById('scanOutput').textContent = JSON.stringify({
+                        scanned: 1247, vulnerabilities: { critical: 1, high: 2, medium: 5, low: 12 },
+                        duration: '4.2s', timestamp: new Date().toISOString(),
+                        message: currentLang === 'ko' ? '취약점 스캔 완료' : 'Vulnerability scan complete'
+                    }, null, 2);
+                }
+            }, 200);
+        }
+
+        function activateShields() {
+            document.querySelectorAll('.shield-card').forEach(c => {
+                c.classList.add('active');
+                c.querySelector('.shield-status').textContent = '✅ Active';
+            });
+            document.getElementById('shieldOutput').textContent = JSON.stringify({
+                activated: ['Firewall', 'Antivirus', 'IDS/IPS', 'WAF'],
+                status: 'All defenses active',
+                message: currentLang === 'ko' ? '모든 방어 시스템 활성화됨' : 'All defense systems activated'
+            }, null, 2);
+        }
+
+        function dismissAlerts() {
+            document.getElementById('alertOutput').textContent = JSON.stringify({
+                acknowledged: 3, remaining: 0,
+                message: currentLang === 'ko' ? '모든 경고 확인됨' : 'All alerts acknowledged'
+            }, null, 2);
+        }
+
+        function encryptAES() {
+            const input = document.getElementById('cryptoInput').value || 'Hello';
+            document.getElementById('cryptoOutput').textContent = btoa(input + '_AES256_' + Date.now());
+        }
+
+        function hashSHA() {
+            const input = document.getElementById('cryptoInput').value || 'Hello';
+            const hash = Array.from(input).reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 0).toString(16);
+            document.getElementById('cryptoOutput').textContent = hash.padStart(64, '0');
+        }
+
+        function hashBcrypt() {
+            const input = document.getElementById('cryptoInput').value || 'Hello';
+            document.getElementById('cryptoOutput').textContent = '$2b$12$' + btoa(input).slice(0, 53);
+        }
+
+        function generateKeys() {
+            document.getElementById('cryptoFullOutput').textContent = JSON.stringify({
+                algorithm: 'RSA-4096', publicKey: 'MIIBIjANBgkq...', privateKey: '[REDACTED]',
+                fingerprint: 'SHA256:' + Math.random().toString(36).slice(2, 10),
+                message: currentLang === 'ko' ? '키 쌍 생성됨' : 'Key pair generated'
+            }, null, 2);
+        }
+
+        function runAudit() {
+            document.getElementById('auditOutput').textContent = JSON.stringify({
+                score: 'A+', compliance: { 'SOC 2': 'Pass', 'ISO 27001': 'Pass', 'GDPR': 'Pass', 'PCI DSS': 'In Progress' },
+                findings: { passed: 142, failed: 3, warnings: 8 },
+                recommendations: ['Enable MFA for all users', 'Update SSL certificates', 'Review access logs'],
+                message: currentLang === 'ko' ? '보안 감사 완료' : 'Security audit complete'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang('en'));
+    </script>
+</body>
+</html>

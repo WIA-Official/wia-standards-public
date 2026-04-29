@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: 클라우드 포렌식 | WIA-LEGAL-007-digital-forensics</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #64748B;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+        }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2rem 0 1rem 0; }
+        h3 { color: var(--text); font-size: 1.3rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--bg); }
+        th, td { padding: 1rem; text-align: left; border: 1px solid var(--border); }
+        th { background: var(--primary); color: white; font-weight: 600; }
+        .summary { background: var(--bg); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; }
+        .summary h3 { color: var(--primary); margin-top: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .nav-links { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .nav-links a { color: var(--primary); text-decoration: none; padding: 0.75rem 1.5rem; border: 1px solid var(--primary); border-radius: 6px; transition: all 0.3s; }
+        .nav-links a:hover { background: var(--primary); color: white; }
+        code { background: var(--bg); color: var(--primary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Courier New', monospace; }
+        pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        .callout { background: rgba(100, 116, 139, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; }
+        .questions { background: var(--bg); padding: 1.5rem; border-radius: 8px; margin: 2rem 0; }
+        .questions ol { margin-left: 1.5rem; }
+        .philosophy { text-align: center; padding: 2rem; margin: 2rem 0; background: var(--bg); border-radius: 8px; }
+        .philosophy-text { font-size: 1.5rem; color: var(--primary); letter-spacing: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 6: 클라우드 포렌식</h1>
+
+        <p>클라우드 컴퓨팅의 보편화로 디지털 증거는 더 이상 물리적 기기에만 존재하지 않습니다. AWS, Azure, GCP와 같은 클라우드 플랫폼, SaaS 애플리케이션, 클라우드 스토리지 서비스에 분산된 데이터는 현대 포렌식의 새로운 도전입니다. 이 장에서는 클라우드 환경에서 증거를 수집하고 분석하는 기법, 클라우드 서비스 제공자와의 협력 절차, 그리고 관할권 문제를 포함한 법적 고려사항을 학습합니다.</p>
+
+        <h2>섹션 1: 클라우드 포렌식 개요</h2>
+
+        <p>클라우드 포렌식은 전통적인 디지털 포렌식과 근본적으로 다른 접근이 필요합니다. 물리적 하드웨어에 대한 직접 접근이 불가능하고, 데이터가 여러 데이터센터에 분산되어 있으며, 멀티테넌시 환경에서 다른 고객의 데이터와 물리적으로 공존합니다. 또한 클라우드의 동적 특성으로 인해 데이터가 빠르게 변경되거나 삭제될 수 있어, 전통적인 이미징 방식이 적용되기 어렵습니다. 이러한 특성은 증거 수집의 완전성, 신뢰성, 법적 유효성에 새로운 과제를 제시합니다.</p>
+
+        <h3>클라우드 서비스 모델과 포렌식</h3>
+
+        <p>클라우드 서비스 모델(IaaS, PaaS, SaaS)에 따라 수집 가능한 증거와 책임 범위가 달라집니다. IaaS에서는 고객이 가상 머신과 스토리지에 대한 통제권을 가지므로 비교적 전통적인 포렌식 기법을 적용할 수 있습니다. PaaS에서는 애플리케이션 레벨 로그와 데이터에 접근할 수 있지만, 인프라 레벨 증거는 제한됩니다. SaaS에서는 서비스 제공자가 제공하는 로그와 내보내기 기능에 의존해야 하며, 직접적인 시스템 접근은 불가능합니다.</p>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">표 6.1: 클라우드 서비스 모델별 포렌식 특성</caption>
+            <thead>
+                <tr>
+                    <th>서비스 모델</th>
+                    <th>접근 가능 증거</th>
+                    <th>수집 방법</th>
+                    <th>주요 제약</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>IaaS</td>
+                    <td>VM 디스크, 네트워크 로그, API 로그</td>
+                    <td>스냅샷, API 추출</td>
+                    <td>물리 인프라 접근 불가</td>
+                </tr>
+                <tr>
+                    <td>PaaS</td>
+                    <td>앱 로그, DB 데이터, 배포 이력</td>
+                    <td>플랫폼 도구, 내보내기</td>
+                    <td>OS/인프라 접근 불가</td>
+                </tr>
+                <tr>
+                    <td>SaaS</td>
+                    <td>사용자 데이터, 감사 로그</td>
+                    <td>관리 콘솔, API</td>
+                    <td>서비스별 기능 제한</td>
+                </tr>
+                <tr>
+                    <td>서버리스</td>
+                    <td>함수 로그, 트레이스</td>
+                    <td>CloudWatch/Stackdriver</td>
+                    <td>실행 환경 접근 불가</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>섹션 2: AWS 포렌식</h2>
+
+        <p>Amazon Web Services는 가장 널리 사용되는 클라우드 플랫폼으로, 포렌식에 필요한 다양한 도구와 서비스를 제공합니다. CloudTrail은 AWS 계정의 모든 API 호출을 기록하여 누가, 언제, 어떤 작업을 수행했는지 추적할 수 있습니다. VPC Flow Logs는 네트워크 트래픽 메타데이터를 수집합니다. GuardDuty는 위협 탐지 서비스로, 의심스러운 활동을 자동으로 식별합니다. 이러한 서비스들을 조합하여 체계적인 포렌식 조사를 수행할 수 있습니다.</p>
+
+        <h3>EC2 인스턴스 포렌식</h3>
+
+        <p>EC2 인스턴스에서 증거를 수집할 때는 라이브 인스턴스의 메모리 덤프, EBS 볼륨 스냅샷, CloudWatch 로그 수집이 핵심입니다. 인스턴스를 중지하기 전에 메모리를 덤프하여 실행 중인 프로세스, 네트워크 연결, 암호화 키 등 휘발성 데이터를 보존해야 합니다. EBS 볼륨 스냅샷은 디스크의 완전한 사본을 제공하며, 포렌식 분석용 별도 인스턴스에 연결하여 분석할 수 있습니다.</p>
+
+        <pre><code>// AWS 포렌식 수집 시스템
+import {
+  EC2Client,
+  CreateSnapshotCommand,
+  DescribeInstancesCommand,
+  DescribeVolumesCommand,
+  CopySnapshotCommand
+} from '@aws-sdk/client-ec2';
+import {
+  CloudTrailClient,
+  LookupEventsCommand
+} from '@aws-sdk/client-cloudtrail';
+import {
+  CloudWatchLogsClient,
+  FilterLogEventsCommand
+} from '@aws-sdk/client-cloudwatch-logs';
+import {
+  S3Client,
+  GetObjectCommand,
+  ListObjectsV2Command
+} from '@aws-sdk/client-s3';
+
+interface AWSForensicArtifact {
+  type: 'snapshot' | 'log' | 'trail' | 'flowlog';
+  resourceId: string;
+  timestamp: Date;
+  data: Buffer | string;
+  metadata: Record&lt;string, any&gt;;
+  hash: string;
+}
+
+interface EC2ForensicReport {
+  instanceId: string;
+  region: string;
+  snapshots: SnapshotInfo[];
+  cloudTrailEvents: CloudTrailEvent[];
+  vpcFlowLogs: FlowLogEntry[];
+  cloudWatchLogs: LogEvent[];
+  collectionTime: Date;
+  chainOfCustody: ChainOfCustodyEntry[];
+}
+
+class AWSForensicCollector {
+  private ec2Client: EC2Client;
+  private cloudTrailClient: CloudTrailClient;
+  private cloudWatchLogsClient: CloudWatchLogsClient;
+  private s3Client: S3Client;
+  private outputBucket: string;
+
+  constructor(region: string, outputBucket: string) {
+    this.ec2Client = new EC2Client({ region });
+    this.cloudTrailClient = new CloudTrailClient({ region });
+    this.cloudWatchLogsClient = new CloudWatchLogsClient({ region });
+    this.s3Client = new S3Client({ region });
+    this.outputBucket = outputBucket;
+  }
+
+  async collectEC2Evidence(instanceId: string): Promise&lt;EC2ForensicReport&gt; {
+    console.log(`Starting forensic collection for instance: ${instanceId}`);
+
+    // 1. 인스턴스 정보 수집
+    const instanceInfo = await this.getInstanceInfo(instanceId);
+
+    // 2. EBS 볼륨 스냅샷 생성
+    const snapshots = await this.createForensicSnapshots(instanceInfo.volumes);
+
+    // 3. CloudTrail 이벤트 수집
+    const cloudTrailEvents = await this.collectCloudTrailEvents(instanceId);
+
+    // 4. VPC Flow Logs 수집
+    const flowLogs = await this.collectVPCFlowLogs(
+      instanceInfo.vpcId,
+      instanceInfo.eniIds
+    );
+
+    // 5. CloudWatch Logs 수집
+    const cwLogs = await this.collectCloudWatchLogs(instanceId);
+
+    // 6. 메모리 덤프 (SSM을 통해)
+    await this.collectMemoryDump(instanceId);
+
+    return {
+      instanceId,
+      region: this.ec2Client.config.region as string,
+      snapshots,
+      cloudTrailEvents,
+      vpcFlowLogs: flowLogs,
+      cloudWatchLogs: cwLogs,
+      collectionTime: new Date(),
+      chainOfCustody: this.generateChainOfCustody(instanceId)
+    };
+  }
+
+  private async getInstanceInfo(instanceId: string): Promise&lt;InstanceInfo&gt; {
+    const response = await this.ec2Client.send(
+      new DescribeInstancesCommand({
+        InstanceIds: [instanceId]
+      })
+    );
+
+    const instance = response.Reservations?.[0]?.Instances?.[0];
+    if (!instance) {
+      throw new Error(`Instance not found: ${instanceId}`);
+    }
+
+    const volumes = instance.BlockDeviceMappings?.map(bdm => ({
+      deviceName: bdm.DeviceName,
+      volumeId: bdm.Ebs?.VolumeId
+    })) || [];
+
+    const eniIds = instance.NetworkInterfaces?.map(eni => eni.NetworkInterfaceId) || [];
+
+    return {
+      instanceId,
+      instanceType: instance.InstanceType,
+      state: instance.State?.Name,
+      launchTime: instance.LaunchTime,
+      vpcId: instance.VpcId,
+      subnetId: instance.SubnetId,
+      privateIp: instance.PrivateIpAddress,
+      publicIp: instance.PublicIpAddress,
+      volumes,
+      eniIds,
+      securityGroups: instance.SecurityGroups?.map(sg => sg.GroupId) || [],
+      iamRole: instance.IamInstanceProfile?.Arn,
+      tags: instance.Tags || []
+    };
+  }
+
+  private async createForensicSnapshots(
+    volumes: VolumeInfo[]
+  ): Promise&lt;SnapshotInfo[]&gt; {
+    const snapshots: SnapshotInfo[] = [];
+
+    for (const volume of volumes) {
+      if (!volume.volumeId) continue;
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const description = `Forensic snapshot - ${volume.volumeId} - ${timestamp}`;
+
+      const response = await this.ec2Client.send(
+        new CreateSnapshotCommand({
+          VolumeId: volume.volumeId,
+          Description: description,
+          TagSpecifications: [{
+            ResourceType: 'snapshot',
+            Tags: [
+              { Key: 'Purpose', Value: 'Forensic' },
+              { Key: 'SourceVolume', Value: volume.volumeId },
+              { Key: 'CollectionTime', Value: new Date().toISOString() },
+              { Key: 'ChainOfCustody', Value: 'Initial Collection' }
+            ]
+          }]
+        })
+      );
+
+      snapshots.push({
+        snapshotId: response.SnapshotId!,
+        volumeId: volume.volumeId,
+        deviceName: volume.deviceName,
+        startTime: response.StartTime!,
+        state: response.State,
+        progress: response.Progress,
+        encrypted: response.Encrypted
+      });
+
+      console.log(`Created snapshot ${response.SnapshotId} for volume ${volume.volumeId}`);
+    }
+
+    return snapshots;
+  }
+
+  private async collectCloudTrailEvents(instanceId: string): Promise&lt;CloudTrailEvent[]&gt; {
+    const events: CloudTrailEvent[] = [];
+    let nextToken: string | undefined;
+
+    // 최근 90일간의 이벤트 수집 (CloudTrail 보존 기간)
+    const startTime = new Date();
+    startTime.setDate(startTime.getDate() - 90);
+
+    do {
+      const response = await this.cloudTrailClient.send(
+        new LookupEventsCommand({
+          LookupAttributes: [{
+            AttributeKey: 'ResourceName',
+            AttributeValue: instanceId
+          }],
+          StartTime: startTime,
+          EndTime: new Date(),
+          MaxResults: 50,
+          NextToken: nextToken
+        })
+      );
+
+      for (const event of response.Events || []) {
+        events.push({
+          eventId: event.EventId!,
+          eventName: event.EventName!,
+          eventTime: event.EventTime!,
+          eventSource: event.EventSource!,
+          username: event.Username,
+          resources: event.Resources?.map(r => ({
+            resourceType: r.ResourceType,
+            resourceName: r.ResourceName
+          })) || [],
+          cloudTrailEvent: JSON.parse(event.CloudTrailEvent || '{}')
+        });
+      }
+
+      nextToken = response.NextToken;
+    } while (nextToken);
+
+    return events;
+  }
+
+  private async collectVPCFlowLogs(
+    vpcId: string,
+    eniIds: string[]
+  ): Promise&lt;FlowLogEntry[]&gt; {
+    const flowLogs: FlowLogEntry[] = [];
+
+    // Flow Logs가 S3에 저장된 경우
+    const flowLogBucket = await this.getFlowLogBucket(vpcId);
+    if (!flowLogBucket) {
+      console.warn('No Flow Log destination found for VPC');
+      return flowLogs;
+    }
+
+    // 최근 7일간의 로그 수집
+    const startTime = new Date();
+    startTime.setDate(startTime.getDate() - 7);
+
+    for (const eniId of eniIds) {
+      const prefix = `AWSLogs/*/vpcflowlogs/*/${eniId}`;
+
+      let continuationToken: string | undefined;
+      do {
+        const listResponse = await this.s3Client.send(
+          new ListObjectsV2Command({
+            Bucket: flowLogBucket,
+            Prefix: prefix,
+            ContinuationToken: continuationToken
+          })
+        );
+
+        for (const obj of listResponse.Contents || []) {
+          if (obj.LastModified && obj.LastModified >= startTime) {
+            const getResponse = await this.s3Client.send(
+              new GetObjectCommand({
+                Bucket: flowLogBucket,
+                Key: obj.Key
+              })
+            );
+
+            const body = await getResponse.Body?.transformToString();
+            if (body) {
+              const parsedLogs = this.parseFlowLogs(body);
+              flowLogs.push(...parsedLogs);
+            }
+          }
+        }
+
+        continuationToken = listResponse.NextContinuationToken;
+      } while (continuationToken);
+    }
+
+    return flowLogs;
+  }
+
+  private parseFlowLogs(logData: string): FlowLogEntry[] {
+    const lines = logData.split('\n').filter(l => l.trim());
+    const entries: FlowLogEntry[] = [];
+
+    // 헤더 라인 스킵 (version, account-id, ...)
+    for (let i = 1; i < lines.length; i++) {
+      const fields = lines[i].split(' ');
+      if (fields.length >= 14) {
+        entries.push({
+          version: parseInt(fields[0]),
+          accountId: fields[1],
+          interfaceId: fields[2],
+          srcAddr: fields[3],
+          dstAddr: fields[4],
+          srcPort: parseInt(fields[5]),
+          dstPort: parseInt(fields[6]),
+          protocol: parseInt(fields[7]),
+          packets: parseInt(fields[8]),
+          bytes: parseInt(fields[9]),
+          startTime: new Date(parseInt(fields[10]) * 1000),
+          endTime: new Date(parseInt(fields[11]) * 1000),
+          action: fields[12] as 'ACCEPT' | 'REJECT',
+          logStatus: fields[13]
+        });
+      }
+    }
+
+    return entries;
+  }
+
+  private async collectMemoryDump(instanceId: string): Promise&lt;void&gt; {
+    // SSM Run Command를 사용하여 메모리 덤프 수행
+    // LiME 또는 AVML 사용
+    console.log(`Memory dump collection requires SSM agent on instance ${instanceId}`);
+
+    // 실제 구현에서는 SSM SendCommand를 사용
+    // await ssmClient.send(new SendCommandCommand({
+    //   InstanceIds: [instanceId],
+    //   DocumentName: 'AWS-RunShellScript',
+    //   Parameters: {
+    //     commands: [
+    //       'sudo insmod /opt/lime/lime.ko "path=/tmp/memory.lime format=lime"',
+    //       'aws s3 cp /tmp/memory.lime s3://forensic-bucket/'
+    //     ]
+    //   }
+    // }));
+  }
+
+  async analyzeIAMActivity(
+    principalArn: string,
+    startTime: Date,
+    endTime: Date
+  ): Promise&lt;IAMActivityReport&gt; {
+    const events: CloudTrailEvent[] = [];
+    let nextToken: string | undefined;
+
+    do {
+      const response = await this.cloudTrailClient.send(
+        new LookupEventsCommand({
+          LookupAttributes: [{
+            AttributeKey: 'Username',
+            AttributeValue: principalArn.split('/').pop()!
+          }],
+          StartTime: startTime,
+          EndTime: endTime,
+          NextToken: nextToken
+        })
+      );
+
+      events.push(...(response.Events?.map(e => ({
+        eventId: e.EventId!,
+        eventName: e.EventName!,
+        eventTime: e.EventTime!,
+        eventSource: e.EventSource!,
+        username: e.Username,
+        resources: e.Resources?.map(r => ({
+          resourceType: r.ResourceType,
+          resourceName: r.ResourceName
+        })) || [],
+        cloudTrailEvent: JSON.parse(e.CloudTrailEvent || '{}')
+      })) || []));
+
+      nextToken = response.NextToken;
+    } while (nextToken);
+
+    // 이상 행위 분석
+    const anomalies = this.detectIAMAnomalies(events);
+
+    // 권한 상승 시도 탐지
+    const privEscAttempts = events.filter(e =>
+      ['CreatePolicyVersion', 'AttachUserPolicy', 'AttachRolePolicy',
+       'PutUserPolicy', 'PutRolePolicy', 'CreateAccessKey',
+       'UpdateAssumeRolePolicy'].includes(e.eventName)
+    );
+
+    return {
+      principalArn,
+      timeRange: { start: startTime, end: endTime },
+      totalEvents: events.length,
+      events,
+      anomalies,
+      privilegeEscalationAttempts: privEscAttempts,
+      uniqueSourceIPs: [...new Set(events.map(e =>
+        e.cloudTrailEvent.sourceIPAddress
+      ))],
+      uniqueUserAgents: [...new Set(events.map(e =>
+        e.cloudTrailEvent.userAgent
+      ))]
+    };
+  }
+
+  private detectIAMAnomalies(events: CloudTrailEvent[]): IAMAnomaly[] {
+    const anomalies: IAMAnomaly[] = [];
+
+    // 비정상 시간대 활동 탐지
+    const offHoursEvents = events.filter(e => {
+      const hour = e.eventTime.getHours();
+      return hour < 6 || hour > 22;
+    });
+
+    if (offHoursEvents.length > 0) {
+      anomalies.push({
+        type: 'off_hours_activity',
+        severity: 'medium',
+        description: `${offHoursEvents.length} events during off-hours`,
+        events: offHoursEvents
+      });
+    }
+
+    // 새로운 IP 주소에서의 접근
+    const sourceIPs = events.map(e => e.cloudTrailEvent.sourceIPAddress);
+    const ipCounts = sourceIPs.reduce((acc, ip) => {
+      acc[ip] = (acc[ip] || 0) + 1;
+      return acc;
+    }, {} as Record&lt;string, number&gt;);
+
+    const rareIPs = Object.entries(ipCounts)
+      .filter(([_, count]) => count <= 2)
+      .map(([ip]) => ip);
+
+    if (rareIPs.length > 0) {
+      anomalies.push({
+        type: 'rare_source_ip',
+        severity: 'high',
+        description: `Activity from rare IP addresses: ${rareIPs.join(', ')}`,
+        events: events.filter(e =>
+          rareIPs.includes(e.cloudTrailEvent.sourceIPAddress)
+        )
+      });
+    }
+
+    return anomalies;
+  }
+
+  private generateChainOfCustody(resourceId: string): ChainOfCustodyEntry[] {
+    return [{
+      timestamp: new Date(),
+      action: 'collection_initiated',
+      actor: process.env.AWS_IAM_USER || 'forensic-collector',
+      resourceId,
+      description: 'Forensic evidence collection initiated',
+      hash: null
+    }];
+  }
+}</code></pre>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">표 6.2: AWS 포렌식 데이터 소스</caption>
+            <thead>
+                <tr>
+                    <th>데이터 소스</th>
+                    <th>수집 데이터</th>
+                    <th>보존 기간</th>
+                    <th>활성화 필요</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>CloudTrail</td>
+                    <td>API 호출 기록</td>
+                    <td>90일 (기본), S3 무제한</td>
+                    <td>관리 이벤트 기본 활성</td>
+                </tr>
+                <tr>
+                    <td>VPC Flow Logs</td>
+                    <td>네트워크 트래픽 메타데이터</td>
+                    <td>설정에 따름</td>
+                    <td>수동 활성화 필요</td>
+                </tr>
+                <tr>
+                    <td>CloudWatch Logs</td>
+                    <td>애플리케이션/시스템 로그</td>
+                    <td>1일~무제한</td>
+                    <td>에이전트 설치 필요</td>
+                </tr>
+                <tr>
+                    <td>GuardDuty</td>
+                    <td>위협 탐지 결과</td>
+                    <td>90일</td>
+                    <td>서비스 활성화 필요</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>섹션 3: Azure 포렌식</h2>
+
+        <p>Microsoft Azure는 기업 환경에서 널리 사용되며, Azure Active Directory와의 통합으로 ID 기반 보안이 강조됩니다. Azure Activity Log는 구독 수준의 관리 작업을 기록하고, Azure Monitor는 리소스 메트릭과 로그를 수집합니다. Azure Sentinel은 SIEM/SOAR 플랫폼으로 보안 이벤트를 상관 분석합니다. 포렌식 조사에서는 이러한 서비스들의 데이터를 통합하여 분석해야 합니다.</p>
+
+        <pre><code>// Azure 포렌식 수집 시스템
+import { DefaultAzureCredential } from '@azure/identity';
+import { ComputeManagementClient } from '@azure/arm-compute';
+import { MonitorClient } from '@azure/arm-monitor';
+import { StorageManagementClient } from '@azure/arm-storage';
+import { BlobServiceClient } from '@azure/storage-blob';
+
+interface AzureForensicReport {
+  subscriptionId: string;
+  resourceGroup: string;
+  vmName: string;
+  diskSnapshots: DiskSnapshotInfo[];
+  activityLogs: ActivityLogEntry[];
+  diagnosticLogs: DiagnosticLogEntry[];
+  azureADLogs: AzureADLogEntry[];
+  networkWatcherData: NetworkWatcherCapture[];
+  collectionTime: Date;
+}
+
+class AzureForensicCollector {
+  private credential: DefaultAzureCredential;
+  private subscriptionId: string;
+  private computeClient: ComputeManagementClient;
+  private monitorClient: MonitorClient;
+
+  constructor(subscriptionId: string) {
+    this.credential = new DefaultAzureCredential();
+    this.subscriptionId = subscriptionId;
+    this.computeClient = new ComputeManagementClient(
+      this.credential,
+      subscriptionId
+    );
+    this.monitorClient = new MonitorClient(
+      this.credential,
+      subscriptionId
+    );
+  }
+
+  async collectVMEvidence(
+    resourceGroup: string,
+    vmName: string
+  ): Promise&lt;AzureForensicReport&gt; {
+    console.log(`Collecting forensic evidence for VM: ${vmName}`);
+
+    // 1. VM 정보 수집
+    const vmInfo = await this.getVMInfo(resourceGroup, vmName);
+
+    // 2. 디스크 스냅샷 생성
+    const snapshots = await this.createDiskSnapshots(
+      resourceGroup,
+      vmInfo.disks
+    );
+
+    // 3. Activity Log 수집
+    const activityLogs = await this.collectActivityLogs(
+      resourceGroup,
+      vmInfo.resourceId
+    );
+
+    // 4. Diagnostic Logs 수집
+    const diagnosticLogs = await this.collectDiagnosticLogs(
+      vmInfo.resourceId
+    );
+
+    // 5. Azure AD 로그인 로그 수집
+    const azureADLogs = await this.collectAzureADLogs();
+
+    // 6. Network Watcher 패킷 캡처 (활성화된 경우)
+    const networkCaptures = await this.collectNetworkWatcherData(
+      resourceGroup,
+      vmInfo.networkInterfaces
+    );
+
+    return {
+      subscriptionId: this.subscriptionId,
+      resourceGroup,
+      vmName,
+      diskSnapshots: snapshots,
+      activityLogs,
+      diagnosticLogs,
+      azureADLogs,
+      networkWatcherData: networkCaptures,
+      collectionTime: new Date()
+    };
+  }
+
+  private async getVMInfo(
+    resourceGroup: string,
+    vmName: string
+  ): Promise&lt;VMInfo&gt; {
+    const vm = await this.computeClient.virtualMachines.get(
+      resourceGroup,
+      vmName,
+      { expand: 'instanceView' }
+    );
+
+    const disks: DiskInfo[] = [];
+
+    // OS 디스크
+    if (vm.storageProfile?.osDisk?.managedDisk) {
+      disks.push({
+        name: vm.storageProfile.osDisk.name!,
+        diskId: vm.storageProfile.osDisk.managedDisk.id!,
+        type: 'os',
+        sizeGB: vm.storageProfile.osDisk.diskSizeGB
+      });
+    }
+
+    // 데이터 디스크
+    for (const dataDisk of vm.storageProfile?.dataDisks || []) {
+      if (dataDisk.managedDisk) {
+        disks.push({
+          name: dataDisk.name!,
+          diskId: dataDisk.managedDisk.id!,
+          type: 'data',
+          lun: dataDisk.lun,
+          sizeGB: dataDisk.diskSizeGB
+        });
+      }
+    }
+
+    const networkInterfaces = vm.networkProfile?.networkInterfaces?.map(
+      nic => nic.id!
+    ) || [];
+
+    return {
+      resourceId: vm.id!,
+      name: vmName,
+      location: vm.location!,
+      vmSize: vm.hardwareProfile?.vmSize,
+      powerState: vm.instanceView?.statuses?.find(
+        s => s.code?.startsWith('PowerState/')
+      )?.displayStatus,
+      disks,
+      networkInterfaces
+    };
+  }
+
+  private async createDiskSnapshots(
+    resourceGroup: string,
+    disks: DiskInfo[]
+  ): Promise&lt;DiskSnapshotInfo[]&gt; {
+    const snapshots: DiskSnapshotInfo[] = [];
+
+    for (const disk of disks) {
+      const timestamp = Date.now();
+      const snapshotName = `forensic-${disk.name}-${timestamp}`;
+
+      const snapshotParams = {
+        location: 'koreacentral',
+        creationData: {
+          createOption: 'Copy',
+          sourceResourceId: disk.diskId
+        },
+        tags: {
+          Purpose: 'Forensic',
+          SourceDisk: disk.name,
+          CollectionTime: new Date().toISOString()
+        }
+      };
+
+      const operation = await this.computeClient.snapshots.beginCreateOrUpdate(
+        resourceGroup,
+        snapshotName,
+        snapshotParams
+      );
+
+      const result = await operation.pollUntilDone();
+
+      snapshots.push({
+        snapshotName,
+        snapshotId: result.id!,
+        sourceDisk: disk.name,
+        diskType: disk.type,
+        sizeGB: disk.sizeGB,
+        creationTime: new Date(),
+        provisioningState: result.provisioningState
+      });
+
+      console.log(`Created snapshot: ${snapshotName}`);
+    }
+
+    return snapshots;
+  }
+
+  private async collectActivityLogs(
+    resourceGroup: string,
+    resourceId: string
+  ): Promise&lt;ActivityLogEntry[]&gt; {
+    const logs: ActivityLogEntry[] = [];
+
+    // 최근 90일간의 로그 (Azure Activity Log 보존 기간)
+    const endTime = new Date();
+    const startTime = new Date();
+    startTime.setDate(startTime.getDate() - 90);
+
+    const filter = `eventTimestamp ge '${startTime.toISOString()}' and ` +
+                   `eventTimestamp le '${endTime.toISOString()}' and ` +
+                   `resourceId eq '${resourceId}'`;
+
+    for await (const event of this.monitorClient.activityLogs.list(filter)) {
+      logs.push({
+        eventId: event.eventDataId || '',
+        eventTimestamp: event.eventTimestamp!,
+        operationName: event.operationName?.localizedValue || '',
+        operationId: event.operationId || '',
+        status: event.status?.localizedValue || '',
+        caller: event.caller || '',
+        level: event.level || '',
+        resourceId: event.resourceId || '',
+        resourceType: event.resourceType?.localizedValue || '',
+        properties: event.properties || {}
+      });
+    }
+
+    return logs;
+  }
+
+  private async collectAzureADLogs(): Promise&lt;AzureADLogEntry[]&gt; {
+    // Microsoft Graph API를 사용하여 Azure AD 로그 수집
+    // 실제 구현에서는 @microsoft/microsoft-graph-client 사용
+
+    console.log('Azure AD sign-in logs require Microsoft Graph API access');
+
+    // Graph API 엔드포인트:
+    // - Sign-in logs: /auditLogs/signIns
+    // - Audit logs: /auditLogs/directoryAudits
+    // - Provisioning logs: /auditLogs/provisioning
+
+    return [];
+  }
+
+  async analyzeKeyVaultAccess(
+    vaultName: string,
+    startTime: Date,
+    endTime: Date
+  ): Promise&lt;KeyVaultAccessReport&gt; {
+    // Key Vault 진단 로그 분석
+    // 비밀 접근, 키 사용, 인증서 작업 추적
+
+    const filter = `eventTimestamp ge '${startTime.toISOString()}' and ` +
+                   `eventTimestamp le '${endTime.toISOString()}'`;
+
+    const accessEvents: KeyVaultAccessEvent[] = [];
+
+    for await (const event of this.monitorClient.activityLogs.list(filter)) {
+      if (event.resourceId?.includes('Microsoft.KeyVault/vaults')) {
+        accessEvents.push({
+          timestamp: event.eventTimestamp!,
+          operation: event.operationName?.localizedValue || '',
+          caller: event.caller || '',
+          clientIp: event.httpRequest?.clientIpAddress || '',
+          result: event.status?.localizedValue || '',
+          secretName: this.extractSecretName(event)
+        });
+      }
+    }
+
+    // 민감한 작업 탐지
+    const sensitiveOperations = accessEvents.filter(e =>
+      ['SecretGet', 'SecretSet', 'SecretDelete', 'KeySign', 'KeyDecrypt']
+        .some(op => e.operation.includes(op))
+    );
+
+    return {
+      vaultName,
+      timeRange: { start: startTime, end: endTime },
+      totalAccesses: accessEvents.length,
+      accessEvents,
+      sensitiveOperations,
+      uniqueCallers: [...new Set(accessEvents.map(e => e.caller))],
+      uniqueClientIPs: [...new Set(accessEvents.map(e => e.clientIp))]
+    };
+  }
+}</code></pre>
+
+        <h2>섹션 4: GCP 포렌식</h2>
+
+        <p>Google Cloud Platform은 Cloud Audit Logs를 통해 관리 활동, 데이터 접근, 시스템 이벤트를 기록합니다. Compute Engine의 디스크 스냅샷, Cloud Logging의 로그 데이터, VPC Flow Logs가 주요 포렌식 소스입니다. BigQuery를 활용한 대량 로그 분석과 Security Command Center의 위협 탐지 기능을 포렌식 조사에 활용할 수 있습니다.</p>
+
+        <table>
+            <caption style="caption-side: top; color: var(--text-dim); padding: 0.5rem;">표 6.3: 클라우드 플랫폼별 포렌식 도구 비교</caption>
+            <thead>
+                <tr>
+                    <th>기능</th>
+                    <th>AWS</th>
+                    <th>Azure</th>
+                    <th>GCP</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>API 감사 로그</td>
+                    <td>CloudTrail</td>
+                    <td>Activity Log</td>
+                    <td>Cloud Audit Logs</td>
+                </tr>
+                <tr>
+                    <td>네트워크 로그</td>
+                    <td>VPC Flow Logs</td>
+                    <td>NSG Flow Logs</td>
+                    <td>VPC Flow Logs</td>
+                </tr>
+                <tr>
+                    <td>위협 탐지</td>
+                    <td>GuardDuty</td>
+                    <td>Azure Sentinel</td>
+                    <td>Security Command Center</td>
+                </tr>
+                <tr>
+                    <td>디스크 이미징</td>
+                    <td>EBS Snapshot</td>
+                    <td>Managed Disk Snapshot</td>
+                    <td>Persistent Disk Snapshot</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>섹션 5: SaaS 포렌식</h2>
+
+        <p>SaaS 애플리케이션(Microsoft 365, Google Workspace, Salesforce 등)의 포렌식은 서비스 제공자의 API와 감사 로그에 전적으로 의존합니다. 관리자 권한으로 사용자 활동 로그, 파일 접근 기록, 공유 설정 변경 이력을 추출할 수 있습니다. 그러나 서비스별로 제공되는 데이터의 범위와 보존 기간이 다르므로, 사전에 로그 보존 정책을 설정하고 정기적으로 백업하는 것이 중요합니다.</p>
+
+        <pre><code>// Microsoft 365 포렌식 수집
+import { Client } from '@microsoft/microsoft-graph-client';
+
+interface M365ForensicReport {
+  userId: string;
+  auditLogs: M365AuditLog[];
+  mailboxActivity: MailboxActivity[];
+  oneDriveActivity: OneDriveActivity[];
+  teamsActivity: TeamsActivity[];
+  signInLogs: SignInLog[];
+}
+
+class M365ForensicCollector {
+  private graphClient: Client;
+
+  constructor(accessToken: string) {
+    this.graphClient = Client.init({
+      authProvider: (done) => {
+        done(null, accessToken);
+      }
+    });
+  }
+
+  async collectUserEvidence(userId: string): Promise&lt;M365ForensicReport&gt; {
+    // 1. 통합 감사 로그 수집
+    const auditLogs = await this.collectAuditLogs(userId);
+
+    // 2. 메일박스 활동 수집
+    const mailboxActivity = await this.collectMailboxActivity(userId);
+
+    // 3. OneDrive 활동 수집
+    const oneDriveActivity = await this.collectOneDriveActivity(userId);
+
+    // 4. Teams 활동 수집
+    const teamsActivity = await this.collectTeamsActivity(userId);
+
+    // 5. 로그인 로그 수집
+    const signInLogs = await this.collectSignInLogs(userId);
+
+    return {
+      userId,
+      auditLogs,
+      mailboxActivity,
+      oneDriveActivity,
+      teamsActivity,
+      signInLogs
+    };
+  }
+
+  private async collectAuditLogs(userId: string): Promise&lt;M365AuditLog[]&gt; {
+    // Office 365 Management API 사용
+    // 최대 7일간의 로그 조회 가능 (E5는 1년)
+
+    const logs: M365AuditLog[] = [];
+
+    // 각 워크로드별 로그 수집
+    const workloads = [
+      'Exchange',
+      'SharePoint',
+      'OneDrive',
+      'AzureActiveDirectory',
+      'MicrosoftTeams'
+    ];
+
+    for (const workload of workloads) {
+      const response = await this.graphClient
+        .api('/security/auditLogs/queries')
+        .post({
+          filterStartDateTime: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          filterEndDateTime: new Date().toISOString(),
+          recordTypeFilters: [workload],
+          userIds: [userId]
+        });
+
+      logs.push(...response.value.map((log: any) => ({
+        id: log.id,
+        creationTime: new Date(log.creationTime),
+        operation: log.operation,
+        workload: log.workload,
+        userId: log.userId,
+        clientIP: log.clientIP,
+        objectId: log.objectId,
+        details: log.auditData
+      })));
+    }
+
+    return logs;
+  }
+
+  private async collectMailboxActivity(userId: string): Promise&lt;MailboxActivity[]&gt; {
+    // 메일박스 감사 로그
+    // - 메일 읽기, 삭제, 이동
+    // - 폴더 생성, 권한 변경
+    // - 대리인 접근
+
+    const activities: MailboxActivity[] = [];
+
+    // 최근 메시지 조회
+    const messages = await this.graphClient
+      .api(`/users/${userId}/messages`)
+      .top(100)
+      .select('id,subject,from,toRecipients,receivedDateTime,isRead')
+      .orderby('receivedDateTime desc')
+      .get();
+
+    // 삭제된 항목 조회
+    const deletedItems = await this.graphClient
+      .api(`/users/${userId}/mailFolders/deleteditems/messages`)
+      .top(100)
+      .select('id,subject,from,receivedDateTime')
+      .get();
+
+    // 메일 규칙 조회 (자동 전달 등)
+    const rules = await this.graphClient
+      .api(`/users/${userId}/mailFolders/inbox/messageRules`)
+      .get();
+
+    // 전달 규칙 탐지 (데이터 유출 지표)
+    const forwardingRules = rules.value.filter((rule: any) =>
+      rule.actions?.forwardTo || rule.actions?.redirectTo
+    );
+
+    return activities;
+  }
+
+  private async collectOneDriveActivity(userId: string): Promise&lt;OneDriveActivity[]&gt; {
+    // OneDrive 활동 추적
+    const activities: OneDriveActivity[] = [];
+
+    // 최근 활동 조회
+    const driveItems = await this.graphClient
+      .api(`/users/${userId}/drive/root/delta`)
+      .get();
+
+    // 공유 설정 조회
+    const sharedItems = await this.graphClient
+      .api(`/users/${userId}/drive/sharedWithMe`)
+      .get();
+
+    // 외부 공유 탐지
+    for (const item of driveItems.value) {
+      if (item.shared) {
+        const permissions = await this.graphClient
+          .api(`/users/${userId}/drive/items/${item.id}/permissions`)
+          .get();
+
+        const externalShares = permissions.value.filter((p: any) =>
+          p.grantedTo?.user?.email &&
+          !p.grantedTo.user.email.endsWith('@mycompany.com')
+        );
+
+        if (externalShares.length > 0) {
+          activities.push({
+            type: 'external_share',
+            itemName: item.name,
+            itemPath: item.parentReference?.path,
+            sharedWith: externalShares.map((s: any) => s.grantedTo?.user?.email),
+            timestamp: new Date(item.lastModifiedDateTime)
+          });
+        }
+      }
+    }
+
+    return activities;
+  }
+
+  private async collectSignInLogs(userId: string): Promise&lt;SignInLog[]&gt; {
+    // Azure AD 로그인 로그
+    const logs = await this.graphClient
+      .api('/auditLogs/signIns')
+      .filter(`userId eq '${userId}'`)
+      .top(100)
+      .orderby('createdDateTime desc')
+      .get();
+
+    return logs.value.map((log: any) => ({
+      id: log.id,
+      createdDateTime: new Date(log.createdDateTime),
+      userPrincipalName: log.userPrincipalName,
+      appDisplayName: log.appDisplayName,
+      clientAppUsed: log.clientAppUsed,
+      ipAddress: log.ipAddress,
+      location: log.location,
+      status: log.status,
+      deviceDetail: log.deviceDetail,
+      riskState: log.riskState,
+      riskLevel: log.riskLevelAggregated,
+      mfaDetail: log.mfaDetail
+    }));
+  }
+}</code></pre>
+
+        <div class="callout">
+            <h3>법적 고려사항</h3>
+            <p>클라우드 포렌식에서 가장 큰 도전은 관할권 문제입니다. 데이터가 저장된 물리적 위치, 서비스 제공자의 본사 위치, 피의자의 국적, 수사 기관의 관할권이 모두 다를 수 있습니다. CLOUD Act(미국), GDPR(EU), 상호법률지원조약(MLAT)에 따른 절차를 준수해야 합니다. 또한 서비스 약관에 따른 데이터 접근 제한, 암호화된 데이터의 복호화 권한 문제도 고려해야 합니다.</p>
+        </div>
+
+        <div class="philosophy">
+            <p class="philosophy-text">弘益人間</p>
+            <p style="margin-top: 1rem; color: var(--text-dim);">Benefit All Humanity</p>
+            <p style="margin-top: 0.5rem; font-size: 0.9rem;">클라우드 포렌식 기술은 국경을 초월한 사이버 범죄 수사를 가능하게 하면서도, 개인의 프라이버시와 데이터 주권을 존중하는 균형을 추구합니다.</p>
+        </div>
+
+        <div class="summary">
+            <h3>장 요약</h3>
+            <p><strong>핵심 요점:</strong></p>
+            <ol>
+                <li>클라우드 포렌식은 물리적 접근이 불가능하고 데이터가 분산되어 있어 전통적 포렌식과 다른 접근이 필요합니다.</li>
+                <li>IaaS, PaaS, SaaS 서비스 모델에 따라 수집 가능한 증거의 범위와 방법이 달라집니다.</li>
+                <li>AWS CloudTrail, Azure Activity Log, GCP Cloud Audit Logs는 API 호출 기록을 제공하는 핵심 포렌식 소스입니다.</li>
+                <li>VM 디스크 스냅샷, VPC Flow Logs, 메모리 덤프가 IaaS 환경에서 수집해야 할 주요 증거입니다.</li>
+                <li>SaaS 포렌식은 서비스 제공자의 감사 로그와 API에 의존하며, 데이터 내보내기 기능 활용이 중요합니다.</li>
+                <li>Microsoft 365, Google Workspace 등에서 메일 전달 규칙, 외부 공유 설정은 데이터 유출 탐지의 핵심 지표입니다.</li>
+                <li>관할권 문제, CLOUD Act, GDPR 등 법적 프레임워크를 이해하고 준수해야 합니다.</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li>클라우드 서비스 모델(IaaS, PaaS, SaaS)별로 포렌식 분석가가 접근할 수 있는 증거의 범위를 비교 설명하세요.</li>
+                <li>AWS CloudTrail에서 수집할 수 있는 정보와 VPC Flow Logs에서 수집할 수 있는 정보의 차이점을 설명하세요.</li>
+                <li>EC2 인스턴스에서 휘발성 증거를 수집하기 위한 절차와 고려사항을 설명하세요.</li>
+                <li>Azure에서 Key Vault 접근 로그 분석이 보안 사고 조사에 중요한 이유를 설명하세요.</li>
+                <li>Microsoft 365 환경에서 데이터 유출을 탐지하기 위해 확인해야 할 주요 설정과 로그를 나열하세요.</li>
+                <li>클라우드 포렌식에서 관할권 문제가 발생하는 상황과 이를 해결하기 위한 법적 프레임워크를 설명하세요.</li>
+                <li>멀티클라우드 환경에서 일관된 포렌식 조사를 수행하기 위한 전략을 제안하세요.</li>
+                <li>클라우드 서비스 제공자의 협조 없이 수행할 수 있는 포렌식 조사의 한계를 설명하세요.</li>
+            </ol>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-05.html">← Previous Chapter</a>
+            <a href="chapter-07.html">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

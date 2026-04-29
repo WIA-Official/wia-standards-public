@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 06: 3단계 - 프로토콜 구현 | WIA-DIGITAL_CITIZENSHIP</title>
+    <style>:root{--primary:#3b82f6;--primary-dark:#2563eb}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;color:#334155;background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3)}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content p{margin:15px 0}.info-box{background:#dbeafe;border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px}.key-takeaways h3{color:#065f46;margin-bottom:20px}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid #e2e8f0}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none}.footer{background:#0f172a;color:white;text-align:center;padding:30px}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{padding:12px;text-align:left;border-bottom:1px solid #e2e8f0}th{background-color:#f8fafc;font-weight:600;color:var(--primary-dark)}tr:hover{background-color:#f8fafc}pre{background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}code{font-family:'Courier New',monospace;font-size:0.9em}.cta-box{background:linear-gradient(135deg,#fef3c7,#fcd34d);border:2px solid #f59e0b;border-radius:12px;padding:30px;margin:40px 0;text-align:center}.cta-box h3{color:#92400e;margin-bottom:15px}.cta-box p{color:#78350f;margin-bottom:20px}.cta-button{display:inline-block;background:#f59e0b;color:white;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;transition:background 0.3s}.cta-button:hover{background:#d97706}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Chapter 06: 3단계 - 프로토콜 구현</h1>
+            <p>디지털 시민권 실시간 통신 및 보안 프로토콜</p>
+        </div>
+        <div class="content">
+            <h2>1. 개요</h2>
+            <p>3단계에서는 WIA-DIGITAL_CITIZENSHIP 표준의 실시간 통신 프로토콜을 구현합니다. WebSocket과 MQTT 기반의 양방향 통신을 통해 디지털 시민권 상태를 실시간으로 동기화하고, 시민권 변경 사항을 즉시 반영할 수 있는 시스템을 구축합니다.</p>
+
+            <div class="info-box">
+                <h4>학습 목표</h4>
+                <ul style="margin:10px 0 0 20px;line-height:1.8">
+                    <li>WebSocket 기반 실시간 시민권 상태 동기화 구현</li>
+                    <li>MQTT 프로토콜을 활용한 이벤트 기반 아키텍처 설계</li>
+                    <li>한국 정부24 및 Pass인증서와의 실시간 연동</li>
+                    <li>엔드투엔드 암호화 및 보안 프로토콜 적용</li>
+                    <li>다중 디바이스 간 시민권 정보 동기화</li>
+                </ul>
+            </div>
+
+            <h2>2. WebSocket 프로토콜 아키텍처</h2>
+            <p>디지털 시민권 시스템은 실시간 양방향 통신이 필수적입니다. 시민권 상태 변경, 권리 행사 내역, 의무 이행 알림 등이 즉시 반영되어야 합니다.</p>
+
+            <h3>2.1 WebSocket 연결 수립</h3>
+            <pre><code>// TypeScript WebSocket Client
+import WebSocket from 'ws';
+
+interface CitizenshipConnection {
+  citizenId: string;
+  deviceId: string;
+  authToken: string;
+}
+
+class CitizenshipWebSocketClient {
+  private ws: WebSocket;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+
+  constructor(private config: CitizenshipConnection) {
+    this.connect();
+  }
+
+  private connect(): void {
+    const wsUrl = `wss://citizenship.wia.live/v1/realtime`;
+
+    this.ws = new WebSocket(wsUrl, {
+      headers: {
+        'Authorization': `Bearer ${this.config.authToken}`,
+        'X-Citizen-ID': this.config.citizenId,
+        'X-Device-ID': this.config.deviceId
+      }
+    });
+
+    this.ws.on('open', () => {
+      console.log('디지털 시민권 실시간 연결 수립');
+      this.reconnectAttempts = 0;
+      this.subscribe();
+    });
+
+    this.ws.on('message', (data: string) => {
+      this.handleMessage(JSON.parse(data));
+    });
+
+    this.ws.on('close', () => {
+      this.handleReconnect();
+    });
+
+    this.ws.on('error', (error) => {
+      console.error('WebSocket 에러:', error);
+    });
+  }
+
+  private subscribe(): void {
+    const subscribeMessage = {
+      type: 'subscribe',
+      topics: [
+        'citizenship.status',
+        'citizenship.rights',
+        'citizenship.duties',
+        'verification.updates'
+      ],
+      citizenId: this.config.citizenId
+    };
+
+    this.ws.send(JSON.stringify(subscribeMessage));
+  }
+
+  private handleMessage(message: any): void {
+    switch (message.type) {
+      case 'citizenship.status.changed':
+        this.handleStatusChange(message.data);
+        break;
+      case 'citizenship.rights.updated':
+        this.handleRightsUpdate(message.data);
+        break;
+      case 'citizenship.duties.reminder':
+        this.handleDutiesReminder(message.data);
+        break;
+      case 'verification.completed':
+        this.handleVerification(message.data);
+        break;
+    }
+  }
+
+  private handleReconnect(): void {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+      setTimeout(() => this.connect(), delay);
+    }
+  }
+}</code></pre>
+
+            <h3>2.2 한국 플랫폼 연동 프로토콜</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>플랫폼</th>
+                        <th>프로토콜</th>
+                        <th>용도</th>
+                        <th>응답시간</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>정부24</td>
+                        <td>WebSocket + REST</td>
+                        <td>행정정보 실시간 동기화</td>
+                        <td>&lt; 100ms</td>
+                    </tr>
+                    <tr>
+                        <td>Pass인증서</td>
+                        <td>WebSocket + Push</td>
+                        <td>본인인증 실시간 처리</td>
+                        <td>&lt; 50ms</td>
+                    </tr>
+                    <tr>
+                        <td>카카오</td>
+                        <td>WebSocket</td>
+                        <td>소셜 시민권 연동</td>
+                        <td>&lt; 80ms</td>
+                    </tr>
+                    <tr>
+                        <td>네이버</td>
+                        <td>SSE + WebHook</td>
+                        <td>뉴스/정보 푸시</td>
+                        <td>&lt; 120ms</td>
+                    </tr>
+                    <tr>
+                        <td>토스</td>
+                        <td>WebSocket</td>
+                        <td>금융 시민권 연계</td>
+                        <td>&lt; 60ms</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>3. MQTT 기반 이벤트 아키텍처</h2>
+            <p>MQTT(Message Queuing Telemetry Transport)는 경량 메시지 프로토콜로, IoT 디바이스와 모바일 애플리케이션 간 효율적인 통신을 지원합니다. 디지털 시민권 시스템에서는 다중 디바이스 동기화와 이벤트 브로드캐스팅에 활용됩니다.</p>
+
+            <h3>3.1 MQTT 토픽 구조</h3>
+            <pre><code>// MQTT Topic Hierarchy
+citizenship/
+├── {citizenId}/
+│   ├── status/
+│   │   ├── active          # 시민권 활성화 상태
+│   │   ├── suspended       # 일시 정지
+│   │   └── revoked        # 취소
+│   ├── rights/
+│   │   ├── voting         # 투표권
+│   │   ├── healthcare     # 의료권
+│   │   ├── education      # 교육권
+│   │   └── welfare        # 복지권
+│   ├── duties/
+│   │   ├── tax            # 납세 의무
+│   │   ├── military       # 병역 의무
+│   │   └── vote           # 투표 의무
+│   └── verification/
+│       ├── identity       # 신원 인증
+│       ├── address        # 주소 인증
+│       └── document       # 서류 인증
+└── global/
+    ├── announcements      # 전체 공지
+    ├── policy_updates     # 정책 변경
+    └── emergency          # 긴급 알림</code></pre>
+
+            <h3>3.2 MQTT 클라이언트 구현</h3>
+            <pre><code>import mqtt from 'mqtt';
+
+interface MQTTConfig {
+  brokerUrl: string;
+  username: string;
+  password: string;
+  citizenId: string;
+}
+
+class CitizenshipMQTTClient {
+  private client: mqtt.MqttClient;
+
+  constructor(private config: MQTTConfig) {
+    this.connect();
+  }
+
+  private connect(): void {
+    this.client = mqtt.connect(this.config.brokerUrl, {
+      username: this.config.username,
+      password: this.config.password,
+      clientId: `citizen-${this.config.citizenId}-${Date.now()}`,
+      clean: true,
+      reconnectPeriod: 1000,
+      connectTimeout: 30000,
+      will: {
+        topic: `citizenship/${this.config.citizenId}/status`,
+        payload: JSON.stringify({ status: 'offline', timestamp: Date.now() }),
+        qos: 1,
+        retain: true
+      }
+    });
+
+    this.client.on('connect', () => {
+      console.log('MQTT 연결 성공');
+      this.subscribeToTopics();
+      this.publishOnlineStatus();
+    });
+
+    this.client.on('message', (topic, message) => {
+      this.handleMessage(topic, message);
+    });
+  }
+
+  private subscribeToTopics(): void {
+    const topics = [
+      `citizenship/${this.config.citizenId}/status/#`,
+      `citizenship/${this.config.citizenId}/rights/#`,
+      `citizenship/${this.config.citizenId}/duties/#`,
+      `citizenship/${this.config.citizenId}/verification/#`,
+      'citizenship/global/#'
+    ];
+
+    topics.forEach(topic => {
+      this.client.subscribe(topic, { qos: 1 });
+    });
+  }
+
+  private publishOnlineStatus(): void {
+    const topic = `citizenship/${this.config.citizenId}/status/active`;
+    const payload = {
+      status: 'online',
+      timestamp: Date.now(),
+      device: navigator.userAgent
+    };
+
+    this.client.publish(topic, JSON.stringify(payload), { qos: 1, retain: true });
+  }
+
+  public publishRightExercise(rightType: string, details: any): void {
+    const topic = `citizenship/${this.config.citizenId}/rights/${rightType}`;
+    const payload = {
+      action: 'exercise',
+      rightType,
+      details,
+      timestamp: Date.now()
+    };
+
+    this.client.publish(topic, JSON.stringify(payload), { qos: 2 });
+  }
+}</code></pre>
+
+            <h2>4. 보안 프로토콜 및 암호화</h2>
+            <p>디지털 시민권 정보는 개인의 권리와 의무에 관한 민감한 데이터를 포함하므로, 강력한 보안 프로토콜이 필수적입니다.</p>
+
+            <h3>4.1 한국 보안 규정 준수</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>규정</th>
+                        <th>요구사항</th>
+                        <th>WIA 구현</th>
+                        <th>검증기관</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>개인정보보호법</td>
+                        <td>AES-256 암호화</td>
+                        <td>TLS 1.3 + AES-256-GCM</td>
+                        <td>개인정보보호위원회</td>
+                    </tr>
+                    <tr>
+                        <td>전자서명법</td>
+                        <td>공인전자서명</td>
+                        <td>ECDSA-P256 서명</td>
+                        <td>한국인터넷진흥원</td>
+                    </tr>
+                    <tr>
+                        <td>정보통신망법</td>
+                        <td>접근통제 및 로깅</td>
+                        <td>RBAC + 감사로그</td>
+                        <td>방송통신위원회</td>
+                    </tr>
+                    <tr>
+                        <td>클라우드법</td>
+                        <td>데이터 국내 저장</td>
+                        <td>한국 리전 전용 서버</td>
+                        <td>과학기술정보통신부</td>
+                    </tr>
+                    <tr>
+                        <td>ISMS-P</td>
+                        <td>정보보호관리체계</td>
+                        <td>ISMS-P 인증 획득</td>
+                        <td>한국인터넷진흥원</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>4.2 엔드투엔드 암호화 구현</h3>
+            <pre><code>import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+
+class CitizenshipEncryption {
+  private algorithm = 'aes-256-gcm';
+
+  // 시민권 데이터 암호화
+  encrypt(data: any, citizenKey: Buffer): EncryptedData {
+    const iv = randomBytes(16);
+    const cipher = createCipheriv(this.algorithm, citizenKey, iv);
+
+    const plaintext = JSON.stringify(data);
+    let encrypted = cipher.update(plaintext, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+
+    const authTag = cipher.getAuthTag();
+
+    return {
+      encrypted,
+      iv: iv.toString('hex'),
+      authTag: authTag.toString('hex'),
+      timestamp: Date.now()
+    };
+  }
+
+  // 시민권 데이터 복호화
+  decrypt(encryptedData: EncryptedData, citizenKey: Buffer): any {
+    const iv = Buffer.from(encryptedData.iv, 'hex');
+    const authTag = Buffer.from(encryptedData.authTag, 'hex');
+
+    const decipher = createDecipheriv(this.algorithm, citizenKey, iv);
+    decipher.setAuthTag(authTag);
+
+    let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+
+    return JSON.parse(decrypted);
+  }
+
+  // Pass인증서 연동 암호화
+  encryptForPassAuth(citizenshipData: any): string {
+    // Pass인증서 표준 암호화 형식
+    const payload = {
+      type: 'WIA_CITIZENSHIP',
+      version: '1.0',
+      data: citizenshipData,
+      timestamp: Date.now()
+    };
+
+    // Pass 공개키로 암호화 (실제로는 Pass SDK 사용)
+    return Buffer.from(JSON.stringify(payload)).toString('base64');
+  }
+}</code></pre>
+
+            <h2>5. 실시간 동기화 메커니즘</h2>
+            <p>다중 디바이스 환경에서 시민권 정보의 일관성을 유지하기 위한 동기화 전략을 구현합니다.</p>
+
+            <h3>5.1 동기화 전략 비교</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>전략</th>
+                        <th>장점</th>
+                        <th>단점</th>
+                        <th>적용 사례</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Eventual Consistency</td>
+                        <td>높은 가용성, 낮은 지연시간</td>
+                        <td>일시적 불일치 가능</td>
+                        <td>뉴스피드, 알림</td>
+                    </tr>
+                    <tr>
+                        <td>Strong Consistency</td>
+                        <td>데이터 정확성 보장</td>
+                        <td>높은 지연시간</td>
+                        <td>투표권 행사, 금융거래</td>
+                    </tr>
+                    <tr>
+                        <td>Causal Consistency</td>
+                        <td>인과관계 보존</td>
+                        <td>복잡한 구현</td>
+                        <td>시민권 상태 변경</td>
+                    </tr>
+                    <tr>
+                        <td>Conflict-free Replicated</td>
+                        <td>자동 충돌 해결</td>
+                        <td>메모리 오버헤드</td>
+                        <td>프로필 정보</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>6. 정부24 실시간 연동</h2>
+            <p>행정안전부의 정부24 플랫폼과 실시간으로 연동하여 행정정보를 동기화합니다.</p>
+
+            <h3>6.1 정부24 WebSocket 연동</h3>
+            <pre><code>interface Gov24Config {
+  apiKey: string;
+  citizenRRN: string;  // 주민등록번호 (암호화)
+  serviceCode: string;
+}
+
+class Gov24RealtimeSync {
+  private ws: WebSocket;
+
+  constructor(private config: Gov24Config) {
+    this.connectToGov24();
+  }
+
+  private connectToGov24(): void {
+    const wsUrl = 'wss://api.gov.kr/v2/realtime';
+
+    this.ws = new WebSocket(wsUrl, {
+      headers: {
+        'X-API-Key': this.config.apiKey,
+        'X-Service-Code': this.config.serviceCode
+      }
+    });
+
+    this.ws.on('open', () => {
+      this.requestCitizenshipSync();
+    });
+
+    this.ws.on('message', (data) => {
+      const message = JSON.parse(data.toString());
+      this.handleGov24Message(message);
+    });
+  }
+
+  private requestCitizenshipSync(): void {
+    const request = {
+      type: 'CITIZENSHIP_SYNC',
+      citizenId: this.config.citizenRRN,
+      requestedData: [
+        'RESIDENT_REGISTRATION',  // 주민등록
+        'FAMILY_RELATIONS',       // 가족관계
+        'LAND_REGISTRY',          // 부동산
+        'VEHICLE_REGISTRATION',   // 차량등록
+        'BUSINESS_LICENSE',       // 사업자등록
+        'TAX_RECORDS'            // 세금납부
+      ],
+      timestamp: Date.now()
+    };
+
+    this.ws.send(JSON.stringify(request));
+  }
+
+  private handleGov24Message(message: any): void {
+    switch (message.type) {
+      case 'CITIZENSHIP_DATA':
+        this.updateCitizenshipInfo(message.data);
+        break;
+      case 'STATUS_CHANGE':
+        this.handleStatusChange(message.data);
+        break;
+      case 'RIGHTS_UPDATE':
+        this.handleRightsUpdate(message.data);
+        break;
+    }
+  }
+
+  // WIA 시민권 데이터로 변환
+  private updateCitizenshipInfo(gov24Data: any): void {
+    const wiaData = {
+      citizenId: this.hashRRN(this.config.citizenRRN),
+      personalInfo: {
+        name: gov24Data.name,
+        address: gov24Data.address,
+        registrationDate: gov24Data.regDate
+      },
+      rights: this.extractRights(gov24Data),
+      duties: this.extractDuties(gov24Data),
+      verificationLevel: 'GOVERNMENT_VERIFIED',
+      lastSync: Date.now()
+    };
+
+    // WIA 시민권 시스템에 업데이트
+    this.syncToWIA(wiaData);
+  }
+}</code></pre>
+
+            <h2>7. 모니터링 및 성능 최적화</h2>
+            <p>실시간 프로토콜의 안정성과 성능을 모니터링하고 최적화합니다.</p>
+
+            <h3>7.1 프로토콜 성능 지표</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>지표</th>
+                        <th>목표값</th>
+                        <th>측정방법</th>
+                        <th>개선 전략</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>메시지 지연시간</td>
+                        <td>&lt; 100ms (P95)</td>
+                        <td>타임스탬프 비교</td>
+                        <td>CDN, 지역별 서버</td>
+                    </tr>
+                    <tr>
+                        <td>연결 수립 시간</td>
+                        <td>&lt; 500ms</td>
+                        <td>핸드셰이크 측정</td>
+                        <td>연결 풀링</td>
+                    </tr>
+                    <tr>
+                        <td>재연결 성공률</td>
+                        <td>&gt; 99%</td>
+                        <td>로그 분석</td>
+                        <td>지수 백오프</td>
+                    </tr>
+                    <tr>
+                        <td>메시지 처리율</td>
+                        <td>&gt; 10,000/초</td>
+                        <td>처리량 카운터</td>
+                        <td>배치 처리</td>
+                    </tr>
+                    <tr>
+                        <td>동기화 정확도</td>
+                        <td>&gt; 99.99%</td>
+                        <td>체크섬 검증</td>
+                        <td>ACK 메커니즘</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>8. 장애 복구 및 재해 대응</h2>
+            <p>실시간 프로토콜의 장애 상황에 대비한 복구 메커니즘을 구현합니다.</p>
+
+            <h3>8.1 Circuit Breaker 패턴</h3>
+            <pre><code>class CitizenshipCircuitBreaker {
+  private failureCount = 0;
+  private lastFailureTime = 0;
+  private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
+
+  private readonly failureThreshold = 5;
+  private readonly timeout = 60000; // 1분
+  private readonly halfOpenRequests = 3;
+
+  async execute<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.state === 'OPEN') {
+      if (Date.now() - this.lastFailureTime > this.timeout) {
+        this.state = 'HALF_OPEN';
+      } else {
+        throw new Error('Circuit breaker is OPEN');
+      }
+    }
+
+    try {
+      const result = await operation();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+
+  private onSuccess(): void {
+    this.failureCount = 0;
+    this.state = 'CLOSED';
+  }
+
+  private onFailure(): void {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+
+    if (this.failureCount >= this.failureThreshold) {
+      this.state = 'OPEN';
+      console.error('Circuit breaker opened due to failures');
+    }
+  }
+}</code></pre>
+
+            <h2>9. 한국 시장 특화 구현</h2>
+            <p>한국 디지털 생태계의 특성을 고려한 프로토콜 최적화를 수행합니다.</p>
+
+            <h3>9.1 주요 통신사 연동</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>통신사</th>
+                        <th>인증방식</th>
+                        <th>프로토콜</th>
+                        <th>특이사항</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>SK텔레콤</td>
+                        <td>T아이디, Pass</td>
+                        <td>WebSocket + OAuth2</td>
+                        <td>5G 우선 처리</td>
+                    </tr>
+                    <tr>
+                        <td>KT</td>
+                        <td>KT 인증, PASS</td>
+                        <td>WebSocket + OpenID</td>
+                        <td>GiGA 네트워크 최적화</td>
+                    </tr>
+                    <tr>
+                        <td>LG U+</td>
+                        <td>U+ 인증, PASS</td>
+                        <td>WebSocket + SAML</td>
+                        <td>모바일 우선</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>10. 요약</h2>
+            <div class="key-takeaways">
+                <h3>핵심 요점</h3>
+                <ul>
+                    <li><strong>실시간 통신</strong>: WebSocket과 MQTT로 저지연 양방향 통신 구현</li>
+                    <li><strong>보안 프로토콜</strong>: TLS 1.3, AES-256-GCM 암호화로 데이터 보호</li>
+                    <li><strong>정부24 연동</strong>: 행정안전부 플랫폼과 실시간 동기화</li>
+                    <li><strong>다중 디바이스</strong>: Conflict-free 복제로 일관성 유지</li>
+                    <li><strong>장애 복구</strong>: Circuit Breaker 패턴으로 안정성 확보</li>
+                </ul>
+            </div>
+
+            <h2>11. 복습 문제</h2>
+            <div class="info-box">
+                <ol style="margin:10px 0 0 20px;line-height:2">
+                    <li>WebSocket과 MQTT의 차이점과 각각의 적합한 사용 사례를 설명하시오.</li>
+                    <li>디지털 시민권 시스템에서 엔드투엔드 암호화가 중요한 이유는?</li>
+                    <li>정부24 연동 시 주의해야 할 개인정보보호법 요구사항은?</li>
+                    <li>다중 디바이스 동기화에서 Strong Consistency와 Eventual Consistency의 트레이드오프를 설명하시오.</li>
+                    <li>Circuit Breaker 패턴이 시민권 시스템의 안정성에 기여하는 방식은?</li>
+                    <li>한국 통신 3사(SKT, KT, LG U+)와의 인증 연동 시 고려사항은?</li>
+                </ol>
+            </div>
+
+            <h2>12. 다음 장 미리보기</h2>
+            <p>7장에서는 WIA-DIGITAL_CITIZENSHIP의 <strong>시스템 통합 및 클라우드 배포</strong>를 다룹니다. AWS, Azure, GCP에 시민권 시스템을 배포하는 방법과 한국 클라우드 서비스(네이버 클라우드, 카카오 클라우드)와의 연동을 학습합니다. CI/CD 파이프라인 구축, 컨테이너 오케스트레이션, 서버리스 아키텍처 적용 등 실전 배포 전략을 다룹니다.</p>
+
+            <div class="cta-box">
+                <h3>WIA-DIGITAL_CITIZENSHIP 인증 프로그램</h3>
+                <p>디지털 시민권 프로토콜 전문가 인증을 획득하세요</p>
+                <a href="https://wia.live/certification" class="cta-button">인증 프로그램 신청하기</a>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter-05.html" class="nav-button">← 이전</a>
+                <a href="chapter-07.html" class="nav-button">다음 →</a>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

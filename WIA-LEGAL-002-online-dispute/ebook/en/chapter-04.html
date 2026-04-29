@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: API Implementation | WIA-LEGAL-002</title>
+    <style>
+        :root {--bg: #0f172a; --surface: #1e293b; --primary: #64748B; --text: #f1f5f9; --text-dim: #94a3b8; --border: #334155;}
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {font-family: Georgia, 'Times New Roman', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem;}
+        .container {max-width: 900px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 3rem;}
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; border-bottom: 3px solid var(--primary); padding-bottom: 1rem;}
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2rem 0 1rem 0;}
+        h3 { color: var(--text); font-size: 1.3rem; margin: 1.5rem 0 0.75rem 0;}
+        p { margin-bottom: 1rem; text-align: justify;}
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--bg);}
+        th, td { padding: 1rem; text-align: left; border: 1px solid var(--border);}
+        th { background: var(--primary); color: white; font-weight: 600;}
+        .summary { background: var(--bg); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0;}
+        .summary h3 { color: var(--primary); margin-top: 0;}
+        ul, ol { margin: 1rem 0 1rem 2rem;}
+        li { margin-bottom: 0.5rem;}
+        .nav-links { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border);}
+        .nav-links a { color: var(--primary); text-decoration: none; padding: 0.75rem 1.5rem; border: 1px solid var(--primary); border-radius: 6px; transition: all 0.3s;}
+        .nav-links a:hover { background: var(--primary); color: white;}
+        code { background: var(--bg); color: var(--primary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Courier New', monospace;}
+        pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0;}
+        pre code { padding: 0;}
+        .callout { background: rgba(100, 116, 139, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0;}
+        .questions { background: var(--bg); padding: 1.5rem; border-radius: 8px; margin: 2rem 0;}
+        .questions ol { margin-left: 1.5rem;}
+        .philosophy { text-align: center; padding: 2rem; margin: 2rem 0; background: var(--bg); border-radius: 8px;}
+        .philosophy-text { font-size: 1.5rem; color: var(--primary); letter-spacing: 4px;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: API Implementation</h1>
+        <h2>4.1 Introduction to Implementation</h2>
+        <p>Implementing WIA-LEGAL-002 APIs requires careful attention to authentication, security, error handling, and client SDK development. This chapter provides practical guidance for building production-ready integrations that leverage the standard's full capabilities while maintaining security and reliability.</p>
+        <p>Whether developing a new ODR platform from scratch, integrating an existing dispute resolution system with the standard, or building client applications that consume ODR APIs, understanding implementation patterns, best practices, and common pitfalls ensures successful deployment.</p>
+
+        <h2>4.2 Authentication and Authorization</h2>
+        <h3>4.2.1 OAuth 2.0 Implementation</h3>
+        <p>The WIA-LEGAL-002 standard mandates OAuth 2.0 for API authentication, supporting multiple grant types appropriate for different integration scenarios. OAuth provides secure, token-based authentication without requiring clients to handle user credentials directly.</p>
+
+        <table>
+            <caption>Table 4.1: OAuth 2.0 Grant Types and Use Cases</caption>
+            <thead><tr><th>Grant Type</th><th>Use Case</th><th>Security Level</th><th>Token Lifetime</th></tr></thead>
+            <tbody>
+                <tr><td>Authorization Code</td><td>Web applications with backend</td><td>High</td><td>1 hour + refresh</td></tr>
+                <tr><td>Client Credentials</td><td>Server-to-server integration</td><td>High</td><td>24 hours</td></tr>
+                <tr><td>PKCE</td><td>Mobile/SPA applications</td><td>High</td><td>1 hour + refresh</td></tr>
+                <tr><td>Device Code</td><td>Limited input devices</td><td>Medium</td><td>15 minutes</td></tr>
+            </tbody>
+        </table>
+
+        <h3>4.2.2 Token Management</h3>
+<pre><code>// Client Credentials Flow - Server to Server
+POST /oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials
+&client_id=odr_client_abc123
+&client_secret=secret_xyz789
+&scope=disputes:read disputes:write documents:upload
+
+// Response
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 86400,
+  "scope": "disputes:read disputes:write documents:upload"
+}
+
+// Using the token
+GET /api/v1/disputes/ODR-2025-001234
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+</code></pre>
+
+        <h3>4.2.3 Fine-Grained Authorization</h3>
+        <p>Beyond authentication, authorization controls determine what actions each authenticated client can perform. The standard defines role-based access control (RBAC) with granular permissions.</p>
+
+        <table>
+            <caption>Table 4.2: Standard Permission Scopes</caption>
+            <thead><tr><th>Scope</th><th>Permissions</th><th>Typical Roles</th></tr></thead>
+            <tbody>
+                <tr><td>disputes:read</td><td>View dispute details</td><td>All parties, neutrals</td></tr>
+                <tr><td>disputes:write</td><td>Create, modify disputes</td><td>Parties, administrators</td></tr>
+                <tr><td>documents:upload</td><td>Submit evidence</td><td>Parties</td></tr>
+                <tr><td>messages:send</td><td>Send communications</td><td>Parties, neutrals</td></tr>
+                <tr><td>settlements:propose</td><td>Draft settlement terms</td><td>Parties, mediators</td></tr>
+                <tr><td>settlements:sign</td><td>Execute agreements</td><td>Authorized parties</td></tr>
+                <tr><td>admin:*</td><td>Full system access</td><td>System administrators</td></tr>
+            </tbody>
+        </table>
+
+        <h2>4.3 SDK Development</h2>
+        <p>Software Development Kits (SDKs) simplify API integration by providing language-specific libraries with type-safe interfaces, automatic retry logic, and error handling. The standard provides reference implementations in TypeScript, Python, Java, and Go.</p>
+
+        <h3>4.3.1 TypeScript SDK Example</h3>
+<pre><code>// Installation
+npm install @wia/odr-client
+
+// Basic usage
+import { ODRClient, DisputeType } from '@wia/odr-client';
+
+const client = new ODRClient({
+  baseURL: 'https://odr.example.com',
+  clientId: 'your_client_id',
+  clientSecret: 'your_client_secret',
+  autoRetry: true,
+  timeout: 30000
+});
+
+// File a dispute
+async function fileDispute() {
+  try {
+    const dispute = await client.disputes.create({
+      jurisdiction: 'US-CA',
+      language: 'en',
+      disputeType: DisputeType.CONSUMER_ECOMMERCE,
+      claimAmount: { value: 2500.00, currency: 'USD' },
+      parties: [
+        {
+          role: 'CLAIMANT',
+          type: 'INDIVIDUAL',
+          name: 'Jane Smith',
+          email: 'jane.smith@example.com'
+        },
+        {
+          role: 'RESPONDENT',
+          type: 'BUSINESS',
+          name: 'Acme Electronics Inc.',
+          email: 'legal@acme-electronics.com'
+        }
+      ],
+      subject: 'Product defect and refund dispute',
+      description: 'Laptop failed within warranty period.'
+    });
+
+    console.log('Dispute filed:', dispute.disputeId);
+    return dispute;
+  } catch (error) {
+    if (error instanceof ODRValidationError) {
+      console.error('Validation errors:', error.errors);
+    } else if (error instanceof ODRAuthenticationError) {
+      console.error('Authentication failed:', error.message);
+    } else {
+      console.error('Unexpected error:', error);
+    }
+    throw error;
+  }
+}
+
+// Upload document
+async function uploadEvidence(disputeId: string, filePath: string) {
+  const document = await client.documents.upload(disputeId, {
+    file: fs.createReadStream(filePath),
+    documentType: 'INVOICE',
+    title: 'Purchase Receipt',
+    description: 'Original purchase documentation'
+  });
+
+  console.log('Document uploaded:', document.documentId);
+  return document;
+}
+
+// Subscribe to webhook events
+client.webhooks.on('dispute.status_changed', (event) => {
+  console.log('Status changed:', event.data);
+  // Handle status change logic
+});
+
+client.webhooks.on('message.received', (event) => {
+  console.log('New message:', event.data);
+  // Handle new message notification
+});
+</code></pre>
+
+        <h3>4.3.2 Python SDK Example</h3>
+<pre><code># Installation
+pip install wia-odr-client
+
+# Basic usage
+from wia_odr import ODRClient, DisputeType, Party, ClaimAmount
+
+client = ODRClient(
+    base_url='https://odr.example.com',
+    client_id='your_client_id',
+    client_secret='your_client_secret',
+    auto_retry=True,
+    timeout=30
+)
+
+# File a dispute
+def file_dispute():
+    try:
+        dispute = client.disputes.create(
+            jurisdiction='US-CA',
+            language='en',
+            dispute_type=DisputeType.CONSUMER_ECOMMERCE,
+            claim_amount=ClaimAmount(value=2500.00, currency='USD'),
+            parties=[
+                Party(
+                    role='CLAIMANT',
+                    type='INDIVIDUAL',
+                    name='Jane Smith',
+                    email='jane.smith@example.com'
+                ),
+                Party(
+                    role='RESPONDENT',
+                    type='BUSINESS',
+                    name='Acme Electronics Inc.',
+                    email='legal@acme-electronics.com'
+                )
+            ],
+            subject='Product defect and refund dispute',
+            description='Laptop failed within warranty period.'
+        )
+
+        print(f'Dispute filed: {dispute.dispute_id}')
+        return dispute
+    except ODRValidationError as e:
+        print(f'Validation errors: {e.errors}')
+        raise
+    except ODRAuthenticationError as e:
+        print(f'Authentication failed: {e.message}')
+        raise
+
+# Query disputes with pagination
+def get_recent_disputes():
+    disputes = client.disputes.list(
+        status='SETTLED',
+        from_date='2025-01-01',
+        sort='-settledAt',
+        limit=50
+    )
+
+    for dispute in disputes:
+        print(f'{dispute.dispute_id}: ${dispute.claim_amount.value}')
+
+    # Handle pagination
+    if disputes.has_next_page():
+        next_page = disputes.next_page()
+        # Process next page...
+
+# Async support
+import asyncio
+
+async def async_operations():
+    async with ODRClient(...) as client:
+        # Multiple concurrent operations
+        tasks = [
+            client.disputes.get('ODR-2025-001234'),
+            client.disputes.get('ODR-2025-001235'),
+            client.disputes.get('ODR-2025-001236')
+        ]
+        disputes = await asyncio.gather(*tasks)
+        return disputes
+</code></pre>
+
+        <h2>4.4 Error Handling Strategies</h2>
+        <p>Robust error handling differentiates production-ready integrations from prototype code. Clients must gracefully handle network failures, API errors, rate limiting, and transient issues.</p>
+
+        <h3>4.4.1 Retry Logic with Exponential Backoff</h3>
+<pre><code>class ODRClient {
+  private async retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+  ): Promise<T> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        // Don't retry on client errors (4xx)
+        if (error.status >= 400 && error.status < 500 && error.status !== 429) {
+          throw error;
+        }
+
+        // Last attempt - throw error
+        if (attempt === maxRetries) {
+          throw error;
+        }
+
+        // Calculate delay with exponential backoff and jitter
+        const delay = baseDelay * Math.pow(2, attempt) +
+                     Math.random() * 1000;
+
+        console.log(`Retry ${attempt + 1}/${maxRetries} after ${delay}ms`);
+        await this.sleep(delay);
+      }
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async getDispute(disputeId: string): Promise<Dispute> {
+    return this.retryWithBackoff(() =>
+      this.http.get(`/api/v1/disputes/${disputeId}`)
+    );
+  }
+}
+</code></pre>
+
+        <h3>4.4.2 Rate Limit Handling</h3>
+<pre><code>class RateLimitHandler {
+  private async handleRateLimit(response: Response): Promise<void> {
+    const retryAfter = response.headers.get('Retry-After');
+
+    if (retryAfter) {
+      const delay = parseInt(retryAfter) * 1000; // Convert to milliseconds
+      console.log(`Rate limited. Waiting ${delay}ms before retry`);
+      await this.sleep(delay);
+    } else {
+      // Default to 60 seconds if Retry-After not provided
+      await this.sleep(60000);
+    }
+  }
+
+  async makeRequest(url: string, options: RequestOptions): Promise<Response> {
+    let response = await fetch(url, options);
+
+    // Handle 429 Too Many Requests
+    if (response.status === 429) {
+      await this.handleRateLimit(response);
+      // Retry the request
+      response = await fetch(url, options);
+    }
+
+    return response;
+  }
+}
+</code></pre>
+
+        <h2>4.5 Testing and Validation</h2>
+        <p>Comprehensive testing ensures API integrations work correctly across various scenarios, including edge cases and error conditions.</p>
+
+        <table>
+            <caption>Table 4.3: Testing Strategies for ODR Integrations</caption>
+            <thead><tr><th>Test Type</th><th>Focus</th><th>Tools</th><th>Coverage Goal</th></tr></thead>
+            <tbody>
+                <tr><td>Unit Tests</td><td>SDK methods, data validation</td><td>Jest, pytest</td><td>90%+</td></tr>
+                <tr><td>Integration Tests</td><td>API endpoint interaction</td><td>Supertest, requests</td><td>80%+</td></tr>
+                <tr><td>End-to-End Tests</td><td>Complete workflows</td><td>Playwright, Selenium</td><td>Critical paths</td></tr>
+                <tr><td>Load Tests</td><td>Performance, scalability</td><td>k6, JMeter</td><td>Expected load + 50%</td></tr>
+                <tr><td>Security Tests</td><td>Authentication, authorization</td><td>OWASP ZAP</td><td>Top 10 vulnerabilities</td></tr>
+            </tbody>
+        </table>
+
+        <h3>4.5.1 Integration Test Example</h3>
+<pre><code>describe('ODR API Integration Tests', () => {
+  let client: ODRClient;
+  let testDispute: Dispute;
+
+  beforeAll(async () => {
+    client = new ODRClient({
+      baseURL: process.env.ODR_API_URL,
+      clientId: process.env.CLIENT_ID,
+      clientSecret: process.env.CLIENT_SECRET
+    });
+  });
+
+  describe('Dispute Lifecycle', () => {
+    test('should file a new dispute', async () => {
+      testDispute = await client.disputes.create({
+        jurisdiction: 'US-CA',
+        disputeType: DisputeType.CONSUMER_ECOMMERCE,
+        claimAmount: { value: 100.00, currency: 'USD' },
+        parties: [/* ... */],
+        subject: 'Test dispute',
+        description: 'Integration test dispute'
+      });
+
+      expect(testDispute.disputeId).toMatch(/^ODR-\d{4}-\d{6}$/);
+      expect(testDispute.status).toBe('FILED');
+    });
+
+    test('should retrieve dispute details', async () => {
+      const dispute = await client.disputes.get(testDispute.disputeId);
+      expect(dispute.subject).toBe('Test dispute');
+    });
+
+    test('should upload document', async () => {
+      const doc = await client.documents.upload(testDispute.disputeId, {
+        file: Buffer.from('test content'),
+        filename: 'test.pdf',
+        documentType: 'CONTRACT'
+      });
+
+      expect(doc.documentId).toBeDefined();
+      expect(doc.file.filename).toBe('test.pdf');
+    });
+
+    test('should handle validation errors', async () => {
+      await expect(client.disputes.create({
+        // Missing required fields
+        subject: 'Invalid dispute'
+      })).rejects.toThrow(ODRValidationError);
+    });
+  });
+
+  afterAll(async () => {
+    // Cleanup test data
+    if (testDispute) {
+      await client.disputes.delete(testDispute.disputeId);
+    }
+  });
+});
+</code></pre>
+
+        <h2>4.6 Performance Optimization</h2>
+        <p>Optimizing API integrations improves user experience and reduces infrastructure costs through efficient resource usage.</p>
+
+        <h3>4.6.1 Caching Strategies</h3>
+<pre><code>class ODRCache {
+  private cache: Map<string, CacheEntry> = new Map();
+  private ttl: number = 300000; // 5 minutes
+
+  async get(key: string): Promise<any | null> {
+    const entry = this.cache.get(key);
+
+    if (!entry) return null;
+
+    // Check if expired
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return entry.value;
+  }
+
+  set(key: string, value: any, ttl?: number): void {
+    this.cache.set(key, {
+      value,
+      expiresAt: Date.now() + (ttl || this.ttl)
+    });
+  }
+
+  // Use cache for dispute retrieval
+  async getDisputeWithCache(disputeId: string): Promise<Dispute> {
+    const cacheKey = `dispute:${disputeId}`;
+
+    // Try cache first
+    let dispute = await this.cache.get(cacheKey);
+
+    if (!dispute) {
+      // Cache miss - fetch from API
+      dispute = await client.disputes.get(disputeId);
+      this.cache.set(cacheKey, dispute);
+    }
+
+    return dispute;
+  }
+}
+</code></pre>
+
+        <h3>4.6.2 Batch Operations</h3>
+<pre><code>// Batch multiple requests to reduce round trips
+class BatchProcessor {
+  async getMultipleDisputes(disputeIds: string[]): Promise<Dispute[]> {
+    // Use batch endpoint if available
+    const response = await fetch('/api/v1/disputes/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: disputeIds })
+    });
+
+    return response.json();
+  }
+
+  // Alternative: Use Promise.all for concurrent requests
+  async getMultipleDisputesConcurrent(ids: string[]): Promise<Dispute[]> {
+    const promises = ids.map(id => client.disputes.get(id));
+    return Promise.all(promises);
+  }
+}
+</code></pre>
+
+        <h2>4.7 Monitoring and Observability</h2>
+        <p>Production integrations require comprehensive monitoring to detect issues before they impact users.</p>
+
+        <table>
+            <caption>Table 4.4: Key Metrics for ODR Integrations</caption>
+            <thead><tr><th>Metric Category</th><th>Specific Metrics</th><th>Alert Threshold</th></tr></thead>
+            <tbody>
+                <tr><td>Performance</td><td>API response time, request duration</td><td>p95 > 500ms</td></tr>
+                <tr><td>Reliability</td><td>Success rate, error rate</td><td>Error rate > 1%</td></tr>
+                <tr><td>Usage</td><td>Requests per minute, data transfer</td><td>80% of quota</td></tr>
+                <tr><td>Business</td><td>Disputes filed, settlements signed</td><td>Drop > 20%</td></tr>
+            </tbody>
+        </table>
+
+        <div class="callout">
+            <h3>Production Checklist</h3>
+            <p>Before deploying ODR integrations to production:</p>
+            <ul>
+                <li>Implement comprehensive error handling with retry logic</li>
+                <li>Configure appropriate timeout values (recommended: 30s for API calls)</li>
+                <li>Enable logging at appropriate levels (INFO for production, DEBUG for development)</li>
+                <li>Set up monitoring and alerting for critical failures</li>
+                <li>Implement rate limiting on the client side to avoid 429 errors</li>
+                <li>Use connection pooling for HTTP clients to improve performance</li>
+                <li>Validate SSL certificates in production (disable only for testing)</li>
+                <li>Rotate API credentials regularly and store securely</li>
+                <li>Test failover scenarios and disaster recovery procedures</li>
+            </ul>
+        </div>
+
+        <div class="summary">
+            <h3>Chapter Summary</h3>
+            <p><strong>Key Takeaways:</strong></p>
+            <ol>
+                <li>WIA-LEGAL-002 mandates OAuth 2.0 for authentication with fine-grained authorization scopes, enabling secure API access while protecting sensitive dispute data.</li>
+                <li>Official SDKs in TypeScript, Python, Java, and Go simplify integration through type-safe interfaces, automatic retry logic, and built-in error handling.</li>
+                <li>Robust error handling strategies including exponential backoff, rate limit handling, and graceful degradation ensure reliable production integrations.</li>
+                <li>Comprehensive testing across unit, integration, end-to-end, load, and security dimensions validates integration correctness and performance.</li>
+                <li>Performance optimization through caching, batch operations, and connection pooling improves user experience while reducing infrastructure costs.</li>
+                <li>Production monitoring with appropriate metrics and alerting enables proactive issue detection and resolution before user impact.</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Compare different OAuth 2.0 grant types. When would you use Client Credentials versus Authorization Code flow?</li>
+                <li>Explain the importance of exponential backoff in retry logic. How does jitter improve retry behavior?</li>
+                <li>What strategies can clients use to handle API rate limiting gracefully? How should Retry-After headers be processed?</li>
+                <li>Describe the testing pyramid for ODR integrations. What types of tests provide the most value?</li>
+                <li>How does caching improve API integration performance? What are the trade-offs with cache consistency?</li>
+                <li>What metrics are most critical for monitoring production ODR integrations? How would you set alert thresholds?</li>
+                <li>Explain the security considerations for storing and rotating API credentials in production environments.</li>
+            </ol>
+        </div>
+
+        <div class="callout">
+            <h3>Looking Ahead</h3>
+            <p>Chapter 5 explores the protocol specifications of Phase 3, examining communication protocols, security standards, workflow orchestration, and process automation that build upon the data formats and APIs covered in previous chapters.</p>
+        </div>
+
+        <div class="philosophy">
+            <p class="philosophy-text">弘益人間</p>
+            <p style="color: var(--text-dim); margin-top: 0.5rem;">Benefit All Humanity</p>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-03.html">← Previous Chapter</a>
+            <a href="chapter-05.html">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

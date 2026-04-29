@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>제05장: Phase 2 - API 인터페이스와 검색 시스템 | WIA-HERITAGE-008</title>
+<style>:root{--bg:#0f172a;--surface:#1e293b;--surface-2:#283548;--primary:#D97706;--text:#f1f5f9;--text-dim:#94a3b8;--border:#334155;--gold:#ffd700;--success:#10b981}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);line-height:1.8}.container{max-width:900px;margin:0 auto;padding:2rem}header{text-align:center;padding:3rem 0;border-bottom:2px solid var(--primary);margin-bottom:2rem}.badge{display:inline-block;background:var(--primary);color:var(--bg);padding:0.5rem 1.5rem;border-radius:2rem;font-weight:600;margin-bottom:1rem}h1{font-size:2.2rem;color:var(--primary)}h2{color:var(--primary);font-size:1.6rem;margin:2rem 0 1rem;border-bottom:1px solid var(--border);padding-bottom:0.5rem}h3{color:var(--gold);font-size:1.3rem;margin:1.5rem 0 1rem}p{margin-bottom:1rem}.callout{background:var(--surface);border-left:4px solid var(--primary);padding:1.5rem;margin:1.5rem 0;border-radius:0 0.5rem 0.5rem 0}.callout-title{font-weight:600;margin-bottom:0.5rem}ul,ol{margin:1rem 0 1rem 1.5rem}li{margin-bottom:0.5rem}table{width:100%;border-collapse:collapse;margin:1.5rem 0;background:var(--surface)}th,td{padding:0.75rem;text-align:left;border-bottom:1px solid var(--border)}th{background:var(--surface-2);color:var(--primary)}.nav{display:flex;justify-content:space-between;padding:2rem 0;border-top:1px solid var(--border);margin-top:2rem}.nav a{color:var(--primary);text-decoration:none;padding:0.75rem 1.5rem;background:var(--surface);border-radius:0.5rem}.philosophy{text-align:center;padding:2rem;background:var(--surface);border-radius:1rem;margin:2rem 0}.philosophy-text{font-size:1.5rem;color:var(--gold)}footer{text-align:center;padding:2rem;color:var(--text-dim)}</style>
+</head>
+<body>
+<div class="container">
+<header><div class="badge">제05장 / 8</div><h1>Phase 2: API 인터페이스와 검색 시스템</h1><p style="color:var(--text-dim)">WIA-HERITAGE-008: Folklore Archive Standard</p></header>
+
+<section>
+<h2>05.1 RESTful API 설계 철학</h2>
+<p>Phase 2는 Phase 1의 데이터를 실제로 활용할 수 있게 하는 프로그래밍 인터페이스를 제공합니다. WIA-HERITAGE-008 API는 REpresentational State Transfer (REST) 아키텍처 스타일을 따르며, 직관적이고 예측 가능한 엔드포인트를 제공합니다.</p>
+
+<h3>REST 원칙 적용</h3>
+<ul>
+<li><strong>리소스 중심</strong>: URL은 동사가 아닌 명사로 표현 (/getStory가 아닌 /stories/:id)</li>
+<li><strong>HTTP 메서드 활용</strong>: GET(조회), POST(생성), PUT(전체 수정), PATCH(부분 수정), DELETE(삭제)</li>
+<li><strong>무상태성</strong>: 각 요청은 독립적이며 서버는 세션 상태를 저장하지 않음</li>
+<li><strong>계층화</strong>: 클라이언트는 중간 프록시/캐시 존재를 알 필요 없음</li>
+<li><strong>캐시 가능</strong>: 응답에 캐시 정책 명시하여 성능 최적화</li>
+</ul>
+
+<table>
+<tr><th>엔드포인트</th><th>메서드</th><th>기능</th><th>권한</th></tr>
+<tr><td>/api/v1/stories</td><td>GET</td><td>이야기 목록 조회 (페이징, 필터)</td><td>Public</td></tr>
+<tr><td>/api/v1/stories/:id</td><td>GET</td><td>특정 이야기 상세 조회</td><td>Public/Restricted</td></tr>
+<tr><td>/api/v1/stories</td><td>POST</td><td>새 이야기 생성</td><td>Authenticated</td></tr>
+<tr><td>/api/v1/stories/:id</td><td>PATCH</td><td>이야기 부분 수정</td><td>Owner/Admin</td></tr>
+<tr><td>/api/v1/narrators</td><td>GET</td><td>구연자 목록</td><td>Public</td></tr>
+<tr><td>/api/v1/search</td><td>GET/POST</td><td>전문 검색</td><td>Public</td></tr>
+<tr><td>/api/v1/motifs</td><td>GET</td><td>ATU 모티프 조회</td><td>Public</td></tr>
+<tr><td>/api/v1/communities/:id</td><td>GET</td><td>커뮤니티 정보</td><td>Community</td></tr>
+</table>
+</section>
+
+<section>
+<h2>05.2 GraphQL 대안 제공</h2>
+<p>REST의 over-fetching(불필요한 데이터 전송)과 under-fetching(여러 요청 필요) 문제를 해결하기 위해 GraphQL도 지원합니다. 클라이언트가 정확히 필요한 데이터만 요청할 수 있습니다.</p>
+
+<h3>GraphQL 쿼리 예시</h3>
+<pre style="background:#1e293b;padding:1rem;border-radius:0.5rem;overflow-x:auto"><code>query GetStoryWithNarrator($id: ID!) {
+  story(id: $id) {
+    title
+    dateRecorded
+    language
+    narrator {
+      name
+      birthYear
+      community {
+        name
+        location
+      }
+    }
+    audio {
+      url
+      duration
+    }
+    motifs {
+      code
+      title
+    }
+  }
+}</code></pre>
+
+<p>REST로 같은 데이터를 얻으려면 최소 3번의 요청(/story, /narrator, /community)이 필요하지만, GraphQL은 1번으로 충분합니다.</p>
+
+<h3>장단점 비교</h3>
+<table>
+<tr><th>특징</th><th>REST</th><th>GraphQL</th></tr>
+<tr><td>학습 곡선</td><td>쉬움</td><td>중간</td></tr>
+<tr><td>캐싱</td><td>HTTP 표준 캐시</td><td>별도 라이브러리 필요</td></tr>
+<tr><td>네트워크 효율</td><td>여러 요청</td><td>단일 요청</td></tr>
+<tr><td>타입 안전성</td><td>없음 (별도 문서)</td><td>스키마 기반 강타입</td></tr>
+<tr><td>버전 관리</td><td>URL 버저닝 (/v1, /v2)</td><td>스키마 진화</td></tr>
+</table>
+</section>
+
+<section>
+<h2>05.3 고급 검색 알고리즘</h2>
+<p>민속 자료 검색은 일반 문서 검색과 다른 특수성이 있습니다. 같은 이야기의 변형 찾기, 유사 모티프 발견, 지리적 분포 분석 등이 중요합니다.</p>
+
+<h3>6가지 검색 모드</h3>
+
+<div class="callout">
+<div class="callout-title">🔍 전문 검색 (Full-Text Search)</div>
+<p>Elasticsearch를 사용하여 68개 언어의 형태소 분석을 지원합니다. 한국어는 은전한닢(mecab-ko), 영어는 Snowball, 중국어는 IK Analyzer를 사용합니다.</p>
+<pre style="background:#1e293b;padding:1rem;border-radius:0.5rem;overflow-x:auto"><code>GET /api/v1/search?q=설문대할망&lang=kor&analyzer=mecab</code></pre>
+</div>
+
+<div class="callout">
+<div class="callout-title">🎯 퍼지 검색 (Fuzzy Search)</div>
+<p>철자 오류, 방언 변형을 허용합니다. Levenshtein distance 2 이내의 단어를 매칭합니다.</p>
+<pre style="background:#1e293b;padding:1rem;border-radius:0.5rem;overflow-x:auto"><code>GET /api/v1/search?q=선녀와나무군&fuzzy=2
+// "선녀와 나무꾼" 찾음 (오타 허용)</code></pre>
+</div>
+
+<div class="callout">
+<div class="callout-title">🧠 시맨틱 검색 (Semantic Search)</div>
+<p>GPT-4 임베딩으로 의미적 유사도를 계산합니다. "날개옷"을 검색하면 "깃옷", "천의무봉"도 찾습니다.</p>
+<pre style="background:#1e293b;padding:1rem;border-radius:0.5rem;overflow-x:auto"><code>POST /api/v1/search/semantic
+{
+  "query": "하늘에서 내려온 여인",
+  "threshold": 0.75
+}</code></pre>
+</div>
+
+<h3>모티프 검색</h3>
+<p>ATU 색인으로 서사 구조 패턴을 매칭합니다. "ATU 400" (잃어버린 아내 찾기)를 검색하면 세계 각국의 비슷한 이야기를 찾습니다.</p>
+
+<table>
+<tr><th>ATU 코드</th><th>한국</th><th>중국</th><th>일본</th><th>그리스</th></tr>
+<tr><td>ATU 400</td><td>선녀와 나무꾼</td><td>牛郎织女</td><td>羽衣伝説</td><td>Eros & Psyche</td></tr>
+<tr><td>ATU 510A</td><td>콩쥐 팥쥐</td><td>叶限</td><td>灰かぶり</td><td>Cinderella</td></tr>
+<tr><td>ATU 327</td><td>해와 달이 된 오누이</td><td>吴刚伐桂</td><td>かぐや姫</td><td>Apollo & Artemis</td></tr>
+</table>
+</section>
+
+<section>
+<h2>05.4 인증과 권한 관리</h2>
+<p>문화적으로 민감한 자료를 보호하기 위해 OAuth 2.0과 JWT(JSON Web Token) 기반 인증 시스템을 구현합니다.</p>
+
+<h3>인증 흐름</h3>
+<ol>
+<li>클라이언트가 /auth/login에 사용자명/비밀번호 전송</li>
+<li>서버가 검증 후 JWT 토큰 발급 (유효기간 24시간)</li>
+<li>클라이언트가 이후 모든 요청에 Authorization 헤더로 토큰 전송</li>
+<li>서버가 토큰 검증 후 사용자 권한 확인</li>
+<li>리프레시 토큰으로 만료 전 갱신</li>
+</ol>
+
+<pre style="background:#1e293b;padding:1rem;border-radius:0.5rem;overflow-x:auto"><code>POST /auth/login
+{
+  "username": "kim.younghee@jeju.kr",
+  "password": "********"
+}
+
+Response:
+{
+  "accessToken": "eyJhbGc...",
+  "refreshToken": "dGhpc2lz...",
+  "expiresIn": 86400,
+  "user": {
+    "id": "narrator:kr:kim-younghee",
+    "roles": ["narrator", "community:jeju"]
+  }
+}</code></pre>
+
+<h3>역할 기반 접근 제어 (RBAC)</h3>
+<table>
+<tr><th>역할</th><th>권한</th><th>API 접근</th></tr>
+<tr><td>Anonymous</td><td>공개 자료만</td><td>GET /stories (level:0)</td></tr>
+<tr><td>Registered</td><td>교육 자료</td><td>+ GET /stories (level:1)</td></tr>
+<tr><td>Researcher</td><td>학술 자료</td><td>+ GET /stories (level:2)</td></tr>
+<tr><td>Community</td><td>공동체 자료</td><td>+ GET /communities/:id/stories</td></tr>
+<tr><td>Narrator</td><td>자기 이야기 수정</td><td>+ PATCH /stories/:id (own)</td></tr>
+<tr><td>Admin</td><td>모든 자료</td><td>+ DELETE, 권한 관리</td></tr>
+</table>
+</section>
+
+<section>
+<h2>05.5 페이지네이션과 성능 최적화</h2>
+<p>대규모 아카이브에서는 수백만 개의 이야기가 있을 수 있습니다. 효율적인 페이지네이션이 필수입니다.</p>
+
+<h3>3가지 페이지네이션 방식</h3>
+
+<p><strong>1. Offset 기반</strong>: 전통적 방식, 구현 간단하지만 대규모 데이터에서 느림</p>
+<pre style="background:#1e293b;padding:1rem;border-radius:0.5rem;overflow-x:auto"><code>GET /api/v1/stories?offset=100&limit=20
+// 101~120번째 이야기</code></pre>
+
+<p><strong>2. Cursor 기반</strong>: 대규모 데이터에 최적, 일관성 보장</p>
+<pre style="background:#1e293b;padding:1rem;border-radius:0.5rem;overflow-x:auto"><code>GET /api/v1/stories?cursor=eyJpZCI6MTIzfQ&limit=20
+// cursor 다음 20개</code></pre>
+
+<p><strong>3. 무한 스크롤</strong>: 모바일 앱에 적합</p>
+<pre style="background:#1e293b;padding:1rem;border-radius:0.5rem;overflow-x:auto"><code>GET /api/v1/stories?after=story:kr:jeju:123&limit=20</code></pre>
+
+<h3>캐싱 전략</h3>
+<ul>
+<li><strong>CDN 캐싱</strong>: 오디오/비디오 파일을 Cloudflare/Fastly에 캐시 (TTL 7일)</li>
+<li><strong>Redis 캐싱</strong>: 인기 이야기 메타데이터 (TTL 1시간)</li>
+<li><strong>브라우저 캐싱</strong>: Cache-Control 헤더로 클라이언트 캐시 (max-age=3600)</li>
+<li><strong>ETags</strong>: 변경 감지로 불필요한 전송 방지</li>
+</ul>
+</section>
+
+<section>
+<h2>05.6 지리적 검색과 매핑</h2>
+<p>이야기의 지리적 분포를 검색하고 시각화합니다. PostGIS를 사용하여 공간 쿼리를 처리합니다.</p>
+
+<h3>지리 검색 API</h3>
+<pre style="background:#1e293b;padding:1rem;border-radius:0.5rem;overflow-x:auto"><code>// 제주도 중심 반경 50km 내 이야기
+GET /api/v1/geo/search?lat=33.4996&lon=126.5312&radius=50
+
+// 특정 행정구역 내 이야기
+GET /api/v1/geo/search?region=kr-jeju
+
+// 두 지역 간 이야기 전파 경로
+GET /api/v1/geo/diffusion?from=kr-jeju&to=kr-ulleung</code></pre>
+
+<h3>GeoJSON 응답</h3>
+<p>표준 GeoJSON 형식으로 응답하여 Leaflet, Mapbox, Google Maps에 바로 표시 가능합니다.</p>
+</section>
+
+<section>
+<h2>05.7 비율 제한과 남용 방지</h2>
+<p>API 남용을 방지하고 공정한 리소스 배분을 위해 비율 제한을 적용합니다.</p>
+
+<table>
+<tr><th>사용자 등급</th><th>시간당 요청</th><th>일일 요청</th><th>동시 연결</th></tr>
+<tr><td>Anonymous</td><td>100</td><td>1,000</td><td>2</td></tr>
+<tr><td>Registered</td><td>1,000</td><td>10,000</td><td>5</td></tr>
+<tr><td>Researcher</td><td>5,000</td><td>50,000</td><td>10</td></tr>
+<tr><td>Institution</td><td>무제한</td><td>무제한</td><td>50</td></tr>
+</table>
+
+<p>초과 시 HTTP 429 Too Many Requests 응답과 함께 재시도 시간을 알려줍니다.</p>
+
+<h3>구연자 프로필 데이터 구조</h3>
+<p>API는 구연자 정보를 풍부하게 제공합니다. 이는 구전 전통의 맥락을 이해하는 데 필수적입니다.</p>
+<pre style="background:#1e293b;padding:1rem;border-radius:0.5rem;overflow-x:auto"><code>{
+  "narratorId": "kor:jeju:kim-giduk:1932",
+  "name": "김기득",
+  "birthYear": 1932,
+  "birthPlace": "제주도 구좌읍",
+  "community": {
+    "id": "kor:jeju",
+    "name": "제주 공동체",
+    "language": "Korean (Jeju dialect)"
+  },
+  "expertise": {
+    "primary": "Mythological tales",
+    "secondary": ["Local legends", "Shamanic narratives"],
+    "ATUCategories": ["300-399", "500-599"]
+  },
+  "recordings": 127,
+  "totalDuration": 3847,
+  "activeYears": "1960-2020",
+  "recognition": {
+    "status": "Intangible Cultural Property",
+    "certificates": 3
+  }
+}</code></pre>
+</section>
+
+<section>
+<h2>05.8 장 요약</h2>
+<div class="callout" style="border-color:var(--success)">
+<div class="callout-title">✅ 핵심 내용</div>
+<ol>
+<li><strong>REST + GraphQL</strong>: 양방향 API 지원으로 개발자가 선호하는 방식 선택</li>
+<li><strong>6가지 검색 모드</strong>: 전문, 퍼지, 시맨틱, 모티프, 지리, 오디오 검색 제공</li>
+<li><strong>OAuth 2.0 + JWT</strong>: 안전한 인증, RBAC로 세분화된 권한 관리</li>
+<li><strong>페이지네이션 3종</strong>: Offset, Cursor, 무한 스크롤로 다양한 사용 사례 지원</li>
+<li><strong>지리 검색</strong>: PostGIS + GeoJSON으로 공간 쿼리와 시각화</li>
+<li><strong>비율 제한</strong>: 공정한 리소스 배분과 남용 방지</li>
+</ol>
+</div>
+
+<div class="philosophy">
+<div class="philosophy-text">弘益人間</div>
+<p>API는 기술이지만, 그를 통해 연결되는 것은 인류의 이야기입니다</p>
+</div>
+</section>
+
+<section>
+<h2>05.9 복습 문제</h2>
+<ol>
+<li>REST API의 5가지 핵심 원칙을 설명하고, WIA-HERITAGE-008 API가 이를 어떻게 구현하는지 예시를 드세요.</li>
+<li>GraphQL이 REST의 over-fetching과 under-fetching 문제를 어떻게 해결하는지 실제 쿼리 예시로 설명하세요.</li>
+<li>6가지 검색 모드의 차이점을 설명하고, 각각 어떤 상황에 적합한지 논하세요.</li>
+<li>OAuth 2.0 + JWT 인증 흐름의 5단계를 설명하고, 리프레시 토큰의 역할은 무엇인지 논하세요.</li>
+<li>Offset 기반과 Cursor 기반 페이지네이션의 장단점을 비교하고, 대규모 데이터에서 어느 것이 적합한지 설명하세요.</li>
+<li>API 비율 제한이 필요한 이유와 사용자 등급별 제한이 다른 이유를 설명하세요.</li>
+</ol>
+</section>
+
+<section>
+<h2>05.10 다음 장 예고</h2>
+<p>제6장에서는 Phase 3 프로토콜 계층을 탐구합니다. 오디오 스트리밍, 협업 주석, 크라우드소싱 전사, P2P 데이터 배포, 오프라인 동기화, CRDT 충돌 해결 등 분산 시스템과 실시간 협업을 가능하게 하는 네트워크 프로토콜을 배웁니다.</p>
+<hr>
+<p><strong>제5장 완료</strong> | 예상 독서 시간: 21분</p>
+<p><a href="chapter-06.html" style="color:var(--primary)">다음: 제6장 - Phase 3: 프로토콜</a></p>
+</section>
+
+</div>
+</body>
+</html>

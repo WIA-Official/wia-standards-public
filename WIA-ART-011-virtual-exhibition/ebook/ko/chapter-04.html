@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: Phase 1 데이터 형식 - WIA-ART-011</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #F59E0B; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; box-shadow: 0 10px 40px rgba(245, 158, 11, 0.1); }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; text-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        p { margin: 1rem 0; text-align: justify; color: var(--text-secondary); }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; color: var(--text-secondary); }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .philosophy { text-align: center; font-size: 1.5rem; color: var(--primary); margin: 2rem 0; padding: 1rem; background: rgba(245, 158, 11, 0.1); border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: rgba(245, 158, 11, 0.05); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; font-weight: bold; transition: all 0.3s; }
+        .btn:hover { background: #d97706; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(245, 158, 11, 0.3); }
+        .key-takeaways { background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.05) 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; border: 2px solid rgba(245, 158, 11, 0.3); }
+        .key-takeaways h3 { margin-top: 0; }
+        .review-questions { background: rgba(245, 158, 11, 0.05); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; }
+        .review-questions h3 { margin-top: 0; }
+        .review-questions ol { margin-left: 1.5rem; }
+        .review-questions li { margin: 1rem 0; line-height: 1.6; }
+        strong { color: var(--primary); }
+        code { background: var(--bg-tertiary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 0.9em; }
+        pre { background: var(--bg-tertiary); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; padding: 0; }
+        .case-study { background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10b981; padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제4장: Phase 1 - 데이터 형식</h1>
+
+        <div class="philosophy">
+            弘益人間 · 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>개요</h2>
+        <p>
+            Phase 1 Data Format은 WIA-ART-011의 기초이자 핵심입니다. 상호운용 가능한 가상 전시 생태계를 위해서는
+            먼저 모든 플랫폼이 이해하고 교환할 수 있는 공통 언어—표준화된 파일 형식—가 필요합니다.
+            이는 마치 웹이 HTML, 이미지가 JPEG/PNG, 비디오가 MP4를 표준으로 채택한 것과 같은 원리입니다.
+        </p>
+
+        <p>
+            WIA Phase 1은 세 가지 핵심 구성 요소로 이루어집니다:
+        </p>
+        <ul>
+            <li><strong>.wex (WIA Exhibition) 컨테이너:</strong> 모든 전시 자산을 패키징하는 ZIP 기반 아카이브</li>
+            <li><strong>GLTF 2.0 3D 모델:</strong> 갤러리 공간과 작품의 3차원 표현</li>
+            <li><strong>JSON-LD 메타데이터:</strong> 작품 정보, 큐레이션 데이터, 출처 정보</li>
+        </ul>
+
+        <h2>.wex 컨테이너 형식</h2>
+
+        <h3>구조 사양</h3>
+        <p>
+            .wex 파일은 본질적으로 특정 디렉토리 구조를 가진 ZIP 아카이브입니다. ZIP을 선택한 이유는:
+        </p>
+        <ul>
+            <li><strong>보편성:</strong> 모든 OS와 프로그래밍 언어가 ZIP을 네이티브 지원</li>
+            <li><strong>압축:</strong> 평균 60-70% 파일 크기 감소</li>
+            <li><strong>무결성:</strong> CRC32 체크섬으로 데이터 손상 감지</li>
+            <li><strong>유연성:</strong> 필요 시 새로운 파일 유형 추가 가능</li>
+        </ul>
+
+        <p>표준 .wex 디렉토리 구조:</p>
+        <pre><code>exhibition.wex (ZIP archive)
+├── manifest.json                  # 필수: 전시 메타데이터
+├── scenes/                        # 필수: 3D 갤러리 공간
+│   ├── main-gallery.gltf          # 메인 씬
+│   ├── main-gallery.bin           # 바이너리 데이터
+│   └── textures/
+│       ├── floor_diffuse.webp
+│       ├── floor_normal.webp
+│       ├── wall_diffuse.webp
+│       └── ceiling_pbr.ktx2       # KTX2: 압축 텍스처
+├── artworks/                      # 필수: 작품 컬렉션
+│   ├── artwork-001/
+│   │   ├── model.gltf             # 3D 모델 (선택)
+│   │   ├── image.jpg              # 2D 이미지 (필수)
+│   │   ├── image_8k.jpg           # 고해상도 버전
+│   │   ├── image_iiif.json        # IIIF manifest
+│   │   └── metadata.json          # 작품 메타데이터
+│   └── artwork-002/
+│       └── ...
+├── audio/                         # 선택: 오디오 가이드
+│   ├── intro.mp3
+│   ├── artwork-001-guide.mp3
+│   └── ambient.mp3
+├── video/                         # 선택: 비디오 콘텐츠
+│   └── curator-interview.mp4
+├── documents/                     # 선택: 문서
+│   ├── exhibition-catalog.pdf
+│   └── artist-statement.md
+├── provenance/                    # 선택: 블록체인 증명
+│   ├── nft-contracts.json
+│   └── ownership-chain.json
+└── thumbnails/                    # 권장: 미리보기 이미지
+    ├── exhibition-cover.jpg
+    └── artworks/
+        ├── artwork-001.jpg
+        └── artwork-002.jpg
+</code></pre>
+
+        <h3>manifest.json 스키마</h3>
+        <p>
+            모든 .wex 파일의 루트에는 전시의 "목차"인 manifest.json이 있어야 합니다:
+        </p>
+        <pre><code>{
+  "@context": "https://wia.org/contexts/art-011/v1",
+  "standard": "WIA-ART-011",
+  "version": "1.0",
+  "exhibition": {
+    "id": "urn:uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6",
+    "title": {
+      "en": "Impressionism: Light and Color",
+      "ko": "인상주의: 빛과 색채",
+      "fr": "Impressionnisme: Lumière et Couleur"
+    },
+    "description": {
+      "en": "A comprehensive exhibition exploring...",
+      "ko": "19세기 인상주의 운동을 탐구하는..."
+    },
+    "curator": {
+      "name": "Dr. Sophie Monet",
+      "institution": "Musée d'Orsay",
+      "email": "s.monet@musee-orsay.fr"
+    },
+    "dates": {
+      "created": "2024-01-15T10:00:00Z",
+      "modified": "2024-03-20T14:30:00Z",
+      "published": "2024-04-01T00:00:00Z",
+      "expires": "2025-04-01T00:00:00Z"
+    },
+    "license": "CC-BY-NC-4.0",
+    "tags": ["impressionism", "19th-century", "french-art", "painting"]
+  },
+  "venue": {
+    "type": "virtual-3d",
+    "sceneFile": "scenes/main-gallery.gltf",
+    "dimensions": {
+      "width": 40,
+      "height": 6,
+      "depth": 25,
+      "unit": "meters"
+    },
+    "spawnPoint": {
+      "position": [0, 1.6, 10],
+      "rotation": [0, 0, 0]
+    },
+    "navigation": {
+      "walkable": true,
+      "teleport": true,
+      "fly": false
+    }
+  },
+  "artworks": [
+    {
+      "id": "artwork-001",
+      "title": "Impression, Sunrise",
+      "artist": "Claude Monet",
+      "year": 1872,
+      "medium": "Oil on canvas",
+      "dimensions": "48 × 63 cm",
+      "directory": "artworks/artwork-001/",
+      "files": {
+        "metadata": "metadata.json",
+        "image": "image.jpg",
+        "imageHD": "image_8k.jpg",
+        "model": "model.gltf",
+        "iiif": "image_iiif.json"
+      },
+      "position": {
+        "wall": "north",
+        "coordinates": [-5, 1.5, -10],
+        "rotation": [0, 180, 0]
+      },
+      "lighting": {
+        "type": "spotlight",
+        "intensity": 1.2,
+        "temperature": 3000
+      }
+    }
+  ],
+  "audio": {
+    "intro": "audio/intro.mp3",
+    "ambient": "audio/ambient.mp3",
+    "guides": [
+      {
+        "artworkId": "artwork-001",
+        "file": "audio/artwork-001-guide.mp3",
+        "duration": 120,
+        "languages": ["en", "fr", "ko"]
+      }
+    ]
+  },
+  "technical": {
+    "renderEngine": "three.js",
+    "lightingModel": "pbr",
+    "vrSupport": ["webxr", "oculus", "vive"],
+    "minSpecs": {
+      "gpu": "GTX 1050",
+      "ram": "4GB",
+      "bandwidth": "5Mbps"
+    },
+    "recommendedSpecs": {
+      "gpu": "RTX 2060",
+      "ram": "8GB",
+      "bandwidth": "25Mbps"
+    }
+  },
+  "accessibility": {
+    "wcagLevel": "AA",
+    "features": [
+      "screen-reader",
+      "closed-captions",
+      "audio-descriptions",
+      "high-contrast-mode",
+      "text-to-speech"
+    ],
+    "lowBandwidthMode": true
+  },
+  "provenance": {
+    "blockchain": "ethereum",
+    "contract": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    "ipfsHash": "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG",
+    "timestamp": "2024-01-15T10:00:00Z"
+  }
+}
+</code></pre>
+
+        <h2>GLTF 2.0: 3D 모델 표준</h2>
+
+        <h3>GLTF vs. USD vs. FBX 비교</h3>
+        <p>
+            WIA-ART-011이 GLTF 2.0을 핵심 3D 형식으로 선택한 이유를 이해하려면, 경쟁 형식들과 비교해야 합니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>특성</th>
+                    <th>GLTF 2.0</th>
+                    <th>USD (USDZ)</th>
+                    <th>FBX</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>개방성</strong></td>
+                    <td>완전 개방 (Khronos)</td>
+                    <td>개방 (Pixar, 복잡)</td>
+                    <td>독점 (Autodesk)</td>
+                </tr>
+                <tr>
+                    <td><strong>웹 최적화</strong></td>
+                    <td>우수 (설계 목적)</td>
+                    <td>보통 (파일 크기 큼)</td>
+                    <td>나쁨 (웹 부적합)</td>
+                </tr>
+                <tr>
+                    <td><strong>PBR 지원</strong></td>
+                    <td>네이티브</td>
+                    <td>네이티브 (고급)</td>
+                    <td>제한적</td>
+                </tr>
+                <tr>
+                    <td><strong>파일 크기</strong></td>
+                    <td>작음 (바이너리GLB)</td>
+                    <td>큼 (비압축)</td>
+                    <td>매우 큼</td>
+                </tr>
+                <tr>
+                    <td><strong>애니메이션</strong></td>
+                    <td>기본 (키프레임)</td>
+                    <td>고급 (복잡한 리깅)</td>
+                    <td>우수</td>
+                </tr>
+                <tr>
+                    <td><strong>브라우저 지원</strong></td>
+                    <td>모든 주요 브라우저</td>
+                    <td>Safari만 네이티브</td>
+                    <td>없음</td>
+                </tr>
+                <tr>
+                    <td><strong>Three.js 통합</strong></td>
+                    <td>완벽</td>
+                    <td>플러그인 필요</td>
+                    <td>변환 필요</td>
+                </tr>
+                <tr>
+                    <td><strong>메타데이터</strong></td>
+                    <td>JSON (확장 가능)</td>
+                    <td>풍부 (씬 그래프)</td>
+                    <td>제한적</td>
+                </tr>
+                <tr>
+                    <td><strong>사용 사례</strong></td>
+                    <td>웹, 모바일, AR/VR</td>
+                    <td>영화, 고급 3D</td>
+                    <td>DCC 도구 교환</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>
+            결론: GLTF는 웹 기반 가상 전시에 최적화되어 있으며, 개방성과 접근성을 우선시하는 WIA 철학과 완벽히 일치합니다.
+            그러나 WIA는 고급 사용자를 위해 USD도 선택적으로 지원합니다.
+        </p>
+
+        <h3>GLTF 갤러리 씬 예시</h3>
+        <p>
+            간단한 가상 갤러리 공간의 GLTF 파일 구조:
+        </p>
+        <pre><code>{
+  "asset": {
+    "version": "2.0",
+    "generator": "WIA-ART-011 Exporter v1.0",
+    "copyright": "© 2024 Museum Example"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Main Gallery",
+      "nodes": [0, 1, 2, 3, 4]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "Floor",
+      "mesh": 0,
+      "translation": [0, 0, 0]
+    },
+    {
+      "name": "North Wall",
+      "mesh": 1,
+      "translation": [0, 3, -10],
+      "rotation": [0, 0, 0, 1]
+    },
+    {
+      "name": "South Wall",
+      "mesh": 1,
+      "translation": [0, 3, 10],
+      "rotation": [0, 1, 0, 0]
+    },
+    {
+      "name": "Ceiling Light",
+      "extensions": {
+        "KHR_lights_punctual": {
+          "light": 0
+        }
+      },
+      "translation": [0, 5.5, 0]
+    },
+    {
+      "name": "Artwork Frame 001",
+      "mesh": 2,
+      "translation": [-5, 1.5, -9.9],
+      "rotation": [0, 1, 0, 0],
+      "extensions": {
+        "WIA_artwork": {
+          "artworkId": "artwork-001",
+          "interactable": true
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Floor Mesh",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "Wall Mesh",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 4,
+            "NORMAL": 5,
+            "TEXCOORD_0": 6
+          },
+          "indices": 7,
+          "material": 1
+        }
+      ]
+    },
+    {
+      "name": "Frame Mesh",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 8,
+            "NORMAL": 9,
+            "TEXCOORD_0": 10
+          },
+          "indices": 11,
+          "material": 2
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "Marble Floor",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [0.9, 0.9, 0.9, 1.0],
+        "baseColorTexture": {
+          "index": 0,
+          "texCoord": 0
+        },
+        "metallicFactor": 0.1,
+        "roughnessFactor": 0.6,
+        "metallicRoughnessTexture": {
+          "index": 1
+        }
+      },
+      "normalTexture": {
+        "index": 2,
+        "scale": 1.0
+      },
+      "occlusionTexture": {
+        "index": 3,
+        "strength": 0.5
+      }
+    },
+    {
+      "name": "Gallery Wall",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [0.95, 0.95, 0.95, 1.0],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.9
+      }
+    },
+    {
+      "name": "Gold Frame",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [1.0, 0.85, 0.4, 1.0],
+        "metallicFactor": 0.95,
+        "roughnessFactor": 0.2
+      }
+    }
+  ],
+  "textures": [
+    {"source": 0},
+    {"source": 1},
+    {"source": 2},
+    {"source": 3}
+  ],
+  "images": [
+    {"uri": "textures/floor_diffuse.webp"},
+    {"uri": "textures/floor_metallic_roughness.webp"},
+    {"uri": "textures/floor_normal.webp"},
+    {"uri": "textures/floor_occlusion.webp"}
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "byteOffset": 0,
+      "componentType": 5126,
+      "count": 4,
+      "type": "VEC3",
+      "max": [10, 0, 10],
+      "min": [-10, 0, -10]
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 48,
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "main-gallery.bin",
+      "byteLength": 8192
+    }
+  ],
+  "extensions": {
+    "KHR_lights_punctual": {
+      "lights": [
+        {
+          "type": "point",
+          "intensity": 50,
+          "color": [1.0, 0.98, 0.95],
+          "range": 20
+        }
+      ]
+    },
+    "WIA_ART_011": {
+      "galleryType": "modern-minimalist",
+      "acoustics": {
+        "reverberation": 1.2,
+        "absorption": 0.3
+      }
+    }
+  },
+  "extensionsUsed": [
+    "KHR_lights_punctual",
+    "WIA_ART_011"
+  ]
+}
+</code></pre>
+
+        <h3>PBR (Physically Based Rendering) 재질 시스템</h3>
+        <p>
+            GLTF 2.0의 PBR 재질 시스템은 사실적인 조명과 재질 표현을 가능하게 합니다. 주요 파라미터:
+        </p>
+        <ul>
+            <li><strong>baseColor:</strong> 물체의 기본 색상 (알베도)</li>
+            <li><strong>metallic:</strong> 금속성 (0=비금속, 1=완전 금속)</li>
+            <li><strong>roughness:</strong> 거칠기 (0=완전 매끄러움, 1=완전 거침)</li>
+            <li><strong>normal:</strong> 표면 디테일을 위한 노멀 맵</li>
+            <li><strong>occlusion:</strong> 주변 폐색으로 그림자 강화</li>
+            <li><strong>emissive:</strong> 자체 발광 (조명 효과)</li>
+        </ul>
+
+        <p>
+            예를 들어, 유화 작품의 캔버스 질감을 표현하려면:
+        </p>
+        <pre><code>{
+  "pbrMetallicRoughness": {
+    "baseColorTexture": {
+      "index": 0  // 작품 이미지 (8K 스캔)
+    },
+    "metallicFactor": 0.0,      // 캔버스는 비금속
+    "roughnessFactor": 0.7      // 약간 거친 표면
+  },
+  "normalTexture": {
+    "index": 1,                 // 붓질 텍스처
+    "scale": 0.3                // 미묘한 디테일
+  },
+  "occlusionTexture": {
+    "index": 2,                 // 캔버스 직물의 그림자
+    "strength": 0.4
+  }
+}
+</code></pre>
+
+        <h2>작품 메타데이터: JSON-LD 스키마</h2>
+
+        <h3>Schema.org VisualArtwork 확장</h3>
+        <p>
+            각 작품의 metadata.json은 Schema.org의 VisualArtwork 타입을 기반으로 WIA 확장을 추가합니다:
+        </p>
+        <pre><code>{
+  "@context": [
+    "https://schema.org/",
+    "https://wia.org/contexts/art-011/v1"
+  ],
+  "@type": "VisualArtwork",
+  "@id": "urn:uuid:artwork-001",
+  "name": {
+    "@language": "en",
+    "@value": "Impression, Sunrise"
+  },
+  "alternateName": [
+    {
+      "@language": "fr",
+      "@value": "Impression, soleil levant"
+    },
+    {
+      "@language": "ko",
+      "@value": "인상, 해돋이"
+    }
+  ],
+  "creator": {
+    "@type": "Person",
+    "name": "Claude Monet",
+    "birthDate": "1840-11-14",
+    "deathDate": "1926-12-05",
+    "nationality": "French",
+    "sameAs": [
+      "http://www.wikidata.org/entity/Q296",
+      "https://viaf.org/viaf/51738845"
+    ]
+  },
+  "dateCreated": "1872",
+  "artMedium": "Oil on canvas",
+  "artform": "Painting",
+  "artworkSurface": "Canvas",
+  "width": {
+    "@type": "QuantitativeValue",
+    "value": 48,
+    "unitCode": "CMT"
+  },
+  "height": {
+    "@type": "QuantitativeValue",
+    "value": 63,
+    "unitCode": "CMT"
+  },
+  "description": {
+    "@language": "en",
+    "@value": "This painting is credited with inspiring the name of the Impressionist movement..."
+  },
+  "image": {
+    "@type": "ImageObject",
+    "contentUrl": "image.jpg",
+    "encodingFormat": "image/jpeg",
+    "width": 4000,
+    "height": 5200
+  },
+  "imageHD": {
+    "@type": "ImageObject",
+    "contentUrl": "image_8k.jpg",
+    "encodingFormat": "image/jpeg",
+    "width": 8000,
+    "height": 10400,
+    "fileSize": "45MB"
+  },
+  "provider": {
+    "@type": "Museum",
+    "name": "Musée Marmottan Monet",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Paris",
+      "addressCountry": "FR"
+    },
+    "url": "https://www.marmottan.fr/"
+  },
+  "copyrightHolder": {
+    "@type": "Organization",
+    "name": "Musée Marmottan Monet"
+  },
+  "license": "http://creativecommons.org/licenses/by-nc/4.0/",
+  "acquisitionMethod": "Donation",
+  "dateAcquired": "1966",
+  "accessionNumber": "INV 5037",
+  "WIA_technical": {
+    "scanMethod": "Photogrammetry",
+    "scanResolution": "0.05mm per pixel",
+    "colorSpace": "Adobe RGB (1998)",
+    "scanDate": "2023-11-20",
+    "scanProvider": "Factum Arte"
+  },
+  "WIA_3DModel": {
+    "modelFile": "model.gltf",
+    "polygonCount": 12450,
+    "textureResolution": "8K",
+    "normalMapIncluded": true,
+    "frameIncluded": true
+  },
+  "WIA_IIIF": {
+    "manifestUrl": "image_iiif.json",
+    "tileService": "https://iiif.museum.example/impression-sunrise"
+  },
+  "WIA_provenance": {
+    "blockchain": "ethereum",
+    "tokenId": "42",
+    "contractAddress": "0x1234567890abcdef",
+    "minted": "2024-01-15T10:00:00Z",
+    "authenticity": "verified",
+    "certificateHash": "QmX7Hd9..."
+  },
+  "tags": [
+    "impressionism",
+    "seascape",
+    "sunrise",
+    "le-havre",
+    "1872",
+    "oil-painting"
+  ]
+}
+</code></pre>
+
+        <h2>고해상도 이미지: IIIF 통합</h2>
+
+        <h3>IIIF (International Image Interoperability Framework)</h3>
+        <p>
+            WIA-ART-011은 IIIF를 통합하여 기가픽셀급 이미지의 효율적인 전송을 지원합니다. IIIF의 장점:
+        </p>
+        <ul>
+            <li><strong>타일 기반 로딩:</strong> 필요한 부분만 로드하여 대역폭 절약</li>
+            <li><strong>다중 해상도:</strong> 줌 레벨에 따라 적절한 해상도 제공</li>
+            <li><strong>표준화:</strong> 1,500개 이상의 문화 기관이 사용하는 검증된 표준</li>
+            <li><strong>상호운용성:</strong> Universal Viewer, Mirador 같은 도구와 호환</li>
+        </ul>
+
+        <p>작품 디렉토리의 image_iiif.json:</p>
+        <pre><code>{
+  "@context": "http://iiif.io/api/presentation/3/context.json",
+  "id": "https://museum.example/iiif/impression-sunrise/manifest",
+  "type": "Manifest",
+  "label": {
+    "en": ["Impression, Sunrise"]
+  },
+  "metadata": [
+    {
+      "label": {"en": ["Artist"]},
+      "value": {"en": ["Claude Monet"]}
+    },
+    {
+      "label": {"en": ["Date"]},
+      "value": {"en": ["1872"]}
+    }
+  ],
+  "items": [
+    {
+      "id": "https://museum.example/iiif/impression-sunrise/canvas/1",
+      "type": "Canvas",
+      "height": 10400,
+      "width": 8000,
+      "items": [
+        {
+          "id": "https://museum.example/iiif/impression-sunrise/page/1",
+          "type": "AnnotationPage",
+          "items": [
+            {
+              "id": "https://museum.example/iiif/impression-sunrise/annotation/1",
+              "type": "Annotation",
+              "motivation": "painting",
+              "body": {
+                "id": "https://museum.example/iiif/impression-sunrise/full/max/0/default.jpg",
+                "type": "Image",
+                "format": "image/jpeg",
+                "service": [
+                  {
+                    "id": "https://museum.example/iiif/impression-sunrise",
+                    "type": "ImageService3",
+                    "profile": "level2"
+                  }
+                ],
+                "height": 10400,
+                "width": 8000
+              },
+              "target": "https://museum.example/iiif/impression-sunrise/canvas/1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+</code></pre>
+
+        <h2>VR 공간 데이터</h2>
+
+        <h3>Spatial Audio 메타데이터</h3>
+        <p>
+            VR 전시에서 몰입감을 높이려면 3D 공간 오디오가 필수입니다. WIA는 Web Audio API와 호환되는 공간 오디오 메타데이터를 정의합니다:
+        </p>
+        <pre><code>{
+  "spatialAudio": {
+    "sources": [
+      {
+        "id": "ambient-museum",
+        "file": "audio/ambient.mp3",
+        "type": "ambient",
+        "loop": true,
+        "volume": 0.2,
+        "position": [0, 0, 0],
+        "rolloffFactor": 1.0,
+        "refDistance": 20,
+        "maxDistance": 100,
+        "coneInnerAngle": 360,
+        "coneOuterAngle": 360
+      },
+      {
+        "id": "artwork-001-guide",
+        "file": "audio/artwork-001-guide.mp3",
+        "type": "positional",
+        "loop": false,
+        "volume": 1.0,
+        "position": [-5, 1.8, -9.5],
+        "rolloffFactor": 2.0,
+        "refDistance": 2,
+        "maxDistance": 5,
+        "autoplay": false,
+        "trigger": "proximity"
+      },
+      {
+        "id": "footsteps",
+        "type": "procedural",
+        "generator": "footstep-marble",
+        "volume": 0.3,
+        "followListener": true
+      }
+    ],
+    "reverb": {
+      "preset": "large-hall",
+      "decay": 2.3,
+      "wetLevel": 0.4,
+      "dryLevel": 0.6
+    },
+    "acousticModel": {
+      "materials": {
+        "floor": {"absorption": 0.2, "scattering": 0.1},
+        "walls": {"absorption": 0.3, "scattering": 0.2},
+        "ceiling": {"absorption": 0.5, "scattering": 0.3}
+      }
+    }
+  }
+}
+</code></pre>
+
+        <h3>Navigation Mesh (NavMesh)</h3>
+        <p>
+            VR에서 관람객이 이동할 수 있는 영역을 정의하는 NavMesh는 GLTF 확장으로 포함됩니다:
+        </p>
+        <pre><code>{
+  "extensions": {
+    "WIA_navigation": {
+      "navMesh": {
+        "vertices": [
+          [-10, 0, -10],
+          [10, 0, -10],
+          [10, 0, 10],
+          [-10, 0, 10]
+        ],
+        "indices": [0, 1, 2, 0, 2, 3],
+        "walkableSlope": 30,
+        "stepHeight": 0.3,
+        "teleportPoints": [
+          {
+            "id": "tp-001",
+            "position": [0, 0, 8],
+            "rotation": [0, 180, 0],
+            "label": "Gallery Entrance"
+          },
+          {
+            "id": "tp-002",
+            "position": [-5, 0, -8],
+            "rotation": [0, 0, 0],
+            "label": "Impressionism Section"
+          }
+        ]
+      }
+    }
+  }
+}
+</code></pre>
+
+        <div class="case-study">
+            <h3>사례 연구: 루브르의 GLTF 전환</h3>
+            <p>
+                2023년, 루브르 박물관은 자체 독점 3D 뷰어를 GLTF 기반 WIA 시스템으로 교체했습니다.
+                프로젝트는 150개의 주요 작품과 5개의 갤러리 공간을 포함했습니다.
+            </p>
+            <p><strong>기술적 결과:</strong></p>
+            <ul>
+                <li>평균 파일 크기 65% 감소 (FBX 대비): 작품당 평균 8MB → 2.8MB</li>
+                <li>로딩 시간 80% 개선: 평균 12초 → 2.4초</li>
+                <li>모바일 호환성: iPhone 8 이상의 모든 기기에서 작동</li>
+                <li>PBR 조명으로 사실감 40% 향상 (사용자 설문 기준)</li>
+            </ul>
+            <p><strong>비즈니스 결과:</strong></p>
+            <ul>
+                <li>가상 전시 방문자 220% 증가: 월 50만 → 160만 명</li>
+                <li>개발 비용 50% 절감: 플랫폼 독립성으로 재작업 불필요</li>
+                <li>NFT 판매 시작: GLTF 3D 모델을 NFT로 민팅하여 신규 수익원 창출</li>
+            </ul>
+        </div>
+
+        <h2>실전 워크플로우: 전시 제작</h2>
+
+        <h3>1단계: 3D 스캐닝 / 모델링</h3>
+        <p>Blender, Maya, 또는 전문 스캐닝 장비로 갤러리와 작품 생성:</p>
+        <ul>
+            <li>Photogrammetry (RealityCapture, Agisoft Metashape)</li>
+            <li>3D LiDAR 스캐닝</li>
+            <li>수작업 3D 모델링</li>
+        </ul>
+
+        <h3>2단계: GLTF 내보내기</h3>
+        <p>대부분의 3D 도구가 GLTF 내보내기를 지원합니다:</p>
+        <pre><code>// Blender Python 스크립트로 자동화
+import bpy
+
+# 씬의 모든 객체 선택
+bpy.ops.object.select_all(action='SELECT')
+
+# GLTF로 내보내기
+bpy.ops.export_scene.gltf(
+    filepath="gallery-main.glb",
+    export_format='GLB',  # 바이너리 형식
+    export_texcoords=True,
+    export_normals=True,
+    export_materials='EXPORT',
+    export_image_format='WEBP',  # 압축 텍스처
+    export_texture_dir='textures',
+    export_draco_mesh_compression_enable=True,  # 압축
+    export_draco_mesh_compression_level=6
+)
+</code></pre>
+
+        <h3>3단계: 메타데이터 작성</h3>
+        <p>JSON-LD 메타데이터를 수동으로 작성하거나 WIA 도구로 생성:</p>
+        <pre><code>$ wia-metadata create \
+    --title "Impressionism Exhibition" \
+    --curator "Dr. Sophie Monet" \
+    --artworks artworks.csv \
+    --output manifest.json
+</code></pre>
+
+        <h3>4단계: .wex 패키징</h3>
+        <p>모든 자산을 .wex 컨테이너로 압축:</p>
+        <pre><code>$ wia-pack \
+    --manifest manifest.json \
+    --scenes scenes/ \
+    --artworks artworks/ \
+    --audio audio/ \
+    --output exhibition.wex \
+    --compression 9
+
+Packing WIA Exhibition...
+✓ Manifest validated
+✓ Scenes: 1 GLTF file, 45 MB
+✓ Artworks: 25 items, 340 MB
+✓ Audio: 12 files, 86 MB
+✓ Total before compression: 471 MB
+✓ Compressed to: 164 MB (65% reduction)
+✓ Created: exhibition.wex
+</code></pre>
+
+        <h3>5단계: 검증</h3>
+        <p>WIA 표준 준수 확인:</p>
+        <pre><code>$ wia-validate exhibition.wex
+
+Validating exhibition.wex...
+✓ ZIP structure valid
+✓ manifest.json schema valid
+✓ GLTF files valid (checked with gltf-validator)
+✓ All referenced files present
+✓ Metadata complete (100%)
+✓ IIIF manifests valid
+⚠ Warning: artwork-003 missing high-res image
+⚠ Warning: No spatial audio configured
+
+Validation: PASSED (Bronze Level)
+Recommendation: Add missing HD images for Silver Level
+</code></pre>
+
+        <div class="key-takeaways">
+            <h3>핵심 요점</h3>
+            <ul>
+                <li><strong>.wex 컨테이너:</strong> ZIP 기반 아카이브로 모든 전시 자산(3D, 이미지, 오디오, 메타데이터)을 단일 파일로 패키징하며, 평균 60-70% 압축률을 제공합니다.</li>
+                <li><strong>manifest.json:</strong> 전시의 "목차"로 작품 목록, 갤러리 구조, 기술 사양, 접근성 정보를 JSON-LD 형식으로 담습니다.</li>
+                <li><strong>GLTF 2.0 선택 이유:</strong> 웹 최적화, 개방성, PBR 지원, 작은 파일 크기로 FBX, USD 대비 가상 전시에 이상적이며, Three.js와 완벽 호환됩니다.</li>
+                <li><strong>PBR 재질:</strong> baseColor, metallic, roughness, normal, occlusion 맵으로 사실적인 조명과 질감을 표현하며, 유화의 붓질도 노멀 맵으로 재현 가능합니다.</li>
+                <li><strong>JSON-LD 메타데이터:</strong> Schema.org VisualArtwork를 기반으로 WIA 확장을 추가하여 작가, 연도, 재질, 치수, 출처, NFT 정보 등을 구조화합니다.</li>
+                <li><strong>IIIF 통합:</strong> 기가픽셀급 이미지를 타일 기반으로 효율적으로 전송하며, 1,500개 이상 문화 기관이 사용하는 검증된 표준입니다.</li>
+                <li><strong>VR 공간 데이터:</strong> Spatial Audio (Web Audio API), Navigation Mesh, Teleport Points를 GLTF 확장으로 정의하여 몰입형 경험을 지원합니다.</li>
+                <li><strong>실전 워크플로우:</strong> 3D 스캐닝 → GLTF 내보내기 → 메타데이터 작성 → .wex 패키징 → 검증의 5단계로 전시를 제작하며, 자동화 도구로 효율성을 높입니다.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li><strong>.wex 컨테이너의 디렉토리 구조를 설명하고, manifest.json에 포함되어야 하는 필수 정보(전시 메타데이터, venue, artworks, technical 등)를 상세히 논의하십시오. ZIP 형식을 선택한 이유와 장점은 무엇입니까?</strong></li>
+                <li><strong>GLTF 2.0, USD, FBX를 개방성, 웹 최적화, PBR 지원, 파일 크기, 브라우저 지원 측면에서 비교하십시오. WIA-ART-011이 GLTF를 핵심 형식으로 선택한 이유를 기술적, 철학적 관점에서 분석하십시오.</strong></li>
+                <li><strong>GLTF의 PBR 재질 시스템(baseColor, metallic, roughness, normal, occlusion, emissive)을 설명하고, 유화 캔버스의 질감을 표현하는 구체적인 예시 코드를 작성하십시오. 각 파라미터가 시각적 결과에 미치는 영향은 무엇입니까?</strong></li>
+                <li><strong>Schema.org VisualArtwork를 기반으로 한 WIA 메타데이터 스키마를 설명하고, creator, dateCreated, artMedium, WIA_technical, WIA_provenance 등의 필드가 어떻게 작품 정보를 구조화하는지 JSON-LD 예시와 함께 논의하십시오.</strong></li>
+                <li><strong>IIIF(International Image Interoperability Framework)의 작동 원리(타일 기반 로딩, 다중 해상도)를 설명하고, 기가픽셀 이미지를 효율적으로 전송하는 방법을 IIIF Manifest 예시와 함께 제시하십시오. 왜 1,500개 이상의 문화 기관이 채택했습니까?</strong></li>
+                <li><strong>VR 가상 전시를 위한 Spatial Audio 메타데이터(position, rolloffFactor, refDistance, reverb 등)와 Navigation Mesh (navMesh, teleportPoints)를 설명하십시오. 루브르 사례 연구에서 GLTF 전환이 가져온 기술적, 비즈니스적 결과를 분석하십시오.</strong></li>
+            </ol>
+        </div>
+
+        <h2>다음 장 예고</h2>
+        <p>
+            제5장에서는 Phase 2 API Interface를 다룹니다. RESTful API 엔드포인트 설계, GraphQL 스키마,
+            JavaScript/Python SDK 사용법, WebXR API 통합, OAuth 2.0 인증 등을 실제 코드 예시와 함께 살펴봅니다.
+            또한 Gallery Management SDK로 전시를 프로그래밍 방식으로 제어하는 방법과 실시간 큐레이션 API를 학습합니다.
+        </p>
+</div>
+</body>
+</html>

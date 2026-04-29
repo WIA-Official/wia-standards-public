@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Data Format Specifications | WIA-CONTACT-002</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-secondary:#cbd5e1;--contact-color:#6366F1;--border:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:800px;margin:0 auto;background:var(--bg-card);border:2px solid var(--contact-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--contact-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--contact-color);margin:40px 0 20px;border-bottom:2px solid var(--contact-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--contact-color);margin:30px 0 15px}
+        h4{font-size:18px;color:var(--text);margin:20px 0 10px}
+        p{margin:15px 0;font-size:17px}
+        .philosophy{text-align:center;color:var(--contact-color);margin:20px 0;font-size:18px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--contact-color);text-decoration:none;font-size:16px}
+        .nav a:hover{text-decoration:underline}
+        blockquote{border-left:4px solid var(--contact-color);padding-left:20px;margin:20px 0;font-style:italic;color:var(--text-secondary)}
+        ul,ol{margin:15px 0 15px 30px}
+        li{margin:10px 0}
+        .highlight{background:rgba(99,102,241,0.1);padding:20px;border-radius:8px;margin:20px 0}
+        table{width:100%;border-collapse:collapse;margin:20px 0}
+        th,td{padding:12px;border:1px solid var(--border);text-align:left}
+        th{background:rgba(99,102,241,0.2);color:var(--contact-color)}
+        code{background:rgba(99,102,241,0.15);padding:3px 8px;border-radius:4px;font-family:monospace;color:#94a3b8}
+        pre{background:var(--bg);padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;font-family:monospace;font-size:14px;border:1px solid var(--border)}
+        .summary{background:var(--bg);border-left:4px solid var(--contact-color);padding:20px;margin:30px 0}
+        .summary h3{margin-top:0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="philosophy">弘益人間 · Benefit All Humanity</div>
+        <h1>Chapter 3: Data Format Specifications</h1>
+
+        <p>Standardized data formats form the foundation of interoperable SETI operations. Without common file structures and metadata schemas, even the most sophisticated detection algorithms become isolated islands, unable to share discoveries or coordinate verification efforts. This chapter defines three primary data formats that enable seamless collaboration across the global SETI network: SETI-RAW for raw observations, SETI-SPEC for spectral data, and SETI-EVENT for candidate signal reports.</p>
+
+        <h2>3.1 Design Principles</h2>
+
+        <p>Before examining specific formats, we establish the principles guiding their design:</p>
+
+        <table>
+            <tr>
+                <th>Principle</th>
+                <th>Rationale</th>
+                <th>Implementation</th>
+            </tr>
+            <tr>
+                <td>Self-Describing</td>
+                <td>Files must be interpretable without external references</td>
+                <td>Embedded metadata, schema versions, units</td>
+            </tr>
+            <tr>
+                <td>Extensible</td>
+                <td>New instruments and methods emerge continuously</td>
+                <td>Optional extension blocks, version control</td>
+            </tr>
+            <tr>
+                <td>Efficient</td>
+                <td>SETI generates petabytes of data annually</td>
+                <td>Binary formats, compression options</td>
+            </tr>
+            <tr>
+                <td>Verifiable</td>
+                <td>Data integrity is paramount for scientific claims</td>
+                <td>Checksums, cryptographic signatures</td>
+            </tr>
+            <tr>
+                <td>Portable</td>
+                <td>Systems range from embedded processors to supercomputers</td>
+                <td>Standard byte ordering, cross-platform libraries</td>
+            </tr>
+        </table>
+
+        <h2>3.2 SETI-RAW Format</h2>
+
+        <p>SETI-RAW captures raw antenna voltage data before any processing. This format preserves the complete information content of observations, enabling future reprocessing with improved algorithms.</p>
+
+        <h3>File Structure</h3>
+
+        <pre>
+┌─────────────────────────────────────────────────────┐
+│  SETI-RAW File Structure                            │
+├─────────────────────────────────────────────────────┤
+│  [Header Block]          256 bytes                  │
+│    - Magic number:       "SETIRAW1"                 │
+│    - Version:            uint16                     │
+│    - Header size:        uint32                     │
+│    - Data offset:        uint64                     │
+│    - Checksum:           SHA-256                    │
+├─────────────────────────────────────────────────────┤
+│  [Primary Metadata]      Variable length            │
+│    - Observation ID:     UUID                       │
+│    - Facility code:      ASCII string               │
+│    - Timestamp start:    ISO 8601 + nanoseconds     │
+│    - Duration:           float64 seconds            │
+│    - Coordinate system:  ICRS/Galactic/TopoCentric  │
+├─────────────────────────────────────────────────────┤
+│  [Instrument Metadata]   Variable length            │
+│    - Receiver ID:        string                     │
+│    - Frequency range:    [min, max] Hz              │
+│    - Sampling rate:      float64 Hz                 │
+│    - Bit depth:          uint8                      │
+│    - Polarization:       [channels]                 │
+│    - Calibration ref:    URI                        │
+├─────────────────────────────────────────────────────┤
+│  [Extension Blocks]      Optional, variable         │
+│    - Weather data                                   │
+│    - RFI environment snapshot                       │
+│    - Telescope pointing corrections                 │
+├─────────────────────────────────────────────────────┤
+│  [Data Payload]          Bulk of file               │
+│    - Raw voltage samples                            │
+│    - Format: complex float32 or int8/int16          │
+│    - Optional: LZ4/ZSTD compression                 │
+└─────────────────────────────────────────────────────┘
+        </pre>
+
+        <h3>Primary Metadata Fields</h3>
+
+        <table>
+            <tr>
+                <th>Field</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Required</th>
+            </tr>
+            <tr>
+                <td>observation_id</td>
+                <td>UUID</td>
+                <td>Globally unique observation identifier</td>
+                <td>Yes</td>
+            </tr>
+            <tr>
+                <td>facility_code</td>
+                <td>string</td>
+                <td>WIA-registered facility identifier</td>
+                <td>Yes</td>
+            </tr>
+            <tr>
+                <td>timestamp_start</td>
+                <td>ISO 8601</td>
+                <td>UTC start time with nanosecond precision</td>
+                <td>Yes</td>
+            </tr>
+            <tr>
+                <td>timestamp_end</td>
+                <td>ISO 8601</td>
+                <td>UTC end time</td>
+                <td>Yes</td>
+            </tr>
+            <tr>
+                <td>target_name</td>
+                <td>string</td>
+                <td>Astronomical target designation</td>
+                <td>No</td>
+            </tr>
+            <tr>
+                <td>ra_j2000</td>
+                <td>float64</td>
+                <td>Right Ascension in degrees</td>
+                <td>Yes</td>
+            </tr>
+            <tr>
+                <td>dec_j2000</td>
+                <td>float64</td>
+                <td>Declination in degrees</td>
+                <td>Yes</td>
+            </tr>
+        </table>
+
+        <h3>Compression Options</h3>
+
+        <p>Raw SETI data can exceed terabytes per observation. SETI-RAW supports three compression modes:</p>
+
+        <ul>
+            <li><strong>Uncompressed</strong>: Maximum compatibility, fastest read/write</li>
+            <li><strong>LZ4</strong>: Fast compression (500+ MB/s), moderate ratio (2-3x)</li>
+            <li><strong>ZSTD</strong>: Balanced compression (100-300 MB/s), better ratio (3-5x)</li>
+        </ul>
+
+        <div class="highlight">
+            <h4>Compression Recommendation</h4>
+            <p>For real-time observations, use LZ4 or uncompressed. For archival storage, ZSTD level 3 provides optimal balance. Never use lossy compression on raw SETI data—artificial signal features might be indistinguishable from compression artifacts.</p>
+        </div>
+
+        <h2>3.3 SETI-SPEC Format</h2>
+
+        <p>SETI-SPEC stores processed spectral data—the output of FFT analysis on raw observations. This format captures frequency-domain representations that form the basis of most SETI signal detection algorithms.</p>
+
+        <h3>Spectral Data Organization</h3>
+
+        <pre>
+{
+  "format": "SETI-SPEC",
+  "version": "2.0",
+  "observation_id": "550e8400-e29b-41d4-a716-446655440000",
+  "parent_raw": "seti-raw://facility-01/2024/obs_12345.raw",
+
+  "spectral_parameters": {
+    "fft_length": 1048576,
+    "overlap_fraction": 0.5,
+    "window_function": "hanning",
+    "frequency_resolution_hz": 0.01,
+    "time_resolution_s": 1.0
+  },
+
+  "frequency_axis": {
+    "start_hz": 1400000000,
+    "stop_hz": 1450000000,
+    "channels": 5000000,
+    "reference_frame": "barycentric"
+  },
+
+  "time_axis": {
+    "start_mjd": 60000.5,
+    "samples": 3600,
+    "cadence_s": 1.0
+  }
+}
+        </pre>
+
+        <h3>Spectral Product Types</h3>
+
+        <table>
+            <tr>
+                <th>Product</th>
+                <th>Description</th>
+                <th>Typical Use</th>
+            </tr>
+            <tr>
+                <td>Dynamic Spectrum</td>
+                <td>2D frequency×time waterfall plot</td>
+                <td>Visual inspection, drift detection</td>
+            </tr>
+            <tr>
+                <td>Average Spectrum</td>
+                <td>Time-averaged frequency profile</td>
+                <td>Narrowband signal search</td>
+            </tr>
+            <tr>
+                <td>Kurtosis Spectrum</td>
+                <td>Statistical measure of non-Gaussianity</td>
+                <td>RFI identification</td>
+            </tr>
+            <tr>
+                <td>Doppler-Corrected</td>
+                <td>Barycentric or source-frame corrected</td>
+                <td>Signal coherent integration</td>
+            </tr>
+        </table>
+
+        <h2>3.4 SETI-EVENT Format</h2>
+
+        <p>SETI-EVENT captures candidate signal reports—structured descriptions of potential extraterrestrial signals identified by detection algorithms or human analysts.</p>
+
+        <h3>Event Record Structure</h3>
+
+        <pre>
+{
+  "format": "SETI-EVENT",
+  "version": "1.5",
+  "event_id": "EVT-2024-GBT-00042",
+  "classification_level": 3,
+  "rio_scale": 4.2,
+
+  "detection": {
+    "timestamp_utc": "2024-06-15T03:42:17.123456Z",
+    "facility": "GBT",
+    "detector": "turboSETI-v2.1",
+    "confidence": 0.87
+  },
+
+  "signal_properties": {
+    "frequency_hz": 1420405751.768,
+    "bandwidth_hz": 2.3,
+    "drift_rate_hz_per_s": 0.42,
+    "snr_db": 12.4,
+    "duration_s": 120,
+    "modulation": "unknown",
+    "polarization": "unpolarized"
+  },
+
+  "source_coordinates": {
+    "ra_j2000_deg": 186.2694,
+    "dec_j2000_deg": 12.8871,
+    "position_uncertainty_arcsec": 30
+  },
+
+  "verification_status": {
+    "tier": 1,
+    "same_site_confirmed": true,
+    "multi_site_confirmed": false
+  }
+}
+        </pre>
+
+        <h2>3.5 Metadata Standards</h2>
+
+        <h3>Time Standards</h3>
+
+        <p>Precise timing is essential for signal verification. WIA-CONTACT-002 mandates:</p>
+
+        <ul>
+            <li><strong>Primary timestamp</strong>: UTC in ISO 8601 format with sub-second precision</li>
+            <li><strong>Time system</strong>: Must specify (UTC, TAI, TDB, etc.)</li>
+            <li><strong>Clock source</strong>: GPS, NTP stratum, or atomic clock reference</li>
+            <li><strong>Timing accuracy</strong>: Stated uncertainty in microseconds</li>
+        </ul>
+
+        <h3>Coordinate Standards</h3>
+
+        <table>
+            <tr>
+                <th>System</th>
+                <th>Frame</th>
+                <th>When to Use</th>
+            </tr>
+            <tr>
+                <td>ICRS</td>
+                <td>J2000 equatorial</td>
+                <td>Default for celestial positions</td>
+            </tr>
+            <tr>
+                <td>Galactic</td>
+                <td>Galactic coordinates</td>
+                <td>Galactic plane surveys</td>
+            </tr>
+            <tr>
+                <td>Horizontal</td>
+                <td>Alt-Az topocentric</td>
+                <td>Telescope pointing, RFI analysis</td>
+            </tr>
+        </table>
+
+        <h2>3.6 Data Integrity</h2>
+
+        <h3>Checksum Requirements</h3>
+
+        <p>Every SETI data file must include integrity verification:</p>
+
+        <ul>
+            <li><strong>Header checksum</strong>: CRC32 of metadata block</li>
+            <li><strong>Data checksum</strong>: SHA-256 of payload</li>
+            <li><strong>Block checksums</strong>: Optional per-block CRC for streaming verification</li>
+        </ul>
+
+        <h3>Digital Signatures</h3>
+
+        <p>For Level 3+ candidate events, digital signatures establish provenance:</p>
+
+        <div class="highlight">
+            <p>SETI-EVENT files above classification level 2 MUST include Ed25519 digital signatures from the originating facility. This cryptographic chain of custody becomes critical evidence if a detection is confirmed as extraterrestrial contact.</p>
+        </div>
+
+        <h2>3.7 Legacy Format Converters</h2>
+
+        <p>The WIA-CONTACT-002 SDK includes converters for common existing formats:</p>
+
+        <table>
+            <tr>
+                <th>Format</th>
+                <th>Origin</th>
+                <th>Converter</th>
+            </tr>
+            <tr>
+                <td>Filterbank (.fil)</td>
+                <td>SIGPROC</td>
+                <td>fil2seti</td>
+            </tr>
+            <tr>
+                <td>PSRFITS</td>
+                <td>Pulsar astronomy</td>
+                <td>psrfits2seti</td>
+            </tr>
+            <tr>
+                <td>GUPPI RAW</td>
+                <td>Green Bank</td>
+                <td>guppi2seti</td>
+            </tr>
+            <tr>
+                <td>VOEvent</td>
+                <td>VO standard</td>
+                <td>voevent2seti</td>
+            </tr>
+        </table>
+
+        <div class="summary">
+            <h3>Chapter 3 Summary</h3>
+            <p>The WIA-CONTACT-002 data format specifications establish:</p>
+            <ol>
+                <li><strong>SETI-RAW</strong>: Preserves raw antenna voltage data with complete metadata for future reprocessing</li>
+                <li><strong>SETI-SPEC</strong>: Captures spectral products with precise frequency and time axis definitions</li>
+                <li><strong>SETI-EVENT</strong>: Structures candidate signal reports for rapid verification and coordination</li>
+                <li><strong>Metadata Standards</strong>: Universal time, coordinate, and unit specifications ensure unambiguous interpretation</li>
+                <li><strong>Data Integrity</strong>: Checksums and digital signatures protect scientific credibility</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

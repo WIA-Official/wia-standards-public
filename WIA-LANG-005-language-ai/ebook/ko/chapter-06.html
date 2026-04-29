@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 06: 통신 프로토콜 | WIA-LANG-005 | 弘益人間</title>
+    <style>
+        :root { --bg: #0f172a; --text: #f8fafc; --lang-color: #14B8A6; --border: #334155; --code-bg: rgba(20, 184, 166, 0.1); --table-header: rgba(20, 184, 166, 0.3); }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', Georgia, serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 40px 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { font-size: 2.2rem; color: var(--lang-color); margin-bottom: 30px; border-bottom: 3px solid var(--lang-color); padding-bottom: 15px; }
+        h2 { font-size: 1.6rem; color: var(--lang-color); margin: 40px 0 20px; padding-left: 15px; border-left: 4px solid var(--lang-color); }
+        h3 { font-size: 1.3rem; color: #94a3b8; margin: 30px 0 15px; }
+        h4 { font-size: 1.1rem; color: #cbd5e1; margin: 20px 0 10px; }
+        p { margin: 15px 0; text-align: justify; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 8px 0; }
+        code { background: var(--code-bg); padding: 2px 8px; border-radius: 4px; font-family: 'Fira Code', monospace; font-size: 0.9em; }
+        pre { background: var(--code-bg); padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border: 1px solid var(--border); }
+        pre code { background: none; padding: 0; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px 15px; text-align: left; }
+        th { background: var(--table-header); color: var(--lang-color); font-weight: 600; }
+        tr:hover { background: rgba(20, 184, 166, 0.05); }
+        .nav { display: flex; justify-content: space-between; margin: 50px 0; padding: 25px 0; border-top: 2px solid var(--border); }
+        .nav a { color: var(--lang-color); text-decoration: none; padding: 12px 25px; border: 2px solid var(--lang-color); border-radius: 8px; transition: all 0.3s ease; }
+        .nav a:hover { background: var(--lang-color); color: var(--bg); }
+        .summary-box { background: linear-gradient(135deg, rgba(20, 184, 166, 0.2), rgba(20, 184, 166, 0.05)); border: 1px solid var(--lang-color); border-radius: 12px; padding: 25px; margin: 30px 0; }
+        .philosophy-box { background: linear-gradient(135deg, rgba(20, 184, 166, 0.15), transparent); border-radius: 12px; padding: 25px; margin: 30px 0; text-align: center; border: 2px solid var(--lang-color); }
+        .warning { background: rgba(234, 179, 8, 0.1); border-left: 4px solid #eab308; padding: 15px 20px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 06: 통신 프로토콜</h1>
+
+        <div class="philosophy-box">
+            <div style="font-size: 1.8rem;">弘益人間</div>
+            <div style="font-size: 1.4rem; color: var(--lang-color); margin-top: 10px;">효율적이고 안전한 통신으로 전 세계 연결</div>
+        </div>
+
+        <h2>6.1 HTTP/2 vs gRPC</h2>
+
+        <p>API가 "무엇을" 할 수 있는지를 정의한다면, 프로토콜은 "어떻게" 통신할 것인지를 정의합니다.</p>
+
+        <table>
+            <thead><tr><th>특성</th><th>HTTP/1.1 + JSON</th><th>HTTP/2 + JSON</th><th>gRPC + Protobuf</th></tr></thead>
+            <tbody>
+                <tr><td>이진 프로토콜</td><td>❌ 텍스트</td><td>✅ 이진</td><td>✅ 이진</td></tr>
+                <tr><td>멀티플렉싱</td><td>❌</td><td>✅</td><td>✅</td></tr>
+                <tr><td>스트리밍</td><td>❌</td><td>✅</td><td>✅ 양방향</td></tr>
+                <tr><td>데이터 크기</td><td>큼</td><td>중간</td><td>작음</td></tr>
+                <tr><td>타입 안전성</td><td>❌</td><td>❌</td><td>✅</td></tr>
+                <tr><td>브라우저 지원</td><td>✅</td><td>✅</td><td>⚠️ gRPC-Web</td></tr>
+            </tbody>
+        </table>
+
+        <h2>6.2 Protocol Buffers 정의</h2>
+
+        <pre><code class="language-typescript">// TypeScript로 표현한 Protobuf 메시지 구조
+interface TranslateRequest {
+  text: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  options?: TranslateOptions;
+}
+
+interface TranslateOptions {
+  formality: 'CASUAL' | 'POLITE' | 'FORMAL';
+  domain: string;
+  numAlternatives: number;
+  preserveFormatting: boolean;
+}
+
+interface TranslateResponse {
+  translation: string;
+  confidence: number;
+  alternatives: Alternative[];
+  metadata: ResponseMetadata;
+}
+
+// gRPC 서비스 정의
+interface TranslationService {
+  // 단일 요청
+  translate(request: TranslateRequest): Promise&lt;TranslateResponse&gt;;
+
+  // 스트리밍: 긴 텍스트 실시간 번역
+  translateStream(
+    request: AsyncIterable&lt;TranslateRequest&gt;
+  ): AsyncIterable&lt;TranslateResponse&gt;;
+
+  // 양방향 스트리밍: 실시간 대화 번역
+  translateBidirectional(
+    stream: AsyncIterable&lt;TranslateRequest&gt;
+  ): AsyncIterable&lt;TranslateResponse&gt;;
+}</code></pre>
+
+        <h2>6.3 모델 배포 프로토콜</h2>
+
+        <pre><code class="language-typescript">// Docker 기반 모델 패키징
+interface ModelPackage {
+  modelId: string;
+  version: string;
+  language: string;
+  task: 'translation' | 'asr' | 'tts' | 'lm';
+
+  // 컨테이너 설정
+  container: {
+    baseImage: 'wia/lang-base:1.0';
+    requirements: string[];
+    entrypoint: string;
+  };
+
+  // 리소스 요구사항
+  resources: {
+    memory: '2Gi' | '4Gi' | '8Gi';
+    cpu: number;
+    gpu?: 'nvidia-t4' | 'nvidia-a10';
+  };
+
+  // 헬스 체크
+  healthCheck: {
+    endpoint: '/health';
+    intervalSeconds: 30;
+    timeoutSeconds: 5;
+  };
+}
+
+// Kubernetes 배포 생성기
+class K8sDeploymentGenerator {
+  generateDeployment(pkg: ModelPackage): string {
+    return `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wia-lang-${pkg.language}-${pkg.task}
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ${pkg.modelId}
+  template:
+    spec:
+      containers:
+      - name: model-server
+        image: wia/${pkg.modelId}:${pkg.version}
+        resources:
+          requests:
+            memory: "${pkg.resources.memory}"
+            cpu: "${pkg.resources.cpu}"
+        livenessProbe:
+          httpGet:
+            path: ${pkg.healthCheck.endpoint}
+            port: 8080
+    `;
+  }
+}</code></pre>
+
+        <h2>6.4 보안 프로토콜</h2>
+
+        <table>
+            <thead><tr><th>계층</th><th>기술</th><th>목적</th></tr></thead>
+            <tbody>
+                <tr><td>전송</td><td>TLS 1.3</td><td>암호화 통신</td></tr>
+                <tr><td>인증</td><td>OAuth 2.0 + JWT</td><td>신원 확인</td></tr>
+                <tr><td>권한</td><td>RBAC</td><td>접근 제어</td></tr>
+                <tr><td>감사</td><td>Audit Logging</td><td>추적 가능성</td></tr>
+                <tr><td>보호</td><td>Rate Limiting</td><td>DDoS 방어</td></tr>
+            </tbody>
+        </table>
+
+        <div class="warning">
+            <strong>⚠️ 문화적 데이터 보호:</strong> 신성한 언어 데이터는 추가 암호화 계층을 적용하고, 접근 로그를 언어 공동체에 실시간 공유합니다.
+        </div>
+
+        <pre><code class="language-typescript">// 보안 미들웨어
+class SecurityMiddleware {
+  async validateRequest(req: Request): Promise&lt;ValidationResult&gt; {
+    // 1. TLS 검증
+    if (!req.secure) {
+      return { valid: false, error: 'HTTPS required' };
+    }
+
+    // 2. JWT 검증
+    const token = req.headers.authorization?.split(' ')[1];
+    const decoded = await this.verifyJWT(token);
+
+    // 3. 권한 확인
+    const hasAccess = await this.checkPermissions(
+      decoded.userId,
+      req.path,
+      req.method
+    );
+
+    // 4. 문화적 민감성 확인
+    if (req.body.language) {
+      const cultural = await this.checkCulturalAccess(
+        decoded.userId,
+        req.body.language,
+        req.body.content
+      );
+      if (!cultural.allowed) {
+        return { valid: false, error: cultural.reason };
+      }
+    }
+
+    // 5. Rate Limit 확인
+    const rateLimited = await this.checkRateLimit(decoded.userId);
+    if (rateLimited) {
+      return { valid: false, error: 'Rate limit exceeded' };
+    }
+
+    return { valid: true, user: decoded };
+  }
+}</code></pre>
+
+        <div class="summary-box">
+            <h3>📚 핵심 요약</h3>
+            <ol>
+                <li><strong>프로토콜 선택:</strong> HTTP/2 REST (웹), gRPC (서버간/스트리밍)를 용도에 맞게 사용합니다.</li>
+                <li><strong>Protocol Buffers:</strong> 타입 안전하고 효율적인 데이터 직렬화를 제공합니다.</li>
+                <li><strong>모델 배포:</strong> Docker + Kubernetes로 표준화된 배포를 수행합니다.</li>
+                <li><strong>스트리밍:</strong> 양방향 스트리밍으로 실시간 처리를 지원합니다.</li>
+                <li><strong>보안:</strong> TLS 1.3, OAuth 2.0, RBAC, Rate Limiting을 적용합니다.</li>
+                <li><strong>문화적 보호:</strong> 민감한 언어 데이터에 추가 보안 계층을 적용합니다.</li>
+                <li><strong>弘益人間:</strong> 안전하면서도 접근 가능한 통신으로 모두를 연결합니다.</li>
+            </ol>
+        </div>
+
+        <h2>✏️ 복습 문제</h2>
+        <h4>1.</h4><p>HTTP/2와 gRPC의 차이점과 각각의 적합한 사용 시나리오를 설명하시오.</p>
+        <h4>2.</h4><p>Protocol Buffers가 JSON보다 효율적인 이유를 데이터 크기 관점에서 분석하시오.</p>
+        <h4>3.</h4><p>양방향 스트리밍이 필요한 언어 AI 응용 사례를 3가지 제시하시오.</p>
+        <h4>4.</h4><p>Kubernetes 배포에서 Auto-scaling 전략을 저자원 언어 서비스에 맞게 설계하시오.</p>
+        <h4>5.</h4><p>문화적으로 민감한 데이터의 보안 요구사항을 정의하시오.</p>
+        <h4>6.</h4><p>SecurityMiddleware의 문화적 접근 검사 로직을 상세 구현하시오.</p>
+        <h4>7.</h4><p>gRPC 서비스의 에러 처리 및 재시도 전략을 설계하시오.</p>
+        <h4>8.</h4><p>엣지 디바이스 배포를 위한 경량 프로토콜을 제안하시오.</p>
+
+        <p style="text-align: center; margin-top: 40px; color: #64748b;">© 2025 SmileStory Inc. / WIA · 弘益人間</p>
+    </div>
+</body>
+</html>

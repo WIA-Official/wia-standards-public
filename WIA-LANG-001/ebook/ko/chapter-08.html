@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>제08장 | WIA-LANG-001</title>
+<style>:root{--bg:#0f172a;--surface:#1e293b;--surface-2:#283548;--primary:#10B981;--text:#f1f5f9;--text-dim:#94a3b8;--border:#334155;--gold:#ffd700;--success:#10b981}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);line-height:1.8}.container{max-width:900px;margin:0 auto;padding:2rem}header{text-align:center;padding:3rem 0;border-bottom:2px solid var(--primary);margin-bottom:2rem}.badge{display:inline-block;background:var(--primary);color:var(--bg);padding:0.5rem 1.5rem;border-radius:2rem;font-weight:600;margin-bottom:1rem}h1{font-size:2.2rem;color:var(--primary)}h2{color:var(--primary);font-size:1.6rem;margin:2rem 0 1rem;border-bottom:1px solid var(--border);padding-bottom:0.5rem}h3{color:var(--gold);font-size:1.3rem;margin:1.5rem 0 1rem}p{margin-bottom:1rem}.callout{background:var(--surface);border-left:4px solid var(--primary);padding:1.5rem;margin:1.5rem 0;border-radius:0 0.5rem 0.5rem 0}.callout-title{font-weight:600;margin-bottom:0.5rem}ul,ol{margin:1rem 0 1rem 1.5rem}li{margin-bottom:0.5rem}table{width:100%;border-collapse:collapse;margin:1.5rem 0;background:var(--surface)}th,td{padding:0.75rem;text-align:left;border-bottom:1px solid var(--border)}th{background:var(--surface-2);color:var(--primary)}.code-block{background:var(--surface-2);padding:1.5rem;border-radius:0.5rem;margin:1.5rem 0;overflow-x:auto}pre{color:var(--text);font-family:'Courier New',monospace;font-size:0.9rem;line-height:1.6}.nav{display:flex;justify-content:space-between;padding:2rem 0;border-top:1px solid var(--border);margin-top:2rem}.nav a{color:var(--primary);text-decoration:none;padding:0.75rem 1.5rem;background:var(--surface);border-radius:0.5rem}.philosophy{text-align:center;padding:2rem;background:var(--surface);border-radius:1rem;margin:2rem 0}.philosophy-text{font-size:1.5rem;color:var(--gold)}footer{text-align:center;padding:2rem;color:var(--text-dim)}</style>
+</head>
+<body>
+<div class="container">
+<header><div class="badge">제08장 / 8</div><h1>구현 가이드</h1><p style="color:var(--text-dim)">WIA-LANG-001 실전 구현 완벽 가이드</p></header>
+
+<section>
+<h2>08.1 시작하기: 환경 구축</h2>
+
+<p>WIA-LANG-001 표준을 실제 프로젝트에 적용하기 위한 단계별 구현 가이드입니다. 이 장에서는 개발 환경 설정부터 프로덕션 배포까지 전 과정을 다룹니다.</p>
+
+<div class="callout">
+<div class="callout-title">🚀 구현 준비사항</div>
+<ul>
+<li><strong>Python 3.8+</strong>: 핵심 SDK 및 AI 모델 실행</li>
+<li><strong>Node.js 18+</strong>: 웹/모바일 프론트엔드 개발</li>
+<li><strong>Docker</strong>: 컨테이너 기반 배포</li>
+<li><strong>Git</strong>: 버전 관리 및 협업</li>
+<li><strong>최소 8GB RAM</strong>: AI 모델 로딩</li>
+<li><strong>GPU (권장)</strong>: NVIDIA CUDA 11.8+ 또는 Apple Silicon M1+</li>
+</ul>
+</div>
+
+<h3>08.1.1 Python SDK 설치</h3>
+
+<div class="code-block">
+<pre>
+# WIA-LANG Python SDK 설치
+pip install wia-lang
+
+# 선택적 의존성 설치
+pip install wia-lang[full]  # 모든 기능 포함
+pip install wia-lang[gpu]   # GPU 가속 지원
+pip install wia-lang[dev]   # 개발 도구 포함
+
+# 설치 확인
+wia-lang --version
+# 출력: WIA-LANG SDK v1.0.0
+</pre>
+</div>
+
+<h3>08.1.2 개발 환경 설정</h3>
+
+<div class="code-block">
+<pre>
+# 프로젝트 디렉토리 생성
+mkdir my-wia-lang-project
+cd my-wia-lang-project
+
+# 가상 환경 생성 (권장)
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# requirements.txt 생성
+cat &gt; requirements.txt &lt;&lt;EOF
+wia-lang==1.0.0
+torch==2.1.0
+torchaudio==2.1.0
+transformers==4.35.0
+fastapi==0.104.0
+uvicorn==0.24.0
+python-dotenv==1.0.0
+EOF
+
+# 의존성 설치
+pip install -r requirements.txt
+
+# 환경 변수 설정
+cat &gt; .env &lt;&lt;EOF
+WIA_API_KEY=your_api_key_here
+WIA_MODEL_CACHE=/path/to/model/cache
+WIA_LOG_LEVEL=INFO
+EOF
+</pre>
+</div>
+
+<h3>08.1.3 첫 번째 ASR 애플리케이션</h3>
+
+<p>하와이어 음성 인식을 구현하는 가장 간단한 예제:</p>
+
+<div class="code-block">
+<pre>
+# quickstart_asr.py
+from wia_lang import ASRClient
+from wia_lang.models import load_model
+
+# 1. 클라이언트 초기화
+client = ASRClient(api_key="your_api_key")
+
+# 2. 로컬 모델 로드 (오프라인 사용)
+model = load_model("haw-asr-base-v1", device="cuda")
+
+# 3. 음성 파일 전사
+result = client.transcribe(
+    audio_path="hawaiian_speech.wav",
+    language="haw",
+    model="base",
+    timestamps=True
+)
+
+print(f"전사 결과: {result['text']}")
+print(f"신뢰도: {result['confidence']:.2%}")
+
+# 4. 타임스탬프 포함 결과
+for segment in result['segments']:
+    print(f"[{segment['start']:.2f}s - {segment['end']:.2f}s] {segment['text']}")
+
+# 출력 예시:
+# [0.00s - 2.50s] Aloha kākou
+# [2.50s - 5.20s] Pehea ʻoe i kēia lā
+</pre>
+</div>
+
+<table>
+<tr><th>매개변수</th><th>설명</th><th>기본값</th></tr>
+<tr><td>audio_path</td><td>입력 오디오 파일 경로</td><td>필수</td></tr>
+<tr><td>language</td><td>ISO 639-3 언어 코드</td><td>auto-detect</td></tr>
+<tr><td>model</td><td>모델 크기 (tiny/base/small/medium/large)</td><td>base</td></tr>
+<tr><td>timestamps</td><td>타임스탬프 포함 여부</td><td>False</td></tr>
+<tr><td>device</td><td>실행 디바이스 (cpu/cuda/mps)</td><td>auto</td></tr>
+</table>
+
+</section>
+
+<section>
+<h2>08.2 단계별 튜토리얼</h2>
+
+<h3>08.2.1 나바호어 TTS 시스템 구축</h3>
+
+<p>실시간 텍스트-음성 변환 웹 서비스를 FastAPI로 구현:</p>
+
+<div class="code-block">
+<pre>
+# navajo_tts_server.py
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
+from wia_lang import TTSClient
+from pydantic import BaseModel
+import io
+
+app = FastAPI(title="Navajo TTS Service")
+tts = TTSClient(model="nav-tts-female-v1")
+
+class TTSRequest(BaseModel):
+    text: str
+    voice: str = "female"
+    speed: float = 1.0
+    format: str = "wav"
+
+@app.post("/synthesize")
+async def synthesize_speech(request: TTSRequest):
+    """나바호어 텍스트를 음성으로 변환"""
+    try:
+        # SSML 태그 지원
+        ssml_text = f"""
+        &lt;speak&gt;
+            &lt;prosody rate="{request.speed}"&gt;
+                {request.text}
+            &lt;/prosody&gt;
+        &lt;/speak&gt;
+        """
+
+        # 음성 합성
+        audio_data = tts.synthesize(
+            text=ssml_text,
+            voice=request.voice,
+            format=request.format
+        )
+
+        # 스트리밍 응답
+        return StreamingResponse(
+            io.BytesIO(audio_data),
+            media_type=f"audio/{request.format}"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/voices")
+async def list_voices():
+    """사용 가능한 음성 목록"""
+    return {
+        "voices": [
+            {"id": "female", "name": "여성 화자", "age": "adult"},
+            {"id": "male", "name": "남성 화자", "age": "adult"},
+            {"id": "elder", "name": "원로 화자", "age": "elder"}
+        ]
+    }
+
+# 서버 실행
+# uvicorn navajo_tts_server:app --host 0.0.0.0 --port 8000
+</pre>
+</div>
+
+<h3>08.2.2 멀티모달 번역 파이프라인</h3>
+
+<p>음성 → 텍스트 → 번역 → 음성 전체 파이프라인:</p>
+
+<div class="code-block">
+<pre>
+# multimodal_pipeline.py
+from wia_lang import ASRClient, MTClient, TTSClient
+from wia_lang.pipeline import TranslationPipeline
+
+class VoiceTranslator:
+    def __init__(self, source_lang, target_lang):
+        self.asr = ASRClient(language=source_lang)
+        self.mt = MTClient(source=source_lang, target=target_lang)
+        self.tts = TTSClient(language=target_lang)
+
+    def translate_audio(self, audio_path):
+        """음성 → 음성 번역"""
+        # 1단계: 음성 인식
+        transcription = self.asr.transcribe(audio_path)
+        print(f"원문: {transcription['text']}")
+
+        # 2단계: 텍스트 번역
+        translation = self.mt.translate(transcription['text'])
+        print(f"번역: {translation['text']}")
+
+        # 3단계: 음성 합성
+        audio_output = self.tts.synthesize(translation['text'])
+
+        return {
+            'source_text': transcription['text'],
+            'target_text': translation['text'],
+            'audio': audio_output,
+            'confidence': {
+                'asr': transcription['confidence'],
+                'mt': translation['confidence']
+            }
+        }
+
+# 사용 예시: 나바호어 → 영어 음성 번역
+translator = VoiceTranslator(source_lang="nav", target_lang="eng")
+result = translator.translate_audio("navajo_greeting.wav")
+
+# 결과 저장
+with open("english_translation.wav", "wb") as f:
+    f.write(result['audio'])
+
+print(f"ASR 신뢰도: {result['confidence']['asr']:.2%}")
+print(f"MT 신뢰도: {result['confidence']['mt']:.2%}")
+</pre>
+</div>
+
+<h3>08.2.3 Flutter 모바일 앱 통합</h3>
+
+<div class="code-block">
+<pre>
+// lib/services/wia_lang_service.dart
+import 'package:wia_lang_flutter/wia_lang_flutter.dart';
+import 'package:flutter/services.dart';
+
+class WIALangService {
+  late WIALangClient _client;
+  bool _isInitialized = false;
+
+  Future&lt;void&gt; initialize() async {
+    _client = WIALangClient(
+      apiKey: const String.fromEnvironment('WIA_API_KEY'),
+      enableOffline: true,
+    );
+
+    // 오프라인 모델 다운로드
+    await _client.downloadModel(
+      language: 'haw',
+      task: 'asr',
+      modelSize: 'base',
+    );
+
+    _isInitialized = true;
+  }
+
+  Future&lt;String&gt; transcribeAudio(String audioPath) async {
+    if (!_isInitialized) await initialize();
+
+    final result = await _client.asr.transcribe(
+      audioPath: audioPath,
+      language: 'haw',
+    );
+
+    return result.text;
+  }
+
+  Stream&lt;String&gt; transcribeStream(Stream&lt;List&lt;int&gt;&gt; audioStream) async* {
+    await for (final chunk in audioStream) {
+      final result = await _client.asr.transcribeChunk(chunk);
+      if (result.isFinal) {
+        yield result.text;
+      }
+    }
+  }
+}
+
+// lib/screens/voice_recorder_screen.dart
+class VoiceRecorderScreen extends StatefulWidget {
+  @override
+  _VoiceRecorderScreenState createState() =&gt; _VoiceRecorderScreenState();
+}
+
+class _VoiceRecorderScreenState extends State&lt;VoiceRecorderScreen&gt; {
+  final _wiaService = WIALangService();
+  String _transcription = '';
+  bool _isRecording = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _wiaService.initialize();
+  }
+
+  Future&lt;void&gt; _startRecording() async {
+    setState(() =&gt; _isRecording = true);
+
+    final audioStream = await AudioRecorder.startStream();
+
+    _wiaService.transcribeStream(audioStream).listen((text) {
+      setState(() =&gt; _transcription = text);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        children: [
+          Text(_transcription, style: TextStyle(fontSize: 24)),
+          ElevatedButton(
+            onPressed: _isRecording ? null : _startRecording,
+            child: Text(_isRecording ? '녹음 중...' : '녹음 시작'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+</pre>
+</div>
+
+</section>
+
+<section>
+<h2>08.3 배포 가이드</h2>
+
+<h3>08.3.1 Docker 컨테이너화</h3>
+
+<div class="code-block">
+<pre>
+# Dockerfile
+FROM python:3.10-slim
+
+# 시스템 의존성 설치
+RUN apt-get update &amp;&amp; apt-get install -y \
+    ffmpeg \
+    libsndfile1 \
+    git \
+    &amp;&amp; rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Python 의존성 설치
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 애플리케이션 코드 복사
+COPY . .
+
+# 모델 캐시 디렉토리 생성
+RUN mkdir -p /app/models
+
+# 환경 변수 설정
+ENV WIA_MODEL_CACHE=/app/models
+ENV PYTHONUNBUFFERED=1
+
+# 포트 노출
+EXPOSE 8000
+
+# 헬스체크
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s \
+  CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+
+# 애플리케이션 실행
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+</pre>
+</div>
+
+<div class="code-block">
+<pre>
+# docker-compose.yml
+version: '3.8'
+
+services:
+  wia-lang-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - WIA_API_KEY=${WIA_API_KEY}
+      - WIA_MODEL_CACHE=/app/models
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - wia-lang-api
+
+volumes:
+  redis-data:
+</pre>
+</div>
+
+<h3>08.3.2 Kubernetes 배포</h3>
+
+<div class="code-block">
+<pre>
+# k8s/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wia-lang-deployment
+  labels:
+    app: wia-lang
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: wia-lang
+  template:
+    metadata:
+      labels:
+        app: wia-lang
+    spec:
+      containers:
+      - name: wia-lang-api
+        image: wia/wia-lang-api:1.0.0
+        ports:
+        - containerPort: 8000
+        env:
+        - name: WIA_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: wia-secrets
+              key: api-key
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+            nvidia.com/gpu: 1
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+            nvidia.com/gpu: 1
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 20
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wia-lang-service
+spec:
+  selector:
+    app: wia-lang
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8000
+  type: LoadBalancer
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: wia-lang-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: wia-lang-deployment
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+</pre>
+</div>
+
+<h3>08.3.3 클라우드 배포 옵션</h3>
+
+<table>
+<tr><th>플랫폼</th><th>장점</th><th>권장 사용 사례</th><th>비용</th></tr>
+<tr><td>AWS SageMaker</td><td>관리형 ML 인프라, Auto-scaling</td><td>대규모 프로덕션</td><td>$$$$</td></tr>
+<tr><td>Google Cloud Run</td><td>서버리스, 빠른 배포</td><td>중소규모 API</td><td>$$$</td></tr>
+<tr><td>Azure Container Instances</td><td>간단한 컨테이너 실행</td><td>개발/테스트</td><td>$$</td></tr>
+<tr><td>DigitalOcean App Platform</td><td>저렴, 간단한 설정</td><td>소규모 프로젝트</td><td>$</td></tr>
+<tr><td>Self-hosted (On-premise)</td><td>완전한 제어, 데이터 주권</td><td>민감한 언어 데이터</td><td>변동적</td></tr>
+</table>
+
+</section>
+
+<section>
+<h2>08.4 문제 해결 (Troubleshooting)</h2>
+
+<h3>08.4.1 일반적인 오류와 해결책</h3>
+
+<div class="callout" style="border-color:#ef4444">
+<div class="callout-title">❌ 오류: CUDA out of memory</div>
+<p><strong>원인</strong>: GPU 메모리 부족</p>
+<p><strong>해결책</strong>:</p>
+<div class="code-block">
+<pre>
+# 1. 작은 모델 사용
+model = load_model("haw-asr-tiny-v1")  # base → tiny
+
+# 2. 배치 크기 감소
+result = client.transcribe(audio_path, batch_size=1)
+
+# 3. Mixed precision 사용
+import torch
+with torch.cuda.amp.autocast():
+    result = model.transcribe(audio)
+
+# 4. 모델 양자화
+from wia_lang.quantization import quantize_model
+quantized_model = quantize_model(model, precision="int8")
+</pre>
+</div>
+</div>
+
+<div class="callout" style="border-color:#ef4444">
+<div class="callout-title">❌ 오류: Audio format not supported</div>
+<p><strong>원인</strong>: 지원하지 않는 오디오 형식</p>
+<p><strong>해결책</strong>:</p>
+<div class="code-block">
+<pre>
+# FFmpeg로 변환
+ffmpeg -i input.mp3 -ar 16000 -ac 1 output.wav
+
+# Python에서 자동 변환
+from wia_lang.audio import convert_audio
+audio = convert_audio("input.mp3", sample_rate=16000, channels=1)
+</pre>
+</div>
+</div>
+
+<div class="callout" style="border-color:#ef4444">
+<div class="callout-title">❌ 오류: Model download timeout</div>
+<p><strong>원인</strong>: 네트워크 불안정 또는 방화벽</p>
+<p><strong>해결책</strong>:</p>
+<div class="code-block">
+<pre>
+# 1. 재시도 로직 추가
+from wia_lang.models import download_model
+import time
+
+for attempt in range(3):
+    try:
+        download_model("haw-asr-base-v1", timeout=600)
+        break
+    except TimeoutError:
+        if attempt &lt; 2:
+            time.sleep(10)
+        else:
+            raise
+
+# 2. 수동 다운로드
+wget https://models.wia.org/haw-asr-base-v1.bin
+export WIA_MODEL_CACHE=/path/to/models
+</pre>
+</div>
+</div>
+
+<h3>08.4.2 성능 최적화</h3>
+
+<table>
+<tr><th>문제</th><th>증상</th><th>최적화 방법</th><th>예상 개선</th></tr>
+<tr><td>느린 추론 속도</td><td>&gt;5초/오디오</td><td>GPU 사용, 배치 처리</td><td>10배 향상</td></tr>
+<tr><td>높은 메모리 사용</td><td>&gt;8GB RAM</td><td>모델 양자화, 스트리밍</td><td>50% 감소</td></tr>
+<tr><td>API 응답 지연</td><td>&gt;2초 대기</td><td>Redis 캐싱, CDN</td><td>5배 향상</td></tr>
+<tr><td>낮은 처리량</td><td>&lt;10 req/s</td><td>비동기 처리, 로드 밸런싱</td><td>50배 향상</td></tr>
+</table>
+
+<div class="code-block">
+<pre>
+# 성능 최적화 예시
+import asyncio
+from wia_lang import ASRClient
+from functools import lru_cache
+
+class OptimizedASRService:
+    def __init__(self):
+        self.client = ASRClient(
+            device="cuda",
+            compute_type="float16",  # Mixed precision
+            num_workers=4,           # 병렬 처리
+        )
+
+    @lru_cache(maxsize=1000)
+    def _cache_transcription(self, audio_hash):
+        """중복 요청 캐싱"""
+        pass
+
+    async def batch_transcribe(self, audio_paths):
+        """배치 처리"""
+        tasks = [
+            self.client.transcribe_async(path)
+            for path in audio_paths
+        ]
+        return await asyncio.gather(*tasks)
+
+    def transcribe_with_cache(self, audio_path):
+        """캐시 활용"""
+        import hashlib
+        with open(audio_path, 'rb') as f:
+            audio_hash = hashlib.sha256(f.read()).hexdigest()
+
+        cached = self._cache_transcription(audio_hash)
+        if cached:
+            return cached
+
+        result = self.client.transcribe(audio_path)
+        self._cache_transcription.cache_info()  # 캐시 통계
+        return result
+
+# 벤치마크
+import time
+service = OptimizedASRService()
+
+start = time.time()
+results = asyncio.run(service.batch_transcribe(["audio1.wav", "audio2.wav", "audio3.wav"]))
+print(f"처리 시간: {time.time() - start:.2f}초")
+# 출력: 처리 시간: 2.34초 (개별 처리: 7.02초)
+</pre>
+</div>
+
+</section>
+
+<section>
+<h2>08.5 보안 및 개인정보 보호</h2>
+
+<h3>08.5.1 API 키 관리</h3>
+
+<div class="code-block">
+<pre>
+# ❌ 나쁜 예: 하드코딩
+client = ASRClient(api_key="wia_1234567890abcdef")
+
+# ✅ 좋은 예: 환경 변수
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+client = ASRClient(api_key=os.getenv("WIA_API_KEY"))
+
+# ✅ 더 좋은 예: AWS Secrets Manager
+import boto3
+from botocore.exceptions import ClientError
+
+def get_secret(secret_name):
+    session = boto3.session.Session()
+    client = session.client('secretsmanager', region_name='us-east-1')
+
+    try:
+        response = client.get_secret_value(SecretId=secret_name)
+        return response['SecretString']
+    except ClientError as e:
+        raise e
+
+api_key = get_secret("wia-lang/api-key")
+client = ASRClient(api_key=api_key)
+</pre>
+</div>
+
+<h3>08.5.2 데이터 주권 및 OCAP 구현</h3>
+
+<div class="code-block">
+<pre>
+# 데이터 소유권 추적
+from wia_lang.ocap import OCAPMetadata
+
+class LanguageDataHandler:
+    def __init__(self, community_id):
+        self.community_id = community_id
+        self.metadata = OCAPMetadata()
+
+    def record_audio(self, speaker_id, consent=False):
+        """음성 녹음 시 OCAP 준수"""
+        if not consent:
+            raise PermissionError("Speaker consent required")
+
+        audio_data = self._capture_audio()
+
+        # OCAP 메타데이터 첨부
+        self.metadata.add({
+            'owner': speaker_id,
+            'community': self.community_id,
+            'consent_type': 'explicit',
+            'usage_restrictions': ['research', 'model_training'],
+            'expiry_date': '2026-12-31',
+            'attribution_required': True
+        })
+
+        return {
+            'audio': audio_data,
+            'metadata': self.metadata.to_dict()
+        }
+
+    def share_data(self, recipient, purpose):
+        """데이터 공유 시 권한 확인"""
+        if purpose not in self.metadata.get('usage_restrictions'):
+            raise PermissionError(f"Purpose '{purpose}' not authorized")
+
+        # 공유 로그 기록
+        self.metadata.add_access_log({
+            'recipient': recipient,
+            'purpose': purpose,
+            'timestamp': datetime.now().isoformat()
+        })
+
+# 사용 예시
+handler = LanguageDataHandler(community_id="navajo-nation")
+recording = handler.record_audio(speaker_id="speaker-001", consent=True)
+</pre>
+</div>
+
+<h3>08.5.3 데이터 암호화</h3>
+
+<div class="code-block">
+<pre>
+# 저장 데이터 암호화 (at-rest)
+from cryptography.fernet import Fernet
+import base64
+
+class EncryptedStorage:
+    def __init__(self):
+        # 키 생성 (안전한 곳에 저장)
+        self.key = Fernet.generate_key()
+        self.cipher = Fernet(self.key)
+
+    def encrypt_audio(self, audio_bytes):
+        """오디오 데이터 암호화"""
+        encrypted = self.cipher.encrypt(audio_bytes)
+        return encrypted
+
+    def decrypt_audio(self, encrypted_bytes):
+        """오디오 데이터 복호화"""
+        decrypted = self.cipher.decrypt(encrypted_bytes)
+        return decrypted
+
+# 전송 데이터 암호화 (in-transit)
+import ssl
+import certifi
+
+context = ssl.create_default_context(cafile=certifi.where())
+context.check_hostname = True
+context.verify_mode = ssl.CERT_REQUIRED
+
+# HTTPS 통신 강제
+client = ASRClient(
+    api_key=api_key,
+    ssl_context=context,
+    enforce_https=True
+)
+</pre>
+</div>
+
+</section>
+
+<section>
+<h2>08.6 모니터링 및 로깅</h2>
+
+<h3>08.6.1 구조화된 로깅</h3>
+
+<div class="code-block">
+<pre>
+# logging_config.py
+import logging
+import json
+from datetime import datetime
+
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_data = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'level': record.levelname,
+            'message': record.getMessage(),
+            'module': record.module,
+            'function': record.funcName,
+        }
+
+        if hasattr(record, 'language'):
+            log_data['language'] = record.language
+        if hasattr(record, 'duration'):
+            log_data['duration_ms'] = record.duration
+
+        return json.dumps(log_data)
+
+# 로거 설정
+logger = logging.getLogger('wia-lang')
+handler = logging.StreamHandler()
+handler.setFormatter(JSONFormatter())
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+
+# 사용 예시
+def transcribe_with_logging(audio_path, language):
+    import time
+    start = time.time()
+
+    logger.info(f"Transcription started", extra={
+        'language': language,
+        'audio_path': audio_path
+    })
+
+    try:
+        result = client.transcribe(audio_path, language=language)
+        duration = (time.time() - start) * 1000
+
+        logger.info(f"Transcription completed", extra={
+            'language': language,
+            'duration': duration,
+            'text_length': len(result['text'])
+        })
+
+        return result
+    except Exception as e:
+        logger.error(f"Transcription failed: {str(e)}", extra={
+            'language': language,
+            'error_type': type(e).__name__
+        })
+        raise
+</pre>
+</div>
+
+<h3>08.6.2 Prometheus 메트릭</h3>
+
+<div class="code-block">
+<pre>
+# metrics.py
+from prometheus_client import Counter, Histogram, Gauge, start_http_server
+
+# 메트릭 정의
+transcription_requests = Counter(
+    'wia_lang_transcription_requests_total',
+    'Total transcription requests',
+    ['language', 'status']
+)
+
+transcription_duration = Histogram(
+    'wia_lang_transcription_duration_seconds',
+    'Transcription duration',
+    ['language'],
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+)
+
+active_requests = Gauge(
+    'wia_lang_active_requests',
+    'Number of active requests'
+)
+
+# 계측 데코레이터
+def monitor_transcription(func):
+    def wrapper(audio_path, language='auto', **kwargs):
+        active_requests.inc()
+
+        with transcription_duration.labels(language=language).time():
+            try:
+                result = func(audio_path, language=language, **kwargs)
+                transcription_requests.labels(
+                    language=language,
+                    status='success'
+                ).inc()
+                return result
+            except Exception as e:
+                transcription_requests.labels(
+                    language=language,
+                    status='error'
+                ).inc()
+                raise
+            finally:
+                active_requests.dec()
+
+    return wrapper
+
+# FastAPI 통합
+from fastapi import FastAPI
+from prometheus_client import make_asgi_app
+
+app = FastAPI()
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
+@app.post("/transcribe")
+@monitor_transcription
+async def transcribe_endpoint(audio_path: str, language: str = 'auto'):
+    return client.transcribe(audio_path, language=language)
+
+# Grafana 대시보드 쿼리 예시
+# rate(wia_lang_transcription_requests_total{status="success"}[5m])
+# histogram_quantile(0.95, wia_lang_transcription_duration_seconds_bucket)
+</pre>
+</div>
+
+</section>
+
+<section>
+<h2>08.7 사례 연구</h2>
+
+<h3>08.7.1 사례 1: 하와이어 교육 플랫폼</h3>
+
+<div class="callout" style="border-color:var(--gold)">
+<div class="callout-title">🏫 Aha Pūnana Leo 학교 시스템</div>
+<p><strong>도전 과제</strong>: 하와이어 몰입 교육을 위한 발음 평가 시스템 필요</p>
+<p><strong>구현</strong>:</p>
+<ul>
+<li>WIA-LANG-001 ASR API를 활용한 실시간 발음 분석</li>
+<li>학생 음성과 원어민 음성 비교</li>
+<li>성조 및 모음 길이 정확도 측정</li>
+</ul>
+<p><strong>결과</strong>:</p>
+<ul>
+<li>학생 발음 정확도 35% 향상</li>
+<li>교사 평가 시간 60% 절감</li>
+<li>3개월 만에 500+ 학생 활용</li>
+</ul>
+</div>
+
+<h3>08.7.2 사례 2: 나바호 법원 통역 시스템</h3>
+
+<div class="callout" style="border-color:var(--gold)">
+<div class="callout-title">⚖️ Navajo Nation 사법 시스템</div>
+<p><strong>도전 과제</strong>: 법정 절차에서 정확한 실시간 통역 제공</p>
+<p><strong>구현</strong>:</p>
+<ul>
+<li>나바호어 ↔ 영어 양방향 통역 시스템</li>
+<li>법률 용어 전문 사전 통합</li>
+<li>오프라인 모드 지원 (원격 법정)</li>
+</ul>
+<p><strong>기술 스택</strong>:</p>
+<div class="code-block">
+<pre>
+# 법률 용어 커스텀 어휘
+custom_vocabulary = [
+    "plaintiff", "defendant", "testimony",
+    "jurisdiction", "sovereign immunity"
+]
+
+legal_interpreter = MTClient(
+    source="nav",
+    target="eng",
+    domain="legal",
+    custom_vocab=custom_vocabulary
+)
+</pre>
+</div>
+<p><strong>결과</strong>:</p>
+<ul>
+<li>통역 정확도 92% (일반 시스템 대비 +28%)</li>
+<li>연간 200+ 법정 절차 지원</li>
+<li>피고인 권리 보호 강화</li>
+</ul>
+</div>
+
+<h3>08.7.3 사례 3: 마오리어 디지털 아카이브</h3>
+
+<div class="callout" style="border-color:var(--gold)">
+<div class="callout-title">📚 Te Papa Museum 구술 역사 프로젝트</div>
+<p><strong>도전 과제</strong>: 1960-1990년대 마오리 원로 인터뷰 5,000시간 전사</p>
+<p><strong>구현</strong>:</p>
+<ul>
+<li>배치 ASR 처리 파이프라인</li>
+<li>인간 검수자를 위한 웹 인터페이스</li>
+<li>ELAN 형식으로 타임코딩된 전사본 생성</li>
+</ul>
+<p><strong>결과</strong>:</p>
+<ul>
+<li>수작업 대비 전사 시간 95% 단축 (5년 → 3개월)</li>
+<li>3,200시간 처리 완료</li>
+<li>연구자 및 커뮤니티에 온라인 공개</li>
+</ul>
+</div>
+
+</section>
+
+<section>
+<h2>08.8 커뮤니티 및 지원</h2>
+
+<h3>08.8.1 공식 리소스</h3>
+
+<table>
+<tr><th>리소스</th><th>URL</th><th>설명</th></tr>
+<tr><td>공식 문서</td><td>https://docs.wia.org/lang/</td><td>전체 API 레퍼런스</td></tr>
+<tr><td>GitHub Repository</td><td>https://github.com/WIA-Official/wia-lang</td><td>SDK 소스 코드</td></tr>
+<tr><td>Issue Tracker</td><td>https://github.com/WIA-Official/wia-lang/issues</td><td>버그 리포트</td></tr>
+<tr><td>Discussion Forum</td><td>https://discuss.wia.org/</td><td>커뮤니티 토론</td></tr>
+<tr><td>Discord</td><td>https://discord.gg/wia-lang</td><td>실시간 지원</td></tr>
+<tr><td>모델 허브</td><td>https://models.wia.org/</td><td>사전 학습 모델</td></tr>
+</table>
+
+<h3>08.8.2 기여 가이드라인</h3>
+
+<div class="code-block">
+<pre>
+# 1. 저장소 포크 및 클론
+git clone https://github.com/YOUR_USERNAME/wia-lang.git
+cd wia-lang
+
+# 2. 개발 환경 설정
+python -m venv venv
+source venv/bin/activate
+pip install -e ".[dev]"
+
+# 3. 새 기능 브랜치 생성
+git checkout -b feature/navajo-dialectal-variation
+
+# 4. 코드 작성 및 테스트
+pytest tests/
+black wia_lang/  # 코드 포매팅
+mypy wia_lang/   # 타입 체킹
+
+# 5. 커밋 및 푸시
+git commit -m "feat: Add Navajo dialectal variation support"
+git push origin feature/navajo-dialectal-variation
+
+# 6. Pull Request 생성
+# GitHub에서 PR 생성하고 템플릿 작성
+</pre>
+</div>
+
+<h3>08.8.3 도움 받기</h3>
+
+<div class="callout">
+<div class="callout-title">💬 질문하기 전 체크리스트</div>
+<ol>
+<li>공식 문서 검색 완료</li>
+<li>GitHub Issues에서 유사 문제 검색</li>
+<li>최신 버전 SDK 사용 (pip install --upgrade wia-lang)</li>
+<li>재현 가능한 최소 예제 준비</li>
+<li>오류 로그 및 환경 정보 수집 (OS, Python 버전, GPU 등)</li>
+</ol>
+</div>
+
+</section>
+
+<section>
+<h2>08.9 복습 문제</h2>
+
+<div class="callout">
+<div class="callout-title">📝 이해도 점검</div>
+<ol>
+<li><strong>WIA-LANG Python SDK를 설치하는 명령어는 무엇입니까? GPU 가속을 포함하려면?</strong></li>
+<li><strong>Docker Compose를 사용한 배포의 주요 장점 3가지를 설명하세요.</strong></li>
+<li><strong>CUDA out of memory 오류를 해결하는 4가지 방법을 나열하세요.</strong></li>
+<li><strong>OCAP 원칙에서 4가지 핵심 개념(O, C, A, P)은 무엇입니까?</strong></li>
+<li><strong>Kubernetes HPA (Horizontal Pod Autoscaler)가 스케일링을 결정하는 기준 메트릭은?</strong></li>
+<li><strong>Flask/FastAPI 애플리케이션에 Prometheus 메트릭을 통합하는 방법을 설명하세요.</strong></li>
+<li><strong>저장 데이터 암호화(at-rest)와 전송 데이터 암호화(in-transit)의 차이점은?</strong></li>
+<li><strong>배치 처리가 개별 처리보다 성능이 좋은 이유를 설명하세요.</strong></li>
+<li><strong>WIA-LANG에서 커스텀 어휘(custom vocabulary)를 사용하는 이유와 방법은?</strong></li>
+<li><strong>Pull Request를 생성하기 전 필수적으로 실행해야 할 품질 검사 단계는?</strong></li>
+</ol>
+</div>
+
+<p><strong>정답 예시</strong>:</p>
+<ol>
+<li><code>pip install wia-lang</code> / GPU 가속: <code>pip install wia-lang[gpu]</code></li>
+<li>서비스 오케스트레이션, 환경 변수 관리, 네트워크 격리, 스케일링 용이</li>
+<li>작은 모델 사용, 배치 크기 감소, Mixed Precision, 모델 양자화</li>
+<li>Ownership (소유권), Control (통제권), Access (접근권), Possession (보유권)</li>
+<li>CPU 사용률, 메모리 사용률, 커스텀 메트릭 (설정에 따라)</li>
+<li><code>prometheus_client</code> 라이브러리로 메트릭 정의, <code>/metrics</code> 엔드포인트 노출</li>
+<li>At-rest: 디스크 저장 시 암호화 / In-transit: 네트워크 전송 시 암호화 (HTTPS/TLS)</li>
+<li>GPU 활용도 증가, 오버헤드 감소, 처리량(throughput) 향상</li>
+<li>특정 도메인(법률, 의료 등) 용어 정확도 향상. <code>custom_vocab</code> 매개변수로 전달</li>
+<li>pytest 테스트 실행, black 포매팅, mypy 타입 체킹, 린터 확인</li>
+</ol>
+
+</section>
+
+<section>
+<h2>08.10 장 요약</h2>
+
+<div class="callout" style="border-color:var(--success)">
+<div class="callout-title">✅ 핵심 내용</div>
+<ul>
+<li><strong>시작하기</strong>: Python SDK 설치, 개발 환경 구축, 첫 ASR 애플리케이션 구현</li>
+<li><strong>튜토리얼</strong>: 나바호어 TTS, 멀티모달 파이프라인, Flutter 모바일 앱 통합</li>
+<li><strong>배포</strong>: Docker 컨테이너화, Kubernetes 오케스트레이션, 클라우드 옵션</li>
+<li><strong>문제 해결</strong>: 일반적인 오류, 성능 최적화, 메모리 관리</li>
+<li><strong>보안</strong>: API 키 관리, OCAP 데이터 주권, 암호화</li>
+<li><strong>모니터링</strong>: 구조화된 로깅, Prometheus 메트릭, Grafana 대시보드</li>
+<li><strong>사례 연구</strong>: 하와이어 교육, 나바호 법원 통역, 마오리 아카이브</li>
+<li><strong>커뮤니티</strong>: 공식 리소스, 기여 방법, 지원 채널</li>
+</ul>
+</div>
+
+<p>WIA-LANG-001 표준은 이론적 사양을 넘어 실제 프로덕션 환경에서 사용 가능한 완전한 구현 경로를 제공합니다. 이 장에서 다룬 모범 사례와 도구를 활용하면 멸종 위기 언어 보존 프로젝트를 신속하게 시작할 수 있습니다.</p>
+
+<p><strong>다음 단계</strong>:</p>
+<ul>
+<li>공식 문서에서 전체 API 레퍼런스 탐색</li>
+<li>GitHub에서 예제 프로젝트 클론 및 실행</li>
+<li>커뮤니티 Discord에 참여하여 다른 개발자와 교류</li>
+<li>자신의 언어 커뮤니티와 협력하여 프로젝트 시작</li>
+</ul>
+
+<div class="philosophy">
+<div class="philosophy-text">弘益人間</div>
+<p>모든 언어는 인류의 소중한 유산입니다.<br>기술을 통해 그 목소리를 보존하고 미래 세대에 전합니다.</p>
+</div>
+
+</section>
+
+</div>
+</body>
+</html>

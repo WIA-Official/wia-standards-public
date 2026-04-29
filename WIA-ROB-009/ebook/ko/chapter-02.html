@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: 로봇 내비게이션 및 매핑 | WIA-ROB-009</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #8B5CF6;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: var(--text);
+            line-height: 2.0;
+            padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        header {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            font-size: 2.5em;
+            background: linear-gradient(45deg, var(--primary), #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 2em;
+            margin: 40px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+        }
+        h3 {
+            color: #a78bfa;
+            font-size: 1.5em;
+            margin: 30px 0 15px 0;
+        }
+        p { margin: 15px 0; text-align: justify; }
+        .content {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 40px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        .highlight {
+            background: rgba(139, 92, 246, 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .callout {
+            background: rgba(139, 92, 246, 0.05);
+            border: 2px solid var(--primary);
+            padding: 25px;
+            margin: 25px 0;
+            border-radius: 10px;
+        }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            margin: 40px 0;
+        }
+        .btn {
+            background: linear-gradient(45deg, var(--primary), #a78bfa);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: transform 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(139, 92, 246, 0.4);
+        }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #a0ffa0;
+        }
+        pre {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+        }
+        th {
+            background: rgba(139, 92, 246, 0.2);
+            color: #a78bfa;
+            font-weight: 600;
+        }
+        .philosophy {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(167, 139, 250, 0.1));
+            border: 2px solid var(--primary);
+            padding: 30px;
+            margin: 40px 0;
+            border-radius: 15px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🗺️ 2장: 로봇 내비게이션 및 매핑</h1>
+            <p style="color: #a78bfa; font-size: 1.2em;">SLAM, 센서, 그리고 자율 경로 계획</p>
+        </header>
+
+        <div class="content">
+            <h2>2.1 로봇 내비게이션의 기초</h2>
+
+            <p>
+                내비게이션은 자율 이동 로봇을 이전의 유도 로봇과 구별하는 핵심 기능입니다. AGV가 물리적 인프라로 표시된 미리 결정된 경로를 따르는 반면, 자율 로봇은 환경을 인식하고, 그 안에서 자신의 위치를 이해하고, 목적지까지의 최적 경로를 계획하고, 장애물을 피하고 변화하는 조건에 적응하면서 그 계획을 실행해야 합니다. 이 복잡한 작업은 센서, 알고리즘, 프로세서 및 액추에이터를 실제 창고 환경에서 안정적으로 작동하는 응집력 있는 시스템으로 통합해야 합니다.
+            </p>
+
+            <p>
+                내비게이션 도전 과제는 모든 이동 로봇이 지속적으로 답해야 하는 세 가지 기본 질문으로 나눌 수 있습니다: "나는 어디에 있는가?" (위치 추정), "어디로 가는가?" (목표 명세), 그리고 "어떻게 그곳에 도달하는가?" (경로 계획 및 실행). 전통적인 로봇공학은 이러한 질문을 개별적으로 다루었지만, 현대 자율 시스템은 세 가지 영역 모두에서 데이터를 공유하고 의사 결정을 조정하는 통합된 접근 방식을 통해 전체적으로 다룹니다.
+            </p>
+
+            <p>
+                창고 환경에서 내비게이션은 다른 자율 차량 응용 프로그램과 비교하여 고유한 도전 과제에 직면합니다. 환경은 구조화되어 있고 상대적으로 예측 가능하여 문제의 일부 측면을 단순화합니다. 그러나 인간 작업자, 지게차 및 기타 로봇이 공유 공간을 통해 지속적으로 이동하는 동적 환경이기도 합니다. 운영 밀도가 높아 로봇이 종종 좁은 통로를 탐색하고 서로 및 사람과 가까운 거리에서 작업합니다. 충돌은 재고, 장비를 손상시키거나 작업자를 부상시킬 수 있으므로 안전이 가장 중요합니다.
+            </p>
+
+            <p>
+                WIA-ROB-009 표준은 여러 사양을 통해 내비게이션을 다룹니다. 다른 제조업체의 로봇이 공간 정보를 공유할 수 있도록 표준 맵 형식을 정의합니다. 로봇이 움직임을 조정하고 충돌을 피할 수 있도록 통신 프로토콜을 지정합니다. 내비게이션 정확도, 효율성 및 안전을 위한 성능 메트릭을 설정합니다. 이러한 사양을 이해하려면 자율 내비게이션을 가능하게 하는 기본 기술을 파악해야 합니다.
+            </p>
+
+            <h2>2.2 인식을 위한 센서 기술</h2>
+
+            <p>
+                자율 내비게이션은 인식, 즉 로봇이 환경을 감지하는 능력에서 시작됩니다. 현대 물류 로봇은 각각 고유한 기능과 한계를 가진 다양한 센서 제품군을 사용합니다. 로봇 설계의 기술은 "센서 융합"을 통해 이러한 센서를 결합하여 포괄적이고 신뢰할 수 있는 인식 시스템을 만드는 데 있습니다.
+            </p>
+
+            <h3>LiDAR (광 검출 및 거리 측정)</h3>
+            <p>
+                LiDAR는 많은 자율 이동 로봇의 주력 센서가 되었습니다. 이러한 장치는 레이저 펄스를 방출하고 반사가 돌아오는 데 걸리는 시간을 측정하여 주변 환경을 나타내는 정밀한 3D 포인트 클라우드를 생성합니다. 현대 LiDAR 장치는 로봇 주위 360도를 스캔하여 100미터 이상의 범위에서 밀리미터 수준의 정확도로 초당 수백만 포인트를 캡처할 수 있습니다.
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>센서 유형</th>
+                        <th>범위</th>
+                        <th>정확도</th>
+                        <th>주요 장점</th>
+                        <th>주요 한계</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>LiDAR</td>
+                        <td>0.1-100m</td>
+                        <td>±1-5cm</td>
+                        <td>조명 독립적, 직접 거리 측정</td>
+                        <td>높은 비용, 반사 표면 문제</td>
+                    </tr>
+                    <tr>
+                        <td>스테레오 카메라</td>
+                        <td>0.5-30m</td>
+                        <td>±5-20cm</td>
+                        <td>색상 정보, 객체 인식</td>
+                        <td>조명 의존적, 높은 계산</td>
+                    </tr>
+                    <tr>
+                        <td>초음파</td>
+                        <td>0.1-5m</td>
+                        <td>±5-10cm</td>
+                        <td>저렴함, 견고함</td>
+                        <td>짧은 범위, 낮은 해상도</td>
+                    </tr>
+                    <tr>
+                        <td>IMU</td>
+                        <td>N/A</td>
+                        <td>±0.1°</td>
+                        <td>고주파수, 방향 추적</td>
+                        <td>시간 경과에 따른 드리프트</td>
+                    </tr>
+                    <tr>
+                        <td>휠 오도메트리</td>
+                        <td>N/A</td>
+                        <td>±2-5%</td>
+                        <td>연속 추적, 저비용</td>
+                        <td>슬립에 따른 오류 누적</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>
+                LiDAR의 장점은 설득력이 있습니다. 복잡한 이미지 처리가 필요 없는 직접 거리 측정을 제공합니다. 다양한 조명 조건, 심지어 완전한 어둠에서도 작동하여 연중무휴 창고 운영에 이상적입니다. 결과 포인트 클라우드는 처리하기 비교적 쉽고 매핑 및 장애물 회피 알고리즘에 직접 공급할 수 있습니다.
+            </p>
+
+            <h3>카메라 및 컴퓨터 비전</h3>
+            <p>
+                카메라는 객체 인식, 바코드 읽기 및 환경의 의미론적 이해를 가능하게 하는 풍부한 시각 정보를 제공하여 LiDAR를 보완합니다. 스테레오 카메라 쌍은 약간 다른 관점에서 이미지를 비교하여 깊이를 추정할 수 있으며, 이는 인간의 양안 시력이 작동하는 방식과 유사합니다. RGB-D 카메라는 단일 장치에서 시각 및 기하학적 정보를 모두 제공하는 색상 이미징과 깊이 감지를 결합합니다.
+            </p>
+
+            <p>
+                딥러닝의 혁명은 로봇이 카메라 이미지에서 추출할 수 있는 것을 극적으로 향상시켰습니다. 현대 비전 시스템은 객체를 인식하고 분류하고, 모든 각도에서 텍스트와 바코드를 읽고, 패키지 상태를 평가하며, 심지어 쌓인 항목이 안정적인지 예측할 수 있습니다. 경로 재계획이 필요한 정적 장애물과 (통로를 건너는 사람과 같은) 기다릴 수 있는 임시 장애물을 구별할 수 있습니다.
+            </p>
+
+            <h3>센서 융합</h3>
+            <p>
+                진정한 힘은 여러 센서의 데이터를 융합하는 데서 나옵니다. LiDAR는 기하학적 구조를 제공하고, 카메라는 의미론적 이해를 추가하며, IMU와 오도메트리는 움직임을 추적하고, 초음파는 근처 장애물을 포착합니다. Extended Kalman Filter 또는 파티클 필터와 같은 고급 알고리즘은 이러한 다양한 데이터 소스를 결합하여 현재 조건에서 각각의 신뢰성에 따라 가중치를 부여하고 로봇의 위치와 환경에 대한 통합된 추정치를 생성합니다.
+            </p>
+
+            <pre><code>// 센서 융합 데이터 구조 예시
+{
+  "timestamp": "2025-01-15T14:23:45.123Z",
+  "sensors": {
+    "lidar": {
+      "pointCloud": "base64_encoded_data",
+      "range": 100.0,
+      "confidence": 0.95
+    },
+    "camera": {
+      "obstacles": [
+        {"type": "person", "distance": 3.2, "angle": 45},
+        {"type": "pallet", "distance": 5.7, "angle": -30}
+      ],
+      "barcodes": ["12345", "67890"]
+    },
+    "imu": {
+      "orientation": {"roll": 0.1, "pitch": -0.2, "yaw": 90.5},
+      "acceleration": {"x": 0.02, "y": 0.01, "z": 9.81}
+    },
+    "odometry": {
+      "distanceTraveled": 125.4,
+      "velocity": 1.2,
+      "confidence": 0.88
+    }
+  },
+  "fusedPosition": {
+    "x": 12.5,
+    "y": 8.3,
+    "theta": 90.5,
+    "confidence": 0.92
+  }
+}</code></pre>
+
+            <h2>2.3 SLAM: 동시적 위치 추정 및 매핑</h2>
+
+            <p>
+                SLAM은 이동 로봇공학의 근본적인 도전 과제 중 하나를 나타냅니다: 로봇이 알려지지 않은 환경의 맵을 구축하는 동시에 그 맵을 사용하여 자신의 위치를 결정하는 방법은 무엇입니까? 이것은 닭과 달걀 문제입니다. 위치를 추정하려면 맵이 필요하지만 정확한 맵을 구축하려면 자신의 위치를 알아야 합니다.
+            </p>
+
+            <h3>2D 그리드 기반 SLAM</h3>
+            <p>
+                실내 이동 로봇을 위한 가장 일반적인 SLAM 접근 방식은 환경을 2D 그리드로 나누며, 각 셀은 작은 영역(일반적으로 5-10cm 정사각형)을 나타냅니다. 각 셀에 대해 알고리즘은 셀이 장애물로 점유될 확률을 유지합니다. 로봇이 이동하고 센서 데이터를 수집함에 따라 이러한 확률을 업데이트합니다. 센서가 장애물을 감지하면 셀이 점유되었다는 확신을 높이고, 센서가 아무것도 감지하지 않고 통과하면 셀이 비어 있다는 확신을 높입니다.
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>SLAM 알고리즘</th>
+                        <th>유형</th>
+                        <th>메모리 요구사항</th>
+                        <th>계산 복잡도</th>
+                        <th>최적 응용</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>GMapping</td>
+                        <td>그리드 기반</td>
+                        <td>중간</td>
+                        <td>O(n log n)</td>
+                        <td>실내 환경, 2D 매핑</td>
+                    </tr>
+                    <tr>
+                        <td>Cartographer</td>
+                        <td>그래프 기반</td>
+                        <td>높음</td>
+                        <td>O(n²)</td>
+                        <td>대규모 환경, 루프 폐쇄</td>
+                    </tr>
+                    <tr>
+                        <td>ORB-SLAM</td>
+                        <td>특징 기반</td>
+                        <td>낮음</td>
+                        <td>O(n)</td>
+                        <td>시각 SLAM, 모바일</td>
+                    </tr>
+                    <tr>
+                        <td>Hector SLAM</td>
+                        <td>스캔 매칭</td>
+                        <td>낮음</td>
+                        <td>O(n)</td>
+                        <td>빠른 스캔, 고주파수</td>
+                    </tr>
+                    <tr>
+                        <td>RTABMap</td>
+                        <td>RGB-D</td>
+                        <td>높음</td>
+                        <td>O(n log n)</td>
+                        <td>3D 매핑, 다중 센서</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>
+                동시에 알고리즘은 이 진화하는 맵 내에서 로봇의 위치를 추적합니다. 현재 센서 판독값을 개발 중인 맵과 일치시킴으로써 로봇은 그러한 판독값을 생성하기 위해 어디에 위치해야 하는지 추정할 수 있습니다. 이 위치 추정치는 휠 오도메트리 및 IMU의 움직임 정보와 결합되어 로봇이 각 움직임 후 어디에 있을지 예측한 다음 센서 판독값이 맵 기대치와 얼마나 잘 일치하는지에 따라 그 예측을 수정할 수 있습니다.
+            </p>
+
+            <h3>WIA-ROB-009 맵 사양</h3>
+            <p>
+                WIA-ROB-009 표준은 다양한 사용 사례를 지원하기 위해 여러 맵 형식을 정의합니다. 주요 표준 형식은 해상도, 원점 및 좌표계 정의를 포함한 메타데이터가 있는 점유 그리드 맵입니다. 이를 통해 다른 제조업체의 로봇이 맵을 공유하고 맵 변환이 필요 없이 동일한 환경에서 작동할 수 있습니다.
+            </p>
+
+            <pre><code>{
+  "mapFormat": "WIA-ROB-009-GridMap-v1.0",
+  "resolution": 0.05,
+  "width": 2000,
+  "height": 1500,
+  "origin": {"x": -50.0, "y": -37.5, "theta": 0.0},
+  "coordinateSystem": "WIA-Standard-Warehouse",
+  "semanticLayers": {
+    "preferredLanes": [
+      {"id": "lane-01", "path": [[0,0], [10,0], [10,20]]},
+      {"id": "lane-02", "path": [[0,5], [10,5], [10,25]]}
+    ],
+    "speedZones": [
+      {"zone": "high-traffic", "maxSpeed": 0.8, "area": [[0,0], [20,20]]},
+      {"zone": "near-people", "maxSpeed": 0.5, "area": [[20,0], [40,20]]}
+    ],
+    "chargingStations": [
+      {"id": "charger-01", "position": {"x": 5, "y": 5}, "type": "fast"},
+      {"id": "charger-02", "position": {"x": 15, "y": 15}, "type": "standard"}
+    ]
+  },
+  "updateTimestamp": "2025-01-15T14:23:00Z"
+}</code></pre>
+
+            <h2>2.4 경로 계획 알고리즘</h2>
+
+            <p>
+                로봇이 자신의 위치를 알고 환경의 맵을 가지고 있으면 목적지에 도달하는 방법을 계획해야 합니다. 경로 계획 알고리즘은 가능한 경로를 검색하여 다양한 기준에 따라 최적 또는 거의 최적의 경로를 찾습니다. 일반적으로 장애물을 피하고 운영 제약을 존중하면서 거리, 시간 또는 에너지 소비를 최소화합니다.
+            </p>
+
+            <h3>A* (A-Star) 알고리즘</h3>
+            <p>
+                A*는 아마도 로봇공학에서 가장 널리 사용되는 경로 계획 알고리즘일 것입니다. 남은 거리의 휴리스틱 추정치를 사용하여 검색을 목표로 안내함으로써 가능한 경로의 공간을 효율적으로 검색합니다. A*는 허용 가능한 휴리스틱을 사용할 때 완전하고(경로가 존재하면 찾는 것이 보장됨) 최적(최단 경로를 찾음)입니다.
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>알고리즘</th>
+                        <th>시간 복잡도</th>
+                        <th>최적성</th>
+                        <th>장점</th>
+                        <th>단점</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>A*</td>
+                        <td>O(b^d)</td>
+                        <td>최적</td>
+                        <td>빠름, 보장된 최적 경로</td>
+                        <td>휴리스틱 필요, 메모리 집약적</td>
+                    </tr>
+                    <tr>
+                        <td>Dijkstra</td>
+                        <td>O(V²)</td>
+                        <td>최적</td>
+                        <td>다중 목표, 보장된 최적</td>
+                        <td>느림, 모든 방향 탐색</td>
+                    </tr>
+                    <tr>
+                        <td>RRT</td>
+                        <td>O(n log n)</td>
+                        <td>근사</td>
+                        <td>빠름, 고차원 공간</td>
+                        <td>최적 아님, 무작위</td>
+                    </tr>
+                    <tr>
+                        <td>DWA</td>
+                        <td>O(n)</td>
+                        <td>지역 최적</td>
+                        <td>실시간, 장애물 회피</td>
+                        <td>지역적, 전역 최적 아님</td>
+                    </tr>
+                    <tr>
+                        <td>D* Lite</td>
+                        <td>O(V log V)</td>
+                        <td>최적</td>
+                        <td>동적 재계획, 효율적</td>
+                        <td>복잡한 구현</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Dynamic Window Approach</h3>
+            <p>
+                A*와 같은 전역 계획자가 시작부터 목표까지의 완전한 경로를 찾는 반면, 지역 계획자는 즉각적인 장애물 회피와 부드러운 제어를 처리합니다. Dynamic Window Approach는 짧은 시간 지평선에 걸쳐 가능한 속도 명령을 샘플링하고, 그 효과를 시뮬레이션하며, 목표를 향한 진전, 장애물 회피 및 부드러운 움직임의 균형을 가장 잘 맞추는 명령을 선택합니다.
+            </p>
+
+            <p>
+                이 지역 계획은 로봇이 완전한 전역 재계획을 요구하지 않고 예상치 못한 장애물(경로에 들어오는 사람과 같은)에 빠르게 반응할 수 있게 합니다. 전역 계획자는 전체 경로를 제공하고 지역 계획자는 초 단위 실행과 실시간 장애물 회피를 처리합니다.
+            </p>
+
+            <h2>2.5 다중 로봇 내비게이션 및 교통 관리</h2>
+
+            <p>
+                단일 로봇 내비게이션도 충분히 도전적이지만, 창고 응용 프로그램은 일반적으로 수십 또는 수백 개의 로봇이 공유 공간에서 동시에 작동하는 것을 포함합니다. 이는 새로운 도전 과제를 만듭니다: 로봇이 어떻게 충돌을 피하기 위해 조정합니까? 출입구나 엘리베이터 접근과 같은 병목 현상을 어떻게 처리합니까? 시스템이 로봇이 서로를 무한정 차단하는 교착 상태를 어떻게 방지할 수 있습니까?
+            </p>
+
+            <h3>우선순위 기반 조정</h3>
+            <p>
+                가장 간단한 조정 접근 방식은 로봇에 우선순위를 할당합니다. 우선순위가 높은 로봇이 먼저 계획하고 경로를 요청하는 반면, 우선순위가 낮은 로봇은 그 주위를 계획합니다. 이것은 작은 플릿에는 잘 작동하지만 더 큰 시스템에서는 비효율성과 잠재적인 기아(우선순위가 낮은 로봇이 무한정 대기)를 초래할 수 있습니다.
+            </p>
+
+            <h3>예약 기반 시스템</h3>
+            <p>
+                더 정교한 접근 방식은 공간과 시간을 예약할 리소스로 취급합니다. 로봇이 경로를 계획할 때 특정 시간에 점유할 셀을 예약합니다. 이후에 계획하는 다른 로봇은 예약된 공간-시간 영역을 피해야 합니다. 이것은 유연한 조정을 허용하면서 충돌을 방지합니다.
+            </p>
+
+            <div class="philosophy">
+                <h3 style="color: #ffd700; font-size: 1.8em; margin-bottom: 15px;">弘益人間 (홍익인간)</h3>
+                <p style="font-size: 1.1em; line-height: 1.8; color: var(--text);">
+                    로봇 내비게이션 기술은 단순히 기계가 움직이는 것이 아닙니다. 이는 인간 작업자의 부담을 줄이고, 더 안전한 작업 환경을 만들며, 효율성을 높여 궁극적으로 모든 사람에게 이익이 되는 시스템을 만드는 것입니다. WIA-ROB-009 표준은 이러한 기술이 보편적으로 접근 가능하고 상호 운용 가능하도록 보장하여 모든 규모의 조직이 자동화의 혜택을 누릴 수 있도록 합니다. 이것이 바로 "널리 인간을 이롭게 하라"는 철학의 실천입니다.
+                </p>
+            </div>
+
+            <h2>2.6 실용적 고려사항 및 모범 사례</h2>
+
+            <p>
+                성공적인 내비게이션 시스템은 정교한 알고리즘 이상을 요구합니다. 실제 배포는 안정적으로 작동하는 시스템과 운영자를 좌절시키는 시스템의 차이를 만들 수 있는 수많은 실용적인 세부 사항에 주의를 기울여야 합니다.
+            </p>
+
+            <p>
+                맵 유지보수가 중요합니다. 창고 레이아웃은 변경됩니다. 랙이 재구성되고, 적재 도크가 추가되며, 보관 패턴이 변경됩니다. 시스템은 자동 변경 감지, 주기적인 재매핑 또는 수동 맵 편집을 위한 운영자 도구를 통해 맵을 업데이트하는 프로세스가 필요합니다. WIA-ROB-009 표준에는 라이브 환경에서 안전한 맵 변경을 가능하게 하는 맵 버전 관리 및 제어된 업데이트에 대한 사양이 포함되어 있습니다.
+            </p>
+
+            <p>
+                위치 추정 복구는 로봇이 자신의 위치에 대해 혼란스러워질 때 발생하는 일을 다룹니다. 아마도 지게차에 의해 들어 올려지거나 GPS를 사용할 수 없는 영역에서 작동한 후일 것입니다. 견고한 시스템은 전체 맵 공간을 검색하는 전역 위치 추정 알고리즘을 통해 위치 추정을 복구하거나 특징적인 특징이 신뢰할 수 있는 자세 추정을 가능하게 하는 지정된 "위치 추정 복구 영역"을 통해 복구할 수 있습니다.
+            </p>
+
+            <div class="callout">
+                <h3>🎯 다음 장 미리보기</h3>
+                <p>
+                    3장에서는 이러한 내비게이션 기능이 수십 또는 수백 개의 로봇을 공통 운영 목표를 향해 함께 작동하도록 조정하는 포괄적인 플릿 관리 시스템에 어떻게 통합되는지 탐구할 것입니다. 작업 할당 알고리즘, 교통 제어, 배터리 관리, 그리고 대규모 로봇 플릿을 효율적으로 운영하는 데 필요한 모든 측면을 배우게 됩니다.
+                </p>
+            </div>
+
+            <h2>핵심 요약</h2>
+            <div class="highlight">
+                <h3>📌 5가지 핵심 요점</h3>
+                <ol>
+                    <li><strong>센서 융합이 핵심:</strong> LiDAR, 카메라, IMU, 오도메트리를 결합하여 신뢰할 수 있는 인식 시스템을 만드는 것이 자율 내비게이션의 기초입니다.</li>
+                    <li><strong>SLAM의 중요성:</strong> 동시적 위치 추정 및 매핑은 로봇이 알려지지 않은 환경을 탐색하고 맵을 구축할 수 있게 하는 핵심 기술입니다.</li>
+                    <li><strong>경로 계획 계층:</strong> 전역 계획자(A*)와 지역 계획자(DWA)의 조합이 효율적이고 안전한 내비게이션을 가능하게 합니다.</li>
+                    <li><strong>다중 로봇 조정:</strong> 예약 기반 시스템과 우선순위 관리를 통해 여러 로봇이 충돌 없이 공유 공간에서 작동할 수 있습니다.</li>
+                    <li><strong>표준화의 가치:</strong> WIA-ROB-009는 다른 제조업체의 로봇이 맵과 조정 정보를 공유할 수 있게 하여 진정한 상호 운용성을 가능하게 합니다.</li>
+                    <li><strong>실용적 구현:</strong> 맵 유지보수, 위치 추정 복구, 안전 시스템은 이론적 알고리즘만큼이나 중요합니다.</li>
+                </ol>
+            </div>
+
+            <h2>복습 질문</h2>
+            <div class="highlight">
+                <h3>💭 이해도 점검</h3>
+                <ol>
+                    <li>LiDAR와 카메라의 주요 차이점은 무엇이며, 왜 둘 다 사용하는 것이 유리한가요?</li>
+                    <li>SLAM의 "닭과 달걀" 문제를 설명하고, 확률적 접근 방식이 어떻게 이를 해결하는지 설명하세요.</li>
+                    <li>그리드 기반 SLAM과 특징 기반 SLAM의 차이점은 무엇인가요?</li>
+                    <li>A* 알고리즘이 Dijkstra 알고리즘보다 더 효율적인 이유는 무엇인가요?</li>
+                    <li>전역 경로 계획자와 지역 경로 계획자가 왜 둘 다 필요한가요?</li>
+                    <li>다중 로봇 환경에서 교착 상태를 방지하는 방법은 무엇인가요?</li>
+                    <li>WIA-ROB-009 맵 형식이 상호 운용성에 어떻게 기여하나요?</li>
+                    <li>센서 융합에서 Extended Kalman Filter의 역할은 무엇인가요?</li>
+                </ol>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

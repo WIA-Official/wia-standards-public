@@ -1,162 +1,746 @@
-# Autoimmune — Phase 2: API Interface Specification
+# WIA-AUTOIMMUNE Phase 2: API Interface Specification
 
 > **Version:** 1.0.0
 > **Status:** Official
-> **Last Updated:** 2025-01-01
+> **Last Updated:** 2026-01-04
 > **Philosophy:** 弘益人間 (Benefit All Humanity)
 
 ---
 
 ## 1. Overview
 
-Phase 2 defines RESTful API endpoints for interacting with Autoimmune services. This specification enables standardized programmatic access to immunological data across clinical research systems.
+The WIA-AUTOIMMUNE API provides RESTful endpoints for autoimmune disease assessment, Treg-Microbiome axis analysis, and personalized treatment recommendations.
 
 ### 1.1 Base URL
 
 ```
-Production: https://api.autoimmune.wia.org/v1
-Sandbox:    https://sandbox.autoimmune.wia.org/v1
+Production: https://api.wia.live/autoimmune/v1
+Staging:    https://api-staging.wia.live/autoimmune/v1
+```
+
+### 1.2 Authentication
+
+```http
+Authorization: Bearer <api_key>
+X-WIA-Client-ID: <client_id>
 ```
 
 ---
 
-## 2. Authentication
+## 2. OpenAPI Specification
 
-### 2.1 OAuth 2.0
+```yaml
+openapi: 3.1.0
+info:
+  title: WIA-AUTOIMMUNE API
+  version: 1.0.0
+  description: |
+    API for autoimmune disease assessment with Treg-Microbiome Axis integration.
+    弘益人間 (홍익인간) - Benefit All Humanity
+  contact:
+    name: WIA Standards Team
+    url: https://wia.live/autoimmune
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
 
-| Grant Type | Use Case |
-|------------|----------|
-| Authorization Code | Web applications |
-| Client Credentials | Server-to-server |
-| Device Code | IoT and embedded devices |
+servers:
+  - url: https://api.wia.live/autoimmune/v1
+    description: Production
+  - url: https://api-staging.wia.live/autoimmune/v1
+    description: Staging
 
-### 2.2 API Keys
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
 
-For sandbox access, API keys may be used via the `X-WIA-API-Key` header.
+paths:
+  /assess:
+    post:
+      operationId: createAssessment
+      summary: Create comprehensive autoimmune assessment
+      description: |
+        Performs full autoimmune profile assessment including:
+        - Treg functional analysis
+        - Microbiome evaluation
+        - Disease activity scoring
+        - Treatment recommendations
+      tags:
+        - Assessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentRequest'
+      responses:
+        '201':
+          description: Assessment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
----
+  /profiles/{patient_id}:
+    get:
+      operationId: getPatientProfile
+      summary: Get patient autoimmune profile
+      tags:
+        - Profiles
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: include
+          in: query
+          description: Include related data
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [treg, microbiome, history, treatments]
+      responses:
+        '200':
+          description: Patient profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoimmuneProfile'
 
-## 3. Endpoints
+  /treg-status/{patient_id}:
+    get:
+      operationId: getTregStatus
+      summary: Get Treg functional status
+      description: |
+        Retrieves detailed regulatory T cell assessment including:
+        - Cell counts and phenotype
+        - FOXP3 expression stability
+        - Suppressive function assay results
+        - GRAIL E3 ligase activity
+      tags:
+        - Treg Analysis
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Treg status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TregStatusResponse'
 
-### 3.1 Resource Management
+  /microbiome/{patient_id}:
+    get:
+      operationId: getMicrobiomeAnalysis
+      summary: Get gut microbiome analysis
+      description: |
+        Retrieves microbiome analysis with focus on:
+        - SCFA-producing bacteria abundance
+        - Dysbiosis scoring
+        - Leaky gut markers
+        - Treg-modulating species
+      tags:
+        - Microbiome
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: include_taxa
+          in: query
+          schema:
+            type: boolean
+            default: true
+        - name: scfa_focus
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Microbiome analysis retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MicrobiomeResponse'
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /resources | List resources with pagination |
-| POST | /resources | Create new resource |
-| GET | /resources/{id} | Retrieve specific resource |
-| PUT | /resources/{id} | Update resource |
-| DELETE | /resources/{id} | Remove resource |
+    post:
+      operationId: submitMicrobiomeSample
+      summary: Submit new microbiome sample
+      tags:
+        - Microbiome
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MicrobiomeSampleRequest'
+      responses:
+        '202':
+          description: Sample accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SampleSubmissionResponse'
 
-### 3.2 Data Operations
+  /treatment/recommend:
+    post:
+      operationId: getRecommendations
+      summary: Get personalized treatment recommendations
+      description: |
+        Generates evidence-based treatment recommendations based on:
+        - Current disease activity
+        - Treg functional status
+        - Microbiome composition
+        - Treatment history
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | /data/ingest | Submit immunological data |
-| GET | /data/query | Query with filters |
-| POST | /data/export | Export data in specified format |
-| GET | /data/stream | Server-Sent Events stream |
+        Recommendations may include:
+        - Low-dose IL-2 therapy
+        - FMT (Fecal Microbiota Transplantation)
+        - Dietary interventions (prebiotics, specific fiber)
+        - CAR-Treg therapy eligibility
+      tags:
+        - Treatment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TreatmentRecommendationRequest'
+      responses:
+        '200':
+          description: Recommendations generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TreatmentRecommendations'
 
-### 3.3 Analytics
+  /disease-activity/{patient_id}:
+    get:
+      operationId: getDiseaseActivity
+      summary: Get disease activity scores
+      tags:
+        - Disease Activity
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: disease_type
+          in: query
+          schema:
+            type: string
+            enum: [RA, SLE, MS, T1D, IBD, PSO, HT, GD]
+      responses:
+        '200':
+          description: Disease activity retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiseaseActivityResponse'
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /analytics/summary | Aggregated summary |
-| GET | /analytics/trends | Trend analysis |
-| POST | /analytics/report | Generate custom report |
+    post:
+      operationId: recordDiseaseActivity
+      summary: Record new disease activity measurement
+      tags:
+        - Disease Activity
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiseaseActivityRecord'
+      responses:
+        '201':
+          description: Activity recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiseaseActivityResponse'
 
----
+  /flare/predict:
+    post:
+      operationId: predictFlare
+      summary: Predict flare risk
+      description: |
+        Uses Treg-Microbiome axis data to predict flare probability
+      tags:
+        - Prediction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlarePredictionRequest'
+      responses:
+        '200':
+          description: Flare prediction generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlarePrediction'
 
-## 4. Request/Response Format
+  /remission/assess:
+    post:
+      operationId: assessRemission
+      summary: Assess remission probability
+      description: |
+        Evaluates likelihood of achieving/maintaining remission
+        based on Treg function and microbiome status
+      tags:
+        - Prediction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemissionAssessmentRequest'
+      responses:
+        '200':
+          description: Remission assessment completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemissionAssessment'
 
-### 4.1 Standard Response Envelope
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-WIA-API-Key
 
-```json
-{
-  "status": "success",
-  "data": {},
-  "meta": {
-    "page": 1,
-    "per_page": 20,
-    "total": 100,
-    "timestamp": "2025-01-15T10:30:00Z"
-  }
-}
+  schemas:
+    AssessmentRequest:
+      type: object
+      required:
+        - patient_id
+        - disease_type
+      properties:
+        patient_id:
+          type: string
+          format: uuid
+        disease_type:
+          type: string
+          enum: [RA, SLE, MS, T1D, IBD, PSO, HT, GD]
+        immune_panel:
+          type: object
+          properties:
+            treg_count:
+              type: number
+            foxp3_expression:
+              type: number
+            suppressive_function:
+              type: number
+            th17_count:
+              type: number
+            autoantibodies:
+              type: array
+              items:
+                type: object
+            cytokines:
+              type: object
+        microbiome_sample_id:
+          type: string
+          description: Reference to existing microbiome sample
+        clinical_observations:
+          type: object
+
+    AssessmentResponse:
+      type: object
+      properties:
+        assessment_id:
+          type: string
+          format: uuid
+        patient_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        profile:
+          $ref: '#/components/schemas/AutoimmuneProfile'
+        recommendations:
+          $ref: '#/components/schemas/TreatmentRecommendations'
+        risk_scores:
+          type: object
+          properties:
+            flare_risk:
+              type: number
+            progression_risk:
+              type: number
+            remission_likelihood:
+              type: number
+
+    TregStatusResponse:
+      type: object
+      properties:
+        patient_id:
+          type: string
+        assessment_date:
+          type: string
+          format: date-time
+        treg:
+          type: object
+          properties:
+            count:
+              type: object
+              properties:
+                value:
+                  type: number
+                unit:
+                  type: string
+                status:
+                  type: string
+                  enum: [low, normal, high]
+            foxp3_expression:
+              type: number
+            suppressive_function:
+              type: number
+            grail_activity:
+              type: number
+            stability_score:
+              type: number
+        th17_treg_ratio:
+          type: number
+        functional_status:
+          type: string
+          enum: [normal, mildly_impaired, moderately_impaired, severely_impaired]
+        clinical_interpretation:
+          type: string
+
+    MicrobiomeResponse:
+      type: object
+      properties:
+        patient_id:
+          type: string
+        sample_date:
+          type: string
+          format: date-time
+        diversity:
+          type: object
+          properties:
+            shannon:
+              type: number
+            simpson:
+              type: number
+            status:
+              type: string
+        scfa_production:
+          type: object
+          properties:
+            butyrate:
+              type: object
+            propionate:
+              type: object
+            acetate:
+              type: object
+            overall_status:
+              type: string
+        dysbiosis:
+          type: object
+          properties:
+            score:
+              type: number
+            severity:
+              type: string
+            key_findings:
+              type: array
+              items:
+                type: string
+        leaky_gut:
+          type: object
+          properties:
+            zonulin:
+              type: number
+            lps:
+              type: number
+            status:
+              type: string
+        treg_modulators:
+          type: object
+          description: Bacteria known to influence Treg function
+
+    TreatmentRecommendations:
+      type: object
+      properties:
+        primary_recommendations:
+          type: array
+          items:
+            type: object
+            properties:
+              treatment_type:
+                type: string
+                enum: [low_dose_il2, fmt, car_treg, dietary, immunosuppressant, biologic]
+              name:
+                type: string
+              rationale:
+                type: string
+              evidence_level:
+                type: string
+                enum: [A, B, C, D]
+              priority:
+                type: integer
+        dietary_interventions:
+          type: array
+          items:
+            type: object
+            properties:
+              intervention:
+                type: string
+              target:
+                type: string
+              expected_benefit:
+                type: string
+        monitoring_plan:
+          type: object
+          properties:
+            frequency:
+              type: string
+            markers_to_track:
+              type: array
+              items:
+                type: string
+
+    FlarePrediction:
+      type: object
+      properties:
+        patient_id:
+          type: string
+        prediction_date:
+          type: string
+          format: date-time
+        flare_probability:
+          type: number
+          description: 0-100 probability of flare in next 30 days
+        risk_level:
+          type: string
+          enum: [low, moderate, high, very_high]
+        contributing_factors:
+          type: array
+          items:
+            type: object
+            properties:
+              factor:
+                type: string
+              contribution:
+                type: number
+              trend:
+                type: string
+        preventive_actions:
+          type: array
+          items:
+            type: string
+
+    AutoimmuneProfile:
+      $ref: 'PHASE-1-DATA-FORMAT.md#/3.1'
+
+    DiseaseActivityResponse:
+      type: object
+      properties:
+        patient_id:
+          type: string
+        disease_type:
+          type: string
+        current_activity:
+          type: object
+        history:
+          type: array
+          items:
+            type: object
+
+    RemissionAssessment:
+      type: object
+      properties:
+        remission_probability:
+          type: number
+        current_status:
+          type: string
+        factors_supporting:
+          type: array
+          items:
+            type: string
+        factors_against:
+          type: array
+          items:
+            type: string
+        time_to_remission_estimate:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              details:
+                type: array
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
 ```
 
-### 4.2 Pagination
-
-Use cursor-based pagination for large datasets:
-- `?cursor=<token>&limit=20`
-
 ---
 
-## 5. Error Handling
+## 3. Example API Calls
 
-### 5.1 Error Response Format
+### 3.1 Create Assessment
 
-```json
-{
-  "status": "error",
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid input parameters",
-    "details": [
-      {"field": "timestamp", "issue": "Format must be ISO 8601"}
-    ]
-  }
-}
+```bash
+curl -X POST https://api.wia.live/autoimmune/v1/assess \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "patient_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "disease_type": "RA",
+    "immune_panel": {
+      "treg_count": 45.2,
+      "foxp3_expression": 68.5,
+      "suppressive_function": 42.0,
+      "th17_count": 145.0,
+      "autoantibodies": [
+        {"name": "RF", "value": 85.0, "positive": true},
+        {"name": "Anti-CCP", "value": 320.0, "positive": true}
+      ],
+      "cytokines": {
+        "il6": 28.5,
+        "il17": 45.2,
+        "tnf_alpha": 32.1
+      }
+    },
+    "microbiome_sample_id": "sample_xyz123"
+  }'
 ```
 
-### 5.2 Error Codes
+### 3.2 Get Treg Status
 
-| HTTP Status | Code | Description |
-|-------------|------|-------------|
-| 400 | VALIDATION_ERROR | Invalid request parameters |
-| 401 | UNAUTHORIZED | Missing or invalid credentials |
-| 403 | FORBIDDEN | Insufficient permissions |
-| 404 | NOT_FOUND | Resource not found |
-| 409 | CONFLICT | Resource conflict |
-| 429 | RATE_LIMITED | Too many requests |
-| 500 | INTERNAL_ERROR | Server error |
+```bash
+curl -X GET "https://api.wia.live/autoimmune/v1/treg-status/a1b2c3d4-e5f6-7890-abcd-ef1234567890" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+### 3.3 Get Treatment Recommendations
+
+```bash
+curl -X POST https://api.wia.live/autoimmune/v1/treatment/recommend \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "patient_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "current_profile_id": "profile_abc123",
+    "treatment_history": [],
+    "preferences": {
+      "avoid_immunosuppressants": false,
+      "open_to_experimental": true
+    }
+  }'
+```
 
 ---
 
-## 6. Rate Limiting
+## 4. Webhooks
 
-| Tier | Requests/min | Burst |
-|------|-------------|-------|
-| Free | 60 | 10 |
-| Standard | 600 | 100 |
-| Enterprise | 6000 | 1000 |
-
-Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
-
----
-
-## 7. Webhooks
-
-### 7.1 Event Types
+### 4.1 Available Events
 
 | Event | Description |
 |-------|-------------|
-| `resource.created` | New resource created |
-| `resource.updated` | Resource modified |
-| `data.processed` | Data processing complete |
-| `alert.triggered` | Alert condition met |
+| `assessment.completed` | New assessment completed |
+| `flare.predicted` | High flare risk detected |
+| `remission.achieved` | Patient achieved remission |
+| `microbiome.analyzed` | Microbiome sample processed |
+| `treg.critical` | Critical Treg dysfunction detected |
 
-### 7.2 Webhook Payload
+### 4.2 Webhook Payload
 
 ```json
 {
-  "event": "resource.created",
-  "timestamp": "2025-01-15T10:30:00Z",
-  "data": {},
-  "signature": "sha256=..."
+  "event": "flare.predicted",
+  "timestamp": "2026-01-04T10:30:00Z",
+  "data": {
+    "patient_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "flare_probability": 78.5,
+    "risk_level": "high",
+    "recommended_actions": ["increase_monitoring", "consider_intervention"]
+  }
 }
 ```
 
 ---
 
-**© 2025 SmileStory Inc. / WIA - World Certification Industry Association**
-**弘益人間 · Benefit All Humanity**
+## 5. Rate Limits
+
+| Plan | Requests/min | Assessments/day |
+|------|--------------|-----------------|
+| Free | 10 | 50 |
+| Professional | 100 | 500 |
+| Enterprise | 1000 | Unlimited |
+
+---
+
+## 6. Error Codes
+
+| Code | Description |
+|------|-------------|
+| AI-001 | Invalid patient ID |
+| AI-002 | Invalid disease type |
+| AI-003 | Incomplete immune panel |
+| AI-004 | Microbiome sample not found |
+| AI-005 | Assessment conflict |
+
+---
+
+© 2026 WIA (World Certification Industry Association)
+弘益人間 (홍익인간) · Benefit All Humanity

@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-HOME Simulator - P2P Personal Web Server</title>
+    <link rel="icon" href="/favicon.ico">
+    <style>
+        :root {
+            --primary: #0EA5E9;
+            --primary-dark: #0284C7;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-darker: #0d1321;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --gold: #ffd700;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background: rgba(15, 23, 42, 0.95);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .nav-brand { font-size: 1.4rem; font-weight: bold; color: var(--primary); text-decoration: none; }
+        .nav-brand:hover { color: var(--gold); }
+        .breadcrumb { color: var(--text-muted); font-size: 0.9rem; }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .lang-toggle { display: flex; gap: 5px; }
+        .lang-btn { padding: 5px 12px; border-radius: 5px; cursor: pointer; background: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border); font-size: 0.85rem; }
+        .lang-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        
+        .hero {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(180deg, rgba(14, 165, 233, 0.1) 0%, transparent 100%);
+        }
+        .hero-emoji { font-size: 60px; animation: pulse 2s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        .hero h1 { font-size: 2rem; margin: 15px 0 5px; }
+        .hero-sub { color: var(--text-muted); margin-bottom: 5px; }
+        .hongik { color: var(--gold); font-size: 1rem; }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        .tabs { display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; background: var(--bg-card); padding: 10px; border-radius: 10px; }
+        .tab { padding: 12px 20px; border-radius: 8px; cursor: pointer; background: transparent; color: var(--text-muted); border: none; font-size: 0.95rem; transition: all 0.3s; }
+        .tab:hover { background: var(--border); color: var(--text); }
+        .tab.active { background: var(--primary); color: white; }
+        
+        .panel { display: none; }
+        .panel.active { display: block; }
+        
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        .card h3 { color: var(--primary); margin-bottom: 15px; }
+        .card h4 { color: var(--text); margin: 20px 0 10px; }
+        
+        pre {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            color: #e2e8f0;
+        }
+        
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .control-item {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        .control-label { color: var(--text-muted); font-size: 0.85rem; }
+        .control-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); margin-top: 5px; }
+        .control-value.running { color: var(--secondary); }
+        .control-value.stopped { color: var(--danger); }
+        
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            margin: 5px;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-success { background: var(--secondary); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+        .btn-outline:hover { background: var(--primary); color: white; }
+        
+        .log-box {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+        .log-line { margin: 3px 0; }
+        .log-info { color: var(--primary); }
+        .log-success { color: var(--secondary); }
+        .log-warning { color: var(--warning); }
+        .log-error { color: var(--danger); }
+        
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .template-item {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .template-item:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .template-item.selected { border-color: var(--secondary); background: rgba(16, 185, 129, 0.1); }
+        .template-emoji { font-size: 32px; margin-bottom: 10px; }
+        .template-name { font-weight: bold; font-size: 0.9rem; }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-darker);
+            color: var(--text);
+            font-size: 1rem;
+            margin: 5px 0 15px;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        label { color: var(--text-muted); font-size: 0.9rem; }
+        
+        .json-output {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            max-height: 300px;
+            overflow: auto;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            border-top: 1px solid var(--border);
+            margin-top: 40px;
+        }
+        .footer-hongik { color: var(--gold); font-size: 1.2rem; margin-bottom: 10px; }
+        .footer a { color: var(--primary); text-decoration: none; }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="/" class="nav-brand">🤟 WIA</a>
+        <span class="breadcrumb">
+            <a href="/">Home</a> › <a href="/home/">WIA Home</a> › <span>Simulator</span>
+        </span>
+        <div class="lang-toggle">
+            <button class="lang-btn active" onclick="setLang('en')">EN</button>
+            <button class="lang-btn" onclick="setLang('ko')">KO</button>
+        </div>
+    </nav>
+    
+    <section class="hero">
+        <div class="hero-emoji">🏠</div>
+        <h1 data-en="WIA-HOME Simulator" data-ko="WIA-HOME 시뮬레이터">WIA-HOME Simulator</h1>
+        <p class="hero-sub" data-en="P2P Personal Web Server - Build Your Digital Home" data-ko="P2P 개인 웹 서버 - 나만의 디지털 홈 만들기">P2P Personal Web Server - Build Your Digital Home</p>
+        <p class="hongik">弘益人間 · Benefit All Humanity</p>
+    </section>
+    
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📊 Overview" data-ko="📊 개요">📊 Overview</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🖥️ Server Control" data-ko="🖥️ 서버 제어">🖥️ Server Control</div>
+            <div class="tab" onclick="showPanel(2)" data-en="📦 Templates" data-ko="📦 템플릿">📦 Templates</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🔗 P2P Network" data-ko="🔗 P2P 네트워크">🔗 P2P Network</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📡 API & JSON" data-ko="📡 API & JSON">📡 API & JSON</div>
+        </div>
+        
+        <!-- Panel 0: Overview -->
+        <div class="panel active" id="panel-0">
+            <div class="card">
+                <h3 data-en="🎯 The Problem" data-ko="🎯 문제점">🎯 The Problem</h3>
+                <pre>
+Traditional Web Hosting Costs:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💸 Domain:     $10-50/year
+💸 Hosting:    $5-100/month
+💸 SSL:        $0-200/year
+💸 Development: ???
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Total: Tens of thousands per year
+                </pre>
+            </div>
+            
+            <div class="card">
+                <h3 data-en="✅ WIA-HOME Solution" data-ko="✅ WIA-HOME 솔루션">✅ WIA-HOME Solution</h3>
+                <pre>
+WIA-HOME: Build-Owner Free Digital Home
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Your PC is the server
+✅ Free domain (yourname.wia.home)
+✅ P2P network hosting
+✅ No landlord, forever yours
+✅ 25+ ready templates
+
+Philosophy:
+  弘益人間 (Hongik Ingan)
+  Everyone deserves a home in the digital world
+                </pre>
+            </div>
+            
+            <div class="card">
+                <h3 data-en="🏗️ Architecture Comparison" data-ko="🏗️ 아키텍처 비교">🏗️ Architecture Comparison</h3>
+                <pre>
+Traditional (Pay Rent):
+  User → AWS/Cloud → Website
+            ↓
+         Pay $$$
+
+WIA-HOME (Own Your Home):
+  Visitor → Your PC/Laptop ← Your Home!
+                 ↓
+            P2P Network
+            No landlord!
+                </pre>
+            </div>
+        </div>
+        
+        <!-- Panel 1: Server Control -->
+        <div class="panel" id="panel-1">
+            <div class="card">
+                <h3 data-en="🖥️ Server Control Panel" data-ko="🖥️ 서버 제어판">🖥️ Server Control Panel</h3>
+                
+                <div class="control-panel">
+                    <div class="control-item">
+                        <div class="control-label" data-en="Status" data-ko="상태">Status</div>
+                        <div class="control-value stopped" id="serverStatus">Stopped</div>
+                    </div>
+                    <div class="control-item">
+                        <div class="control-label" data-en="Domain" data-ko="도메인">Domain</div>
+                        <div class="control-value" id="serverDomain" style="font-size: 1rem;">mysite.wia.home</div>
+                    </div>
+                    <div class="control-item">
+                        <div class="control-label" data-en="Visitors" data-ko="방문자">Visitors</div>
+                        <div class="control-value" id="visitorCount">0</div>
+                    </div>
+                    <div class="control-item">
+                        <div class="control-label" data-en="Uptime" data-ko="가동시간">Uptime</div>
+                        <div class="control-value" id="uptime">00:00:00</div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin: 20px 0;">
+                    <button class="btn btn-success" onclick="startServer()" data-en="▶️ Start Server" data-ko="▶️ 서버 시작">▶️ Start Server</button>
+                    <button class="btn btn-danger" onclick="stopServer()" data-en="⏹️ Stop Server" data-ko="⏹️ 서버 중지">⏹️ Stop Server</button>
+                    <button class="btn btn-primary" onclick="openTunnel()" data-en="🌐 Open Tunnel" data-ko="🌐 터널 열기">🌐 Open Tunnel</button>
+                </div>
+                
+                <h4 data-en="📊 Resource Monitor" data-ko="📊 리소스 모니터">📊 Resource Monitor</h4>
+                <div class="control-panel">
+                    <div class="control-item"><div class="control-label">CPU</div><div class="control-value" id="cpuUsage">0%</div></div>
+                    <div class="control-item"><div class="control-label">Memory</div><div class="control-value" id="memUsage">0 MB</div></div>
+                    <div class="control-item"><div class="control-label">Bandwidth</div><div class="control-value" id="bandwidth">0 KB/s</div></div>
+                    <div class="control-item"><div class="control-label">Requests</div><div class="control-value" id="requests">0</div></div>
+                </div>
+                
+                <h4 data-en="📝 Server Log" data-ko="📝 서버 로그">📝 Server Log</h4>
+                <div class="log-box" id="serverLog">
+                    <div class="log-line log-info">[System] Ready to start...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Panel 2: Templates -->
+        <div class="panel" id="panel-2">
+            <div class="card">
+                <h3 data-en="📦 Business Templates" data-ko="📦 비즈니스 템플릿">📦 Business Templates</h3>
+                <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Select a template to create your site" data-ko="사이트를 만들 템플릿을 선택하세요">Select a template to create your site</p>
+                
+                <div class="template-grid">
+                    <div class="template-item" onclick="selectTemplate('cafe')">
+                        <div class="template-emoji">☕</div>
+                        <div class="template-name">Cafe</div>
+                    </div>
+                    <div class="template-item" onclick="selectTemplate('restaurant')">
+                        <div class="template-emoji">🍽️</div>
+                        <div class="template-name">Restaurant</div>
+                    </div>
+                    <div class="template-item" onclick="selectTemplate('shop')">
+                        <div class="template-emoji">🛒</div>
+                        <div class="template-name">Shop</div>
+                    </div>
+                    <div class="template-item" onclick="selectTemplate('portfolio')">
+                        <div class="template-emoji">💼</div>
+                        <div class="template-name">Portfolio</div>
+                    </div>
+                    <div class="template-item" onclick="selectTemplate('clinic')">
+                        <div class="template-emoji">🏥</div>
+                        <div class="template-name">Clinic</div>
+                    </div>
+                    <div class="template-item" onclick="selectTemplate('salon')">
+                        <div class="template-emoji">💇</div>
+                        <div class="template-name">Salon</div>
+                    </div>
+                    <div class="template-item" onclick="selectTemplate('gym')">
+                        <div class="template-emoji">🏋️</div>
+                        <div class="template-name">Gym</div>
+                    </div>
+                    <div class="template-item" onclick="selectTemplate('blog')">
+                        <div class="template-emoji">📝</div>
+                        <div class="template-name">Blog</div>
+                    </div>
+                    <div class="template-item" onclick="selectTemplate('bakery')">
+                        <div class="template-emoji">🥐</div>
+                        <div class="template-name">Bakery</div>
+                    </div>
+                    <div class="template-item" onclick="selectTemplate('yoga')">
+                        <div class="template-emoji">🧘</div>
+                        <div class="template-name">Yoga Studio</div>
+                    </div>
+                    <div class="template-item" onclick="selectTemplate('lawyer')">
+                        <div class="template-emoji">⚖️</div>
+                        <div class="template-name">Law Firm</div>
+                    </div>
+                    <div class="template-item" onclick="selectTemplate('photo')">
+                        <div class="template-emoji">📷</div>
+                        <div class="template-name">Photography</div>
+                    </div>
+                </div>
+                
+                <!-- 벤치마킹 섹션 -->
+                <div style="margin-top: 30px; padding: 20px; background: rgba(139, 92, 246, 0.1); border-radius: 12px; border: 1px solid #8B5CF6;">
+                    <h4 style="color: #A78BFA; margin-bottom: 15px;" data-en="🎯 Benchmark Clone" data-ko="🎯 벤치마킹 복제">🎯 Benchmark Clone</h4>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;" data-en="Enter a website URL to clone its design" data-ko="복제할 웹사이트 URL을 입력하세요">Enter a website URL to clone its design</p>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="url" id="benchmarkUrl" placeholder="https://example.com" style="flex: 1;">
+                        <button class="btn" style="background: #8B5CF6;" onclick="cloneBenchmark()" data-en="🔍 Analyze" data-ko="🔍 분석">🔍 Analyze</button>
+                    </div>
+                    <div id="benchmarkResult" style="margin-top: 15px; display: none;"></div>
+                </div>
+                
+
+                <h4 style="margin-top: 30px;" data-en="🛠️ Create Site" data-ko="🛠️ 사이트 생성">🛠️ Create Site</h4>
+                <label data-en="Site Name" data-ko="사이트 이름">Site Name</label>
+                <input type="text" id="siteName" placeholder="My Awesome Site">
+                
+                <label data-en="Domain" data-ko="도메인">Domain</label>
+                <input type="text" id="siteDomain" placeholder="mysite.wia.home">
+                
+                <label data-en="Selected Template" data-ko="선택된 템플릿">Selected Template</label>
+                <input type="text" id="selectedTemplate" readonly value="None selected">
+                
+                <button class="btn btn-primary" onclick="createSite()" data-en="🚀 Create Site" data-ko="🚀 사이트 생성">🚀 Create Site</button>
+            </div>
+        </div>
+        
+        <!-- Panel 3: P2P Network -->
+        <div class="panel" id="panel-3">
+            <div class="card">
+                <h3 data-en="🔗 P2P Network Status" data-ko="🔗 P2P 네트워크 상태">🔗 P2P Network Status</h3>
+                
+                <div class="control-panel">
+                    <div class="control-item">
+                        <div class="control-label" data-en="Connected Peers" data-ko="연결된 피어">Connected Peers</div>
+                        <div class="control-value" id="peerCount">0</div>
+                    </div>
+                    <div class="control-item">
+                        <div class="control-label" data-en="Network Status" data-ko="네트워크 상태">Network Status</div>
+                        <div class="control-value stopped" id="networkStatus">Offline</div>
+                    </div>
+                    <div class="control-item">
+                        <div class="control-label" data-en="Your Node ID" data-ko="노드 ID">Your Node ID</div>
+                        <div class="control-value" style="font-size: 0.8rem;" id="nodeId">-</div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin: 20px 0;">
+                    <button class="btn btn-success" onclick="joinNetwork()" data-en="🔗 Join Network" data-ko="🔗 네트워크 참가">🔗 Join Network</button>
+                    <button class="btn btn-danger" onclick="leaveNetwork()" data-en="🔌 Leave Network" data-ko="🔌 네트워크 탈퇴">🔌 Leave Network</button>
+                </div>
+                
+                <h4 data-en="🌐 Tunnel Options" data-ko="🌐 터널 옵션">🌐 Tunnel Options</h4>
+                <div class="template-grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="template-item" onclick="selectTunnel('ngrok')">
+                        <div class="template-emoji">🔗</div>
+                        <div class="template-name">ngrok</div>
+                    </div>
+                    <div class="template-item" onclick="selectTunnel('cloudflare')">
+                        <div class="template-emoji">☁️</div>
+                        <div class="template-name">Cloudflare</div>
+                    </div>
+                    <div class="template-item" onclick="selectTunnel('localtunnel')">
+                        <div class="template-emoji">🚇</div>
+                        <div class="template-name">localtunnel</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Panel 4: API & JSON -->
+        <div class="panel" id="panel-4">
+            <div class="card">
+                <h3 data-en="📡 API Reference" data-ko="📡 API 레퍼런스">📡 API Reference</h3>
+                
+                <h4>Server Control API</h4>
+                <pre>
+POST /api/server/start
+POST /api/server/stop
+GET  /api/server/status
+
+POST /api/tunnel/open
+POST /api/tunnel/close
+                </pre>
+                
+                <h4>Site Management API</h4>
+                <pre>
+POST /api/site/create
+GET  /api/site/list
+GET  /api/site/{id}
+PUT  /api/site/{id}
+DELETE /api/site/{id}
+                </pre>
+                
+                <h4 data-en="📄 Current Configuration JSON" data-ko="📄 현재 설정 JSON">📄 Current Configuration JSON</h4>
+                <button class="btn btn-primary" onclick="generateJSON()" data-en="📋 Generate JSON" data-ko="📋 JSON 생성">📋 Generate JSON</button>
+                <div class="json-output" id="jsonOutput">
+                    <pre>{
+  "message": "Click 'Generate JSON' to see your configuration"
+}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="footer">
+        <p class="footer-hongik">弘益人間 (홍익인간)</p>
+        <p data-en="Benefit All Humanity" data-ko="널리 인간을 이롭게 하라">Benefit All Humanity</p>
+        <p style="margin-top: 15px;">
+            <a href="/home/">← Back to WIA Home</a> ·
+            <a href="https://github.com/WIA-Official/wia-standards-public" target="_blank">GitHub</a>
+        </p>
+    </footer>
+    
+    <script>
+        // Tab switching
+        function showPanel(idx) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('panel-' + idx).classList.add('active');
+            document.querySelectorAll('.tab')[idx].classList.add('active');
+        }
+        
+        // Language toggle
+        function setLang(lang) {
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.lang-btn:${lang === 'en' ? 'first-child' : 'last-child'}`).classList.add('active');
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute(`data-${lang}`);
+            });
+        }
+        
+        // Server simulation
+        let serverRunning = false;
+        let uptimeSeconds = 0;
+        let uptimeInterval = null;
+        
+        function startServer() {
+            serverRunning = true;
+            document.getElementById('serverStatus').textContent = 'Running';
+            document.getElementById('serverStatus').className = 'control-value running';
+            addLog('Server started successfully!', 'success');
+            
+            uptimeInterval = setInterval(() => {
+                uptimeSeconds++;
+                const h = Math.floor(uptimeSeconds / 3600);
+                const m = Math.floor((uptimeSeconds % 3600) / 60);
+                const s = uptimeSeconds % 60;
+                document.getElementById('uptime').textContent = 
+                    `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+                
+                // Simulate activity
+                document.getElementById('cpuUsage').textContent = Math.floor(Math.random() * 30 + 5) + '%';
+                document.getElementById('memUsage').textContent = Math.floor(Math.random() * 100 + 50) + ' MB';
+                document.getElementById('bandwidth').textContent = Math.floor(Math.random() * 500) + ' KB/s';
+            }, 1000);
+            
+            simulateVisitors();
+        }
+        
+        function stopServer() {
+            serverRunning = false;
+            document.getElementById('serverStatus').textContent = 'Stopped';
+            document.getElementById('serverStatus').className = 'control-value stopped';
+            addLog('Server stopped.', 'warning');
+            clearInterval(uptimeInterval);
+            uptimeSeconds = 0;
+            document.getElementById('uptime').textContent = '00:00:00';
+            document.getElementById('cpuUsage').textContent = '0%';
+            document.getElementById('memUsage').textContent = '0 MB';
+            document.getElementById('bandwidth').textContent = '0 KB/s';
+        }
+        
+        function openTunnel() {
+            addLog('Opening tunnel via ngrok...', 'info');
+            setTimeout(() => {
+                addLog('Tunnel opened: https://abc123.ngrok.io', 'success');
+            }, 1500);
+        }
+        
+        function addLog(msg, type) {
+            const log = document.getElementById('serverLog');
+            const time = new Date().toLocaleTimeString();
+            log.innerHTML += `<div class="log-line log-${type}">[${time}] ${msg}</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function simulateVisitors() {
+            if (!serverRunning) return;
+            const visitors = Math.floor(Math.random() * 5);
+            document.getElementById('visitorCount').textContent = visitors;
+            if (visitors > 0) {
+                addLog(`${visitors} visitor(s) connected`, 'info');
+            }
+            setTimeout(simulateVisitors, 3000 + Math.random() * 5000);
+        }
+        
+        // Template selection
+        let selectedTpl = '';
+        function selectTemplate(tpl) {
+            selectedTpl = tpl;
+            document.querySelectorAll('.template-item').forEach(t => t.classList.remove('selected'));
+            event.target.closest('.template-item').classList.add('selected');
+            document.getElementById('selectedTemplate').value = tpl.charAt(0).toUpperCase() + tpl.slice(1);
+        }
+        
+        function createSite() {
+            const name = document.getElementById('siteName').value || 'My Site';
+            const domain = document.getElementById('siteDomain').value || 'mysite.wia.home';
+            if (!selectedTpl) {
+                alert('Please select a template first!');
+                return;
+            }
+            addLog(`Creating site: ${name} (${selectedTpl}) at ${domain}`, 'success');
+            document.getElementById('serverDomain').textContent = domain;
+        }
+        
+        // P2P Network
+        function joinNetwork() {
+            document.getElementById('networkStatus').textContent = 'Online';
+            document.getElementById('networkStatus').className = 'control-value running';
+            document.getElementById('nodeId').textContent = 'WIA-' + Math.random().toString(36).substr(2, 8).toUpperCase();
+            
+            let peers = 0;
+            const interval = setInterval(() => {
+                if (peers < 12) {
+                    peers += Math.floor(Math.random() * 3) + 1;
+                    document.getElementById('peerCount').textContent = peers;
+                } else {
+                    clearInterval(interval);
+                }
+            }, 1000);
+        }
+        
+        function leaveNetwork() {
+            document.getElementById('networkStatus').textContent = 'Offline';
+            document.getElementById('networkStatus').className = 'control-value stopped';
+            document.getElementById('peerCount').textContent = '0';
+            document.getElementById('nodeId').textContent = '-';
+        }
+        
+        function selectTunnel(tunnel) {
+            addLog(`Selected tunnel: ${tunnel}`, 'info');
+        }
+        
+        // JSON Generation
+        function generateJSON() {
+            const config = {
+                "wia-home": {
+                    "version": "1.0",
+                    "site": {
+                        "name": document.getElementById('siteName').value || "My Site",
+                        "domain": document.getElementById('siteDomain').value || "mysite.wia.home",
+                        "template": selectedTpl || "default"
+                    },
+                    "server": {
+                        "status": serverRunning ? "running" : "stopped",
+                        "port": 8080,
+                        "ssl": true
+                    },
+                    "p2p": {
+                        "enabled": document.getElementById('networkStatus').textContent === 'Online',
+                        "nodeId": document.getElementById('nodeId').textContent
+                    }
+                }
+            };
+            document.getElementById('jsonOutput').innerHTML = '<pre>' + JSON.stringify(config, null, 2) + '</pre>';
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setLang(localStorage.getItem('wiaLang') || 'en');
+        });
+        // Benchmark Clone Function
+        function cloneBenchmark() {
+            const url = document.getElementById("benchmarkUrl").value;
+            if (!url) {
+                alert(lang === "ko" ? "URL을 입력하세요" : "Please enter a URL");
+                return;
+            }
+            
+            const resultDiv = document.getElementById("benchmarkResult");
+            resultDiv.style.display = "block";
+            resultDiv.innerHTML = `<div style="text-align: center; color: #A78BFA;">🔄 ${lang === "ko" ? "분석 중..." : "Analyzing..."}</div>`;
+            
+            // Simulate analysis
+            setTimeout(() => {
+                const domain = new URL(url).hostname;
+                resultDiv.innerHTML = `
+                    <div style="background: var(--bg-card); padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
+                        <div style="color: #10B981; font-weight: bold; margin-bottom: 10px;">✅ ${lang === "ko" ? "분석 완료!" : "Analysis Complete!"}</div>
+                        <div style="font-size: 0.9rem; color: var(--text-muted);">
+                            <div>🌐 Domain: <strong>${domain}</strong></div>
+                            <div>📐 Layout: <strong>Responsive</strong></div>
+                            <div>🎨 Colors: <strong>#2563eb, #10b981, #f8fafc</strong></div>
+                            <div>📝 Sections: <strong>Header, Hero, Features, CTA, Footer</strong></div>
+                        </div>
+                        <button class="btn btn-primary" style="margin-top: 15px; width: 100%;" onclick="applyBenchmark(\)">🚀 ${lang === "ko" ? "이 스타일로 생성" : "Create with this style"}</button>
+                    </div>
+                `;
+                addLog("Benchmark analysis: " + domain, "success");
+            }, 2000);
+        }
+        
+        function applyBenchmark(domain) {
+            document.getElementById("siteName").value = "My " + domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1) + " Clone";
+            document.getElementById("selectedTemplate").value = "Benchmark: " + domain;
+            selectedTpl = "benchmark-" + domain;
+            addLog("Applied benchmark style from: " + domain, "success");
+            alert(lang === "ko" ? "벤치마킹 스타일이 적용되었습니다! 사이트 생성 버튼을 눌러주세요." : "Benchmark style applied! Click Create Site to continue.");
+        }
+
+    </script>
+</body>
+</html>

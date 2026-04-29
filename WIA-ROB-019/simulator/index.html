@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚶 WIA-ROB-019 Humanoid Robot Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(139, 92, 246, 0.1);
+            border-bottom: 2px solid #8B5CF6;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            color: #8B5CF6;
+        }
+
+        .language-selector {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .language-selector select {
+            padding: 0.5rem 1rem;
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid #8B5CF6;
+            color: #e0e0e0;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 1rem 2rem;
+            background: rgba(139, 92, 246, 0.1);
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        .tab:hover {
+            background: rgba(139, 92, 246, 0.2);
+            color: #d1d5db;
+        }
+
+        .tab.active {
+            background: #8B5CF6;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid #8B5CF6;
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .card h3 {
+            color: #8B5CF6;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #9ca3af;
+            font-size: 0.9rem;
+        }
+
+        .input-group input,
+        .input-group select,
+        .input-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(139, 92, 246, 0.5);
+            color: #e0e0e0;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .input-group input[type="range"] {
+            padding: 0;
+        }
+
+        .slider-value {
+            display: inline-block;
+            margin-left: 0.5rem;
+            color: #8B5CF6;
+            font-weight: 600;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #8B5CF6, #7c3aed);
+            border: none;
+            color: white;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            transform: translateY(-2px);
+        }
+
+        .output-panel {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid #8B5CF6;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+            min-height: 200px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+
+        .robot-canvas {
+            background: rgba(0, 0, 0, 0.4);
+            border: 2px solid #8B5CF6;
+            border-radius: 8px;
+            width: 100%;
+            height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .robot-figure {
+            font-size: 10rem;
+            animation: idle 2s ease-in-out infinite;
+        }
+
+        @keyframes idle {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(2deg); }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .stat-card {
+            background: rgba(139, 92, 246, 0.1);
+            padding: 1rem;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #8B5CF6;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #9ca3af;
+            margin-top: 0.5rem;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #d1d5db;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
+
+        .log-entry {
+            padding: 0.5rem;
+            border-left: 3px solid #8B5CF6;
+            margin-bottom: 0.5rem;
+            background: rgba(139, 92, 246, 0.05);
+        }
+
+        .log-entry.success { border-left-color: #10b981; }
+        .log-entry.warning { border-left-color: #f59e0b; }
+        .log-entry.error { border-left-color: #ef4444; }
+
+        .philosophy {
+            text-align: center;
+            color: #fbbf24;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 2rem 0;
+            padding: 1rem;
+            border-top: 2px solid rgba(139, 92, 246, 0.3);
+            border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚶 WIA-ROB-019 Humanoid Robot Simulator</h1>
+        <div class="language-selector">
+            <label for="language"> Language:</label>
+            <select id="language" onchange="changeLanguage(this.value)">
+                <option value="en">English</option>
+                <option value="ko">한국어 (Korean)</option>
+                <option value="ja">日本語 (Japanese)</option>
+                <option value="zh">中文 (Chinese)</option>
+                <option value="es">Español (Spanish)</option>
+                <option value="fr">Français (French)</option>
+                <option value="de">Deutsch (German)</option>
+                <option value="it">Italiano (Italian)</option>
+                <option value="pt">Português (Portuguese)</option>
+                <option value="ru">Русский (Russian)</option>
+                <option value="ar">العربية (Arabic)</option>
+                <option value="hi">हिन्दी (Hindi)</option>
+                <option value="bn">বাংলা (Bengali)</option>
+                <option value="pa">ਪੰਜਾਬੀ (Punjabi)</option>
+                <option value="jv">Basa Jawa (Javanese)</option>
+                <option value="vi">Tiếng Việt (Vietnamese)</option>
+                <option value="tr">Türkçe (Turkish)</option>
+                <option value="ta">தமிழ் (Tamil)</option>
+                <option value="mr">मराठी (Marathi)</option>
+                <option value="te">తెలుగు (Telugu)</option>
+                <option value="ur">اردو (Urdu)</option>
+                <option value="gu">ગુજરાતી (Gujarati)</option>
+                <option value="pl">Polski (Polish)</option>
+                <option value="uk">Українська (Ukrainian)</option>
+                <option value="ml">മലയാളം (Malayalam)</option>
+                <option value="kn">ಕನ್ನಡ (Kannada)</option>
+                <option value="or">ଓଡ଼ିଆ (Odia)</option>
+                <option value="my">မြန်မာဘာသာ (Burmese)</option>
+                <option value="th">ไทย (Thai)</option>
+                <option value="fa">فارسی (Persian)</option>
+                <option value="ps">پښتو (Pashto)</option>
+                <option value="sw">Kiswahili (Swahili)</option>
+                <option value="su">Basa Sunda (Sundanese)</option>
+                <option value="ro">Română (Romanian)</option>
+                <option value="nl">Nederlands (Dutch)</option>
+                <option value="hu">Magyar (Hungarian)</option>
+                <option value="cs">Čeština (Czech)</option>
+                <option value="el">Ελληνικά (Greek)</option>
+                <option value="sv">Svenska (Swedish)</option>
+                <option value="be">Беларуская (Belarusian)</option>
+                <option value="az">Azərbaycan (Azerbaijani)</option>
+                <option value="he">עברית (Hebrew)</option>
+                <option value="sr">Српски (Serbian)</option>
+                <option value="ha">Hausa</option>
+                <option value="fi">Suomi (Finnish)</option>
+                <option value="da">Dansk (Danish)</option>
+                <option value="sk">Slovenčina (Slovak)</option>
+                <option value="no">Norsk (Norwegian)</option>
+                <option value="bg">Български (Bulgarian)</option>
+                <option value="ms">Bahasa Melayu (Malay)</option>
+                <option value="ca">Català (Catalan)</option>
+                <option value="hr">Hrvatski (Croatian)</option>
+                <option value="lt">Lietuvių (Lithuanian)</option>
+                <option value="sl">Slovenščina (Slovenian)</option>
+                <option value="et">Eesti (Estonian)</option>
+                <option value="lv">Latviešu (Latvian)</option>
+                <option value="sq">Shqip (Albanian)</option>
+                <option value="ka">ქართული (Georgian)</option>
+                <option value="hy">Հայերեն (Armenian)</option>
+                <option value="mk">Македонски (Macedonian)</option>
+                <option value="km">ខ្មែរ (Khmer)</option>
+                <option value="lo">ລາວ (Lao)</option>
+                <option value="ne">नेपाली (Nepali)</option>
+                <option value="si">සිංහල (Sinhala)</option>
+                <option value="am">አማርኛ (Amharic)</option>
+                <option value="af">Afrikaans</option>
+                <option value="is">Íslenska (Icelandic)</option>
+                <option value="mt">Malti (Maltese)</option>
+                <option value="gl">Galego (Galician)</option>
+                <option value="eu">Euskara (Basque)</option>
+                <option value="cy">Cymraeg (Welsh)</option>
+                <option value="ga">Gaeilge (Irish)</option>
+                <option value="mn">Монгол (Mongolian)</option>
+                <option value="bo">བོད་ཡིག (Tibetan)</option>
+                <option value="ug">ئۇيغۇرچە (Uyghur)</option>
+                <option value="ku">Kurdî (Kurdish)</option>
+                <option value="yi">ייִדיש (Yiddish)</option>
+                <option value="la">Latina (Latin)</option>
+                <option value="eo">Esperanto</option>
+                <option value="tl">Tagalog (Filipino)</option>
+                <option value="ceb">Cebuano</option>
+                <option value="mg">Malagasy</option>
+                <option value="so">Soomaali (Somali)</option>
+                <option value="zu">isiZulu (Zulu)</option>
+                <option value="xh">isiXhosa (Xhosa)</option>
+                <option value="yo">Yorùbá (Yoruba)</option>
+                <option value="ig">Igbo</option>
+                <option value="rw">Kinyarwanda</option>
+                <option value="ny">Chichewa</option>
+                <option value="sn">chiShona (Shona)</option>
+                <option value="st">Sesotho</option>
+                <option value="tn">Setswana (Tswana)</option>
+                <option value="ti">ትግርኛ (Tigrinya)</option>
+                <option value="gd">Gàidhlig (Scots Gaelic)</option>
+                <option value="lb">Lëtzebuergesch (Luxembourgish)</option>
+                <option value="fy">Frysk (Frisian)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="philosophy">弘益人間 (홍익인간) · Benefit All Humanity</div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('motion')">🚶 Motion Control</button>
+            <button class="tab" onclick="switchTab('interaction')">💬 Interaction</button>
+            <button class="tab" onclick="switchTab('sensors')">📡 Sensors</button>
+            <button class="tab" onclick="switchTab('safety')">🛡️ Safety</button>
+            <button class="tab" onclick="switchTab('analytics')"> Analytics</button>
+        </div>
+
+        <!-- Motion Control Tab -->
+        <div id="motion" class="tab-content active">
+            <div class="grid">
+                <div class="card">
+                    <h3>🦿 Locomotion Parameters</h3>
+                    <div class="input-group">
+                        <label>Walking Speed (m/s): <span class="slider-value" id="speed-value">0.5</span></label>
+                        <input type="range" min="0" max="2" step="0.1" value="0.5" oninput="updateSlider('speed', this.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Step Length (m): <span class="slider-value" id="step-value">0.3</span></label>
+                        <input type="range" min="0.1" max="0.8" step="0.05" value="0.3" oninput="updateSlider('step', this.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Balance Factor: <span class="slider-value" id="balance-value">0.8</span></label>
+                        <input type="range" min="0" max="1" step="0.05" value="0.8" oninput="updateSlider('balance', this.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Gait Type:</label>
+                        <select id="gait-type">
+                            <option value="walk">Normal Walk</option>
+                            <option value="jog">Jog</option>
+                            <option value="run">Run</option>
+                            <option value="stairs">Stairs Climbing</option>
+                            <option value="slope">Slope Navigation</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>🤸 Joint Control</h3>
+                    <div class="input-group">
+                        <label>Hip Angle (°): <span class="slider-value" id="hip-value">0</span></label>
+                        <input type="range" min="-45" max="45" step="5" value="0" oninput="updateSlider('hip', this.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Knee Angle (°): <span class="slider-value" id="knee-value">0</span></label>
+                        <input type="range" min="0" max="130" step="5" value="0" oninput="updateSlider('knee', this.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Ankle Angle (°): <span class="slider-value" id="ankle-value">0</span></label>
+                        <input type="range" min="-30" max="30" step="5" value="0" oninput="updateSlider('ankle', this.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Shoulder Angle (°): <span class="slider-value" id="shoulder-value">0</span></label>
+                        <input type="range" min="-180" max="180" step="10" value="0" oninput="updateSlider('shoulder', this.value)">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>🎮 Motion Commands</h3>
+                    <button onclick="executeMotion('walk')">▶ Start Walking</button>
+                    <button onclick="executeMotion('stop')" style="margin-top: 0.5rem;">⏸ Stop</button>
+                    <button onclick="executeMotion('turn-left')" style="margin-top: 0.5rem;">↺ Turn Left</button>
+                    <button onclick="executeMotion('turn-right')" style="margin-top: 0.5rem;">↻ Turn Right</button>
+                    <button onclick="executeMotion('sit')" style="margin-top: 0.5rem;">🪑 Sit Down</button>
+                    <button onclick="executeMotion('stand')" style="margin-top: 0.5rem;">🧍 Stand Up</button>
+                    <button onclick="executeMotion('wave')" style="margin-top: 0.5rem;">👋 Wave Hand</button>
+                </div>
+            </div>
+
+            <div class="robot-canvas">
+                <div class="robot-figure">🚶</div>
+            </div>
+
+            <div class="output-panel" id="motion-output">Ready for motion control commands...</div>
+        </div>
+
+        <!-- Interaction Tab -->
+        <div id="interaction" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <h3>💬 Natural Language</h3>
+                    <div class="input-group">
+                        <label>Speak to Robot:</label>
+                        <textarea id="user-input" rows="3" placeholder="Type your command or question here..."></textarea>
+                    </div>
+                    <button onclick="processNaturalLanguage()">Send Command</button>
+                </div>
+
+                <div class="card">
+                    <h3>😊 Emotion Recognition</h3>
+                    <div class="input-group">
+                        <label>Detected Emotion:</label>
+                        <select id="emotion-type">
+                            <option value="happy">😊 Happy</option>
+                            <option value="sad">😢 Sad</option>
+                            <option value="angry">😠 Angry</option>
+                            <option value="surprised">😲 Surprised</option>
+                            <option value="neutral">😐 Neutral</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Confidence: <span class="slider-value" id="emotion-conf-value">0.85</span></label>
+                        <input type="range" min="0" max="1" step="0.05" value="0.85" oninput="updateSlider('emotion-conf', this.value)">
+                    </div>
+                    <button onclick="respondToEmotion()">Process Emotion</button>
+                </div>
+
+                <div class="card">
+                    <h3>👁️ Visual Recognition</h3>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" checked> Face Detection</label>
+                        <label><input type="checkbox" checked> Object Recognition</label>
+                        <label><input type="checkbox"> Gesture Recognition</label>
+                        <label><input type="checkbox"> Person Tracking</label>
+                    </div>
+                    <button onclick="processVision()" style="margin-top: 1rem;">Analyze Scene</button>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">3</div>
+                    <div class="stat-label">People Detected</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">12</div>
+                    <div class="stat-label">Objects Identified</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">94%</div>
+                    <div class="stat-label">Recognition Accuracy</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">45ms</div>
+                    <div class="stat-label">Response Time</div>
+                </div>
+            </div>
+
+            <div class="output-panel" id="interaction-output">Interaction system ready...</div>
+        </div>
+
+        <!-- Sensors Tab -->
+        <div id="sensors" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <h3>📡 IMU Sensors</h3>
+                    <div class="input-group">
+                        <label>Acceleration X (m/s²): <span class="slider-value" id="accel-x-value">0</span></label>
+                        <input type="range" min="-10" max="10" step="0.5" value="0" oninput="updateSlider('accel-x', this.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Gyro Z (°/s): <span class="slider-value" id="gyro-z-value">0</span></label>
+                        <input type="range" min="-180" max="180" step="10" value="0" oninput="updateSlider('gyro-z', this.value)">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3> Force-Torque</h3>
+                    <div class="input-group">
+                        <label>Left Foot Force (N): <span class="slider-value" id="force-left-value">300</span></label>
+                        <input type="range" min="0" max="1000" step="10" value="300" oninput="updateSlider('force-left', this.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Right Foot Force (N): <span class="slider-value" id="force-right-value">300</span></label>
+                        <input type="range" min="0" max="1000" step="10" value="300" oninput="updateSlider('force-right', this.value)">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>🎥 Camera Feed</h3>
+                    <div class="input-group">
+                        <label>Resolution:</label>
+                        <select>
+                            <option>1920x1080 (Full HD)</option>
+                            <option>1280x720 (HD)</option>
+                            <option>640x480 (VGA)</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>FPS: <span class="slider-value" id="fps-value">30</span></label>
+                        <input type="range" min="15" max="60" step="15" value="30" oninput="updateSlider('fps', this.value)">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>📏 LiDAR</h3>
+                    <div class="input-group">
+                        <label>Range (m): <span class="slider-value" id="lidar-range-value">10</span></label>
+                        <input type="range" min="1" max="30" step="1" value="10" oninput="updateSlider('lidar-range', this.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Points/sec: <span class="slider-value" id="lidar-rate-value">100000</span></label>
+                        <input type="range" min="50000" max="300000" step="50000" value="100000" oninput="updateSlider('lidar-rate', this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <div class="output-panel" id="sensor-output">All sensors operational. Streaming data...</div>
+        </div>
+
+        <!-- Safety Tab -->
+        <div id="safety" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <h3>🛡️ Safety Systems</h3>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" checked> Emergency Stop</label>
+                        <label><input type="checkbox" checked> Collision Avoidance</label>
+                        <label><input type="checkbox" checked> Force Limiting</label>
+                        <label><input type="checkbox" checked> Fall Detection</label>
+                        <label><input type="checkbox"> Obstacle Detection</label>
+                        <label><input type="checkbox"> Person Detection</label>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>⚠️ Safety Thresholds</h3>
+                    <div class="input-group">
+                        <label>Max Force (N): <span class="slider-value" id="max-force-value">150</span></label>
+                        <input type="range" min="50" max="300" step="10" value="150" oninput="updateSlider('max-force', this.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Min Distance (m): <span class="slider-value" id="min-dist-value">0.5</span></label>
+                        <input type="range" min="0.1" max="2" step="0.1" value="0.5" oninput="updateSlider('min-dist', this.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Max Speed (m/s): <span class="slider-value" id="max-speed-value">1.5</span></label>
+                        <input type="range" min="0.5" max="3" step="0.1" value="1.5" oninput="updateSlider('max-speed', this.value)">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>🔍 Compliance Check</h3>
+                    <button onclick="checkCompliance('iso13482')">Check ISO 13482</button>
+                    <button onclick="checkCompliance('ul3300')" style="margin-top: 0.5rem;">Check UL 3300</button>
+                    <button onclick="checkCompliance('ce')" style="margin-top: 0.5rem;">Check CE Marking</button>
+                    <button onclick="runSafetyTest()" style="margin-top: 1rem; background: #ef4444;">⚠️ Run Safety Test</button>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #10b981;">✓</div>
+                    <div class="stat-label">Safety Status</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">Incidents</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">100%</div>
+                    <div class="stat-label">Compliance Rate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">24/7</div>
+                    <div class="stat-label">Monitoring</div>
+                </div>
+            </div>
+
+            <div class="output-panel" id="safety-output">Safety systems active and monitoring...</div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analytics" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <h3> Power Management</h3>
+                    <div class="input-group">
+                        <label>Battery Level: <span class="slider-value" id="battery-value">75%</span></label>
+                        <input type="range" min="0" max="100" step="5" value="75" oninput="updateSlider('battery', this.value + '%')">
+                    </div>
+                    <div class="input-group">
+                        <label>Power Consumption (W): <span class="slider-value" id="power-value">250</span></label>
+                        <input type="range" min="50" max="500" step="10" value="250" oninput="updateSlider('power', this.value)">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>📈 Performance Metrics</h3>
+                    <div class="input-group">
+                        <label>CPU Usage: <span class="slider-value" id="cpu-value">45%</span></label>
+                        <input type="range" min="0" max="100" step="5" value="45" oninput="updateSlider('cpu', this.value + '%')">
+                    </div>
+                    <div class="input-group">
+                        <label>Memory Usage: <span class="slider-value" id="memory-value">60%</span></label>
+                        <input type="range" min="0" max="100" step="5" value="60" oninput="updateSlider('memory', this.value + '%')">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3> Usage Statistics</h3>
+                    <button onclick="generateReport()">Generate Report</button>
+                    <button onclick="exportData()" style="margin-top: 0.5rem;">Export Data (JSON)</button>
+                    <button onclick="resetStats()" style="margin-top: 0.5rem; background: #ef4444;">Reset Statistics</button>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">1,247</div>
+                    <div class="stat-label">Operations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">42.5</div>
+                    <div class="stat-label">Hours Active</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">3.2km</div>
+                    <div class="stat-label">Distance Traveled</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">99.8%</div>
+                    <div class="stat-label">Uptime</div>
+                </div>
+            </div>
+
+            <div class="output-panel" id="analytics-output">Analytics engine running. Collecting metrics...</div>
+        </div>
+    </div>
+
+    <script>
+        let currentLanguage = 'en';
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        function updateSlider(name, value) {
+            document.getElementById(name + '-value').textContent = value;
+        }
+
+        function changeLanguage(lang) {
+            currentLanguage = lang;
+            addLog('interaction-output', `Language changed to: ${lang}`, 'success');
+        }
+
+        function executeMotion(action) {
+            const output = document.getElementById('motion-output');
+            const timestamp = new Date().toLocaleTimeString();
+            addLog('motion-output', `[${timestamp}] Executing motion: ${action.toUpperCase()}`, 'success');
+
+            const robotFigure = document.querySelector('.robot-figure');
+            switch(action) {
+                case 'walk':
+                    robotFigure.style.animation = 'walk 3s ease-in-out infinite';
+                    break;
+                case 'stop':
+                    robotFigure.style.animation = 'idle 2s ease-in-out infinite';
+                    break;
+                case 'wave':
+                    robotFigure.textContent = '🙋';
+                    setTimeout(() => robotFigure.textContent = '🚶', 2000);
+                    break;
+                case 'sit':
+                    robotFigure.textContent = '🧘';
+                    break;
+                case 'stand':
+                    robotFigure.textContent = '🧍';
+                    break;
+            }
+        }
+
+        function processNaturalLanguage() {
+            const input = document.getElementById('user-input').value;
+            if (!input.trim()) return;
+
+            addLog('interaction-output', `User: ${input}`, 'info');
+
+            setTimeout(() => {
+                const responses = [
+                    "I understand. I'll help you with that.",
+                    "Processing your request now...",
+                    "Acknowledged. Executing command.",
+                    "Got it! Let me assist you.",
+                    "I'm analyzing your request. One moment please."
+                ];
+                const response = responses[Math.floor(Math.random() * responses.length)];
+                addLog('interaction-output', `Robot: ${response}`, 'success');
+            }, 500);
+
+            document.getElementById('user-input').value = '';
+        }
+
+        function respondToEmotion() {
+            const emotion = document.getElementById('emotion-type').value;
+            const confidence = document.getElementById('emotion-conf-value').textContent;
+            addLog('interaction-output', `Detected emotion: ${emotion} (confidence: ${confidence})`, 'success');
+            addLog('interaction-output', `Adjusting response parameters for ${emotion} state...`, 'info');
+        }
+
+        function processVision() {
+            addLog('interaction-output', 'Analyzing visual data...', 'info');
+            setTimeout(() => {
+                addLog('interaction-output', 'Vision processing complete. Objects and faces detected.', 'success');
+            }, 1000);
+        }
+
+        function checkCompliance(standard) {
+            addLog('safety-output', `Checking compliance with ${standard.toUpperCase()}...`, 'info');
+            setTimeout(() => {
+                addLog('safety-output', `✓ Compliance check passed for ${standard.toUpperCase()}`, 'success');
+            }, 1500);
+        }
+
+        function runSafetyTest() {
+            addLog('safety-output', 'Running comprehensive safety test...', 'warning');
+            const tests = [
+                'Emergency stop functionality',
+                'Collision detection',
+                'Force limiting',
+                'Fall prevention',
+                'Sensor validation'
+            ];
+
+            tests.forEach((test, index) => {
+                setTimeout(() => {
+                    addLog('safety-output', `✓ ${test} - PASSED`, 'success');
+                }, (index + 1) * 500);
+            });
+        }
+
+        function generateReport() {
+            addLog('analytics-output', 'Generating comprehensive analytics report...', 'info');
+            setTimeout(() => {
+                const report = {
+                    timestamp: new Date().toISOString(),
+                    operations: 1247,
+                    uptime: '42.5 hours',
+                    distance: '3.2 km',
+                    batteryHealth: '95%',
+                    avgPowerConsumption: '245W',
+                    incidents: 0
+                };
+                addLog('analytics-output', JSON.stringify(report, null, 2), 'success');
+            }, 1000);
+        }
+
+        function exportData() {
+            const data = {
+                robot: 'WIA-ROB-019',
+                timestamp: new Date().toISOString(),
+                language: currentLanguage,
+                metrics: {
+                    battery: document.getElementById('battery-value').textContent,
+                    cpu: document.getElementById('cpu-value').textContent,
+                    memory: document.getElementById('memory-value').textContent
+                }
+            };
+            addLog('analytics-output', 'Data exported:\n' + JSON.stringify(data, null, 2), 'success');
+        }
+
+        function resetStats() {
+            addLog('analytics-output', 'Statistics reset to default values', 'warning');
+        }
+
+        function addLog(outputId, message, type = 'info') {
+            const output = document.getElementById(outputId);
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = message;
+            output.appendChild(entry);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        // Initialize
+        addLog('motion-output', 'Motion control system initialized', 'success');
+        addLog('interaction-output', 'Interaction system ready', 'success');
+        addLog('sensor-output', 'All sensors operational', 'success');
+        addLog('safety-output', 'Safety systems active', 'success');
+        addLog('analytics-output', 'Analytics engine started', 'success');
+    </script>
+</body>
+</html>

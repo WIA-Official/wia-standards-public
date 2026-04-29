@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Feature Engineering - WIA Standards</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.8; color: #333; background: #f5f5f5; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 60px 40px; border-radius: 15px; margin-bottom: 40px; }
+        h1 { font-size: 3em; margin-bottom: 20px; }
+        .content { background: white; padding: 50px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+        h2 { color: #667eea; font-size: 2em; margin: 40px 0 20px 0; }
+        h3 { color: #764ba2; font-size: 1.5em; margin: 30px 0 15px 0; }
+        p { margin-bottom: 20px; text-align: justify; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+        pre { background: #f4f4f4; padding: 20px; border-radius: 5px; overflow-x: auto; margin: 20px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 30px 0; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #667eea; color: white; }
+        ul { margin-left: 30px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 40px; }
+        .nav-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; border-radius: 30px; text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <div>Chapter 3</div>
+            <h1>Data Collection & Feature Engineering</h1>
+        </div>
+        <div class="content">
+            <h2>3.1 The 80+ Feature Framework</h2>
+            <p>Feature engineering is the most critical component of fraud detection. The right features can make the difference between a 70% detection rate and a 95%+ detection rate. This chapter covers the systematic approach to creating 80+ fraud detection features.</p>
+
+            <h3>3.1.1 Transaction Features (15 features)</h3>
+            <table>
+                <tr><th>Feature</th><th>Description</th><th>Example</th></tr>
+                <tr><td>transaction_amount</td><td>Raw transaction amount</td><td>$149.99</td></tr>
+                <tr><td>amount_z_score</td><td>Deviation from user's average</td><td>2.5σ</td></tr>
+                <tr><td>amount_percentile</td><td>Relative to all transactions</td><td>85th percentile</td></tr>
+                <tr><td>hour_of_day</td><td>Transaction hour (0-23)</td><td>3 (3 AM)</td></tr>
+                <tr><td>day_of_week</td><td>0=Monday, 6=Sunday</td><td>2 (Wednesday)</td></tr>
+                <tr><td>is_weekend</td><td>Boolean weekend indicator</td><td>False</td></tr>
+                <tr><td>merchant_category_code</td><td>MCC (e.g., 5732 = electronics)</td><td>5732</td></tr>
+                <tr><td>currency_conversion_rate</td><td>If not USD</td><td>1.08 (EUR→USD)</td></tr>
+            </table>
+
+            <h3>3.1.2 User Behavioral Features (25 features)</h3>
+            <pre>
+# Historical spending patterns
+- user_avg_transaction_amount_30d
+- user_median_transaction_amount_30d
+- user_std_transaction_amount_30d
+- user_max_transaction_amount_30d
+- user_total_transactions_30d
+- user_total_amount_30d
+
+# Account characteristics
+- account_age_days
+- loyalty_tier_encoded (0=none, 1=bronze, 2=silver, 3=gold)
+- lifetime_value
+
+# Behavioral patterns
+- avg_transactions_per_day_30d
+- unique_merchants_30d
+- merchant_repeat_rate
+- avg_days_between_transactions
+
+# Geographic patterns
+- unique_countries_30d
+- home_country_indicator
+- travel_frequency_score
+
+# Velocity features (rolling windows)
+- transactions_last_1h
+- transactions_last_6h
+- transactions_last_24h
+- amount_spent_last_24h
+            </pre>
+
+            <h3>3.1.3 Device & Network Features (20 features)</h3>
+            <ul>
+                <li><strong>Device characteristics:</strong> device_age_days, device_transaction_count_30d, device_unique_users, device_fraud_rate_30d</li>
+                <li><strong>IP address:</strong> ip_country, ip_reputation_score, ip_is_vpn, ip_is_proxy, ip_is_tor, ip_transaction_count_30d</li>
+                <li><strong>User agent:</strong> browser_type, os_type, platform_type, is_mobile, is_bot_suspected</li>
+                <li><strong>Session:</strong> session_duration_seconds, session_pages_viewed</li>
+            </ul>
+
+            <h3>3.1.4 Graph Features (10 features)</h3>
+            <p>Network analysis to detect fraud rings:</p>
+            <ul>
+                <li>connected_users_count (shared device, IP, address)</li>
+                <li>connected_users_fraud_rate</li>
+                <li>shared_device_count</li>
+                <li>shared_ip_count</li>
+                <li>risk_cluster_id (from graph clustering)</li>
+                <li>risk_cluster_fraud_rate</li>
+            </ul>
+
+            <h2>3.2 Feature Store Architecture</h2>
+            <p><strong>Technology:</strong> Feast (Feature Store)</p>
+            <ul>
+                <li><strong>Offline Store:</strong> Historical features for model training (Parquet on S3)</li>
+                <li><strong>Online Store:</strong> Low-latency features for real-time inference (Redis)</li>
+                <li><strong>Feature Registry:</strong> Metadata about features (YAML definitions)</li>
+            </ul>
+
+            <h3>3.2.1 Example Feature Definition</h3>
+            <pre>
+feature_view:
+  name: user_transaction_statistics_30d
+  entities:
+    - customer
+  ttl: 86400s  # 24 hours
+  features:
+    - name: user_avg_transaction_amount_30d
+      dtype: FLOAT
+    - name: user_total_transactions_30d
+      dtype: INT64
+  batch_source:
+    type: BigQuerySource
+    query: |
+      SELECT
+        customer_id,
+        timestamp,
+        AVG(amount) as user_avg_transaction_amount_30d,
+        COUNT(*) as user_total_transactions_30d
+      FROM transactions
+      WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+      GROUP BY customer_id, DATE(timestamp)
+            </pre>
+
+            <h2>3.3 Real-Time Feature Computation</h2>
+            <p><strong>Kafka + Flink Pipeline:</strong></p>
+            <pre>
+DataStream<Transaction> transactions = env
+    .addSource(new FlinkKafkaConsumer<>("transactions", ...))
+    .keyBy(Transaction::getCustomerId)
+    .window(TumblingEventTimeWindows.of(Time.hours(1)))
+    .aggregate(new TransactionCountAggregator());
+
+// Write to Redis (online feature store)
+transactions.addSink(new RedisSink<>(redisConfig));
+            </pre>
+
+            <h2>3.4 Feature Engineering Best Practices</h2>
+            <h3>3.4.1 Handle Missing Values</h3>
+            <ul>
+                <li><strong>Numerical features:</strong> Median imputation or -999 placeholder</li>
+                <li><strong>Categorical features:</strong> "UNKNOWN" category</li>
+                <li><strong>Boolean features:</strong> Create "is_missing" indicator</li>
+            </ul>
+
+            <h3>3.4.2 Feature Scaling</h3>
+            <pre>
+# StandardScaler (mean=0, std=1)
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X_train)
+
+# MinMaxScaler (0-1 range)
+scaler = MinMaxScaler()
+X_scaled = scaler.fit_transform(X_train)
+            </pre>
+
+            <h3>3.4.3 Categorical Encoding</h3>
+            <ul>
+                <li><strong>One-Hot Encoding:</strong> For low-cardinality features (< 10 unique values)</li>
+                <li><strong>Target Encoding:</strong> Replace categories with mean fraud rate</li>
+                <li><strong>Frequency Encoding:</strong> Replace with count/frequency</li>
+            </ul>
+
+            <h2>3.5 Feature Selection</h2>
+            <h3>3.5.1 Feature Importance (XGBoost)</h3>
+            <pre>
+import xgboost as xgb
+
+model = xgb.XGBClassifier()
+model.fit(X_train, y_train)
+
+# Get feature importance
+importance = model.feature_importances_
+feature_importance_df = pd.DataFrame({
+    'feature': X_train.columns,
+    'importance': importance
+}).sort_values('importance', ascending=False)
+
+print(feature_importance_df.head(10))
+            </pre>
+
+            <h3>3.5.2 Correlation Analysis</h3>
+            <pre>
+# Remove highly correlated features (> 0.95)
+correlation_matrix = X_train.corr().abs()
+upper_triangle = correlation_matrix.where(
+    np.triu(np.ones(correlation_matrix.shape), k=1).astype(bool)
+)
+to_drop = [column for column in upper_triangle.columns 
+           if any(upper_triangle[column] > 0.95)]
+X_train_reduced = X_train.drop(columns=to_drop)
+            </pre>
+
+            </div>
+    </div>
+</body>
+</html>

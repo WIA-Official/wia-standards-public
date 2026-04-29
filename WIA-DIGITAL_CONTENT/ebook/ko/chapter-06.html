@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 06 - WIA-DIGITAL_CONTENT</title>
+    <style>:root{--primary:#8b5cf6;--primary-dark:#7c3aed}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;color:#334155;background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3)}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content p{margin:15px 0}.info-box{background:#dbeafe;border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px}.key-takeaways h3{color:#065f46;margin-bottom:20px}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid #e2e8f0}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none}.footer{background:#0f172a;color:white;text-align:center;padding:30px}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📖 Chapter 06</h1>
+            <p>WIA-DIGITAL_CONTENT: 모범 사례</p>
+        </div>
+        <div class="content">
+            <h2>1. 모범 사례 개요</h2>
+            <p>WIA-DIGITAL_CONTENT를 성공적으로 구현하려면 기술적 구현뿐만 아니라 보안, 성능, 사용자 경험, 운영 효율성을 종합적으로 고려해야 합니다. 이 장에서는 네이버, 카카오, 넷플릭스 등 선도 기업들이 축적한 노하우와 교훈을 정리했습니다.</p>
+
+            <div class="info-box">
+                <h4>📌 학습 목표</h4>
+                <p>이 장을 마치면 다음 베스트 프랙티스를 적용할 수 있습니다:</p>
+                <ul style="margin:10px 0 0 20px;line-height:1.8">
+                    <li>보안 강화를 위한 10가지 체크리스트</li>
+                    <li>API 응답 시간 50% 개선 기법</li>
+                    <li>사용자 이탈률 30% 감소 UX 전략</li>
+                    <li>운영 비용 40% 절감 자동화</li>
+                    <li>흔한 실수와 해결 방법 10가지</li>
+                </ul>
+            </div>
+
+            <h2>2. 보안 강화 체크리스트</h2>
+            <p>디지털 콘텐츠 플랫폼은 해커의 주요 공격 대상입니다. 한국저작권위원회 통계에 따르면 2024년 불법 복제로 인한 피해액이 2조 원을 넘었습니다.</p>
+
+            <h3>2.1 암호화 키 관리</h3>
+            <table style="width:100%;border-collapse:collapse;margin:20px 0">
+                <thead>
+                    <tr style="background:#7c3aed;color:white">
+                        <th style="padding:12px;border:1px solid #ddd">위험</th>
+                        <th style="padding:12px;border:1px solid #ddd">잘못된 방법</th>
+                        <th style="padding:12px;border:1px solid #ddd">올바른 방법</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>하드코딩된 키</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">const KEY = "abc123..."</td>
+                        <td style="padding:10px;border:1px solid #ddd">AWS KMS, HashiCorp Vault 사용</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>평문 전송</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">HTTP로 키 전송</td>
+                        <td style="padding:10px;border:1px solid #ddd">TLS 1.3 + Certificate Pinning</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>키 재사용</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">모든 콘텐츠에 동일한 키</td>
+                        <td style="padding:10px;border:1px solid #ddd">콘텐츠별 고유 키 생성</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>키 로테이션 부재</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">1년 넘게 같은 키 사용</td>
+                        <td style="padding:10px;border:1px solid #ddd">30일마다 자동 로테이션</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>2.2 DRM 우회 방지</h3>
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+// 클라이언트 무결성 검증
+async function validateClient(deviceInfo) {
+  // 1. 루팅/탈옥 탐지
+  if (deviceInfo.isRooted || deviceInfo.isJailbroken) {
+    throw new Error('변조된 기기에서는 재생할 수 없습니다');
+  }
+
+  // 2. 앱 서명 검증 (Android)
+  const expectedSignature = 'SHA256:abcdef123456...';
+  if (deviceInfo.appSignature !== expectedSignature) {
+    throw new Error('비정상적인 앱입니다');
+  }
+
+  // 3. 디버거 감지
+  if (deviceInfo.isDebugging) {
+    throw new Error('디버그 모드에서는 재생할 수 없습니다');
+  }
+
+  // 4. 화면 캡처 차단
+  if (deviceInfo.platform === 'android') {
+    window.setFlag(FLAG_SECURE);
+  }
+
+  return true;
+}</pre>
+
+            <h2>3. 성능 최적화 가이드</h2>
+            <p>네이버 웹툰은 API 응답 시간을 800ms에서 150ms로 단축하여 사용자 만족도를 35% 향상시켰습니다.</p>
+
+            <h3>3.1 캐싱 전략</h3>
+            <div style="background:#f0f9ff;padding:20px;margin:20px 0;border-left:5px solid #3b82f6;border-radius:8px">
+                <h4 style="color:#1e40af;margin-bottom:10px">다층 캐싱 아키텍처</h4>
+                <ul style="margin-left:20px;line-height:1.8">
+                    <li><strong>L1: 브라우저 캐시</strong> - 정적 리소스 (이미지, JS, CSS) 7일</li>
+                    <li><strong>L2: CDN 캐시</strong> - CloudFront에서 24시간</li>
+                    <li><strong>L3: Redis 캐시</strong> - 메타데이터 1시간</li>
+                    <li><strong>L4: PostgreSQL</strong> - 원본 데이터</li>
+                </ul>
+            </div>
+
+            <h3>3.2 데이터베이스 최적화</h3>
+            <table style="width:100%;border-collapse:collapse;margin:20px 0">
+                <thead>
+                    <tr style="background:#7c3aed;color:white">
+                        <th style="padding:12px;border:1px solid #ddd">최적화 기법</th>
+                        <th style="padding:12px;border:1px solid #ddd">적용 전</th>
+                        <th style="padding:12px;border:1px solid #ddd">적용 후</th>
+                        <th style="padding:12px;border:1px solid #ddd">개선률</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>인덱스 최적화</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">800ms</td>
+                        <td style="padding:10px;border:1px solid #ddd">50ms</td>
+                        <td style="padding:10px;border:1px solid #ddd">-94%</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>N+1 쿼리 해결</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">100개 쿼리</td>
+                        <td style="padding:10px;border:1px solid #ddd">1개 JOIN</td>
+                        <td style="padding:10px;border:1px solid #ddd">-99%</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>연결 풀링</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">매번 새 연결</td>
+                        <td style="padding:10px;border:1px solid #ddd">20개 유지</td>
+                        <td style="padding:10px;border:1px solid #ddd">-60%</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>4. 사용자 경험 개선</h2>
+            <p>카카오페이지는 UX 개선으로 유료 전환율을 5%에서 12%로 향상시켰습니다.</p>
+
+            <h3>4.1 로딩 속도 최적화</h3>
+            <div style="background:#fef3c7;padding:20px;margin:20px 0;border-radius:8px">
+                <h4 style="color:#92400e">웹툰 이미지 최적화</h4>
+                <ul style="margin-left:20px;line-height:1.8">
+                    <li><strong>1. WebP 포맷 사용</strong>: PNG 대비 30% 용량 감소</li>
+                    <li><strong>2. 반응형 이미지</strong>: 디바이스별 최적 해상도 전송</li>
+                    <li><strong>3. Lazy Loading</strong>: 스크롤 시점에 로드</li>
+                    <li><strong>4. 프리페칭</strong>: 다음 에피소드 미리 로드</li>
+                </ul>
+            </div>
+
+            <h3>4.2 오프라인 모드</h3>
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+// Service Worker로 오프라인 지원
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse; // 캐시 우선 반환
+      }
+
+      // 네트워크 요청
+      return fetch(event.request).then((response) => {
+        // DRM 콘텐츠는 조건부 캐싱
+        if (event.request.url.includes('/encrypted/')) {
+          const license = await checkOfflineLicense();
+          if (license.valid && license.downloadable) {
+            caches.open('offline-content').then((cache) => {
+              cache.put(event.request, response.clone());
+            });
+          }
+        }
+        return response;
+      });
+    })
+  );
+});</pre>
+
+            <h2>5. 운영 효율화 전략</h2>
+            <p>넷플릭스는 자동화로 운영 인력을 70% 절감하면서도 서비스 가용성을 99.99%로 유지합니다.</p>
+
+            <h3>5.1 CI/CD 파이프라인</h3>
+            <table style="width:100%;border-collapse:collapse;margin:20px 0">
+                <thead>
+                    <tr style="background:#7c3aed;color:white">
+                        <th style="padding:12px;border:1px solid #ddd">단계</th>
+                        <th style="padding:12px;border:1px solid #ddd">도구</th>
+                        <th style="padding:12px;border:1px solid #ddd">자동화 범위</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>코드 검증</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">ESLint, TypeScript</td>
+                        <td style="padding:10px;border:1px solid #ddd">커밋 시 자동 실행</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>테스트</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">Jest, Cypress</td>
+                        <td style="padding:10px;border:1px solid #ddd">PR 생성 시 자동</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>빌드</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">Docker, Webpack</td>
+                        <td style="padding:10px;border:1px solid #ddd">main 병합 시 자동</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>배포</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">Kubernetes, ArgoCD</td>
+                        <td style="padding:10px;border:1px solid #ddd">태그 푸시 시 자동</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>6. 흔한 실수와 해결 방법</h2>
+            <div style="background:#fef2f2;padding:20px;margin:20px 0;border-left:5px solid #ef4444;border-radius:8px">
+                <h4 style="color:#991b1b;margin-bottom:10px">실수 1: 메타데이터 검증 생략</h4>
+                <p><strong>문제</strong>: 잘못된 메타데이터로 검색 불가, 추천 시스템 오작동</p>
+                <p style="margin-top:10px"><strong>해결</strong>: WIA SDK의 validateMetadata() 함수로 등록 전 검증</p>
+
+                <h4 style="color:#991b1b;margin:15px 0 10px 0">실수 2: DRM 키 로그 출력</h4>
+                <p><strong>문제</strong>: console.log()에 암호화 키 노출, 보안 위험</p>
+                <p style="margin-top:10px"><strong>해결</strong>: 프로덕션에서 DEBUG=false 설정, 민감 정보 필터링</p>
+
+                <h4 style="color:#991b1b;margin:15px 0 10px 0">실수 3: 에러 메시지에 민감 정보 포함</h4>
+                <p><strong>문제</strong>: "Failed to decrypt with key abc123..." → 키 유출</p>
+                <p style="margin-top:10px"><strong>해결</strong>: "암호화 오류가 발생했습니다" 같은 일반적 메시지 사용</p>
+
+                <h4 style="color:#991b1b;margin:15px 0 10px 0">실수 4: Rate Limiting 미적용</h4>
+                <p><strong>문제</strong>: DDoS 공격에 취약, API 과부하</p>
+                <p style="margin-top:10px"><strong>해결</strong>: express-rate-limit로 IP당 분당 100 요청 제한</p>
+
+                <h4 style="color:#991b1b;margin:15px 0 10px 0">실수 5: 정산 데이터 백업 부재</h4>
+                <p><strong>문제</strong>: DB 장애 시 창작자 수익 정보 소실</p>
+                <p style="margin-top:10px"><strong>해결</strong>: 매일 자동 백업, 3개월 보관, 블록체인에 해시 기록</p>
+            </div>
+
+            <h2>7. 모니터링과 알림</h2>
+            <h3>7.1 핵심 지표 (KPI)</h3>
+            <table style="width:100%;border-collapse:collapse;margin:20px 0">
+                <thead>
+                    <tr style="background:#7c3aed;color:white">
+                        <th style="padding:12px;border:1px solid #ddd">지표</th>
+                        <th style="padding:12px;border:1px solid #ddd">목표</th>
+                        <th style="padding:12px;border:1px solid #ddd">알림 조건</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>API 가용성</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">99.9%</td>
+                        <td style="padding:10px;border:1px solid #ddd">< 99.5%시 경고</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>응답 시간 (P95)</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">< 300ms</td>
+                        <td style="padding:10px;border:1px solid #ddd">> 500ms시 경고</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>DRM 성공률</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">99.9%</td>
+                        <td style="padding:10px;border:1px solid #ddd">< 99%시 긴급</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>정산 지연</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">< 10초</td>
+                        <td style="padding:10px;border:1px solid #ddd">> 60초시 경고</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>8. 弘益人間: 품질이 곧 신뢰</h2>
+            <p>최고의 모범 사례는 기술적 완벽함을 넘어, 사용자에게 신뢰를 주는 것입니다.</p>
+
+            <div style="background:#fef3c7;padding:20px;margin:20px 0;border-radius:8px">
+                <h4 style="color:#92400e">창작자에게 신뢰</h4>
+                <p>정확한 정산, 안정적인 서비스로 창작에 집중할 수 있는 환경</p>
+
+                <h4 style="color:#92400e;margin-top:15px">소비자에게 신뢰</h4>
+                <p>빠른 로딩, 안정적 재생, 개인정보 보호로 만족도 향상</p>
+
+                <h4 style="color:#92400e;margin-top:15px">파트너에게 신뢰</h4>
+                <p>표준 준수, API 안정성으로 장기 협력 관계 구축</p>
+            </div>
+
+            <h2>9. 요약 및 핵심 요점</h2>
+            <div class="key-takeaways">
+                <h3>🎯 핵심 요점</h3>
+                <ul>
+                    <li><strong>보안</strong>: 암호화 키 관리, DRM 우회 방지, 클라이언트 무결성 검증</li>
+                    <li><strong>성능</strong>: 다층 캐싱, DB 최적화로 응답 시간 50% 개선</li>
+                    <li><strong>UX</strong>: WebP, Lazy Loading, 오프라인 모드로 이탈률 30% 감소</li>
+                    <li><strong>운영</strong>: CI/CD 자동화로 비용 40% 절감</li>
+                    <li><strong>모니터링</strong>: 99.9% 가용성 목표, 실시간 알림</li>
+                    <li><strong>弘益人間</strong>: 품질과 신뢰로 모두에게 이로움 🌍</li>
+                </ul>
+            </div>
+
+            <h2>10. 생각해볼 질문</h2>
+            <div style="background:#ede9fe;padding:20px;margin:20px 0;border-radius:8px">
+                <ol style="margin-left:20px;line-height:2">
+                    <li>보안과 사용자 편의성이 충돌할 때 어떻게 균형을 맞출까요?</li>
+                    <li>캐싱 전략에서 데이터 일관성을 어떻게 보장할까요?</li>
+                    <li>모바일 네트워크에서 오프라인 모드는 얼마나 유용할까요?</li>
+                    <li>자동화가 인간의 일자리를 빼앗는다는 비판을 어떻게 생각하나요?</li>
+                    <li>99.9%와 99.99% 가용성의 차이는 비즈니스에 얼마나 중요할까요?</li>
+                </ol>
+            </div>
+
+            <h2>11. 다음 장에서는</h2>
+            <div style="background:#e0e7ff;padding:20px;margin:20px 0;border-radius:8px">
+                <p><strong>Chapter 07: 미래 전망</strong>에서는 WIA-DIGITAL_CONTENT의 발전 방향을 다룹니다:</p>
+                <ul style="margin-left:20px;margin-top:10px;line-height:1.8">
+                    <li>AI 기반 콘텐츠 생성과 저작권</li>
+                    <li>블록체인 NFT 통합</li>
+                    <li>메타버스 콘텐츠 표준</li>
+                    <li>6G 네트워크와 실감형 콘텐츠</li>
+                    <li>2030년 디지털 콘텐츠 시장 전망</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter-05.html" class="nav-button">← 이전</a>
+                <a href="chapter-07.html" class="nav-button">다음 →</a>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

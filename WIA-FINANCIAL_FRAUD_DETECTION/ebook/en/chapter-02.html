@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: System Architecture - WIA Standards</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.8; color: #333; background: #f5f5f5; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 60px 40px; border-radius: 15px; margin-bottom: 40px; }
+        h1 { font-size: 3em; margin-bottom: 20px; }
+        .content { background: white; padding: 50px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+        h2 { color: #667eea; font-size: 2em; margin: 40px 0 20px 0; }
+        h3 { color: #764ba2; font-size: 1.5em; margin: 30px 0 15px 0; }
+        p { margin-bottom: 20px; text-align: justify; }
+        .highlight-box { background: #f8f9fa; border-left: 5px solid #667eea; padding: 25px; margin: 30px 0; border-radius: 5px; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+        pre { background: #f4f4f4; padding: 20px; border-radius: 5px; overflow-x: auto; margin: 20px 0; }
+        ul { margin-left: 30px; margin-bottom: 20px; }
+        li { margin-bottom: 10px; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 40px; }
+        .nav-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; border-radius: 30px; text-decoration: none; font-weight: bold; }
+        .key-takeaway { background: #d4edda; border-left: 5px solid #28a745; padding: 25px; margin: 30px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <div>Chapter 2</div>
+            <h1>System Architecture & Design</h1>
+            <div style="font-size: 1.2em; margin-top: 15px; opacity: 0.9;">Building scalable, real-time fraud detection systems</div>
+        </div>
+        <div class="content">
+            <h2>2.1 Architecture Overview</h2>
+            <p>A production fraud detection system requires careful architectural design to handle millions of transactions per day with sub-100ms latency while maintaining 99.99% uptime. This chapter covers the architecture patterns, technology choices, and design principles for building such systems.</p>
+
+            <h3>2.1.1 High-Level Architecture</h3>
+            <pre>
+┌─────────────────────────────────────────────────────────────────┐
+│                    CLIENT APPLICATIONS                          │
+│  (Mobile Apps, Web, POS, API Integrations)                     │
+└────────────────────────┬───────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    API GATEWAY LAYER                            │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
+│  │ Rate Limiter │  │ Auth/AuthZ   │  │ TLS Offload  │         │
+│  └──────────────┘  └──────────────┘  └──────────────┘         │
+└────────────────────────┬───────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│               FRAUD DETECTION CORE ENGINE                       │
+│  ┌──────────────────────────────────────────────────┐          │
+│  │  Real-Time Stream Processing (Kafka + Flink)     │          │
+│  └────────────┬─────────────────────────────────────┘          │
+│               │                                                  │
+│       ┌───────┴────────┬──────────────┬──────────────┐         │
+│       ▼                ▼              ▼              ▼         │
+│  ┌─────────┐   ┌──────────────┐  ┌─────────┐  ┌─────────┐    │
+│  │ Feature │   │   ML Models  │  │  Rules  │  │ Scoring │    │
+│  │Engineer │   │  Ensemble    │  │ Engine  │  │ Fusion  │    │
+│  └─────────┘   └──────────────┘  └─────────┘  └─────────┘    │
+└────────────────────────┬───────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│  Case Mgmt   │  │  Analytics   │  │  Feedback    │
+│  (Manual     │  │  Dashboard   │  │  Loop (Model │
+│   Review)    │  │  (Kibana)    │  │  Retraining) │
+└──────────────┘  └──────────────┘  └──────────────┘
+            </pre>
+
+            <h2>2.2 Core Components</h2>
+
+            <h3>2.2.1 Transaction Collector</h3>
+            <p><strong>Purpose:</strong> Ingest transaction data from multiple sources in real-time with guaranteed delivery.</p>
+            <ul>
+                <li>Multi-protocol support: REST API, gRPC, GraphQL, message queues</li>
+                <li>Schema validation and transformation</li>
+                <li>Deduplication using idempotency keys</li>
+                <li>At-least-once delivery semantics</li>
+            </ul>
+
+            <h3>2.2.2 Feature Engineering Pipeline</h3>
+            <p>Transforms raw transaction data into 80+ ML-ready features:</p>
+            <ul>
+                <li><strong>Transaction Features (15):</strong> Amount, currency, MCC, time of day, velocity</li>
+                <li><strong>User Behavioral Features (25):</strong> Historical spending patterns, merchant affinity, geographic distribution</li>
+                <li><strong>Device/Network Features (20):</strong> Device fingerprint, IP geolocation, VPN detection</li>
+                <li><strong>Graph Features (10):</strong> Social network analysis, entity resolution</li>
+                <li><strong>External Data Features (10):</strong> Email reputation, phone validation, address verification</li>
+            </ul>
+
+            <h3>2.2.3 ML Model Ensemble</h3>
+            <p><strong>Ensemble Strategy:</strong> Weighted voting across multiple models</p>
+            <pre>
+Fraud_Score = 0.40 × XGBoost
+            + 0.30 × Random_Forest
+            + 0.15 × DNN
+            + 0.10 × Isolation_Forest
+            + 0.05 × Autoencoder
+            </pre>
+
+            <h3>2.2.4 Rules Engine</h3>
+            <p>Deterministic fraud checks using Drools:</p>
+            <ul>
+                <li><strong>Blacklist/Whitelist Rules:</strong> Blocked countries, IPs, email domains</li>
+                <li><strong>Velocity Rules:</strong> Max transactions per time window</li>
+                <li><strong>Geolocation Rules:</strong> Impossible travel detection</li>
+                <li><strong>Behavioral Rules:</strong> First transaction thresholds, address mismatches</li>
+            </ul>
+
+            <h2>2.3 Technology Stack</h2>
+
+            <h3>2.3.1 Stream Processing</h3>
+            <ul>
+                <li><strong>Apache Kafka:</strong> Event streaming platform (10K+ TPS per partition)</li>
+                <li><strong>Apache Flink:</strong> Stateful stream processing (windowed aggregations, joins)</li>
+                <li><strong>Kafka Streams:</strong> Lightweight stream processing (for simpler use cases)</li>
+            </ul>
+
+            <h3>2.3.2 Data Storage</h3>
+            <ul>
+                <li><strong>Transactional:</strong> PostgreSQL 15 (Aurora), DynamoDB</li>
+                <li><strong>Caching:</strong> Redis (feature store), Elasticache</li>
+                <li><strong>Time-Series:</strong> InfluxDB, TimescaleDB</li>
+                <li><strong>Graph:</strong> Neo4j (network analysis)</li>
+                <li><strong>Data Lake:</strong> S3, GCS (historical data for model training)</li>
+            </ul>
+
+            <h3>2.3.3 ML Infrastructure</h3>
+            <ul>
+                <li><strong>Training:</strong> Python (XGBoost, scikit-learn, TensorFlow)</li>
+                <li><strong>Feature Store:</strong> Feast, Tecton</li>
+                <li><strong>Model Serving:</strong> TensorFlow Serving, Seldon Core</li>
+                <li><strong>Experiment Tracking:</strong> MLflow, Weights & Biases</li>
+            </ul>
+
+            <h2>2.4 Scalability & Performance</h2>
+
+            <h3>2.4.1 Horizontal Scaling</h3>
+            <p><strong>Kubernetes Auto-Scaling (HPA):</strong></p>
+            <ul>
+                <li>Min replicas: 3, Max replicas: 50</li>
+                <li>CPU threshold: 70%, Memory threshold: 80%</li>
+                <li>Custom metrics: Request latency p95 < 100ms</li>
+                <li>Scale-up policy: 50% per minute</li>
+                <li>Scale-down cooldown: 5 minutes</li>
+            </ul>
+
+            <h3>2.4.2 Database Sharding</h3>
+            <p><strong>Shard Key:</strong> <code>customer_id</code> (consistent hashing)</p>
+            <pre>
+def get_shard_id(customer_id: str, num_shards: int = 8) -> int:
+    hash_value = int(hashlib.md5(customer_id.encode()).hexdigest(), 16)
+    return hash_value % num_shards
+            </pre>
+
+            <h3>2.4.3 Caching Strategy</h3>
+            <p><strong>Multi-Level Caching:</strong></p>
+            <ul>
+                <li><strong>L1 (Application):</strong> In-memory cache (60s TTL)</li>
+                <li><strong>L2 (Distributed):</strong> Redis (15 min TTL for user profiles)</li>
+                <li><strong>L3 (Database):</strong> PostgreSQL with indexes</li>
+            </ul>
+
+            <h2>2.5 High Availability</h2>
+
+            <h3>2.5.1 Multi-Region Deployment</h3>
+            <ul>
+                <li><strong>Primary:</strong> us-east-1 (Active)</li>
+                <li><strong>Secondary:</strong> eu-west-1 (Active)</li>
+                <li><strong>Failover:</strong> Route 53 latency-based routing + health checks</li>
+                <li><strong>RTO:</strong> < 5 minutes</li>
+                <li><strong>RPO:</strong> < 1 minute (Aurora continuous replication)</li>
+            </ul>
+
+            <h3>2.5.2 Circuit Breaker Pattern</h3>
+            <pre>
+@circuit(failure_threshold=5, recovery_timeout=60)
+def call_external_api(url, data):
+    response = requests.post(url, json=data, timeout=2)
+    response.raise_for_status()
+    return response.json()
+            </pre>
+
+            <h2>2.6 Deployment Patterns</h2>
+
+            <h3>2.6.1 Blue-Green Deployment</h3>
+            <p>Major version upgrades with instant rollback:</p>
+            <ul>
+                <li>Deploy new version (Green) alongside old version (Blue)</li>
+                <li>Run smoke tests on Green environment</li>
+                <li>Switch traffic from Blue to Green (via Kubernetes Service)</li>
+                <li>Keep Blue running for 1 hour for potential rollback</li>
+            </ul>
+
+            <h3>2.6.2 Canary Deployment</h3>
+            <p>Gradual rollout with risk mitigation:</p>
+            <ul>
+                <li>Hour 0: 100% stable, 0% canary</li>
+                <li>Hour 1: 95% stable, 5% canary</li>
+                <li>Hour 4: 75% stable, 25% canary</li>
+                <li>Hour 8: 50% stable, 50% canary</li>
+                <li>Hour 16: 0% stable, 100% canary (complete rollout)</li>
+            </ul>
+
+            <div class="key-takeaway">
+                <h3>Key Takeaways</h3>
+                <ul>
+                    <li>Microservices architecture with Kubernetes enables horizontal scaling to 10K+ TPS</li>
+                    <li>Kafka + Flink provide real-time stream processing with sub-100ms latency</li>
+                    <li>Feature store (Feast) centralizes feature management for online/offline scenarios</li>
+                    <li>Multi-region deployment with Route 53 ensures 99.99% uptime (RTO < 5 min)</li>
+                    <li>Database sharding by customer_id enables linear scalability</li>
+                    <li>Canary deployment reduces risk of bad releases</li>
+                </ul>
+            </div>
+
+            </div>
+    </div>
+</body>
+</html>

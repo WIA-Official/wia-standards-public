@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-HOME Simulator</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <style>
+        :root {
+            --primary: #6366F1;
+            --primary-dark: #4F46E5;
+            --secondary: #F59E0B;
+            --danger: #ef4444;
+            --success: #10b981;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        header { text-align: center; padding: 2rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary); }
+        .subtitle { color: var(--text-muted); }
+        .lang-toggle { position: absolute; top: 1rem; right: 1rem; }
+        .lang-toggle button {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+        }
+        .lang-toggle button:hover { background: var(--bg-input); }
+        .lang-toggle button.active { background: var(--primary); border-color: var(--primary); }
+        .tabs { display: flex; gap: 0.25rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .tab {
+            padding: 0.75rem 1.25rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 0.5rem 0.5rem 0 0;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        .tab:hover { color: var(--text); background: var(--bg-input); }
+        .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .panel { display: none; }
+        .panel.active { display: block; }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .card h3 { color: var(--primary); margin-bottom: 1rem; font-size: 1.1rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            color: var(--text);
+            font-size: 1rem;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary { background: var(--secondary); color: black; }
+        .btn-secondary:hover { opacity: 0.9; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { opacity: 0.9; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { opacity: 0.9; }
+        .output {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            color: #7ee787;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .status-success { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .status-error { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .status-warning { background: rgba(245, 158, 11, 0.2); color: var(--secondary); }
+        .status-info { background: rgba(99, 102, 241, 0.2); color: var(--primary); }
+        .grid { display: grid; gap: 1rem; }
+        .grid-2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+        .grid-3 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+        .meter-container { margin: 0.5rem 0; }
+        .meter-label { display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.85rem; }
+        .meter { height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; }
+        .meter-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+        .server-card { text-align: center; padding: 2rem; }
+        .server-status { font-size: 3rem; margin-bottom: 0.5rem; }
+        .domain-display { font-size: 1.2rem; color: var(--primary); margin: 1rem 0; font-family: monospace; }
+        .visitors-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin: 1rem 0; }
+        .visitor-badge { background: var(--bg-input); padding: 0.5rem; border-radius: 0.5rem; font-size: 0.8rem; text-align: center; }
+        .log-entry { padding: 0.25rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+        .log-entry:last-child { border-bottom: none; }
+        .log-time { color: var(--text-muted); margin-right: 0.5rem; }
+        .peer-node { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--bg-input); border-radius: 0.5rem; margin-bottom: 0.5rem; }
+        .peer-status { width: 10px; height: 10px; border-radius: 50%; }
+        .peer-status.online { background: var(--success); }
+        .peer-status.offline { background: var(--danger); }
+        .peer-info { flex: 1; }
+        .peer-name { font-weight: 500; }
+        .peer-details { font-size: 0.8rem; color: var(--text-muted); }
+        .template-card { background: var(--bg-input); border-radius: 0.75rem; padding: 1.25rem; cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
+        .template-card:hover { border-color: var(--primary); }
+        .template-card.selected { border-color: var(--success); background: rgba(16, 185, 129, 0.1); }
+        .template-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+        .template-name { font-weight: 600; margin-bottom: 0.25rem; }
+        .template-desc { font-size: 0.85rem; color: var(--text-muted); }
+        footer { text-align: center; padding: 2rem 0; margin-top: 2rem; border-top: 1px solid var(--border); color: var(--text-muted); }
+        footer a { color: var(--primary); text-decoration: none; }
+        @media (max-width: 768px) {
+            .tabs { flex-direction: column; }
+            .tab { border-radius: 0.5rem; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="lang-toggle">
+        <button id="btn-en" class="active" onclick="setLang('en')">EN</button>
+        <button id="btn-ko" onclick="setLang('ko')">KO</button>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>WIA-HOME Simulator</h1>
+            <p class="subtitle"><span data-en="P2P Personal Web Server - Build-Owner Free Home" data-ko="P2P 개인 웹 서버 - 건축주 없는 자유로운 집">P2P Personal Web Server - Build-Owner Free Home</span></p>
+            <p style="margin-top: 0.5rem; color: var(--secondary);"><span data-en="Philosophy: Hongik Ingan - Everyone deserves a home in the digital world" data-ko="철학: 弘益人間(홍익인간) - 모든 사람은 디지털 세상에서 집을 가질 자격이 있습니다">Philosophy: Hongik Ingan - Everyone deserves a home in the digital world</span></p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('server')"><span data-en="Server" data-ko="서버">Server</span></button>
+            <button class="tab" onclick="showTab('p2p')"><span data-en="P2P Network" data-ko="P2P 네트워크">P2P Network</span></button>
+            <button class="tab" onclick="showTab('cloner')"><span data-en="Site Cloner" data-ko="사이트 복제">Site Cloner</span></button>
+            <button class="tab" onclick="showTab('templates')"><span data-en="Templates" data-ko="템플릿">Templates</span></button>
+            <button class="tab" onclick="showTab('api')"><span data-en="API Test" data-ko="API 테스트">API Test</span></button>
+        </div>
+
+        <div id="panel-server" class="panel active">
+            <div class="grid grid-2">
+                <div class="card server-card">
+                    <div class="server-status" id="serverIcon">🏠</div>
+                    <div id="serverStatusText"><span data-en="Server Stopped" data-ko="서버 중지됨">Server Stopped</span></div>
+                    <div class="domain-display" id="domainDisplay">happy-bakery.wia.home</div>
+                    <div style="margin: 1.5rem 0;">
+                        <button class="btn btn-success" id="startBtn" onclick="startServer()"><span data-en="Start Server" data-ko="서버 시작">Start Server</span></button>
+                        <button class="btn btn-danger" id="stopBtn" onclick="stopServer()" style="display: none;"><span data-en="Stop Server" data-ko="서버 중지">Stop Server</span></button>
+                    </div>
+                    <div class="visitors-grid" id="visitorsGrid" style="display: none;">
+                        <div class="visitor-badge">👤 Visitor 1</div>
+                        <div class="visitor-badge">👤 Visitor 2</div>
+                        <div class="visitor-badge">👤 Visitor 3</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3><span data-en="Resource Monitor" data-ko="리소스 모니터">Resource Monitor</span></h3>
+                    <div class="meter-container">
+                        <div class="meter-label"><span>CPU</span><span id="cpuValue">0%</span></div>
+                        <div class="meter"><div class="meter-fill" id="cpuMeter" style="width: 0%; background: var(--primary);"></div></div>
+                    </div>
+                    <div class="meter-container">
+                        <div class="meter-label"><span><span data-en="Memory" data-ko="메모리">Memory</span></span><span id="memValue">0 MB</span></div>
+                        <div class="meter"><div class="meter-fill" id="memMeter" style="width: 0%; background: var(--success);"></div></div>
+                    </div>
+                    <div class="meter-container">
+                        <div class="meter-label"><span><span data-en="Bandwidth" data-ko="대역폭">Bandwidth</span></span><span id="bwValue">0 KB/s</span></div>
+                        <div class="meter"><div class="meter-fill" id="bwMeter" style="width: 0%; background: var(--secondary);"></div></div>
+                    </div>
+                    <div class="meter-container">
+                        <div class="meter-label"><span><span data-en="Visitors" data-ko="방문자">Visitors</span></span><span id="visitorCount">0 active</span></div>
+                        <div class="meter"><div class="meter-fill" id="visitorMeter" style="width: 0%; background: var(--danger);"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3><span data-en="Server Log" data-ko="서버 로그">Server Log</span></h3>
+                <div class="output" id="serverLog">[System] Ready to start server...</div>
+            </div>
+        </div>
+
+        <div id="panel-p2p" class="panel">
+            <div class="card">
+                <h3><span data-en="P2P Network Status" data-ko="P2P 네트워크 상태">P2P Network Status</span></h3>
+                <div class="grid grid-3" style="margin-bottom: 1rem;">
+                    <div style="text-align: center; padding: 1rem; background: var(--bg-input); border-radius: 0.5rem;">
+                        <div style="font-size: 1.5rem; color: var(--primary);" id="peerCount">0</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);"><span data-en="Connected Peers" data-ko="연결된 피어">Connected Peers</span></div>
+                    </div>
+                    <div style="text-align: center; padding: 1rem; background: var(--bg-input); border-radius: 0.5rem;">
+                        <div style="font-size: 1.5rem; color: var(--success);" id="cachePercent">0%</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);"><span data-en="Cache Coverage" data-ko="캐시 커버리지">Cache Coverage</span></div>
+                    </div>
+                    <div style="text-align: center; padding: 1rem; background: var(--bg-input); border-radius: 0.5rem;">
+                        <div style="font-size: 1.5rem; color: var(--secondary);" id="uptimePercent">99.9%</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);"><span data-en="Uptime" data-ko="가동률">Uptime</span></div>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="connectP2P()"><span data-en="Connect to P2P Network" data-ko="P2P 네트워크 연결">Connect to P2P Network</span></button>
+            </div>
+
+            <div class="card">
+                <h3><span data-en="Nearby Peers" data-ko="근처 피어">Nearby Peers</span></h3>
+                <div id="peerList">
+                    <p style="color: var(--text-muted);"><span data-en="Click 'Connect' to discover peers..." data-ko="피어를 찾으려면 '연결' 버튼을 클릭하세요...">Click 'Connect' to discover peers...</span></p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3><span data-en="Offline Availability" data-ko="오프라인 가용성">Offline Availability</span></h3>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;"><span data-en="Your site stays available even when your PC is off through P2P caching" data-ko="P2P 캐싱을 통해 PC가 꺼져 있어도 사이트가 계속 이용 가능합니다">Your site stays available even when your PC is off through P2P caching</span></p>
+                <div class="form-group">
+                    <label><span data-en="Cache Priority" data-ko="캐시 우선순위">Cache Priority</span></label>
+                    <select id="cachePriority">
+                        <option value="high">High - Always cached by 5+ peers</option>
+                        <option value="medium" selected>Medium - Cached by 2-3 peers</option>
+                        <option value="low">Low - Cached when available</option>
+                    </select>
+                </div>
+                <button class="btn btn-secondary" onclick="updateCacheSettings()"><span data-en="Update Settings" data-ko="설정 업데이트">Update Settings</span></button>
+            </div>
+        </div>
+
+        <div id="panel-cloner" class="panel">
+            <div class="card">
+                <h3><span data-en="Clone Any Website" data-ko="웹사이트 복제">Clone Any Website</span></h3>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;"><span data-en="Import your existing site or clone a template to get started quickly" data-ko="기존 사이트를 가져오거나 템플릿을 복제하여 빠르게 시작하세요">Import your existing site or clone a template to get started quickly</span></p>
+                <div class="form-group">
+                    <label><span data-en="Website URL" data-ko="웹사이트 URL">Website URL</span></label>
+                    <input type="text" id="cloneUrl" placeholder="https://example.com">
+                </div>
+                <div class="form-group">
+                    <label><span data-en="Clone Depth" data-ko="복제 깊이">Clone Depth</span></label>
+                    <select id="cloneDepth">
+                        <option value="1">Single Page</option>
+                        <option value="2" selected>With Links (2 levels)</option>
+                        <option value="3">Full Site (3 levels)</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="cloneSite()"><span data-en="Clone Website" data-ko="웹사이트 복제">Clone Website</span></button>
+            </div>
+
+            <div class="card">
+                <h3><span data-en="Clone Progress" data-ko="복제 진행상황">Clone Progress</span></h3>
+                <div class="output" id="cloneOutput">[Cloner] Ready to clone...</div>
+            </div>
+        </div>
+
+        <div id="panel-templates" class="panel">
+            <div class="card">
+                <h3><span data-en="Business Templates" data-ko="비즈니스 템플릿">Business Templates</span></h3>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;"><span data-en="Choose a template to start your digital home business" data-ko="디지털 홈 비즈니스를 시작할 템플릿을 선택하세요">Choose a template to start your digital home business</span></p>
+                <div class="grid grid-3" id="templateGrid">
+                    <div class="template-card" onclick="selectTemplate(this, 'shop')">
+                        <div class="template-icon">🛒</div>
+                        <div class="template-name">Shop</div>
+                        <div class="template-desc"><span data-en="E-commerce store" data-ko="전자상거래 스토어">E-commerce store</span></div>
+                    </div>
+                    <div class="template-card" onclick="selectTemplate(this, 'booking')">
+                        <div class="template-icon">📅</div>
+                        <div class="template-name">Booking</div>
+                        <div class="template-desc"><span data-en="Appointment system" data-ko="예약 시스템">Appointment system</span></div>
+                    </div>
+                    <div class="template-card" onclick="selectTemplate(this, 'portfolio')">
+                        <div class="template-icon">🎨</div>
+                        <div class="template-name">Portfolio</div>
+                        <div class="template-desc"><span data-en="Showcase work" data-ko="작업 쇼케이스">Showcase work</span></div>
+                    </div>
+                    <div class="template-card" onclick="selectTemplate(this, 'blog')">
+                        <div class="template-icon">📝</div>
+                        <div class="template-name">Blog</div>
+                        <div class="template-desc"><span data-en="Personal blog" data-ko="개인 블로그">Personal blog</span></div>
+                    </div>
+                    <div class="template-card" onclick="selectTemplate(this, 'restaurant')">
+                        <div class="template-icon">🍽️</div>
+                        <div class="template-name">Restaurant</div>
+                        <div class="template-desc"><span data-en="Menu & orders" data-ko="메뉴 & 주문">Menu & orders</span></div>
+                    </div>
+                    <div class="template-card" onclick="selectTemplate(this, 'services')">
+                        <div class="template-icon">💼</div>
+                        <div class="template-name">Services</div>
+                        <div class="template-desc"><span data-en="Service business" data-ko="서비스 비즈니스">Service business</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3><span data-en="Configure Template" data-ko="템플릿 설정">Configure Template</span></h3>
+                <div class="form-group">
+                    <label><span data-en="Business Name" data-ko="사업체 이름">Business Name</span></label>
+                    <input type="text" id="businessName" placeholder="My Awesome Business">
+                </div>
+                <div class="form-group">
+                    <label><span data-en="Subdomain" data-ko="서브도메인">Subdomain</span></label>
+                    <input type="text" id="subdomain" placeholder="my-business">.wia.home
+                </div>
+                <button class="btn btn-primary" onclick="deployTemplate()"><span data-en="Deploy Template" data-ko="템플릿 배포">Deploy Template</span></button>
+                <div class="output" id="templateOutput" style="margin-top: 1rem;">[Template] Select a template above...</div>
+            </div>
+        </div>
+
+        <div id="panel-api" class="panel">
+            <div class="card">
+                <h3><span data-en="API Endpoints" data-ko="API 엔드포인트">API Endpoints</span></h3>
+                <div class="form-group">
+                    <label><span data-en="Select Endpoint" data-ko="엔드포인트 선택">Select Endpoint</span></label>
+                    <select id="apiEndpoint" onchange="updateApiPreview()">
+                        <option value="server.start">POST /api/server/start</option>
+                        <option value="server.status">GET /api/server/status</option>
+                        <option value="p2p.connect">POST /api/p2p/connect</option>
+                        <option value="p2p.peers">GET /api/p2p/peers</option>
+                        <option value="clone.start">POST /api/clone/start</option>
+                        <option value="template.deploy">POST /api/template/deploy</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="testApi()"><span data-en="Test API" data-ko="API 테스트">Test API</span></button>
+            </div>
+
+            <div class="card">
+                <h3><span data-en="Response" data-ko="응답">Response</span></h3>
+                <div class="output" id="apiOutput">{
+  "message": "Select an endpoint and click Test API"
+}</div>
+            </div>
+        </div>
+
+        <footer>
+            <p><strong>WIA-HOME</strong> - <span data-en="Your PC is Your Server" data-ko="당신의 PC가 당신의 서버입니다">Your PC is Your Server</span></p>
+            <p style="margin-top: 0.5rem;"><span data-en="Philosophy" data-ko="철학">Philosophy</span>: 弘益人間 (Hongik Ingan) · <span data-en="Benefit All Humanity" data-ko="널리 인간을 이롭게">Benefit All Humanity</span></p>
+            <p style="margin-top: 0.5rem;"><a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a></p>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+        let serverRunning = false;
+        let resourceInterval = null;
+        let selectedTemplate = null;
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+            document.getElementById('btn-ko').classList.toggle('active', lang === 'ko');
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang);
+            });
+        }
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            event.target.closest('.tab').classList.add('active');
+            document.getElementById('panel-' + tabId).classList.add('active');
+        }
+
+        function addLog(message) {
+            const log = document.getElementById('serverLog');
+            const time = new Date().toLocaleTimeString();
+            log.textContent += '\n[' + time + '] ' + message;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function startServer() {
+            serverRunning = true;
+            document.getElementById('serverIcon').textContent = '🏠✨';
+            document.getElementById('serverStatusText').innerHTML = '<span class="status-badge status-success">Running</span>';
+            document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('stopBtn').style.display = 'inline-block';
+            document.getElementById('visitorsGrid').style.display = 'grid';
+            addLog('Server started successfully!');
+            addLog('Listening on https://happy-bakery.wia.home');
+
+            resourceInterval = setInterval(() => {
+                const cpu = Math.floor(Math.random() * 20 + 5);
+                const mem = Math.floor(Math.random() * 50 + 30);
+                const bw = Math.floor(Math.random() * 500 + 100);
+                const visitors = Math.floor(Math.random() * 5 + 1);
+
+                document.getElementById('cpuValue').textContent = cpu + '%';
+                document.getElementById('cpuMeter').style.width = cpu + '%';
+                document.getElementById('memValue').textContent = mem + ' MB';
+                document.getElementById('memMeter').style.width = (mem / 128 * 100) + '%';
+                document.getElementById('bwValue').textContent = bw + ' KB/s';
+                document.getElementById('bwMeter').style.width = (bw / 1000 * 100) + '%';
+                document.getElementById('visitorCount').textContent = visitors + ' active';
+                document.getElementById('visitorMeter').style.width = (visitors / 10 * 100) + '%';
+            }, 2000);
+        }
+
+        function stopServer() {
+            serverRunning = false;
+            clearInterval(resourceInterval);
+            document.getElementById('serverIcon').textContent = '🏠';
+            document.getElementById('serverStatusText').innerHTML = '<span data-en="Server Stopped" data-ko="서버 중지됨">Server Stopped</span>';
+            document.getElementById('startBtn').style.display = 'inline-block';
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('visitorsGrid').style.display = 'none';
+            document.getElementById('cpuValue').textContent = '0%';
+            document.getElementById('cpuMeter').style.width = '0%';
+            document.getElementById('memValue').textContent = '0 MB';
+            document.getElementById('memMeter').style.width = '0%';
+            document.getElementById('bwValue').textContent = '0 KB/s';
+            document.getElementById('bwMeter').style.width = '0%';
+            document.getElementById('visitorCount').textContent = '0 active';
+            document.getElementById('visitorMeter').style.width = '0%';
+            addLog('Server stopped');
+            setLang(currentLang);
+        }
+
+        function connectP2P() {
+            document.getElementById('peerCount').textContent = '7';
+            document.getElementById('cachePercent').textContent = '85%';
+            const peers = [
+                { name: 'peer-tokyo-01', region: 'Tokyo, JP', online: true },
+                { name: 'peer-seoul-03', region: 'Seoul, KR', online: true },
+                { name: 'peer-sf-02', region: 'San Francisco, US', online: true },
+                { name: 'peer-london-01', region: 'London, UK', online: true },
+                { name: 'peer-sydney-02', region: 'Sydney, AU', online: false },
+                { name: 'peer-berlin-01', region: 'Berlin, DE', online: true },
+                { name: 'peer-mumbai-03', region: 'Mumbai, IN', online: true }
+            ];
+
+            let html = '';
+            peers.forEach(p => {
+                html += '<div class="peer-node"><span class="peer-status ' + (p.online ? 'online' : 'offline') + '"></span><div class="peer-info"><div class="peer-name">' + p.name + '</div><div class="peer-details">' + p.region + '</div></div></div>';
+            });
+            document.getElementById('peerList').innerHTML = html;
+        }
+
+        function updateCacheSettings() {
+            const priority = document.getElementById('cachePriority').value;
+            alert('Cache priority updated to: ' + priority);
+        }
+
+        function cloneSite() {
+            const url = document.getElementById('cloneUrl').value || 'https://example.com';
+            const depth = document.getElementById('cloneDepth').value;
+            const output = document.getElementById('cloneOutput');
+
+            output.textContent = '[Cloner] Starting clone of ' + url + '...\n';
+            output.textContent += '[Cloner] Depth: ' + depth + ' levels\n';
+
+            setTimeout(() => { output.textContent += '[Cloner] Fetching homepage...\n'; }, 500);
+            setTimeout(() => { output.textContent += '[Cloner] Downloading assets (15 files)...\n'; }, 1000);
+            setTimeout(() => { output.textContent += '[Cloner] Processing CSS...\n'; }, 1500);
+            setTimeout(() => { output.textContent += '[Cloner] Optimizing images...\n'; }, 2000);
+            setTimeout(() => { output.textContent += '[Cloner] Clone complete!\n'; output.textContent += '[Cloner] Site saved to ./cloned/' + url.replace(/https?:\/\//, '').replace(/\//g, '_'); }, 2500);
+        }
+
+        function selectTemplate(el, template) {
+            document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedTemplate = template;
+            document.getElementById('templateOutput').textContent = '[Template] Selected: ' + template + '\nConfigure and deploy when ready.';
+        }
+
+        function deployTemplate() {
+            if (!selectedTemplate) {
+                alert('Please select a template first');
+                return;
+            }
+            const name = document.getElementById('businessName').value || 'My Business';
+            const subdomain = document.getElementById('subdomain').value || 'my-business';
+            const output = document.getElementById('templateOutput');
+
+            output.textContent = '[Template] Deploying ' + selectedTemplate + ' template...\n';
+            output.textContent += '[Template] Business: ' + name + '\n';
+            output.textContent += '[Template] Domain: ' + subdomain + '.wia.home\n\n';
+
+            setTimeout(() => {
+                output.textContent += '[Template] Creating site structure...\n';
+            }, 500);
+            setTimeout(() => {
+                output.textContent += '[Template] Setting up database...\n';
+            }, 1000);
+            setTimeout(() => {
+                output.textContent += '[Template] Deployment complete!\n';
+                output.textContent += '[Template] Your site is live at: https://' + subdomain + '.wia.home';
+            }, 1500);
+        }
+
+        function testApi() {
+            const endpoint = document.getElementById('apiEndpoint').value;
+            const responses = {
+                'server.start': { success: true, status: 'running', domain: 'happy-bakery.wia.home', port: 443 },
+                'server.status': { running: true, uptime: '12h 34m', visitors: 156, bandwidth: '2.3 GB' },
+                'p2p.connect': { success: true, peers_connected: 7, cache_coverage: '85%' },
+                'p2p.peers': { peers: [{ id: 'peer-tokyo-01', latency: '23ms' }, { id: 'peer-seoul-03', latency: '8ms' }] },
+                'clone.start': { job_id: 'clone_abc123', status: 'in_progress', progress: 45 },
+                'template.deploy': { success: true, template: 'shop', domain: 'my-store.wia.home', ssl: true }
+            };
+            document.getElementById('apiOutput').textContent = JSON.stringify(responses[endpoint], null, 2);
+        }
+
+        setLang(currentLang);
+    </script>
+</body>
+</html>

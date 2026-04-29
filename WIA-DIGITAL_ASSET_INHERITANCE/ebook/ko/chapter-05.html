@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 05 - Phase 2: API 인터페이스</title>
+    <style>:root{--primary:#ec4899;--primary-dark:#db2777}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;color:#334155;background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3)}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content p{margin:15px 0}.info-box{background:#dbeafe;border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.warning-box{background:#fef3c7;border-left:5px solid #f59e0b;padding:20px;margin:25px 0;border-radius:8px}.success-box{background:#d1fae5;border-left:5px solid #10b981;padding:20px;margin:25px 0;border-radius:8px}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px}.key-takeaways h3{color:#065f46;margin-bottom:20px}table{width:100%;border-collapse:collapse;margin:25px 0;background:white;box-shadow:0 2px 8px rgba(0,0,0,.1)}th{background:var(--primary);color:white;padding:15px;text-align:left}td{padding:12px 15px;border-bottom:1px solid #e2e8f0}tr:hover{background:#f8fafc}pre{background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0}code{font-family:'Courier New',monospace;font-size:0.9em}.review-questions{background:#f1f5f9;padding:30px;border-radius:12px;margin:30px 0}.review-questions h3{color:var(--primary-dark);margin-bottom:20px}.review-questions ol{margin-left:20px}.review-questions li{margin:15px 0;line-height:1.8}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid #e2e8f0}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none}.footer{background:#0f172a;color:white;text-align:center;padding:30px}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📖 Chapter 05</h1>
+            <p>Phase 2: API 인터페이스 구축</p>
+            <p style="margin-top:10px;font-size:0.9em;opacity:0.9">RESTful API, GraphQL, 플랫폼 통합</p>
+        </div>
+        <div class="content">
+            <h2>1. Phase 2 개요</h2>
+            <p>Phase 2는 2025년 하반기(Q3-Q4)에 진행되며, 데이터 포맷 위에 실제 플랫폼 간 통신을 가능하게 하는 API 계층을 구축합니다. 이 단계에서는 5개 파일럿 플랫폼에서 20개 주요 플랫폼으로 확대되며, 월 1,000건 이상의 상속 케이스를 처리할 수 있는 확장성을 확보합니다.</p>
+
+            <div class="info-box">
+                <h4>🎯 Phase 2 목표</h4>
+                <ul style="margin:10px 0 0 20px;line-height:2">
+                    <li>WIA API Gateway 구축 및 운영</li>
+                    <li>RESTful API + GraphQL 이중 지원</li>
+                    <li>Pass/NPKI 통합 인증 게이트웨이 완성</li>
+                    <li>20개 플랫폼 API 연동 완료</li>
+                    <li>디지털 자산 조회/이전 API 구현</li>
+                    <li>초당 100 req/s 처리 능력 확보</li>
+                    <li>99.9% 가용성 보장</li>
+                </ul>
+            </div>
+
+            <h2>2. WIA API Gateway 아키텍처</h2>
+            <p>WIA API Gateway는 플랫폼, 정부, 금융기관, 사용자를 연결하는 중앙 허브 역할을 합니다:</p>
+
+            <pre><code>// WIA API Gateway 아키텍처
+const apiGatewayArchitecture = {
+  // 1. 프론트엔드 계층
+  frontend: {
+    loadBalancer: {
+      provider: "AWS ALB (Seoul Region)",
+      backup: "네이버 클라우드 Load Balancer",
+      algorithm: "Round Robin + Sticky Session",
+      healthCheck: "매 10초, 3회 실패 시 제외"
+    },
+
+    cdn: {
+      provider: "Cloudflare + AWS CloudFront",
+      caching: "정적 리소스 24시간, API 응답 5분",
+      ddosProtection: "Cloudflare Pro",
+      koreanEdge: "서울, 부산 엣지 서버"
+    }
+  },
+
+  // 2. API 게이트웨이 계층
+  gateway: {
+    technology: "Kong Gateway Enterprise",
+    deployment: "Kubernetes (EKS Seoul)",
+    replicas: 5,  // 최소 5개 인스턴스
+
+    features: [
+      "Rate Limiting",
+      "Authentication (OAuth 2.0, JWT)",
+      "Request/Response Transformation",
+      "Circuit Breaker",
+      "Retry & Timeout",
+      "Logging & Monitoring"
+    ],
+
+    rateLimits: {
+      anonymous: "10 req/min",
+      authenticated: "1000 req/min",
+      platform: "10000 req/min",
+      government: "무제한"
+    }
+  },
+
+  // 3. 인증 계층
+  authentication: {
+    passIntegration: {
+      endpoint: "https://api.pass-alliance.or.kr/v1/verify",
+      providers: [
+        "KB국민은행", "신한은행", "하나은행", "우리은행",
+        "NH농협", "IBK기업은행", "카카오뱅크", "토스뱅크"
+      ],
+      verification: "실시간 API 호출",
+      fallback: "NPKI 인증서"
+    },
+
+    npkiIntegration: {
+      validators: [
+        "한국정보인증", "코스콤", "한국전자인증",
+        "한국무역정보통신", "TradeSign", "SignKorea"
+      ],
+      verification: "PKCS#7 서명 검증",
+      cache: "검증 결과 1시간 캐싱"
+    },
+
+    oauth2: {
+      providers: ["카카오", "네이버", "구글", "애플"],
+      tokenExpiry: "1시간",
+      refreshToken: "30일",
+      scope: ["profile", "inheritance", "asset_read"]
+    }
+  },
+
+  // 4. 비즈니스 로직 계층
+  services: {
+    assetDiscovery: "자산 검색 서비스",
+    beneficiaryVerification: "유족 확인 서비스",
+    assetTransfer: "자산 이전 서비스",
+    taxCalculation: "세금 계산 서비스",
+    notification: "알림 서비스",
+    audit: "감사 추적 서비스"
+  },
+
+  // 5. 데이터 계층
+  database: {
+    primary: "PostgreSQL 14 (Multi-AZ)",
+    read_replica: 3,
+    cache: "Redis Cluster (6 nodes)",
+    search: "Elasticsearch 8.x",
+    blockchain: "Klaytn Mainnet"
+  },
+
+  // 6. 외부 연동 계층
+  external: {
+    platforms: {
+      count: 20,
+      categories: ["금융", "SNS", "게임", "클라우드", "암호화폐"],
+      protocol: "HTTPS + mTLS"
+    },
+
+    government: {
+      mois: "행정안전부 - 가족관계",
+      nts: "국세청 - 상속세",
+      fsc: "금융위원회 - 금융정보",
+      courts: "법원 - 상속 포기/한정승인"
+    },
+
+    thirdParty: {
+      codef: "CODEF - 금융 데이터 스크래핑",
+      nice: "NICE - 신용정보",
+      sms: "알리고 - SMS 발송"
+    }
+  }
+};</code></pre>
+
+            <h2>3. RESTful API 엔드포인트 설계</h2>
+            <p>WIA는 직관적이고 RESTful한 API 설계를 따릅니다:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>엔드포인트</th>
+                        <th>메서드</th>
+                        <th>설명</th>
+                        <th>인증</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>/api/v1/inheritance</strong></td>
+                        <td>POST</td>
+                        <td>상속 케이스 생성</td>
+                        <td>Pass/NPKI</td>
+                    </tr>
+                    <tr>
+                        <td><strong>/api/v1/inheritance/{id}</strong></td>
+                        <td>GET</td>
+                        <td>상속 케이스 조회</td>
+                        <td>JWT</td>
+                    </tr>
+                    <tr>
+                        <td><strong>/api/v1/assets/discover</strong></td>
+                        <td>POST</td>
+                        <td>디지털 자산 검색</td>
+                        <td>OAuth 2.0</td>
+                    </tr>
+                    <tr>
+                        <td><strong>/api/v1/assets/transfer</strong></td>
+                        <td>POST</td>
+                        <td>자산 이전 실행</td>
+                        <td>Pass + OTP</td>
+                    </tr>
+                    <tr>
+                        <td><strong>/api/v1/beneficiary/verify</strong></td>
+                        <td>POST</td>
+                        <td>유족 신원 확인</td>
+                        <td>행안부 API</td>
+                    </tr>
+                    <tr>
+                        <td><strong>/api/v1/tax/calculate</strong></td>
+                        <td>POST</td>
+                        <td>상속세 계산</td>
+                        <td>국세청 API</td>
+                    </tr>
+                    <tr>
+                        <td><strong>/api/v1/platforms</strong></td>
+                        <td>GET</td>
+                        <td>지원 플랫폼 목록</td>
+                        <td>None</td>
+                    </tr>
+                    <tr>
+                        <td><strong>/api/v1/audit/{id}</strong></td>
+                        <td>GET</td>
+                        <td>감사 추적 조회</td>
+                        <td>JWT</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>4. 디지털 자산 조회 API 상세</h2>
+            <p>가장 핵심적인 자산 검색 API의 상세 스펙입니다:</p>
+
+            <pre><code>// 디지털 자산 검색 API
+POST https://api.wia.org/v1/assets/discover
+Content-Type: application/json
+Authorization: Bearer {JWT_TOKEN}
+X-WIA-Pass: {PASS_SIGNATURE}
+
+// 요청 본문
+{
+  "deceased": {
+    "identifier": "sha256:a3f5b8c9d2e1...",
+    "name": "홍길동",
+    "deathDate": "2024-12-15"
+  },
+
+  "requestor": {
+    "identifier": "sha256:c5d7e8f9a2b3...",
+    "relationship": "배우자",
+    "passAuth": {
+      "provider": "KB국민은행",
+      "ci": "encrypted_ci_value",
+      "timestamp": "2024-12-16T10:30:00+09:00"
+    }
+  },
+
+  "scope": {
+    "categories": ["금융", "암호화폐", "게임", "SNS", "클라우드"],
+    "platforms": ["all"],  // 또는 특정 플랫폼 ["카카오", "네이버"]
+    "includeZeroBalance": false,
+    "includeInactive": true
+  }
+}
+
+// 응답 (성공 시)
+{
+  "status": "success",
+  "discoveryId": "disc-2024-1234567",
+  "timestamp": "2024-12-16T10:35:00+09:00",
+
+  "summary": {
+    "totalPlatforms": 15,
+    "totalAssets": 23,
+    "totalValue": {
+      "amount": 35500000,
+      "currency": "KRW"
+    },
+    "discoveryDuration": "5.2초"
+  },
+
+  "assets": [
+    {
+      "platform": "카카오페이",
+      "category": "금융",
+      "assets": [
+        {
+          "type": "전자지갑",
+          "accountId": "encrypted",
+          "balance": 5000000,
+          "lastActivity": "2024-12-14",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "platform": "업비트",
+      "category": "암호화폐",
+      "assets": [
+        {
+          "type": "비트코인",
+          "amount": 0.5,
+          "currentValue": 22500000,
+          "valuationMethod": "WIA 3거래소 평균",
+          "walletAddress": "bc1q...(encrypted)"
+        }
+      ]
+    },
+    {
+      "platform": "네이버",
+      "category": "클라우드",
+      "assets": [
+        {
+          "type": "네이버 클라우드",
+          "storageUsed": "50GB",
+          "fileCount": 2847,
+          "commercialValue": 0,  // 개인 데이터
+          "note": "사진, 문서 등 개인 파일"
+        }
+      ]
+    }
+  ],
+
+  "unreachablePlatforms": [
+    {
+      "platform": "넷마블",
+      "reason": "게임 서버 점검 중",
+      "retryAfter": "2024-12-16T14:00:00+09:00"
+    }
+  ],
+
+  "warnings": [
+    {
+      "platform": "토스",
+      "message": "증권 계좌는 별도 상속 절차 필요",
+      "action": "토스증권 고객센터 연락"
+    }
+  ],
+
+  "nextSteps": [
+    "유족 확인 완료",
+    "상속세 계산",
+    "자산 이전 신청"
+  ]
+}
+
+// 응답 (에러 시)
+{
+  "status": "error",
+  "code": "AUTH_FAILED",
+  "message": "Pass 인증 실패: 유효하지 않은 서명",
+  "details": {
+    "passProvider": "KB국민은행",
+    "errorCode": "PASS-401",
+    "retryable": true,
+    "suggestedAction": "Pass 앱에서 재인증 필요"
+  },
+  "timestamp": "2024-12-16T10:35:00+09:00"
+}</code></pre>
+
+            <h2>5. 자산 이전 API 상세</h2>
+            <p>디지털 자산을 실제로 이전하는 API입니다. 보안이 가장 중요합니다:</p>
+
+            <div class="warning-box">
+                <h4>⚠️ 자산 이전 API 보안 요구사항</h4>
+                <ul style="margin:10px 0 0 20px;line-height:2">
+                    <li><strong>다중 인증</strong>: Pass + OTP + 생체인식 (3-factor authentication)</li>
+                    <li><strong>승인 프로세스</strong>: 복수 상속인 시 전원 동의 필요</li>
+                    <li><strong>금액 제한</strong>: 1회 1억원 이상 시 추가 검증</li>
+                    <li><strong>쿨다운 타임</strong>: 대량 이전 시 24시간 대기 기간</li>
+                    <li><strong>블록체인 기록</strong>: 모든 이전 내역 영구 기록</li>
+                    <li><strong>이의신청 기간</strong>: 이전 후 30일간 이의 제기 가능</li>
+                </ul>
+            </div>
+
+            <pre><code>// 자산 이전 API
+POST https://api.wia.org/v1/assets/transfer
+Content-Type: application/json
+Authorization: Bearer {JWT_TOKEN}
+X-WIA-Pass: {PASS_SIGNATURE}
+X-WIA-OTP: {OTP_CODE}
+X-WIA-Biometric: {FINGERPRINT_HASH}
+
+// 요청 본문
+{
+  "inheritanceId": "inh-2024-1234567",
+  "transferId": "txn-2024-7654321",
+
+  "assets": [
+    {
+      "platform": "카카오페이",
+      "assetId": "kakao-pay-001",
+      "amount": 5000000,
+      "recipients": [
+        {
+          "beneficiaryId": "ben-001",
+          "name": "홍배우자",
+          "shareRatio": 0.5,
+          "amount": 2500000,
+          "accountInfo": {
+            "bank": "KB국민은행",
+            "accountNumber": "encrypted",
+            "accountHolder": "홍배우자"
+          }
+        },
+        {
+          "beneficiaryId": "ben-002",
+          "name": "홍자녀",
+          "shareRatio": 0.5,
+          "amount": 2500000,
+          "accountInfo": {
+            "bank": "신한은행",
+            "accountNumber": "encrypted",
+            "accountHolder": "홍자녀"
+          }
+        }
+      ]
+    }
+  ],
+
+  "taxInformation": {
+    "totalTax": 2550000,
+    "taxPaid": true,
+    "hometaxFilingNumber": "HT-2024-INH-123456",
+    "taxPaymentReceipt": "encrypted_pdf_base64"
+  },
+
+  "approvals": [
+    {
+      "beneficiaryId": "ben-001",
+      "approvedAt": "2024-12-16T10:00:00+09:00",
+      "signature": "pass_signature_1"
+    },
+    {
+      "beneficiaryId": "ben-002",
+      "approvedAt": "2024-12-16T10:30:00+09:00",
+      "signature": "npki_signature_2"
+    }
+  ]
+}
+
+// 응답 (성공 시)
+{
+  "status": "success",
+  "transferId": "txn-2024-7654321",
+  "executedAt": "2024-12-16T11:00:00+09:00",
+
+  "results": [
+    {
+      "platform": "카카오페이",
+      "status": "completed",
+      "transfers": [
+        {
+          "recipient": "홍배우자",
+          "amount": 2500000,
+          "transactionId": "kakao-txn-001",
+          "completedAt": "2024-12-16T11:00:15+09:00"
+        },
+        {
+          "recipient": "홍자녀",
+          "amount": 2500000,
+          "transactionId": "kakao-txn-002",
+          "completedAt": "2024-12-16T11:00:18+09:00"
+        }
+      ]
+    }
+  ],
+
+  "blockchain": {
+    "chain": "Klaytn",
+    "transactionHash": "0x1234567890abcdef...",
+    "blockNumber": 123456789,
+    "gasUsed": 21000,
+    "explorerUrl": "https://scope.klaytn.com/tx/0x1234..."
+  },
+
+  "objectionPeriod": {
+    "startDate": "2024-12-16",
+    "endDate": "2025-01-15",
+    "durationDays": 30
+  }
+}</code></pre>
+
+            <h2>6. GraphQL 스키마</h2>
+            <p>복잡한 쿼리와 실시간 업데이트를 위한 GraphQL도 지원합니다:</p>
+
+            <pre><code># WIA Digital Inheritance GraphQL Schema
+
+type Query {
+  # 상속 케이스 조회
+  inheritance(id: ID!): Inheritance
+  inheritances(filter: InheritanceFilter): [Inheritance!]!
+
+  # 디지털 자산 조회
+  assets(deceasedId: ID!): AssetDiscoveryResult
+  asset(id: ID!): DigitalAsset
+
+  # 플랫폼 정보
+  platforms: [Platform!]!
+  platform(name: String!): Platform
+
+  # 유족 정보
+  beneficiaries(inheritanceId: ID!): [Beneficiary!]!
+}
+
+type Mutation {
+  # 상속 프로세스
+  createInheritance(input: CreateInheritanceInput!): Inheritance!
+  updateInheritanceStatus(id: ID!, status: InheritanceStatus!): Inheritance!
+
+  # 자산 관리
+  discoverAssets(input: AssetDiscoveryInput!): AssetDiscoveryResult!
+  transferAssets(input: AssetTransferInput!): AssetTransferResult!
+
+  # 유족 확인
+  verifyBeneficiary(input: BeneficiaryVerificationInput!): BeneficiaryVerificationResult!
+
+  # 세무
+  calculateTax(inheritanceId: ID!): TaxCalculation!
+}
+
+type Subscription {
+  # 실시간 상속 프로세스 업데이트
+  inheritanceUpdated(id: ID!): Inheritance!
+
+  # 자산 검색 진행 상황
+  assetDiscoveryProgress(discoveryId: ID!): DiscoveryProgress!
+
+  # 플랫폼 응답 상태
+  platformStatus: PlatformStatusUpdate!
+}
+
+type Inheritance {
+  id: ID!
+  deceased: Person!
+  beneficiaries: [Beneficiary!]!
+  assets: [DigitalAsset!]!
+  status: InheritanceStatus!
+  timeline: Timeline!
+  taxInformation: TaxInformation
+  auditTrail: [AuditEntry!]!
+}
+
+type DigitalAsset {
+  id: ID!
+  platform: String!
+  category: AssetCategory!
+  assetType: String!
+  currentValue: MonetaryAmount!
+  metadata: JSON!
+}
+
+enum InheritanceStatus {
+  INITIATED
+  BENEFICIARY_VERIFIED
+  ASSETS_DISCOVERED
+  TAX_CALCULATED
+  TAX_PAID
+  TRANSFER_PENDING
+  TRANSFER_COMPLETED
+  OBJECTION_PERIOD
+  COMPLETED
+  DISPUTED
+}
+
+# 한국 특화 타입
+type KoreanPassAuth {
+  provider: String!
+  ci: String!
+  verifiedAt: DateTime!
+}
+
+type KoreanNPKI {
+  issuer: String!
+  serialNumber: String!
+  validUntil: DateTime!
+}</code></pre>
+
+            <h2>7. 20개 플랫폼 API 연동 현황</h2>
+            <p>Phase 2에서 확대되는 20개 플랫폼의 연동 상태:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>플랫폼</th>
+                        <th>카테고리</th>
+                        <th>API 유형</th>
+                        <th>인증 방식</th>
+                        <th>연동 상태</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>카카오</strong></td>
+                        <td>금융/SNS</td>
+                        <td>RESTful</td>
+                        <td>OAuth 2.0</td>
+                        <td>완료 ✅</td>
+                    </tr>
+                    <tr>
+                        <td><strong>네이버</strong></td>
+                        <td>금융/클라우드</td>
+                        <td>RESTful</td>
+                        <td>OAuth 2.0</td>
+                        <td>완료 ✅</td>
+                    </tr>
+                    <tr>
+                        <td><strong>토스</strong></td>
+                        <td>금융/증권</td>
+                        <td>RESTful</td>
+                        <td>Toss Auth</td>
+                        <td>완료 ✅</td>
+                    </tr>
+                    <tr>
+                        <td><strong>업비트</strong></td>
+                        <td>암호화폐</td>
+                        <td>RESTful + WebSocket</td>
+                        <td>API Key</td>
+                        <td>완료 ✅</td>
+                    </tr>
+                    <tr>
+                        <td><strong>빗썸</strong></td>
+                        <td>암호화폐</td>
+                        <td>RESTful</td>
+                        <td>API Key</td>
+                        <td>진행중 🔄</td>
+                    </tr>
+                    <tr>
+                        <td><strong>넷마블</strong></td>
+                        <td>게임</td>
+                        <td>RESTful</td>
+                        <td>Game Auth</td>
+                        <td>완료 ✅</td>
+                    </tr>
+                    <tr>
+                        <td><strong>엔씨소프트</strong></td>
+                        <td>게임</td>
+                        <td>RESTful</td>
+                        <td>NC Auth</td>
+                        <td>진행중 🔄</td>
+                    </tr>
+                    <tr>
+                        <td><strong>쿠팡</strong></td>
+                        <td>커머스</td>
+                        <td>RESTful</td>
+                        <td>OAuth 2.0</td>
+                        <td>진행중 🔄</td>
+                    </tr>
+                    <tr>
+                        <td><strong>배달의민족</strong></td>
+                        <td>커머스</td>
+                        <td>RESTful</td>
+                        <td>OAuth 2.0</td>
+                        <td>계획 📅</td>
+                    </tr>
+                    <tr>
+                        <td><strong>당근마켓</strong></td>
+                        <td>커머스</td>
+                        <td>RESTful</td>
+                        <td>OAuth 2.0</td>
+                        <td>계획 📅</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>8. Pass/NPKI 통합 인증 게이트웨이</h2>
+            <p>한국 고유의 인증 체계를 완벽하게 통합한 게이트웨이:</p>
+
+            <div class="success-box">
+                <h4>🔐 통합 인증 프로세스</h4>
+                <p><strong>1단계: 사용자 인증 선택</strong></p>
+                <ul style="margin:5px 0 0 20px">
+                    <li>Pass 인증서 (모바일 간편 인증) - 권장</li>
+                    <li>NPKI 공동인증서 (PC 인증)</li>
+                    <li>생체인증 (지문, 얼굴인식) - Pass 연동</li>
+                    <li>카카오/네이버 간편 로그인 - 초기 접근</li>
+                </ul>
+
+                <p style="margin-top:15px"><strong>2단계: WIA Gateway 검증</strong></p>
+                <ul style="margin:5px 0 0 20px">
+                    <li>Pass Alliance API로 실시간 CI(Connecting Information) 검증</li>
+                    <li>NPKI 인증서 PKCS#7 서명 검증</li>
+                    <li>행안부 주민등록 시스템으로 실명 확인</li>
+                    <li>검증 결과 JWT 토큰 발급 (1시간 유효)</li>
+                </ul>
+
+                <p style="margin-top:15px"><strong>3단계: 권한 확인</strong></p>
+                <ul style="margin:5px 0 0 20px">
+                    <li>행안부 전자가족관계등록시스템 API로 상속 권한 확인</li>
+                    <li>법원 전산망으로 상속 포기/한정승인 여부 조회</li>
+                    <li>금융위원회 API로 금융사고 정보 확인</li>
+                    <li>모든 검증 통과 시 자산 접근 권한 부여</li>
+                </ul>
+
+                <p style="margin-top:15px"><strong>4단계: 블록체인 기록</strong></p>
+                <ul style="margin:5px 0 0 20px">
+                    <li>인증 성공 시각, 방법, IP 주소 블록체인 기록</li>
+                    <li>이후 모든 API 호출 감사 추적</li>
+                    <li>의심 활동 시 실시간 알림</li>
+                </ul>
+            </div>
+
+            <h2>9. 에러 처리 및 재시도 로직</h2>
+            <p>20개 플랫폼과의 안정적인 통신을 위한 에러 처리 전략:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>에러 유형</th>
+                        <th>HTTP 코드</th>
+                        <th>재시도 전략</th>
+                        <th>사용자 조치</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>인증 실패</strong></td>
+                        <td>401</td>
+                        <td>재시도 안함</td>
+                        <td>재인증 필요</td>
+                    </tr>
+                    <tr>
+                        <td><strong>권한 부족</strong></td>
+                        <td>403</td>
+                        <td>재시도 안함</td>
+                        <td>관리자 문의</td>
+                    </tr>
+                    <tr>
+                        <td><strong>리소스 없음</strong></td>
+                        <td>404</td>
+                        <td>재시도 안함</td>
+                        <td>요청 정보 확인</td>
+                    </tr>
+                    <tr>
+                        <td><strong>요청 제한 초과</strong></td>
+                        <td>429</td>
+                        <td>Exponential Backoff</td>
+                        <td>1분 후 재시도</td>
+                    </tr>
+                    <tr>
+                        <td><strong>서버 오류</strong></td>
+                        <td>500</td>
+                        <td>3회 재시도</td>
+                        <td>5초, 15초, 45초 대기</td>
+                    </tr>
+                    <tr>
+                        <td><strong>게이트웨이 타임아웃</strong></td>
+                        <td>504</td>
+                        <td>2회 재시도</td>
+                        <td>플랫폼 점검 여부 확인</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>10. API 모니터링 및 성능</h2>
+            <p>WIA API Gateway는 실시간 모니터링과 성능 최적화를 제공합니다:</p>
+
+            <div class="info-box">
+                <h4>📊 모니터링 지표</h4>
+                <ul style="margin:10px 0 0 20px;line-height:2">
+                    <li><strong>가용성</strong>: 99.95% (2025년 Q4 실적)</li>
+                    <li><strong>응답 시간</strong>: P50 150ms, P95 800ms, P99 2s</li>
+                    <li><strong>처리량</strong>: 초당 최대 500 req/s</li>
+                    <li><strong>에러율</strong>: 0.5% 미만</li>
+                    <li><strong>플랫폼 연결 성공률</strong>: 98.2% (20개 플랫폼 평균)</li>
+                    <li><strong>인증 성공률</strong>: Pass 99.8%, NPKI 98.5%</li>
+                    <li><strong>자산 검색 정확도</strong>: 96.7%</li>
+                    <li><strong>이전 성공률</strong>: 99.1% (1회 시도 기준)</li>
+                </ul>
+            </div>
+
+            <div class="key-takeaways">
+                <h3>🎯 핵심 요약</h3>
+                <ul style="line-height:2">
+                    <li><strong>API Gateway</strong>: Kong 기반 5개 인스턴스, 초당 100 req/s 처리</li>
+                    <li><strong>이중 지원</strong>: RESTful API + GraphQL로 다양한 사용 사례 대응</li>
+                    <li><strong>통합 인증</strong>: Pass/NPKI/OAuth2 통합 게이트웨이로 모든 인증 방식 지원</li>
+                    <li><strong>20개 플랫폼</strong>: 금융, 암호화폐, 게임, 커머스, SNS 전 영역 커버</li>
+                    <li><strong>보안 강화</strong>: 3-factor 인증, 블록체인 감사, 이의신청 기간 30일</li>
+                    <li><strong>弘益人間</strong>: API를 통해 모든 국민이 디지털 상속 권리 누림</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h3>📝 복습 문제</h3>
+                <ol>
+                    <li>WIA API Gateway의 6계층 아키텍처를 설명하고, 각 계층의 역할을 기술하시오.</li>
+                    <li>디지털 자산 조회 API(/api/v1/assets/discover)의 요청/응답 구조를 설명하시오.</li>
+                    <li>자산 이전 API의 6가지 보안 요구사항을 나열하고, 각각의 목적을 설명하시오.</li>
+                    <li>RESTful API와 GraphQL의 차이점을 비교하고, WIA가 둘 다 지원하는 이유를 논하시오.</li>
+                    <li>Pass/NPKI 통합 인증 게이트웨이의 4단계 프로세스를 순서대로 설명하시오.</li>
+                    <li>20개 플랫폼 중 5개를 선택하여 API 연동 현황과 특이사항을 분석하시오.</li>
+                </ol>
+            </div>
+
+            <div class="info-box">
+                <h4>🔍 다음 장 미리보기</h4>
+                <p><strong>Chapter 06: Phase 3 - 프로토콜</strong></p>
+                <p>다음 장에서는 Phase 3인 상속 프로토콜 구현을 다룹니다. State Machine 기반 프로세스 관리, 스마트 계약 자동 실행, 법원/국세청/금융위원회 연동, 그리고 분쟁 해결 메커니즘을 상세히 살펴봅니다. 특히 한국 법률 체계와의 완벽한 통합 방안을 제시합니다.</p>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter-04.html" class="nav-button">← 이전 장</a>
+                <a href="chapter-06.html" class="nav-button">다음 장 →</a>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

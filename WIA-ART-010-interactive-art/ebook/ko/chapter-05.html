@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: Phase 2 - API 인터페이스 - WIA-ART-010</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #F59E0B; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; box-shadow: 0 10px 40px rgba(245, 158, 11, 0.1); }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; text-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        p { margin: 1rem 0; text-align: justify; color: var(--text-secondary); }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; color: var(--text-secondary); }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .philosophy { text-align: center; font-size: 1.5rem; color: var(--primary); margin: 2rem 0; padding: 1rem; background: rgba(245, 158, 11, 0.1); border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: rgba(245, 158, 11, 0.05); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; font-weight: bold; transition: all 0.3s; }
+        .btn:hover { background: #d97706; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(245, 158, 11, 0.3); }
+        .key-takeaways { background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.05) 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; border: 2px solid rgba(245, 158, 11, 0.3); }
+        .key-takeaways h3 { margin-top: 0; }
+        .review-questions { background: rgba(245, 158, 11, 0.05); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; }
+        .review-questions h3 { margin-top: 0; }
+        .review-questions ol { margin-left: 1.5rem; }
+        .review-questions li { margin: 1rem 0; line-height: 1.6; }
+        strong { color: var(--primary); }
+        code { background: var(--bg-tertiary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Consolas', monospace; color: #f1f5f9; }
+        pre { background: var(--bg-tertiary); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border); }
+        pre code { background: none; padding: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제5장: Phase 2 - API 인터페이스</h1>
+
+        <div class="philosophy">
+            弘益人間 · 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>개요</h2>
+        <p>
+            2023년, 서울 아트센터 나비의 한 작가는 새로운 인터랙티브 설치 작품을 준비하고 있었습니다. 작가는 Processing으로
+            프로토타입을 만들었지만, 전시장의 기술 팀은 TouchDesigner를 사용하고 있었습니다. 센서 데이터를 읽고 조명을
+            제어하는 코드를 두 플랫폼 모두에서 다시 작성해야 했고, 각 플랫폼마다 다른 API를 배워야 했습니다.
+            결국 작품 설치에만 3주가 소요되었고, 버그 수정과 최적화에 추가 2주가 필요했습니다.
+        </p>
+
+        <p>
+            WIA-ART-010의 Phase 2는 바로 이러한 플랫폼 파편화 문제를 해결합니다. 표준화된 API와 SDK를 제공하여
+            어떤 프로그래밍 언어나 크리에이티브 플랫폼에서든 동일한 방식으로 센서를 읽고 출력 장치를 제어할 수 있게 합니다.
+            이 장에서는 WIA-ART-010 API의 구조, TypeScript/JavaScript SDK, REST API 엔드포인트, 그리고 주요 플랫폼
+            통합 방법을 실제 코드 예제와 함께 상세히 살펴봅니다.
+        </p>
+
+        <h2>1. WIA-ART-010 API 아키텍처</h2>
+
+        <h3>1.1 API 설계 원칙</h3>
+        <p>
+            WIA-ART-010 API는 다음의 핵심 원칙을 따릅니다:
+        </p>
+
+        <ul>
+            <li><strong>일관성(Consistency):</strong> 모든 센서와 출력 장치에 동일한 인터페이스 패턴을 적용합니다.</li>
+            <li><strong>단순성(Simplicity):</strong> 복잡한 하드웨어 제어를 간단한 함수 호출로 추상화합니다.</li>
+            <li><strong>확장성(Extensibility):</strong> 플러그인 아키텍처로 새로운 센서와 장치를 쉽게 추가할 수 있습니다.</li>
+            <li><strong>성능(Performance):</strong> 실시간 인터랙션을 위한 저지연 처리를 보장합니다.</li>
+            <li><strong>타입 안전성(Type Safety):</strong> TypeScript 타입 정의로 개발 시 오류를 사전에 방지합니다.</li>
+        </ul>
+
+        <h3>1.2 API 계층 구조</h3>
+        <p>
+            WIA-ART-010 API는 3계층 아키텍처로 구성됩니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>계층</th>
+                    <th>역할</th>
+                    <th>구현 언어</th>
+                    <th>사용자</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>High-Level SDK</strong></td>
+                    <td>간편한 작품 개발 API</td>
+                    <td>TypeScript, Python</td>
+                    <td>아티스트, 디자이너</td>
+                </tr>
+                <tr>
+                    <td><strong>Core API</strong></td>
+                    <td>센서/출력 추상화</td>
+                    <td>TypeScript, C++</td>
+                    <td>기술 개발자</td>
+                </tr>
+                <tr>
+                    <td><strong>Hardware Drivers</strong></td>
+                    <td>하드웨어 직접 제어</td>
+                    <td>C++, Rust</td>
+                    <td>시스템 엔지니어</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>2. TypeScript SDK</h2>
+
+        <h3>2.1 설치 및 초기화</h3>
+        <p>
+            WIA-ART-010 TypeScript SDK를 설치하고 초기화하는 방법:
+        </p>
+
+        <pre><code>// npm 설치
+npm install @wia/art-010
+
+// 기본 초기화
+import { WIAArtwork, DepthCamera, LEDStrip } from '@wia/art-010';
+
+const artwork = new WIAArtwork({
+  manifestPath: './artwork.wia-manifest.json',
+  autoConnect: true
+});
+
+await artwork.init();</code></pre>
+
+        <h3>2.2 센서 API</h3>
+        <p>
+            모든 센서는 <code>Sensor</code> 기본 인터페이스를 구현하며, 각 센서 유형마다 특화된 메서드를 제공합니다.
+        </p>
+
+        <div class="highlight-box">
+            <h3>깊이 카메라 API 사용 예제</h3>
+            <pre><code>import { DepthCamera, SkeletonData } from '@wia/art-010';
+
+// 센서 생성 및 연결
+const camera = new DepthCamera({
+  id: 'sensor-001',
+  model: 'Intel RealSense D455',
+  resolution: { width: 1280, height: 720, fps: 30 }
+});
+
+await camera.connect();
+
+// 실시간 골격 추적
+camera.on('skeleton', (skeleton: SkeletonData) => {
+  const { head, hands } = skeleton.joints;
+
+  console.log(`Head position: x=${head.x}, y=${head.y}, z=${head.z}`);
+  console.log(`Hand height: ${hands.left.y}`);
+
+  // 손 높이에 따라 조명 색상 변경
+  const hue = mapRange(hands.left.y, 0.5, 2.5, 0, 360);
+  ledStrip.setColor({ h: hue, s: 100, v: 100 });
+});
+
+// 제스처 인식
+camera.on('gesture', (gesture) => {
+  if (gesture.type === 'waving' && gesture.confidence > 0.8) {
+    console.log('손 흔들기 감지!');
+    ledStrip.flash({ duration: 500, color: '#FFD700' });
+  }
+});
+
+// 군중 분석
+camera.on('crowd', (metrics) => {
+  console.log(`현재 관람객 수: ${metrics.totalPeople}`);
+  console.log(`평균 거리: ${metrics.averageDistance}m`);
+  console.log(`움직임 강도: ${metrics.movementIntensity}`);
+});</code></pre>
+        </div>
+
+        <h3>2.3 출력 장치 API</h3>
+        <p>
+            LED, 프로젝터, 스피커 등 모든 출력 장치는 <code>OutputDevice</code> 인터페이스를 구현합니다.
+        </p>
+
+        <pre><code>import { LEDStrip, DMXController } from '@wia/art-010';
+
+// DMX 컨트롤러를 통한 LED 스트립 제어
+const dmx = new DMXController({ port: '/dev/ttyUSB0' });
+const ledStrip = new LEDStrip({
+  id: 'led-strip-001',
+  controller: dmx,
+  channelStart: 1,
+  channelCount: 5
+});
+
+// 밝기 설정 (0-255)
+ledStrip.setBrightness(200);
+
+// 색상 설정 (HSV)
+ledStrip.setColor({ h: 120, s: 100, v: 80 });
+
+// RGB 직접 설정
+ledStrip.setRGB(255, 100, 50);
+
+// 부드러운 페이드 효과
+await ledStrip.fadeTo({
+  color: { h: 240, s: 100, v: 100 },
+  duration: 2000  // 2초
+});
+
+// 스트로브 효과
+ledStrip.strobe({
+  frequency: 5,  // 5 Hz
+  duration: 3000  // 3초간
+});</code></pre>
+
+        <h3>2.4 인터랙션 매핑</h3>
+        <p>
+            센서 입력을 출력으로 매핑하는 고수준 API를 제공합니다.
+        </p>
+
+        <pre><code>import { InteractionMapper, Curve } from '@wia/art-010';
+
+const mapper = new InteractionMapper();
+
+// 거리 → 밝기 매핑 (역제곱 법칙)
+mapper.map({
+  sensor: camera,
+  inputPath: 'skeleton.torso.z',
+  output: ledStrip,
+  outputParameter: 'brightness',
+  inputRange: [0.5, 5.0],
+  outputRange: [0, 255],
+  curve: Curve.InverseSquare,
+  smoothing: {
+    type: 'exponential',
+    alpha: 0.3
+  }
+});
+
+// 손 위치 → 색상 매핑 (선형)
+mapper.map({
+  sensor: camera,
+  inputPath: 'skeleton.hands.left.y',
+  output: ledStrip,
+  outputParameter: 'hue',
+  inputRange: [0.5, 2.5],
+  outputRange: [0, 360],
+  curve: Curve.Linear
+});
+
+// 매핑 활성화
+mapper.start();</code></pre>
+
+        <h2>3. REST API</h2>
+
+        <h3>3.1 API 엔드포인트</h3>
+        <p>
+            WIA-ART-010 작품은 표준 REST API를 제공하여 원격 모니터링과 제어를 지원합니다.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>엔드포인트</th>
+                    <th>메서드</th>
+                    <th>설명</th>
+                    <th>응답</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>/api/v1/artwork</code></td>
+                    <td>GET</td>
+                    <td>작품 메타데이터 조회</td>
+                    <td>JSON manifest</td>
+                </tr>
+                <tr>
+                    <td><code>/api/v1/sensors</code></td>
+                    <td>GET</td>
+                    <td>센서 목록 조회</td>
+                    <td>센서 배열</td>
+                </tr>
+                <tr>
+                    <td><code>/api/v1/sensors/:id</code></td>
+                    <td>GET</td>
+                    <td>특정 센서 데이터</td>
+                    <td>실시간 센서 값</td>
+                </tr>
+                <tr>
+                    <td><code>/api/v1/outputs</code></td>
+                    <td>GET</td>
+                    <td>출력 장치 목록</td>
+                    <td>출력 장치 배열</td>
+                </tr>
+                <tr>
+                    <td><code>/api/v1/outputs/:id</code></td>
+                    <td>POST</td>
+                    <td>출력 장치 제어</td>
+                    <td>실행 결과</td>
+                </tr>
+                <tr>
+                    <td><code>/api/v1/interactions</code></td>
+                    <td>GET/POST</td>
+                    <td>인터랙션 모드 관리</td>
+                    <td>모드 상태</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>3.2 REST API 사용 예제</h3>
+        <pre><code>// 작품 정보 조회
+GET /api/v1/artwork
+Response:
+{
+  "artwork": {
+    "id": "uuid:a7f3c9e2-4d8b-11ef-8e9a-0242ac120002",
+    "title": "Resonating Forest",
+    "artist": "김민준",
+    "status": "running"
+  }
+}
+
+// 센서 데이터 조회
+GET /api/v1/sensors/sensor-001
+Response:
+{
+  "sensor_id": "sensor-001",
+  "timestamp": 1705478400.523,
+  "detected_objects": [
+    {
+      "id": "person-1",
+      "skeleton": {
+        "head": {"x": 0.5, "y": 1.7, "z": 3.2}
+      }
+    }
+  ],
+  "crowd_metrics": {
+    "total_people": 3
+  }
+}
+
+// LED 제어
+POST /api/v1/outputs/led-strip-001
+Body:
+{
+  "action": "setColor",
+  "params": {
+    "h": 120,
+    "s": 100,
+    "v": 80
+  }
+}
+Response:
+{
+  "status": "success",
+  "device_id": "led-strip-001"
+}</code></pre>
+
+        <h2>4. 플랫폼 통합</h2>
+
+        <h3>4.1 TouchDesigner 통합</h3>
+        <p>
+            TouchDesigner는 실시간 비주얼 제작에 널리 사용되는 노드 기반 플랫폼입니다. WIA-ART-010 WebSocket 브리지를
+            통해 TouchDesigner와 통합할 수 있습니다.
+        </p>
+
+        <div class="highlight-box">
+            <h3>TouchDesigner 연동 예제</h3>
+            <pre><code># TouchDesigner Python Script OP
+
+import asyncio
+import websocket
+import json
+
+# WIA-ART-010 WebSocket 연결
+ws_url = "ws://localhost:8080/sensor-001"
+ws = websocket.create_connection(ws_url)
+
+def onReceive():
+    # 센서 데이터 수신
+    data = json.loads(ws.recv())
+
+    # 골격 데이터 추출
+    if 'detected_objects' in data:
+        person = data['detected_objects'][0]
+        head_y = person['skeleton']['head']['y']
+
+        # TouchDesigner CHOP으로 전달
+        op('constant1').par.value0 = head_y
+
+        # 손 위치로 색상 제어
+        hand_y = person['skeleton']['left_hand']['y']
+        hue = (hand_y - 0.5) / 2.0 * 360
+        op('constant_hue').par.value0 = hue
+
+# 매 프레임 실행
+me.time.rate = 30  # 30 FPS</code></pre>
+        </div>
+
+        <h3>4.2 Processing 통합</h3>
+        <p>
+            Processing은 비주얼 아티스트를 위한 인기 있는 크리에이티브 코딩 플랫폼입니다.
+        </p>
+
+        <pre><code>// Processing Sketch
+
+import wia.art.*;
+
+WIAArtwork artwork;
+DepthCamera camera;
+LEDController leds;
+
+void setup() {
+  size(800, 600);
+
+  // WIA-ART-010 초기화
+  artwork = new WIAArtwork("artwork.wia-manifest.json");
+  camera = artwork.getDepthCamera("sensor-001");
+  leds = artwork.getLEDController("led-strip-001");
+
+  // 센서 이벤트 리스너
+  camera.addSkeletonListener(new SkeletonListener() {
+    void onSkeleton(SkeletonData skeleton) {
+      PVector head = skeleton.getJoint("head");
+      PVector hand = skeleton.getJoint("left_hand");
+
+      // 화면에 골격 그리기
+      drawSkeleton(skeleton);
+
+      // 손 높이로 LED 색상 제어
+      float hue = map(hand.y, 0.5, 2.5, 0, 360);
+      leds.setHSV(hue, 100, 100);
+    }
+  });
+}
+
+void draw() {
+  background(0);
+  // 매 프레임 업데이트
+  artwork.update();
+}
+
+void drawSkeleton(SkeletonData skeleton) {
+  stroke(255, 200, 0);
+  strokeWeight(5);
+  for (Joint joint : skeleton.getJoints()) {
+    PVector pos = joint.getPosition();
+    point(pos.x * width, pos.y * height);
+  }
+}</code></pre>
+
+        <h3>4.3 openFrameworks 통합</h3>
+        <p>
+            openFrameworks는 C++ 기반의 고성능 크리에이티브 코딩 툴킷입니다.
+        </p>
+
+        <pre><code>// ofApp.h
+#include "ofMain.h"
+#include "wia/art-010.h"
+
+class ofApp : public ofBaseApp {
+public:
+    void setup();
+    void update();
+    void draw();
+
+    wia::Artwork artwork;
+    wia::DepthCamera camera;
+    wia::LEDStrip ledStrip;
+};
+
+// ofApp.cpp
+void ofApp::setup() {
+    // WIA-ART-010 초기화
+    artwork.loadManifest("artwork.wia-manifest.json");
+    camera = artwork.getDepthCamera("sensor-001");
+    ledStrip = artwork.getLEDStrip("led-strip-001");
+
+    // 센서 콜백 등록
+    camera.setSkeletonCallback([this](const wia::SkeletonData& skeleton) {
+        auto head = skeleton.joints["head"];
+        auto leftHand = skeleton.joints["left_hand"];
+
+        // 손 높이로 색상 매핑
+        float hue = ofMap(leftHand.y, 0.5, 2.5, 0, 255);
+        ofColor color = ofColor::fromHsb(hue, 255, 255);
+        ledStrip.setColor(color);
+    });
+}
+
+void ofApp::update() {
+    artwork.update();
+}
+
+void ofApp::draw() {
+    ofBackground(0);
+
+    // 센서 데이터 시각화
+    auto skeletons = camera.getSkeletons();
+    for (auto& skeleton : skeletons) {
+        ofSetColor(255, 200, 0);
+        for (auto& [name, joint] : skeleton.joints) {
+            ofDrawSphere(joint.x * ofGetWidth(),
+                        joint.y * ofGetHeight(),
+                        joint.z * 10, 10);
+        }
+    }
+}</code></pre>
+
+        <h2>5. 실전 예제: teamLab 스타일 작품</h2>
+
+        <h3>5.1 "Interactive Flower Garden" 구현</h3>
+        <p>
+            관람객이 움직이면 꽃이 피고 지는 teamLab 스타일의 인터랙티브 작품을 WIA-ART-010 API로 구현합니다.
+        </p>
+
+        <pre><code>import { WIAArtwork, DepthCamera, Projector, ParticleSystem } from '@wia/art-010';
+
+class FlowerGarden {
+  private camera: DepthCamera;
+  private projector: Projector;
+  private flowers: Flower[] = [];
+
+  async setup() {
+    const artwork = new WIAArtwork({
+      manifestPath: './flower-garden.wia-manifest.json'
+    });
+
+    this.camera = artwork.getDepthCamera('sensor-001');
+    this.projector = artwork.getProjector('projector-001');
+
+    // 가상 꽃 500송이 생성
+    for (let i = 0; i < 500; i++) {
+      this.flowers.push(new Flower({
+        x: Math.random() * this.projector.width,
+        y: Math.random() * this.projector.height
+      }));
+    }
+
+    // 사람 감지 이벤트
+    this.camera.on('person', (person) => {
+      const { x, y, z } = person.position;
+
+      // 사람 근처의 꽃 찾기
+      this.flowers.forEach(flower => {
+        const distance = flower.distanceTo(x, y);
+
+        if (distance < 1.0) {
+          // 1m 이내: 꽃 피우기
+          flower.bloom();
+        } else if (distance < 2.0) {
+          // 2m 이내: 꽃잎 흔들림
+          flower.sway(distance);
+        }
+      });
+    });
+
+    // 애니메이션 루프
+    this.animate();
+  }
+
+  animate() {
+    requestAnimationFrame(() => this.animate());
+
+    // 모든 꽃 업데이트
+    this.flowers.forEach(flower => flower.update());
+
+    // 프로젝터로 렌더링
+    const canvas = this.renderFlowers();
+    this.projector.display(canvas);
+  }
+
+  renderFlowers() {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    this.flowers.forEach(flower => {
+      flower.draw(ctx);
+    });
+
+    return canvas;
+  }
+}
+
+class Flower {
+  private bloomLevel = 0;  // 0: 봉오리, 1: 만개
+  private swayAngle = 0;
+
+  bloom() {
+    // 부드럽게 꽃 피우기
+    this.bloomLevel += 0.05;
+    if (this.bloomLevel > 1) this.bloomLevel = 1;
+  }
+
+  sway(distance: number) {
+    // 거리에 반비례하여 흔들림
+    this.swayAngle = Math.sin(Date.now() / 500) * (2.0 - distance) * 10;
+  }
+
+  update() {
+    // 시간이 지나면 서서히 시들기
+    if (this.bloomLevel > 0) {
+      this.bloomLevel -= 0.001;
+    }
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.swayAngle * Math.PI / 180);
+
+    // 꽃잎 그리기
+    const petalCount = 5;
+    const petalLength = 20 * this.bloomLevel;
+
+    for (let i = 0; i < petalCount; i++) {
+      const angle = (i / petalCount) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.ellipse(
+        Math.cos(angle) * petalLength,
+        Math.sin(angle) * petalLength,
+        petalLength, petalLength / 2,
+        angle, 0, Math.PI * 2
+      );
+      ctx.fillStyle = `hsl(${30 + this.bloomLevel * 30}, 100%, 70%)`;
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+}
+
+// 실행
+const garden = new FlowerGarden();
+garden.setup();</code></pre>
+
+        <h2>6. 성능 최적화</h2>
+
+        <h3>6.1 센서 데이터 스로틀링</h3>
+        <p>
+            고속 센서는 초당 수백~수천 개의 데이터를 생성할 수 있습니다. 애플리케이션이 모든 데이터를 처리할 필요가 없다면
+            스로틀링을 적용하여 성능을 향상시킬 수 있습니다.
+        </p>
+
+        <pre><code>import { DepthCamera, Throttle } from '@wia/art-010';
+
+const camera = new DepthCamera({ id: 'sensor-001' });
+
+// 초당 10회로 제한
+const throttled = Throttle(camera, { fps: 10 });
+
+throttled.on('skeleton', (skeleton) => {
+  // 초당 10번만 실행됨
+  updateVisualization(skeleton);
+});</code></pre>
+
+        <h3>6.2 배치 처리</h3>
+        <p>
+            여러 출력 장치를 동시에 업데이트할 때 배치 처리를 사용하면 네트워크 오버헤드를 줄일 수 있습니다.
+        </p>
+
+        <pre><code>import { LEDController, Batch } from '@wia/art-010';
+
+const controller = new LEDController();
+const batch = controller.createBatch();
+
+// 여러 LED를 한 번에 업데이트
+for (let i = 0; i < 100; i++) {
+  batch.setLED(i, { h: i * 3.6, s: 100, v: 100 });
+}
+
+// 한 번의 DMX 전송으로 모든 LED 업데이트
+await batch.commit();</code></pre>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>최적화 기법</th>
+                    <th>적용 대상</th>
+                    <th>성능 향상</th>
+                    <th>트레이드오프</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Throttling</strong></td>
+                    <td>고속 센서 데이터</td>
+                    <td>CPU 사용량 -60%</td>
+                    <td>반응 지연 증가</td>
+                </tr>
+                <tr>
+                    <td><strong>Batching</strong></td>
+                    <td>다수 출력 장치</td>
+                    <td>네트워크 트래픽 -80%</td>
+                    <td>약간의 시간 지연</td>
+                </tr>
+                <tr>
+                    <td><strong>Caching</strong></td>
+                    <td>센서 캘리브레이션</td>
+                    <td>초기화 시간 -70%</td>
+                    <td>메모리 사용 증가</td>
+                </tr>
+                <tr>
+                    <td><strong>Worker Threads</strong></td>
+                    <td>복잡한 계산</td>
+                    <td>메인 스레드 부하 -50%</td>
+                    <td>구현 복잡도 증가</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="key-takeaways">
+            <h3>핵심 요점</h3>
+            <ul>
+                <li><strong>통합 API:</strong> WIA-ART-010은 TypeScript/JavaScript SDK와 REST API를 제공하여 모든 플랫폼에서 일관된 방식으로 센서와 출력 장치를 제어할 수 있습니다.</li>
+                <li><strong>이벤트 기반 아키텍처:</strong> 센서 데이터는 이벤트로 전달되어 반응형 프로그래밍 패턴을 쉽게 구현할 수 있으며, skeleton, gesture, crowd 등 다양한 이벤트를 지원합니다.</li>
+                <li><strong>고수준 추상화:</strong> InteractionMapper를 통해 센서 입력을 출력으로 매핑하는 복잡한 로직을 선언적으로 정의할 수 있어 코드 양을 크게 줄입니다.</li>
+                <li><strong>플랫폼 통합:</strong> TouchDesigner, Processing, openFrameworks 등 주요 크리에이티브 코딩 플랫폼과 원활하게 통합되며, WebSocket과 REST API를 통한 원격 제어를 지원합니다.</li>
+                <li><strong>성능 최적화:</strong> Throttling, Batching, Worker Threads 등의 기법을 통해 실시간 인터랙션에 필요한 저지연 고성능 처리를 보장합니다.</li>
+                <li><strong>타입 안전성:</strong> TypeScript 기반 SDK는 개발 시점에 오류를 발견할 수 있어 안정적인 작품 개발을 지원하며, 자동 완성 기능으로 생산성을 향상시킵니다.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li><strong>WIA-ART-010 API의 3계층 아키텍처(High-Level SDK, Core API, Hardware Drivers)를 설명하고, 각 계층이 담당하는 역할과 대상 사용자를 논의하십시오. 이러한 계층 분리가 API 설계에서 왜 중요한지 소프트웨어 공학 관점에서 분석하십시오.</strong></li>
+
+                <li><strong>TypeScript SDK에서 DepthCamera의 이벤트 기반 API(on('skeleton'), on('gesture'), on('crowd'))와 전통적인 폴링(polling) 방식을 비교하십시오. 실시간 인터랙티브 아트에서 이벤트 기반 아키텍처가 더 적합한 이유를 성능, 코드 가독성, 확장성 측면에서 논의하십시오.</strong></li>
+
+                <li><strong>InteractionMapper API를 사용한 선언적 매핑과 수동 코딩을 비교하십시오. 제공된 예제 코드에서 거리→밝기 매핑(inverse-square curve)과 손 위치→색상 매핑(linear curve)이 InteractionMapper 없이 구현된다면 코드가 어떻게 달라질지 작성하고, 두 접근 방식의 장단점을 분석하십시오.</strong></li>
+
+                <li><strong>REST API 엔드포인트 설계를 평가하십시오. GET /api/v1/sensors/:id와 POST /api/v1/outputs/:id가 RESTful 원칙을 얼마나 잘 따르고 있는지, 그리고 WebSocket 대신 REST API를 사용하는 것이 적합한 상황과 부적합한 상황을 실시간성과 상태 관리 측면에서 논의하십시오.</strong></li>
+
+                <li><strong>"Interactive Flower Garden" 예제에서 500개의 꽃 객체를 매 프레임(60 FPS) 업데이트하는 성능을 분석하십시오. bloomLevel과 swayAngle 계산, 거리 측정(distanceTo), 캔버스 렌더링의 계산 복잡도를 평가하고, 1000개 이상의 꽃으로 확장할 때 필요한 최적화 전략(공간 분할, Level of Detail 등)을 제안하십시오.</strong></li>
+
+                <li><strong>센서 데이터 스로틀링(Throttle)과 출력 배치 처리(Batch)의 트레이드오프를 분석하십시오. 표에 제시된 대로 Throttling은 반응 지연을 증가시키고 Batching은 시간 지연을 발생시킵니다. teamLab 스타일의 몰입형 작품에서 이러한 최적화 기법을 적용할 때 관람객 경험을 해치지 않으면서 성능을 향상시키는 최적의 파라미터(fps, batch size)를 결정하는 방법을 논의하십시오.</strong></li>
+            </ol>
+        </div>
+
+        <h2>다음 장 예고</h2>
+        <p>
+            제6장에서는 WIA-ART-010의 Phase 3인 통신 프로토콜을 다룹니다. OSC(Open Sound Control), WebSocket, MQTT 등
+            실시간 센서 데이터 전송 프로토콜을 상세히 살펴보고, 네트워크 토폴로지, 시간 동기화, 에러 처리 전략을
+            실제 대규모 전시 사례와 함께 탐구합니다. 또한 여러 작품이 네트워크를 통해 연동되는 분산 인터랙티브 아트
+            시스템의 구현 방법을 학습합니다.
+        </p>
+
+        </div>
+</body>
+</html>

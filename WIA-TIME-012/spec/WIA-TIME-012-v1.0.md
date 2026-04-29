@@ -415,7 +415,7 @@ def ensure_no_cloning_compliance(transmission):
 
 ### 3.3 Quantum Teleportation Protocol
 
-**Based on**: 선행 연구 quantum teleportation
+**Based on**: standard quantum teleportation
 
 **Process**:
 ```python
@@ -1906,7 +1906,6 @@ def emergency_abort_transmission(transmission_id, reason):
 ### 12.1 Scientific Papers
 
 1. Einstein, A. (1905). "Does the Inertia of a Body Depend Upon Its Energy Content?"
-2. 선행 연구. "Teleporting an Unknown Quantum State via Dual Classical and Einstein-Podolsky-Rosen Channels"
 3. Wootters, W.K. & Zurek, W.H. (1982). "A Single Quantum Cannot be Cloned"
 4. Shor, P.W. (1995). "Scheme for Reducing Decoherence in Quantum Computer Memory"
 5. Jozsa, R. (1994). "Fidelity for Mixed Quantum States"

@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Pain Monitoring and Pattern Recognition | WIA-CHRONIC-PAIN</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 3: Pain Monitoring and Pattern Recognition</h1>
+
+    <div class="highlight">
+        <strong>Learning Objectives:</strong> Implement continuous pain monitoring systems, develop pattern recognition algorithms, and build trigger identification mechanisms for personalized pain management.
+    </div>
+
+    <h2>Continuous Pain Monitoring</h2>
+
+    <p>The WIA-CHRONIC-PAIN standard defines approaches for capturing pain data through patient self-reports, wearable sensor data, and contextual information.</p>
+
+    <h3>Multi-Modal Data Collection</h3>
+
+    <pre><code>interface MonitoringDataStream {
+  patient_reported: {
+    pain_logs: PainLogEntry[];
+    mood_assessments: MoodEntry[];
+    activity_reports: ActivityEntry[];
+    sleep_diaries: SleepEntry[];
+  };
+  passive_sensing: {
+    wearable_metrics: WearableDataPoint[];
+    smartphone_sensors: {
+      accelerometer: AccelerometerData[];
+      location_context: LocationContext[];
+      app_usage: AppUsageData[];
+    };
+    environmental: {
+      weather: WeatherData[];
+      air_quality: AirQualityData[];
+    };
+  };
+  clinical_data: {
+    vital_signs: VitalSign[];
+    lab_results: LabResult[];
+    imaging: ImagingStudy[];
+  };
+}
+
+class PainMonitoringEngine {
+  private dataStreams: Map&lt;string, DataStream&gt;;
+  private patternDetector: PatternDetector;
+  private alertManager: AlertManager;
+
+  async processDataPoint(data: MonitoringDataPoint): Promise&lt;void&gt; {
+    // Validate and normalize incoming data
+    const normalized = await this.normalizeData(data);
+
+    // Store in time-series database
+    await this.storage.insert(normalized);
+
+    // Update real-time aggregations
+    await this.updateAggregations(data.patientId, normalized);
+
+    // Check for patterns and anomalies
+    const patterns = await this.patternDetector.analyze(data.patientId);
+
+    // Generate alerts if needed
+    if (patterns.alertWorthy) {
+      await this.alertManager.notify(data.patientId, patterns);
+    }
+  }
+}</code></pre>
+
+    <h2>Ecological Momentary Assessment</h2>
+
+    <div class="highlight">
+        <strong>EMA Benefits:</strong> Real-time data collection eliminates recall bias and captures context that influences pain.
+    </div>
+
+    <h3>Adaptive Sampling Strategy</h3>
+
+    <pre><code>class AdaptiveSampler {
+  private baseFrequency: number = 4; // prompts per day
+
+  calculateSamplingSchedule(patientId: string): SamplingSchedule {
+    const history = this.getPatientHistory(patientId);
+    const preferences = this.getPatientPreferences(patientId);
+
+    // Increase sampling during high-variability periods
+    const variabilityMultiplier = this.calculateVariability(history) > 0.5 ? 1.5 : 1.0;
+
+    // Respect patient preferences for quiet hours
+    const activeHours = preferences.activeHours || { start: 8, end: 22 };
+
+    // Generate time-stratified random schedule
+    const schedule = this.generateStratifiedSchedule({
+      frequency: Math.round(this.baseFrequency * variabilityMultiplier),
+      startHour: activeHours.start,
+      endHour: activeHours.end,
+      minimumInterval: 90, // minutes between prompts
+      randomization: 0.3   // 30% randomization window
+    });
+
+    return schedule;
+  }
+
+  async triggerAssessment(patientId: string, type: AssessmentType): Promise&lt;void&gt; {
+    // Send push notification
+    await this.notifications.send(patientId, {
+      title: 'Pain Check-in',
+      body: 'How are you feeling right now?',
+      data: { assessmentType: type },
+      priority: 'high',
+      ttl: 1800 // 30 minutes to respond
+    });
+
+    // Track prompt delivery
+    await this.analytics.track('assessment_prompted', {
+      patientId,
+      type,
+      scheduledTime: new Date()
+    });
+  }
+}</code></pre>
+
+    <h2>Pattern Recognition Algorithms</h2>
+
+    <h3>Time Series Analysis</h3>
+
+    <pre><code>interface TimeSeriesAnalysis {
+  trend: {
+    direction: 'improving' | 'stable' | 'worsening';
+    slope: number;
+    confidence: number;
+  };
+  seasonality: {
+    daily: CyclicPattern;
+    weekly: CyclicPattern;
+    monthly: CyclicPattern;
+  };
+  changePoints: ChangePoint[];
+  forecasts: PainForecast[];
+}
+
+class PainPatternAnalyzer {
+  async analyzePainPatterns(patientId: string, window: TimeWindow): Promise&lt;PatternAnalysis&gt; {
+    const painData = await this.fetchPainData(patientId, window);
+
+    // Decompose time series
+    const decomposition = this.decomposeTimeSeries(painData, {
+      frequency: 'daily',
+      model: 'additive'
+    });
+
+    // Detect trend
+    const trend = this.analyzeTrend(decomposition.trend, {
+      minDays: 14,
+      significanceLevel: 0.05
+    });
+
+    // Find cyclic patterns
+    const dailyPattern = this.detectDailyPattern(painData);
+    const weeklyPattern = this.detectWeeklyPattern(painData);
+
+    // Identify change points
+    const changePoints = this.detectChangePoints(painData, {
+      algorithm: 'PELT',
+      minSegmentLength: 7
+    });
+
+    return {
+      trend,
+      dailyPattern,
+      weeklyPattern,
+      changePoints,
+      summary: this.generateSummary(trend, dailyPattern, weeklyPattern)
+    };
+  }
+
+  detectDailyPattern(data: PainDataPoint[]): DailyPattern {
+    // Group by hour of day
+    const hourlyAverages = this.groupByHour(data);
+
+    // Find peak and trough hours
+    const peakHour = this.findPeak(hourlyAverages);
+    const troughHour = this.findTrough(hourlyAverages);
+
+    // Calculate pattern strength
+    const amplitude = hourlyAverages[peakHour] - hourlyAverages[troughHour];
+    const strength = amplitude / this.mean(Object.values(hourlyAverages));
+
+    return {
+      peakHour,
+      troughHour,
+      amplitude,
+      strength,
+      hourlyProfile: hourlyAverages,
+      significance: this.testPatternSignificance(hourlyAverages)
+    };
+  }
+}</code></pre>
+
+    <h3>Machine Learning Models</h3>
+
+    <table>
+        <tr>
+            <th>Model Type</th>
+            <th>Use Case</th>
+            <th>Features</th>
+        </tr>
+        <tr>
+            <td>LSTM Networks</td>
+            <td>Sequential pattern recognition</td>
+            <td>Pain history, time features, physiological data</td>
+        </tr>
+        <tr>
+            <td>Random Forests</td>
+            <td>Trigger identification</td>
+            <td>Activity, sleep, weather, medication</td>
+        </tr>
+        <tr>
+            <td>Gradient Boosting</td>
+            <td>Pain intensity prediction</td>
+            <td>Multi-modal feature set</td>
+        </tr>
+        <tr>
+            <td>Clustering</td>
+            <td>Patient phenotyping</td>
+            <td>Pain patterns, demographics, treatments</td>
+        </tr>
+    </table>
+
+    <pre><code>import tensorflow as tf
+from tensorflow.keras import layers
+
+class PainPredictionModel:
+    def __init__(self, config):
+        self.sequence_length = config.sequence_length
+        self.feature_dim = config.feature_dim
+        self.model = self._build_model()
+
+    def _build_model(self):
+        inputs = layers.Input(shape=(self.sequence_length, self.feature_dim))
+
+        # LSTM layers for temporal patterns
+        x = layers.LSTM(64, return_sequences=True)(inputs)
+        x = layers.Dropout(0.2)(x)
+        x = layers.LSTM(32)(x)
+        x = layers.Dropout(0.2)(x)
+
+        # Dense layers for prediction
+        x = layers.Dense(16, activation='relu')(x)
+        outputs = layers.Dense(1, activation='sigmoid')(x)
+
+        model = tf.keras.Model(inputs, outputs)
+        model.compile(
+            optimizer='adam',
+            loss='mse',
+            metrics=['mae']
+        )
+        return model
+
+    def predict_pain(self, patient_data, horizon=24):
+        """Predict pain levels for next 'horizon' hours"""
+        features = self.prepare_features(patient_data)
+        predictions = []
+
+        for h in range(horizon):
+            pred = self.model.predict(features)
+            predictions.append({
+                'hour': h,
+                'predicted_pain': float(pred[0][0] * 10),
+                'confidence': self.calculate_confidence(features)
+            })
+            features = self.update_features(features, pred)
+
+        return predictions</code></pre>
+
+    <h2>Trigger Identification</h2>
+
+    <div class="highlight">
+        <strong>Trigger Categories:</strong> Physical activities, emotional states, sleep quality, weather conditions, and medication timing are potential pain triggers the system monitors.
+    </div>
+
+    <h3>Trigger Analysis Framework</h3>
+
+    <pre><code>interface TriggerAnalysis {
+  trigger: {
+    category: TriggerCategory;
+    specific: string;
+    description: string;
+  };
+  association: {
+    correlation: number;
+    temporalLag: number; // hours before pain increase
+    doseResponse: boolean;
+    confidence: number;
+  };
+  evidence: {
+    occurrences: number;
+    pain_increase_avg: number;
+    last_occurrence: string;
+    examples: TriggerExample[];
+  };
+}
+
+class TriggerDetector {
+  async identifyTriggers(patientId: string): Promise&lt;TriggerAnalysis[]&gt; {
+    const painData = await this.fetchPainHistory(patientId);
+    const contextData = await this.fetchContextHistory(patientId);
+
+    const triggers: TriggerAnalysis[] = [];
+
+    // Analyze activity triggers
+    const activityTriggers = await this.analyzeActivityTriggers(
+      painData,
+      contextData.activities
+    );
+    triggers.push(...activityTriggers);
+
+    // Analyze sleep triggers
+    const sleepTriggers = await this.analyzeSleepTriggers(
+      painData,
+      contextData.sleep
+    );
+    triggers.push(...sleepTriggers);
+
+    // Analyze weather triggers
+    const weatherTriggers = await this.analyzeWeatherTriggers(
+      painData,
+      contextData.weather
+    );
+    triggers.push(...weatherTriggers);
+
+    // Analyze medication timing
+    const medicationTriggers = await this.analyzeMedicationTiming(
+      painData,
+      contextData.medications
+    );
+    triggers.push(...medicationTriggers);
+
+    // Rank by strength and confidence
+    return this.rankTriggers(triggers);
+  }
+
+  async analyzeActivityTriggers(
+    painData: PainDataPoint[],
+    activityData: ActivityDataPoint[]
+  ): Promise&lt;TriggerAnalysis[]&gt; {
+    const triggers: TriggerAnalysis[] = [];
+
+    // Group activities by type
+    const activityTypes = this.groupByActivityType(activityData);
+
+    for (const [activityType, activities] of activityTypes) {
+      // Find pain levels before and after activity
+      const painDeltas = activities.map(activity => {
+        const painBefore = this.getPainNearTime(painData, activity.startTime, -60);
+        const painAfter = this.getPainNearTime(painData, activity.endTime, 120);
+        return painAfter - painBefore;
+      });
+
+      // Calculate statistics
+      const avgDelta = this.mean(painDeltas);
+      const pValue = this.tTest(painDeltas, 0);
+
+      if (avgDelta > 0.5 && pValue < 0.05) {
+        triggers.push({
+          trigger: {
+            category: 'activity',
+            specific: activityType,
+            description: `${activityType} appears to increase pain`
+          },
+          association: {
+            correlation: avgDelta / 10,
+            temporalLag: 2,
+            doseResponse: this.checkDoseResponse(activities, painDeltas),
+            confidence: 1 - pValue
+          },
+          evidence: {
+            occurrences: activities.length,
+            pain_increase_avg: avgDelta,
+            last_occurrence: activities[activities.length - 1].startTime,
+            examples: this.getTopExamples(activities, painDeltas, 3)
+          }
+        });
+      }
+    }
+
+    return triggers;
+  }
+}</code></pre>
+
+    <h2>Real-Time Alerting</h2>
+
+    <pre><code>class AlertManager {
+  private alertRules: AlertRule[];
+  private notificationService: NotificationService;
+
+  async evaluateAlerts(patientId: string, currentData: MonitoringData): Promise&lt;void&gt; {
+    const baseline = await this.getPatientBaseline(patientId);
+    const preferences = await this.getAlertPreferences(patientId);
+
+    for (const rule of this.alertRules) {
+      if (this.shouldTriggerAlert(rule, currentData, baseline)) {
+        await this.sendAlert({
+          patientId,
+          rule,
+          data: currentData,
+          baseline,
+          preferences
+        });
+      }
+    }
+  }
+
+  private shouldTriggerAlert(
+    rule: AlertRule,
+    current: MonitoringData,
+    baseline: PatientBaseline
+  ): boolean {
+    switch (rule.type) {
+      case 'PAIN_SPIKE':
+        return current.painLevel > baseline.averagePain + (2 * baseline.painStdDev);
+
+      case 'MISSED_MEDICATION':
+        return current.medicationAdherence < 0.8 && rule.adherenceWindow;
+
+      case 'PATTERN_CHANGE':
+        return this.detectPatternDeviation(current, baseline) > rule.threshold;
+
+      case 'FLARE_PREDICTION':
+        return current.flareRisk > rule.riskThreshold;
+
+      default:
+        return false;
+    }
+  }
+}</code></pre>
+
+    <h2>Visualization and Insights</h2>
+
+    <pre><code>interface PainVisualization {
+  type: 'timeline' | 'calendar' | 'heatmap' | 'correlation' | 'trend';
+  config: VisualizationConfig;
+  data: ProcessedData;
+  insights: Insight[];
+}
+
+const visualizationSpecs = {
+  painTimeline: {
+    type: 'timeline',
+    xAxis: { field: 'timestamp', label: 'Date' },
+    yAxis: { field: 'intensity', label: 'Pain Level (0-10)' },
+    layers: [
+      { type: 'line', field: 'intensity', color: '#3b82f6' },
+      { type: 'area', field: 'confidence', opacity: 0.2 },
+      { type: 'markers', field: 'medications', shape: 'pill' },
+      { type: 'markers', field: 'activities', shape: 'activity' }
+    ],
+    annotations: {
+      triggers: true,
+      treatments: true,
+      flares: true
+    }
+  },
+
+  dailyHeatmap: {
+    type: 'heatmap',
+    xAxis: { field: 'dayOfWeek', labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] },
+    yAxis: { field: 'hourOfDay', range: [0, 23] },
+    color: {
+      field: 'averageIntensity',
+      scale: 'sequential',
+      scheme: 'blues'
+    }
+  }
+};</code></pre>
+</body>
+</html>

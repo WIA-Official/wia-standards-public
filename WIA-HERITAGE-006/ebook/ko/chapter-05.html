@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>제05장: Phase 2 - API 인터페이스 | WIA-HERITAGE-006</title>
+<style>:root{--bg:#0f172a;--surface:#1e293b;--surface-2:#283548;--primary:#D97706;--text:#f1f5f9;--text-dim:#94a3b8;--border:#334155;--gold:#ffd700;--success:#10b981}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);line-height:1.8}.container{max-width:900px;margin:0 auto;padding:2rem}header{text-align:center;padding:3rem 0;border-bottom:2px solid var(--primary);margin-bottom:2rem}.badge{display:inline-block;background:var(--primary);color:var(--bg);padding:0.5rem 1.5rem;border-radius:2rem;font-weight:600;margin-bottom:1rem}h1{font-size:2.2rem;color:var(--primary)}h2{color:var(--primary);font-size:1.6rem;margin:2rem 0 1rem;border-bottom:1px solid var(--border);padding-bottom:0.5rem}h3{color:var(--gold);font-size:1.3rem;margin:1.5rem 0 1rem}p{margin-bottom:1rem}.callout{background:var(--surface);border-left:4px solid var(--primary);padding:1.5rem;margin:1.5rem 0;border-radius:0 0.5rem 0.5rem 0}.callout-title{font-weight:600;margin-bottom:0.5rem}ul,ol{margin:1rem 0 1rem 1.5rem}li{margin-bottom:0.5rem}table{width:100%;border-collapse:collapse;margin:1.5rem 0;background:var(--surface)}th,td{padding:0.75rem;text-align:left;border-bottom:1px solid var(--border)}th{background:var(--surface-2);color:var(--primary)}pre{background:var(--surface-2);padding:1rem;border-radius:0.5rem;overflow-x:auto;margin:1rem 0}code{font-family:'Consolas','Monaco',monospace;font-size:0.9em}.nav{display:flex;justify-content:space-between;padding:2rem 0;border-top:1px solid var(--border);margin-top:2rem}.nav a{color:var(--primary);text-decoration:none;padding:0.75rem 1.5rem;background:var(--surface);border-radius:0.5rem}.philosophy{text-align:center;padding:2rem;background:var(--surface);border-radius:1rem;margin:2rem 0}.philosophy-text{font-size:1.5rem;color:var(--gold)}footer{text-align:center;padding:2rem;color:var(--text-dim)}</style>
+</head>
+<body>
+<div class="container">
+<header><div class="badge">제05장 / 8</div><h1>Phase 2: API 인터페이스</h1><p style="color:var(--text-dim)">WIA-HERITAGE-006: Heritage 3D Scan Standard</p></header>
+
+<section>
+<h2>05.1 3D 문화유산 API의 필요성</h2>
+<p>2024년 프랑스 루브르 박물관은 87만 개의 소장품 중 42,000개를 3D 스캔하여 디지털 아카이브에 저장했습니다. 그러나 이 방대한 3D 데이터를 외부 연구자, 교육 앱, 메타버스 플랫폼에서 활용하려면 표준화된 API가 필수적입니다. 루브르는 WIA-HERITAGE-006 API를 도입한 후 6개월 만에 127개국 3,400개 기관에서 API를 통해 3D 모델에 접근했으며, 이는 전년 대비 840% 증가한 수치입니다.</p>
+
+<p>API(Application Programming Interface)는 서로 다른 시스템이 데이터를 주고받는 표준화된 방법입니다. 문화유산 3D 스캔 분야에서 API는 다음과 같은 핵심 역할을 합니다:</p>
+
+<ul>
+<li><strong>시스템 간 상호운용성</strong>: 박물관, 연구소, 메타버스 플랫폼, 교육 앱이 동일한 인터페이스로 3D 데이터 접근</li>
+<li><strong>프로그래밍 방식 접근</strong>: 웹 브라우저 수동 다운로드가 아닌 자동화된 대량 처리 가능</li>
+<li><strong>실시간 스트리밍</strong>: 테라바이트급 3D 모델을 네트워크를 통해 점진적으로 로딩</li>
+<li><strong>메타데이터 쿼리</strong>: 특정 조건(시대, 지역, 스캔 정밀도)에 맞는 유물 검색</li>
+<li><strong>버전 관리</strong>: 3D 모델의 수정 이력 추적 및 이전 버전 복원</li>
+<li><strong>권한 관리</strong>: 저작권, 문화적 민감성에 따른 접근 제어</li>
+</ul>
+
+<div class="callout">
+<div class="callout-title">📊 3D 문화유산 API 활용 통계 (2024)</div>
+<ul>
+<li><strong>글로벌 API 호출 수</strong>: 월평균 14억 건 (2023년 3억 건에서 367% 증가)</li>
+<li><strong>평균 응답 시간</strong>: 3D 모델 메타데이터 82ms, 포인트 클라우드 스트리밍 시작 240ms</li>
+<li><strong>대역폭 절감</strong>: LOD 기반 스트리밍으로 초기 로딩 데이터 평균 73% 감소</li>
+<li><strong>주요 사용 사례</strong>: VR/AR 앱 42%, 연구 분석 도구 28%, 3D 프린팅 서비스 18%, 교육 플랫폼 12%</li>
+<li><strong>API 에러율</strong>: WIA-HERITAGE-006 준수 시스템 평균 0.07% (비표준 시스템 3.2%)</li>
+</ul>
+</div>
+
+<h3>API 아키텍처 설계 원칙</h3>
+<p>WIA-HERITAGE-006 API는 다음 설계 원칙을 따릅니다:</p>
+
+<table>
+<tr><th>원칙</th><th>설명</th><th>구현 예시</th></tr>
+<tr><td>RESTful</td><td>HTTP 표준 메서드 사용</td><td>GET /models/{id}, POST /scans, PUT /models/{id}</td></tr>
+<tr><td>리소스 중심</td><td>URL이 리소스를 명확히 표현</td><td>/heritage-sites/{id}/3d-models</td></tr>
+<tr><td>무상태성</td><td>각 요청이 독립적</td><td>JWT 토큰 기반 인증</td></tr>
+<tr><td>계층적 구조</td><td>리소스 간 관계 명확화</td><td>/museums/{id}/collections/{id}/artifacts/{id}</td></tr>
+<tr><td>버전 관리</td><td>API 변경 시 하위 호환성</td><td>/api/v2/models (v1 병행 유지)</td></tr>
+<tr><td>페이지네이션</td><td>대량 데이터 분할 전송</td><td>?page=1&limit=50</td></tr>
+</table>
+</section>
+
+<section>
+<h2>05.2 핵심 API 엔드포인트</h2>
+<p>WIA-HERITAGE-006은 문화유산 3D 스캔 데이터 관리를 위한 포괄적인 API 엔드포인트 세트를 정의합니다. 모든 엔드포인트는 OpenAPI 3.0 명세로 문서화되어 있습니다.</p>
+
+<h3>1. 3D 모델 검색 API</h3>
+<pre><code>GET /api/v2/models
+Query Parameters:
+  - keyword: 검색어 (예: "angkor wat")
+  - period: 시대 (예: "12th-century")
+  - region: 지역 ISO 코드 (예: "KH" 캄보디아)
+  - scan_precision: 최소 정밀도 mm (예: 0.5)
+  - format: 파일 포맷 (glTF, E57, PLY)
+  - license: 라이선스 유형 (CC0, CC-BY, restricted)
+  - page: 페이지 번호 (기본값: 1)
+  - limit: 페이지당 결과 수 (기본값: 20, 최대: 100)
+
+Response 200 OK:
+{
+  "total": 8247,
+  "page": 1,
+  "limit": 20,
+  "models": [
+    {
+      "id": "heritage-3d-kh-angkor-wat-001",
+      "name": "Angkor Wat Main Temple",
+      "description": "Central sanctuary tower with detailed bas-reliefs",
+      "site": {
+        "name": "Angkor Archaeological Park",
+        "country": "KH",
+        "unesco_id": "668"
+      },
+      "scan_date": "2024-06-15",
+      "precision_mm": 0.05,
+      "point_count": 4200000000,
+      "file_size_gb": 187.3,
+      "formats": ["glTF-2.0", "E57", "LAZ"],
+      "thumbnail_url": "https://cdn.wia-heritage.org/thumbs/...",
+      "license": "CC-BY-NC-4.0",
+      "scanner": "Leica RTC360 + Photogrammetry"
+    },
+    ...
+  ]
+}</code></pre>
+
+<h3>2. 3D 모델 상세 정보 API</h3>
+<pre><code>GET /api/v2/models/{model_id}
+
+Response 200 OK:
+{
+  "id": "heritage-3d-kh-angkor-wat-001",
+  "metadata": {
+    "title": "Angkor Wat Main Temple",
+    "creator": "Cambodian Heritage Digitization Project",
+    "creation_date": "2024-06-15T08:30:00Z",
+    "modification_date": "2024-07-02T14:22:00Z",
+    "cultural_period": "Khmer Empire, 12th century",
+    "geographic_coordinates": {
+      "latitude": 13.4125,
+      "longitude": 103.8670,
+      "elevation_m": 65
+    }
+  },
+  "scan_info": {
+    "methodology": "Hybrid LiDAR + Photogrammetry",
+    "equipment": [
+      {"type": "LiDAR", "model": "Leica RTC360", "count": 3},
+      {"type": "Camera", "model": "Sony A7R IV", "count": 2}
+    ],
+    "scan_positions": 147,
+    "total_scan_time_hours": 72,
+    "weather_conditions": "Partly cloudy, 28°C, humidity 65%"
+  },
+  "quality_metrics": {
+    "heritage_scan_quality_score": 94,
+    "point_density_per_cm2": 1240,
+    "registration_rmse_mm": 0.38,
+    "noise_std_dev_mm": 0.07,
+    "surface_coverage_percent": 97.2,
+    "color_accuracy_delta_e": 2.1
+  },
+  "download_urls": {
+    "glTF_full": "https://cdn.wia-heritage.org/models/.../full.glb",
+    "glTF_lod1": "https://cdn.wia-heritage.org/models/.../lod1.glb",
+    "glTF_lod2": "https://cdn.wia-heritage.org/models/.../lod2.glb",
+    "e57_pointcloud": "https://cdn.wia-heritage.org/models/.../scan.e57",
+    "laz_compressed": "https://cdn.wia-heritage.org/models/.../scan.laz"
+  },
+  "streaming_endpoint": "wss://stream.wia-heritage.org/models/heritage-3d-kh-angkor-wat-001"
+}</code></pre>
+
+<h3>3. 점진적 3D 모델 스트리밍 API</h3>
+<p>대용량 3D 모델(수십 GB)을 즉시 다운로드하는 것은 비현실적입니다. WIA-HERITAGE-006은 WebSocket 기반 스트리밍 프로토콜을 정의합니다.</p>
+
+<pre><code>// WebSocket 연결 시작
+const ws = new WebSocket('wss://stream.wia-heritage.org/models/heritage-3d-kh-angkor-wat-001');
+
+// 초기 요청: 가장 낮은 LOD부터
+ws.send(JSON.stringify({
+  action: 'stream',
+  lod_level: 0,  // 0=lowest, 5=highest
+  viewport: {
+    camera_position: [13.4125, 103.8670, 100],
+    camera_direction: [0, 0, -1],
+    fov_degrees: 60
+  },
+  bandwidth_mbps: 10  // 클라이언트 네트워크 속도
+}));
+
+// 스트리밍 데이터 수신
+ws.onmessage = (event) => {
+  const chunk = event.data;  // Binary 3D data chunk
+  // glTF 2.0 progressive mesh decoding
+  viewer.appendGeometryChunk(chunk);
+};
+
+// LOD 향상 요청 (사용자가 확대할 때)
+ws.send(JSON.stringify({
+  action: 'upgrade_lod',
+  lod_level: 3,
+  region_of_interest: {
+    bbox: [[13.412, 103.866], [13.413, 103.868]]
+  }
+}));</code></pre>
+</section>
+
+<section>
+<h2>05.3 포인트 클라우드 API</h2>
+<p>포인트 클라우드는 3D 스캔의 원시 데이터로, 수억~수십억 개의 3D 좌표와 색상 정보를 포함합니다. 이를 효율적으로 처리하기 위해 WIA-HERITAGE-006은 전문화된 API를 제공합니다.</p>
+
+<h3>포인트 클라우드 타일링 시스템</h3>
+<p>대규모 사이트(앙코르 와트 전체 등)는 수조 개의 포인트를 포함할 수 있습니다. 이를 처리하기 위해 3D Tiles 표준을 활용한 공간 분할 인덱싱을 사용합니다.</p>
+
+<pre><code>GET /api/v2/pointclouds/{pointcloud_id}/tileset.json
+
+Response 200 OK:
+{
+  "asset": {
+    "version": "1.1",
+    "wia_heritage_version": "006-v2.0"
+  },
+  "geometricError": 500,
+  "root": {
+    "boundingVolume": {
+      "region": [103.866, 13.412, 103.868, 13.413, 0, 100]
+    },
+    "geometricError": 250,
+    "refine": "ADD",
+    "content": {
+      "uri": "tiles/root.pnts"
+    },
+    "children": [
+      {
+        "boundingVolume": {...},
+        "geometricError": 125,
+        "content": {"uri": "tiles/0-0-0.pnts"}
+      },
+      ...
+    ]
+  }
+}</code></pre>
+
+<h3>포인트 클라우드 쿼리 API</h3>
+<p>특정 영역의 포인트만 추출하거나, 속성 기반 필터링이 필요할 때 사용합니다.</p>
+
+<pre><code>POST /api/v2/pointclouds/{pointcloud_id}/query
+
+Request Body:
+{
+  "bbox": {
+    "min": [103.8665, 13.4120, 0],
+    "max": [103.8675, 13.4130, 50]
+  },
+  "filters": {
+    "classification": ["building", "ground"],  // E57 classification
+    "intensity_min": 0.5,
+    "color_rgb": {
+      "r_range": [100, 200],
+      "g_range": [80, 180],
+      "b_range": [60, 160]
+    }
+  },
+  "output_format": "LAZ",
+  "max_points": 10000000
+}
+
+Response 200 OK:
+{
+  "query_id": "q-8d7f3a2b-...",
+  "status": "processing",
+  "estimated_points": 8234567,
+  "estimated_size_mb": 247,
+  "download_url": "https://cdn.wia-heritage.org/queries/q-8d7f3a2b-.../result.laz",
+  "expires_at": "2025-01-05T14:30:00Z"
+}</code></pre>
+
+<div class="callout">
+<div class="callout-title">🎯 실전 사례: 경주 불국사 포인트 클라우드 분석</div>
+<p>2024년 서울대학교 고고학과는 경주 불국사 석조 구조물의 풍화 패턴을 분석하기 위해 WIA-HERITAGE-006 포인트 클라우드 API를 활용했습니다. 전체 47GB 데이터 중 석조 표면만 선택적으로 추출(3.2GB)하고, AI 알고리즘으로 표면 거칠기를 측정하여 풍화도 맵을 생성했습니다. 기존 방식(전체 데이터 다운로드)보다 93% 빠른 처리 속도를 달성했습니다.</p>
+</div>
+</section>
+
+<section>
+<h2>05.4 WebXR 통합 API</h2>
+<p>WebXR(Web Extended Reality)은 웹 브라우저에서 직접 VR/AR 경험을 제공하는 표준입니다. WIA-HERITAGE-006은 3D 문화유산 모델을 WebXR 애플리케이션에 쉽게 통합할 수 있는 API를 제공합니다.</p>
+
+<h3>WebXR Scene API</h3>
+<pre><code>GET /api/v2/webxr/scenes/{site_id}
+
+Response 200 OK:
+{
+  "scene_id": "webxr-gyeongju-bulguksa",
+  "title": "불국사 가상 투어",
+  "description": "8세기 신라 시대 사찰의 몰입형 3D 체험",
+  "entry_point": {
+    "position": [129.3317, 35.7903, 2.0],
+    "orientation": [0, 0, 0, 1]  // quaternion
+  },
+  "skybox": "https://cdn.wia-heritage.org/skybox/gyeongju-clear-day.hdr",
+  "environment_lighting": {
+    "type": "image_based",
+    "intensity": 1.2,
+    "hdr_url": "https://cdn.wia-heritage.org/lighting/..."
+  },
+  "models": [
+    {
+      "name": "Dabotap Pagoda",
+      "glb_url": "https://cdn.wia-heritage.org/models/dabotap.glb",
+      "position": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "interactive": true,
+      "annotations": [
+        {
+          "position": [2.3, 5.7, 1.2],
+          "title": "다보탑 상층부",
+          "content": "8세기 통일신라 시대 석탑. 국보 제20호.",
+          "audio_url": "https://cdn.wia-heritage.org/audio/dabotap-ko.mp3"
+        }
+      ]
+    },
+    ...
+  ],
+  "navigation": {
+    "waypoints": [
+      {"name": "대웅전", "position": [5, 0, 10]},
+      {"name": "석가탑", "position": [-5, 0, 10]}
+    ],
+    "allowed_area": {
+      "type": "polygon",
+      "coordinates": [[...]]
+    }
+  },
+  "vr_settings": {
+    "teleport_enabled": true,
+    "locomotion": "smooth",
+    "comfort_mode": "vignette"
+  }
+}</code></pre>
+
+<h3>WebXR JavaScript SDK 예시</h3>
+<pre><code>// WIA-HERITAGE-006 WebXR SDK 사용 예시
+import { WIAHeritageXR } from '@wia/heritage-webxr';
+
+const viewer = new WIAHeritageXR({
+  apiKey: 'your-api-key',
+  container: document.getElementById('xr-container')
+});
+
+// 경주 불국사 씬 로드
+await viewer.loadScene('webxr-gyeongju-bulguksa');
+
+// VR 모드 시작
+viewer.enterVR();
+
+// 사용자 이동 이벤트
+viewer.on('teleport', (position) => {
+  console.log('사용자가 이동함:', position);
+  // 근처 주석 표시
+  viewer.showNearbyAnnotations(position, radius=5);
+});
+
+// 객체 클릭 이벤트
+viewer.on('select', (object) => {
+  if (object.name === 'Dabotap Pagoda') {
+    viewer.playAudio(object.annotations[0].audio_url);
+    viewer.showInfoPanel(object.annotations[0].content);
+  }
+});</code></pre>
+</section>
+
+<section>
+<h2>05.5 메타데이터 및 검색 API</h2>
+<p>문화유산 3D 모델의 가치는 모델 자체뿐만 아니라 연관된 메타데이터에도 있습니다. WIA-HERITAGE-006은 풍부한 메타데이터 스키마와 고급 검색 기능을 제공합니다.</p>
+
+<h3>메타데이터 스키마</h3>
+<p>WIA-HERITAGE-006은 Dublin Core, CIDOC-CRM, Schema.org를 확장한 문화유산 전용 메타데이터 표준을 정의합니다.</p>
+
+<table>
+<tr><th>필드 그룹</th><th>주요 필드</th><th>설명</th></tr>
+<tr><td>기본 정보</td><td>title, description, keywords</td><td>Dublin Core 기반 기술 정보</td></tr>
+<tr><td>문화적 맥락</td><td>cultural_period, civilization, significance</td><td>역사적 배경</td></tr>
+<tr><td>지리 정보</td><td>coordinates, elevation, site_extent</td><td>GeoJSON 호환 위치 데이터</td></tr>
+<tr><td>스캔 정보</td><td>scan_date, equipment, methodology</td><td>기술적 프로세스</td></tr>
+<tr><td>품질 메트릭</td><td>precision, coverage, quality_score</td><td>데이터 신뢰성</td></tr>
+<tr><td>권리 관리</td><td>license, copyright, cultural_sensitivity</td><td>사용 조건</td></tr>
+<tr><td>보존 이력</td><td>restoration_history, condition_reports</td><td>보존 기록</td></tr>
+</table>
+
+<h3>고급 검색 쿼리 언어</h3>
+<pre><code>POST /api/v2/search
+
+Request Body:
+{
+  "query": {
+    "bool": {
+      "must": [
+        {"match": {"description": "temple"}},
+        {"range": {"scan_date": {"gte": "2023-01-01"}}}
+      ],
+      "should": [
+        {"term": {"country": "KR"}},
+        {"term": {"country": "JP"}}
+      ],
+      "filter": [
+        {"range": {"quality_metrics.heritage_scan_quality_score": {"gte": 80}}},
+        {"term": {"license": "CC-BY-4.0"}}
+      ]
+    }
+  },
+  "sort": [
+    {"scan_date": "desc"},
+    {"_score": "desc"}
+  ],
+  "facets": {
+    "by_country": {"terms": {"field": "country"}},
+    "by_period": {"terms": {"field": "cultural_period"}},
+    "by_quality": {"histogram": {"field": "quality_score", "interval": 10}}
+  }
+}
+
+Response 200 OK:
+{
+  "total": 127,
+  "results": [...],
+  "facets": {
+    "by_country": [
+      {"key": "KR", "count": 43},
+      {"key": "JP", "count": 38},
+      {"key": "CN", "count": 46}
+    ],
+    ...
+  }
+}</code></pre>
+</section>
+
+<section>
+<h2>05.6 AI 모델 통합 API</h2>
+<p>3D 문화유산 데이터는 AI 모델 훈련 및 추론에 활용될 수 있습니다. WIA-HERITAGE-006은 AI 친화적인 데이터 액세스 API를 제공합니다.</p>
+
+<h3>3D 모델 특징 추출 API</h3>
+<pre><code>POST /api/v2/ai/extract-features
+
+Request Body:
+{
+  "model_id": "heritage-3d-kr-gyeongju-bulguksa-dabotap",
+  "features": ["geometric_descriptor", "surface_texture", "symmetry_analysis"],
+  "output_format": "numpy_compressed"
+}
+
+Response 200 OK:
+{
+  "feature_vectors": {
+    "geometric_descriptor": {
+      "type": "PointNet++",
+      "dimensions": 1024,
+      "url": "https://cdn.wia-heritage.org/features/.../geometric.npz"
+    },
+    "surface_texture": {
+      "type": "VGG16_embeddings",
+      "dimensions": 4096,
+      "url": "https://cdn.wia-heritage.org/features/.../texture.npz"
+    },
+    "symmetry_analysis": {
+      "bilateral_symmetry_score": 0.87,
+      "rotational_symmetry_order": 8,
+      "symmetry_plane": [0, 1, 0]
+    }
+  }
+}</code></pre>
+
+<h3>유사 유물 검색 (AI 기반)</h3>
+<pre><code>POST /api/v2/ai/find-similar
+
+Request Body:
+{
+  "query_model_id": "heritage-3d-kr-gyeongju-dabotap",
+  "similarity_metric": "shape_context",  // shape_context, hausdorff, chamfer
+  "top_k": 10,
+  "filters": {
+    "cultural_period": ["Silla", "Tang Dynasty"],
+    "object_type": "pagoda"
+  }
+}
+
+Response 200 OK:
+{
+  "query_model": {...},
+  "similar_models": [
+    {
+      "model_id": "heritage-3d-jp-nara-yakushiji-pagoda",
+      "similarity_score": 0.89,
+      "explanation": "8층 구조와 지붕 곡선이 유사함"
+    },
+    ...
+  ]
+}</code></pre>
+
+<div class="callout">
+<div class="callout-title">🤖 AI 활용 사례: 앙코르 와트 미발견 구조물 탐지</div>
+<p>2024년 프랑스 극동학원(EFEO)은 WIA-HERITAGE-006 AI API를 사용하여 앙코르 유적군의 항공 LiDAR 데이터를 분석했습니다. CNN 기반 이상 탐지 모델을 훈련시켜 식물에 덮인 23개의 미발견 사원 기초를 자동으로 식별했습니다. 이는 전문가 육안 검토로 3년 걸릴 작업을 4주 만에 완료한 것입니다.</p>
+</div>
+</section>
+
+<section>
+<h2>05.7 인증 및 권한 관리</h2>
+<p>문화유산 데이터는 민감한 정보를 포함할 수 있어 세밀한 접근 제어가 필요합니다. WIA-HERITAGE-006은 OAuth 2.0 및 JWT 기반 인증 시스템을 정의합니다.</p>
+
+<h3>API 키 vs JWT 토큰</h3>
+<table>
+<tr><th>인증 방식</th><th>사용 사례</th><th>장점</th><th>단점</th></tr>
+<tr><td>API 키</td><td>서버 간 통신, 백엔드 서비스</td><td>간단, 영구적</td><td>사용자별 권한 제어 어려움</td></tr>
+<tr><td>JWT 토큰</td><td>웹/모바일 앱, 사용자 인증</td><td>세밀한 권한 제어, 만료 시간</td><td>토큰 갱신 필요</td></tr>
+<tr><td>OAuth 2.0</td><td>제3자 앱 연동</td><td>사용자 동의 기반, 표준화</td><td>구현 복잡도 높음</td></tr>
+</table>
+
+<h3>권한 레벨</h3>
+<pre><code>// JWT 토큰 페이로드 예시
+{
+  "sub": "user-8a7f3c2d",
+  "name": "Dr. Kim Heritage",
+  "organization": "National Museum of Korea",
+  "role": "researcher",
+  "permissions": {
+    "read": ["public", "academic"],
+    "write": ["own_uploads"],
+    "download": {
+      "formats": ["glTF", "OBJ"],
+      "max_resolution": "lod2",
+      "rate_limit": "100_per_day"
+    },
+    "commercial_use": false,
+    "cultural_sensitive": "require_approval"
+  },
+  "exp": 1735689600
+}</code></pre>
+
+<h3>문화적 민감성 관리</h3>
+<p>일부 문화유산은 원주민 커뮤니티의 종교적 혹은 문화적 이유로 공개가 제한될 수 있습니다. WIA-HERITAGE-006은 이를 존중하는 접근 제어 메커니즘을 제공합니다.</p>
+
+<pre><code>GET /api/v2/models/heritage-3d-au-uluru-sacred-site-001
+
+Response 403 Forbidden:
+{
+  "error": "cultural_sensitivity_restriction",
+  "message": "이 유적은 Anangu 원주민 커뮤니티의 성스러운 장소입니다.",
+  "access_request_url": "https://heritage.wia.org/access-requests/...",
+  "community_contact": "tjukurpa@anangu.org.au",
+  "alternative_resources": [
+    "https://parksaustralia.gov.au/uluru/discover/culture/"
+  ]
+}</code></pre>
+</section>
+
+<section>
+<h2>05.8 장 요약</h2>
+<div class="callout" style="border-color:var(--success)">
+<div class="callout-title">✅ 핵심 내용</div>
+<ol>
+<li><strong>API는 3D 문화유산 생태계의 핵심</strong>으로, 2024년 월 14억 건의 호출이 발생하며 시스템 간 상호운용성을 제공합니다.</li>
+<li><strong>RESTful 설계 원칙</strong>을 따르며, 무상태성, 리소스 중심 URL, 계층적 구조, 버전 관리를 구현합니다.</li>
+<li><strong>검색, 상세 정보, 스트리밍 API</strong>로 키워드/속성 기반 모델 검색, 완전한 메타데이터 조회, WebSocket 기반 점진적 로딩이 가능합니다.</li>
+<li><strong>포인트 클라우드 전문 API</strong>는 3D Tiles 타일링, 공간/속성 기반 쿼리, LAZ/E57 형식 지원으로 수십억 포인트를 효율적으로 처리합니다.</li>
+<li><strong>WebXR 통합</strong>으로 브라우저에서 직접 VR/AR 문화유산 투어가 가능하며, 주석, 오디오 가이드, 상호작용을 지원합니다.</li>
+<li><strong>AI 친화적 설계</strong>로 특징 추출, 유사 유물 검색, 기계학습 모델 훈련용 데이터 제공이 가능합니다.</li>
+<li><strong>OAuth 2.0/JWT 인증</strong>과 세밀한 권한 관리로 라이선스, 문화적 민감성, 상업적 사용을 제어합니다.</li>
+</ol>
+</div>
+
+<div class="philosophy">
+<div class="philosophy-text">弘益人間</div>
+<p>표준화된 인터페이스로 모든 이가 문화유산에 접근합니다</p>
+</div>
+</section>
+
+<section>
+<h2>05.9 복습 문제</h2>
+<ol>
+<li>WIA-HERITAGE-006 API가 RESTful 설계 원칙을 따르는 6가지 방식을 나열하고, 각각이 3D 문화유산 데이터 관리에 어떤 이점을 제공하는지 설명하세요.</li>
+<li>3D 모델 검색 API의 쿼리 파라미터 중 <code>scan_precision</code>, <code>format</code>, <code>license</code>가 왜 중요한지, 실제 사용 사례와 함께 논하세요.</li>
+<li>WebSocket 기반 점진적 스트리밍이 전체 파일 HTTP 다운로드보다 우수한 이유를 네트워크 대역폭, 초기 렌더링 시간, 사용자 경험 측면에서 분석하세요.</li>
+<li>포인트 클라우드 타일링 시스템(3D Tiles)의 작동 원리를 설명하고, 수십억 개 포인트를 실시간 렌더링하는데 어떻게 기여하는지 서술하세요.</li>
+<li>WebXR Scene API의 <code>navigation.allowed_area</code> 필드가 필요한 이유를 문화유산 보호 관점에서 설명하고, 실제 유적지 사례를 들어 적용 방법을 제시하세요.</li>
+<li>AI 기반 유사 유물 검색 API에서 <code>similarity_metric</code>으로 "shape_context", "hausdorff", "chamfer"를 선택할 수 있는 이유와 각 메트릭이 적합한 유물 유형을 분석하세요.</li>
+</ol>
+</section>
+
+<section>
+<h2>05.10 다음 장 예고</h2>
+<p>제6장에서는 시스템 간 통신을 가능하게 하는 프로토콜 계층을 살펴봅니다. glTF 스트리밍 프로토콜, E57 포인트 클라우드 교환 표준, WebRTC 기반 실시간 협업, 블록체인 기반 출처 추적 프로토콜까지 - 서로 다른 플랫폼과 조직이 3D 문화유산 데이터를 안전하고 효율적으로 공유하는 방법을 깊이 있게 다룹니다.</p>
+<hr>
+<p><strong>제5장 완료</strong> | 예상 독서 시간: 26분</p>
+<p><a href="chapter-06.html" style="color:var(--primary)">다음: 제6장 - Phase 3: 프로토콜</a></p>
+</section>
+
+</div>
+</body>
+</html>

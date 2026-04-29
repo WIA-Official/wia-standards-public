@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Smart Wheelchair - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #3B82F6;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 1rem; }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .sub-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .sub-section h4 { color: var(--primary); margin-bottom: 15px; font-size: 1rem; }
+
+        .joystick-container { display: flex; justify-content: center; margin: 20px 0; }
+        .joystick { width: 200px; height: 200px; background: var(--bg); border: 2px solid var(--border); border-radius: 50%; position: relative; cursor: pointer; }
+        .joystick-knob { width: 60px; height: 60px; background: var(--primary); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transition: all 0.1s; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); }
+        .joystick-crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; }
+        .joystick-crosshair::before, .joystick-crosshair::after { content: ''; position: absolute; background: var(--border); }
+        .joystick-crosshair::before { width: 1px; height: 100%; left: 50%; }
+        .joystick-crosshair::after { width: 100%; height: 1px; top: 50%; }
+        .joystick-values { text-align: center; margin-top: 15px; font-size: 0.9rem; color: var(--text-muted); }
+
+        .input-method-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 20px 0; }
+        .input-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .input-card:hover { border-color: var(--primary); }
+        .input-card.selected { border-color: var(--primary); background: rgba(16, 185, 129, 0.1); }
+        .input-card .icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .input-card .name { font-weight: 600; }
+
+        .motor-display { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin: 20px 0; }
+        .motor-gauge { text-align: center; }
+        .motor-gauge .gauge { width: 150px; height: 150px; border-radius: 50%; border: 8px solid var(--border); margin: 0 auto 15px; position: relative; display: flex; align-items: center; justify-content: center; }
+        .motor-gauge .gauge-value { font-size: 2rem; font-weight: bold; color: var(--primary); }
+        .motor-gauge .gauge-label { font-size: 0.85rem; color: var(--text-muted); }
+
+        .sensor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin: 20px 0; }
+        .sensor-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .sensor-item .value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .sensor-item .label { font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; }
+        .sensor-item.warning { border-color: var(--warning); }
+        .sensor-item.danger { border-color: var(--danger); }
+
+        .nav-map { width: 100%; height: 300px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; position: relative; overflow: hidden; }
+        .wheelchair-icon { position: absolute; font-size: 2rem; transform: translate(-50%, -50%); transition: all 0.5s; }
+        .obstacle { position: absolute; width: 30px; height: 30px; background: var(--danger); border-radius: 4px; opacity: 0.7; }
+        .goal-point { position: absolute; width: 20px; height: 20px; background: var(--primary); border-radius: 50%; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 50% { transform: translate(-50%, -50%) scale(1.3); opacity: 0.7; } }
+
+        .safety-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .safety-card { background: var(--bg); border: 2px solid var(--secondary); border-radius: 12px; padding: 25px; text-align: center; }
+        .safety-card.active { border-color: var(--primary); background: rgba(16, 185, 129, 0.1); }
+        .safety-card.warning { border-color: var(--warning); background: rgba(245, 158, 11, 0.1); }
+        .safety-card.danger { border-color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+        .safety-card .icon { font-size: 3rem; margin-bottom: 15px; }
+        .safety-card .title { font-weight: 600; margin-bottom: 10px; }
+        .safety-card .status { font-size: 0.9rem; color: var(--text-muted); }
+
+        .estop-btn { width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(145deg, #ef4444, #dc2626); border: 4px solid #991b1b; color: white; font-size: 1.2rem; font-weight: bold; cursor: pointer; margin: 20px auto; display: block; box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4); transition: all 0.2s; }
+        .estop-btn:hover { transform: scale(1.05); }
+        .estop-btn:active { transform: scale(0.95); }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .motor-display { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Smart Wheelchair</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🦽 WIA Smart Wheelchair</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Smart Wheelchair CAN Protocol" data-ko="스마트 휠체어 CAN 프로토콜">Smart Wheelchair CAN Protocol</h1>
+            <p data-en="Intelligent mobility system with multiple input methods" data-ko="다양한 입력 방식의 지능형 이동 시스템">Intelligent mobility system with multiple input methods</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🎮 Control" data-ko="🎮 제어">🎮 Control</div>
+            <div class="tab" onclick="showPanel(1)" data-en="⚡ Motor" data-ko="⚡ 모터">⚡ Motor</div>
+            <div class="tab" onclick="showPanel(2)" data-en="📡 Sensor" data-ko="📡 센서">📡 Sensor</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🗺️ Navigation" data-ko="🗺️ 내비게이션">🗺️ Navigation</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🛡️ Safety" data-ko="🛡️ 안전">🛡️ Safety</div>
+        </div>
+
+        <!-- Panel 0: Control -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🎮 Input Control" data-ko="🎮 입력 제어">🎮 Input Control</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Select input method and control the wheelchair" data-ko="입력 방식을 선택하고 휠체어를 제어하세요">Select input method and control</p>
+
+            <div class="sub-section">
+                <h4 data-en="Input Method" data-ko="입력 방식">Input Method</h4>
+                <div class="input-method-grid">
+                    <div class="input-card selected" onclick="selectInput(this, 'joystick')">
+                        <div class="icon">🕹️</div>
+                        <div class="name" data-en="Joystick" data-ko="조이스틱">Joystick</div>
+                    </div>
+                    <div class="input-card" onclick="selectInput(this, 'sippuff')">
+                        <div class="icon">💨</div>
+                        <div class="name" data-en="Sip-and-Puff" data-ko="흡입/배출">Sip-and-Puff</div>
+                    </div>
+                    <div class="input-card" onclick="selectInput(this, 'head')">
+                        <div class="icon">🗣️</div>
+                        <div class="name" data-en="Head Array" data-ko="헤드 어레이">Head Array</div>
+                    </div>
+                    <div class="input-card" onclick="selectInput(this, 'voice')">
+                        <div class="icon">🎤</div>
+                        <div class="name" data-en="Voice" data-ko="음성">Voice</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Joystick Control" data-ko="조이스틱 제어">Joystick Control</h4>
+                <div class="joystick-container">
+                    <div class="joystick" id="joystick" onmousedown="startJoystick(event)" onmousemove="moveJoystick(event)" onmouseup="stopJoystick()" onmouseleave="stopJoystick()">
+                        <div class="joystick-crosshair"></div>
+                        <div class="joystick-knob" id="joystickKnob"></div>
+                    </div>
+                </div>
+                <div class="joystick-values">
+                    <span>X: <strong id="joyX">0</strong></span> &nbsp;&nbsp;
+                    <span>Y: <strong id="joyY">0</strong></span> &nbsp;&nbsp;
+                    <span data-en="Speed:" data-ko="속도:">Speed:</span> <strong id="joySpeed">0%</strong>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="sendControl()" data-en="📤 Send Command" data-ko="📤 명령 전송">📤 Send Command</button>
+            </div>
+            <div class="output" id="controlOutput"></div>
+        </div>
+
+        <!-- Panel 1: Motor -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="⚡ Motor Control" data-ko="⚡ 모터 제어">⚡ Motor Control</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Monitor and control wheel motors" data-ko="휠 모터 모니터링 및 제어">Monitor and control wheel motors</p>
+
+            <div class="motor-display">
+                <div class="motor-gauge">
+                    <div class="gauge">
+                        <span class="gauge-value" id="leftMotor">0%</span>
+                    </div>
+                    <div class="gauge-label" data-en="Left Motor" data-ko="왼쪽 모터">Left Motor</div>
+                </div>
+                <div class="motor-gauge">
+                    <div class="gauge">
+                        <span class="gauge-value" id="rightMotor">0%</span>
+                    </div>
+                    <div class="gauge-label" data-en="Right Motor" data-ko="오른쪽 모터">Right Motor</div>
+                </div>
+            </div>
+
+            <div class="sensor-grid">
+                <div class="sensor-item">
+                    <div class="value" id="currentSpeed">0</div>
+                    <div class="label" data-en="Speed (km/h)" data-ko="속도 (km/h)">Speed (km/h)</div>
+                </div>
+                <div class="sensor-item">
+                    <div class="value" id="motorTemp">32°C</div>
+                    <div class="label" data-en="Motor Temp" data-ko="모터 온도">Motor Temp</div>
+                </div>
+                <div class="sensor-item">
+                    <div class="value" id="torque">0</div>
+                    <div class="label" data-en="Torque (Nm)" data-ko="토크 (Nm)">Torque (Nm)</div>
+                </div>
+                <div class="sensor-item">
+                    <div class="value" id="battery">85%</div>
+                    <div class="label" data-en="Battery" data-ko="배터리">Battery</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runMotorTest()" data-en="🔄 Motor Test" data-ko="🔄 모터 테스트">🔄 Motor Test</button>
+            </div>
+            <div class="output" id="motorOutput"></div>
+        </div>
+
+        <!-- Panel 2: Sensor -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="📡 Sensor Data" data-ko="📡 센서 데이터">📡 Sensor Data</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Real-time sensor readings" data-ko="실시간 센서 수치">Real-time sensor readings</p>
+
+            <div class="sub-section">
+                <h4 data-en="Ultrasonic Sensors" data-ko="초음파 센서">Ultrasonic Sensors</h4>
+                <div class="sensor-grid">
+                    <div class="sensor-item" id="sonarFront">
+                        <div class="value">120</div>
+                        <div class="label" data-en="Front (cm)" data-ko="전방 (cm)">Front (cm)</div>
+                    </div>
+                    <div class="sensor-item" id="sonarLeft">
+                        <div class="value">85</div>
+                        <div class="label" data-en="Left (cm)" data-ko="좌측 (cm)">Left (cm)</div>
+                    </div>
+                    <div class="sensor-item" id="sonarRight">
+                        <div class="value">92</div>
+                        <div class="label" data-en="Right (cm)" data-ko="우측 (cm)">Right (cm)</div>
+                    </div>
+                    <div class="sensor-item" id="sonarRear">
+                        <div class="value">200</div>
+                        <div class="label" data-en="Rear (cm)" data-ko="후방 (cm)">Rear (cm)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="IMU Data" data-ko="IMU 데이터">IMU Data</h4>
+                <div class="sensor-grid">
+                    <div class="sensor-item">
+                        <div class="value" id="imuRoll">0.5°</div>
+                        <div class="label">Roll</div>
+                    </div>
+                    <div class="sensor-item">
+                        <div class="value" id="imuPitch">-1.2°</div>
+                        <div class="label">Pitch</div>
+                    </div>
+                    <div class="sensor-item">
+                        <div class="value" id="imuYaw">45°</div>
+                        <div class="label">Yaw</div>
+                    </div>
+                    <div class="sensor-item">
+                        <div class="value" id="imuAccel">9.81</div>
+                        <div class="label">Accel (m/s²)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="refreshSensors()" data-en="🔄 Refresh" data-ko="🔄 새로고침">🔄 Refresh</button>
+            </div>
+            <div class="output" id="sensorOutput"></div>
+        </div>
+
+        <!-- Panel 3: Navigation -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🗺️ Autonomous Navigation" data-ko="🗺️ 자율 내비게이션">🗺️ Autonomous Navigation</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Path planning and obstacle avoidance" data-ko="경로 계획 및 장애물 회피">Path planning and obstacle avoidance</p>
+
+            <div class="nav-map" id="navMap">
+                <div class="wheelchair-icon" id="wheelchairIcon" style="left: 50%; top: 80%;">🦽</div>
+                <div class="goal-point" id="goalPoint" style="left: 50%; top: 20%;"></div>
+                <div class="obstacle" style="left: 30%; top: 50%;"></div>
+                <div class="obstacle" style="left: 70%; top: 40%;"></div>
+            </div>
+
+            <div class="sensor-grid" style="margin-top: 20px;">
+                <div class="sensor-item">
+                    <div class="value" id="navStatus">Idle</div>
+                    <div class="label" data-en="Status" data-ko="상태">Status</div>
+                </div>
+                <div class="sensor-item">
+                    <div class="value" id="navDistance">5.2m</div>
+                    <div class="label" data-en="To Goal" data-ko="목표까지">To Goal</div>
+                </div>
+                <div class="sensor-item">
+                    <div class="value" id="navObstacles">2</div>
+                    <div class="label" data-en="Obstacles" data-ko="장애물">Obstacles</div>
+                </div>
+                <div class="sensor-item">
+                    <div class="value" id="navETA">15s</div>
+                    <div class="label" data-en="ETA" data-ko="예상시간">ETA</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="startNavigation()" data-en="▶️ Start Navigation" data-ko="▶️ 내비게이션 시작">▶️ Start Navigation</button>
+                <button class="btn btn-secondary" onclick="stopNavigation()" data-en="⏹️ Stop" data-ko="⏹️ 정지">⏹️ Stop</button>
+            </div>
+            <div class="output" id="navOutput"></div>
+        </div>
+
+        <!-- Panel 4: Safety -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="🛡️ Safety Systems" data-ko="🛡️ 안전 시스템">🛡️ Safety Systems</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Emergency stop and safety monitoring" data-ko="비상 정지 및 안전 모니터링">Emergency stop and safety monitoring</p>
+
+            <button class="estop-btn" onclick="emergencyStop()" data-en="E-STOP" data-ko="긴급정지">E-STOP</button>
+
+            <div class="safety-panel">
+                <div class="safety-card active" id="safetyCollision">
+                    <div class="icon">🚧</div>
+                    <div class="title" data-en="Collision Prevention" data-ko="충돌 방지">Collision Prevention</div>
+                    <div class="status">✅ Active</div>
+                </div>
+                <div class="safety-card active" id="safetyTilt">
+                    <div class="icon">⚖️</div>
+                    <div class="title" data-en="Tilt Protection" data-ko="전복 방지">Tilt Protection</div>
+                    <div class="status">✅ Active</div>
+                </div>
+                <div class="safety-card active" id="safetySpeed">
+                    <div class="icon">🏎️</div>
+                    <div class="title" data-en="Speed Limiter" data-ko="속도 제한">Speed Limiter</div>
+                    <div class="status">✅ 8 km/h max</div>
+                </div>
+                <div class="safety-card active" id="safetyBattery">
+                    <div class="icon">🔋</div>
+                    <div class="title" data-en="Battery Monitor" data-ko="배터리 모니터">Battery Monitor</div>
+                    <div class="status">✅ 85%</div>
+                </div>
+            </div>
+
+            <div class="output" id="safetyOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Smart Wheelchair: Mobility for everyone" data-ko="WIA Smart Wheelchair: 모든 사람을 위한 이동성">WIA Smart Wheelchair: Mobility for everyone</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let joystickActive = false;
+        let joyX = 0, joyY = 0;
+        let navInterval = null;
+        let selectedInput = 'joystick';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+        }
+
+        function selectInput(el, type) {
+            document.querySelectorAll('.input-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedInput = type;
+        }
+
+        // Joystick
+        function startJoystick(e) {
+            joystickActive = true;
+            moveJoystick(e);
+        }
+
+        function moveJoystick(e) {
+            if (!joystickActive) return;
+            const joystick = document.getElementById('joystick');
+            const rect = joystick.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const maxRadius = rect.width / 2 - 30;
+
+            let x = e.clientX - rect.left - centerX;
+            let y = e.clientY - rect.top - centerY;
+
+            const distance = Math.sqrt(x * x + y * y);
+            if (distance > maxRadius) {
+                x = (x / distance) * maxRadius;
+                y = (y / distance) * maxRadius;
+            }
+
+            const knob = document.getElementById('joystickKnob');
+            knob.style.left = (centerX + x) + 'px';
+            knob.style.top = (centerY + y) + 'px';
+
+            joyX = Math.round((x / maxRadius) * 100);
+            joyY = Math.round((-y / maxRadius) * 100);
+            const speed = Math.round(Math.sqrt(joyX*joyX + joyY*joyY));
+
+            document.getElementById('joyX').textContent = joyX;
+            document.getElementById('joyY').textContent = joyY;
+            document.getElementById('joySpeed').textContent = speed + '%';
+
+            // Update motor display
+            const leftPower = Math.min(100, Math.max(-100, joyY + joyX));
+            const rightPower = Math.min(100, Math.max(-100, joyY - joyX));
+            document.getElementById('leftMotor').textContent = leftPower + '%';
+            document.getElementById('rightMotor').textContent = rightPower + '%';
+        }
+
+        function stopJoystick() {
+            joystickActive = false;
+            const knob = document.getElementById('joystickKnob');
+            knob.style.left = '50%';
+            knob.style.top = '50%';
+            joyX = 0; joyY = 0;
+            document.getElementById('joyX').textContent = '0';
+            document.getElementById('joyY').textContent = '0';
+            document.getElementById('joySpeed').textContent = '0%';
+        }
+
+        function sendControl() {
+            document.getElementById('controlOutput').textContent = JSON.stringify({
+                canId: '0x200',
+                inputMethod: selectedInput,
+                joystick: { x: joyX, y: joyY },
+                motorCommand: {
+                    left: Math.min(100, Math.max(-100, joyY + joyX)),
+                    right: Math.min(100, Math.max(-100, joyY - joyX))
+                },
+                timestamp: Date.now(),
+                message: currentLang === 'ko' ? '제어 명령 전송됨' : 'Control command sent'
+            }, null, 2);
+        }
+
+        // Motor
+        function runMotorTest() {
+            document.getElementById('currentSpeed').textContent = '3.5';
+            document.getElementById('motorTemp').textContent = '38°C';
+            document.getElementById('torque').textContent = '12.5';
+            
+            document.getElementById('motorOutput').textContent = JSON.stringify({
+                status: '✅ Motor Test Complete',
+                leftMotor: { rpm: 120, current: '2.5A', temp: '38°C' },
+                rightMotor: { rpm: 118, current: '2.4A', temp: '37°C' },
+                diagnosis: 'All motors functioning normally',
+                message: currentLang === 'ko' ? '모터 테스트 완료' : 'Motor test completed'
+            }, null, 2);
+        }
+
+        // Sensors
+        function refreshSensors() {
+            const sensors = {
+                front: Math.floor(Math.random() * 150 + 50),
+                left: Math.floor(Math.random() * 100 + 30),
+                right: Math.floor(Math.random() * 100 + 30),
+                rear: Math.floor(Math.random() * 200 + 100)
+            };
+
+            document.querySelector('#sonarFront .value').textContent = sensors.front;
+            document.querySelector('#sonarLeft .value').textContent = sensors.left;
+            document.querySelector('#sonarRight .value').textContent = sensors.right;
+            document.querySelector('#sonarRear .value').textContent = sensors.rear;
+
+            // Warning colors
+            ['sonarFront', 'sonarLeft', 'sonarRight', 'sonarRear'].forEach(id => {
+                const el = document.getElementById(id);
+                const val = parseInt(el.querySelector('.value').textContent);
+                el.classList.remove('warning', 'danger');
+                if (val < 50) el.classList.add('danger');
+                else if (val < 80) el.classList.add('warning');
+            });
+
+            document.getElementById('imuRoll').textContent = (Math.random() * 4 - 2).toFixed(1) + '°';
+            document.getElementById('imuPitch').textContent = (Math.random() * 4 - 2).toFixed(1) + '°';
+            document.getElementById('imuYaw').textContent = Math.floor(Math.random() * 360) + '°';
+
+            document.getElementById('sensorOutput').textContent = JSON.stringify({
+                timestamp: Date.now(),
+                ultrasonic: sensors,
+                imu: {
+                    roll: document.getElementById('imuRoll').textContent,
+                    pitch: document.getElementById('imuPitch').textContent,
+                    yaw: document.getElementById('imuYaw').textContent
+                },
+                message: currentLang === 'ko' ? '센서 데이터 갱신됨' : 'Sensor data refreshed'
+            }, null, 2);
+        }
+
+        // Navigation
+        function startNavigation() {
+            document.getElementById('navStatus').textContent = 'Moving';
+            let progress = 0;
+            
+            navInterval = setInterval(() => {
+                progress += 5;
+                const wheelchair = document.getElementById('wheelchairIcon');
+                const currentTop = 80 - (progress * 0.6);
+                wheelchair.style.top = Math.max(20, currentTop) + '%';
+                
+                document.getElementById('navDistance').textContent = (5.2 * (1 - progress/100)).toFixed(1) + 'm';
+                document.getElementById('navETA').textContent = Math.max(0, Math.floor(15 * (1 - progress/100))) + 's';
+
+                if (progress >= 100) {
+                    clearInterval(navInterval);
+                    document.getElementById('navStatus').textContent = 'Arrived';
+                    document.getElementById('navOutput').textContent = JSON.stringify({
+                        status: '✅ Navigation Complete',
+                        message: currentLang === 'ko' ? '목적지 도착' : 'Arrived at destination'
+                    }, null, 2);
+                }
+            }, 500);
+
+            document.getElementById('navOutput').textContent = JSON.stringify({
+                status: '▶️ Navigation Started',
+                goal: { x: 150, y: 60 },
+                obstacles: 2,
+                message: currentLang === 'ko' ? '내비게이션 시작' : 'Navigation started'
+            }, null, 2);
+        }
+
+        function stopNavigation() {
+            if (navInterval) clearInterval(navInterval);
+            document.getElementById('navStatus').textContent = 'Stopped';
+            document.getElementById('navOutput').textContent = JSON.stringify({
+                status: '⏹️ Navigation Stopped',
+                message: currentLang === 'ko' ? '내비게이션 정지' : 'Navigation stopped'
+            }, null, 2);
+        }
+
+        // Safety
+        function emergencyStop() {
+            stopNavigation();
+            document.getElementById('leftMotor').textContent = '0%';
+            document.getElementById('rightMotor').textContent = '0%';
+            document.getElementById('currentSpeed').textContent = '0';
+            
+            document.getElementById('safetyOutput').textContent = JSON.stringify({
+                status: '🚨 EMERGENCY STOP ACTIVATED',
+                canId: '0x600',
+                action: 'All motors disabled',
+                timestamp: Date.now(),
+                message: currentLang === 'ko' ? '긴급 정지 활성화됨!' : 'Emergency stop activated!'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang('en');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: 센서 융합 및 인식 - WIA-FARMING_ROBOT</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.8; color: #333; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 50px; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        .chapter-header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 3px solid #667eea; }
+        .chapter-number { color: #764ba2; font-size: 1.2em; font-weight: 600; margin-bottom: 10px; }
+        h1 { color: #667eea; font-size: 2.5em; margin-bottom: 20px; }
+        h2 { color: #667eea; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
+        h3 { color: #764ba2; font-size: 1.4em; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 15px; text-align: justify; }
+        .highlight-box { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 25px; border-radius: 10px; margin: 25px 0; border-left: 5px solid #667eea; }
+        .info-box { background: #e8f4f8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196F3; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        th { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; text-align: left; font-weight: 600; }
+        td { padding: 12px 15px; border-bottom: 1px solid #eee; }
+        tr:hover { background: #f8f9fa; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #2d2d2d; color: #f8f8f2; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; color: #f8f8f2; padding: 0; }
+        ul, ol { margin: 15px 0; padding-left: 30px; }
+        li { margin: 8px 0; }
+        .key-takeaways { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .key-takeaways h2 { color: white; border-bottom: 2px solid rgba(255,255,255,0.3); margin-top: 0; }
+        .key-takeaways ul { list-style: none; }
+        .key-takeaways li:before { content: "✓ "; font-weight: bold; margin-right: 10px; }
+        .review-questions { background: #f8f9fa; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions h2 { color: #667eea; margin-top: 0; }
+        .review-questions ol { counter-reset: question-counter; list-style: none; }
+        .review-questions li { counter-increment: question-counter; margin: 20px 0; padding-left: 40px; position: relative; }
+        .review-questions li:before { content: "Q" counter(question-counter); position: absolute; left: 0; top: 0; background: #667eea; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9em; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 30px; border-top: 2px solid #eee; }
+        .nav-button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; border-radius: 25px; text-decoration: none; font-weight: 600; transition: transform 0.3s ease; display: inline-block; }
+        .nav-button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); }
+        .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #eee; color: #999; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <div class="chapter-number">제4장</div>
+            <h1>센서 융합 및 인식</h1>
+        </div>
+
+        <div class="highlight-box">
+            <h3>장 개요</h3>
+            <p>이 장에서는 농업 로봇이 환경을 이해하는 데 사용하는 다중 센서 시스템을 탐구합니다. LiDAR, 카메라, 레이더, IMU 및 환경 센서의 융합을 다루며, 작물 인식, 장애물 감지 및 건강 모니터링을 위한 AI 기반 인식 시스템을 살펴봅니다.</p>
+        </div>
+
+        <h2>4.1 다중 센서 시스템 아키텍처</h2>
+
+        <p>농업 로봇은 비구조화된 환경에서 작동하므로, 다양한 조건에서 견고한 인식을 위해 여러 센서 유형에 의존합니다. WIA 표준은 계층적 센서 융합 아키텍처를 정의합니다.</p>
+
+        <h3>4.1.1 센서 우선순위 계층</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>우선순위</th>
+                    <th>센서</th>
+                    <th>주요 기능</th>
+                    <th>업데이트 빈도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1. 기본</td>
+                    <td>RTK-GNSS</td>
+                    <td>정밀 위치 측정</td>
+                    <td>10-20 Hz</td>
+                </tr>
+                <tr>
+                    <td>2. 보조</td>
+                    <td>LiDAR</td>
+                    <td>장애물 감지, 3D 매핑</td>
+                    <td>10-50 Hz</td>
+                </tr>
+                <tr>
+                    <td>3. 3차</td>
+                    <td>RGB 카메라</td>
+                    <td>작물 분석, 시각 인식</td>
+                    <td>30-60 Hz</td>
+                </tr>
+                <tr>
+                    <td>4. 4차</td>
+                    <td>레이더</td>
+                    <td>장거리 감지, 전천후</td>
+                    <td>4-10 Hz</td>
+                </tr>
+                <tr>
+                    <td>5. 5차</td>
+                    <td>IMU</td>
+                    <td>방향, 가속도</td>
+                    <td>100-200 Hz</td>
+                </tr>
+                <tr>
+                    <td>6. 보조</td>
+                    <td>환경 센서</td>
+                    <td>온도, 습도, 토양</td>
+                    <td>0.1-1 Hz</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.2 LiDAR 시스템 및 포인트 클라우드 처리</h2>
+
+        <p>LiDAR(Light Detection and Ranging)는 레이저 펄스를 사용하여 환경의 3D 표현을 생성합니다. 농업 로봇은 장애물 감지, 지형 매핑 및 캐노피 분석에 LiDAR를 사용합니다.</p>
+
+        <h3>4.2.1 LiDAR 포인트 클라우드 처리 파이프라인</h3>
+
+        <pre><code>class LiDARProcessor {
+  processPointCloud(rawPointCloud) {
+    // 1. 필터링: 노이즈 및 이상값 제거
+    const filtered = this.filterOutliers(rawPointCloud);
+    
+    // 2. 지면 분할: 지면과 장애물 분리
+    const { ground, obstacles } = this.segmentGround(filtered);
+    
+    // 3. 클러스터링: 개별 객체 그룹화
+    const clusters = this.dbscanClustering(obstacles);
+    
+    // 4. 객체 분류: 각 클러스터 유형 식별
+    const classified = clusters.map(c => this.classifyObject(c));
+    
+    // 5. 추적: 시간 경과에 따라 객체 추적
+    const tracked = this.updateObjectTracking(classified);
+    
+    return tracked;
+  }
+
+  filterOutliers(pointCloud, k=20, stddevMultiplier=2.0) {
+    // 통계적 이상값 제거 (SOR)
+    return pointCloud.filter(point => {
+      const neighbors = this.findKNearestNeighbors(point, k);
+      const meanDist = neighbors.reduce((sum, n) => 
+        sum + distance(point, n), 0) / k;
+      const stdDev = calculateStdDev(neighbors.map(n => 
+        distance(point, n)));
+      
+      return distance(point, mean) < (meanDist + stddevMultiplier * stdDev);
+    });
+  }
+
+  segmentGround(pointCloud, threshold=0.2) {
+    // RANSAC를 사용한 지면 평면 추정
+    let bestPlane = null;
+    let bestInliers = [];
+    
+    for (let i = 0; i < 100; i++) {  // 100번 반복
+      const sample = randomSample(pointCloud, 3);
+      const plane = fitPlane(sample);
+      const inliers = pointCloud.filter(p => 
+        distanceToPlane(p, plane) < threshold);
+      
+      if (inliers.length > bestInliers.length) {
+        bestPlane = plane;
+        bestInliers = inliers;
+      }
+    }
+    
+    const obstacles = pointCloud.filter(p => 
+      !bestInliers.includes(p));
+    
+    return { ground: bestInliers, obstacles: obstacles };
+  }
+}</code></pre>
+
+        <h3>4.2.2 장애물 감지 및 분류</h3>
+
+        <pre><code>function classifyObstacle(cluster) {
+  const dimensions = calculateBoundingBox(cluster);
+  const height = dimensions.max.z - dimensions.min.z;
+  const width = Math.max(dimensions.max.x - dimensions.min.x,
+                        dimensions.max.y - dimensions.min.y);
+  const volume = calculateVolume(cluster);
+  const pointDensity = cluster.points.length / volume;
+  
+  // 규칙 기반 분류
+  if (height > 1.5 && width < 1.0 && pointDensity > 100) {
+    return { type: "HUMAN", confidence: 0.85 };
+  } else if (height < 0.5 && pointDensity < 50) {
+    return { type: "VEGETATION", confidence: 0.75 };
+  } else if (height > 2.0 && width > 2.0) {
+    return { type: "VEHICLE", confidence: 0.90 };
+  } else if (pointDensity > 200 && height > 1.0) {
+    return { type: "TREE", confidence: 0.80 };
+  } else {
+    return { type: "UNKNOWN", confidence: 0.50 };
+  }
+}</code></pre>
+
+        <h2>4.3 컴퓨터 비전 및 카메라 시스템</h2>
+
+        <p>카메라는 작물 건강, 성숙도, 질병 및 잡초 식별에 대한 풍부한 시각 정보를 제공합니다. 현대 농업 로봇은 RGB, 다중 스펙트럼 및 열 카메라를 결합합니다.</p>
+
+        <h3>4.3.1 다중 스펙트럼 이미징</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>스펙트럼 밴드</th>
+                    <th>파장 (nm)</th>
+                    <th>농업 응용</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>청색 (Blue)</td>
+                    <td>450-495</td>
+                    <td>엽록소 흡수, 식물 성장 단계</td>
+                </tr>
+                <tr>
+                    <td>녹색 (Green)</td>
+                    <td>495-570</td>
+                    <td>식물 활력도, 스트레스 감지</td>
+                </tr>
+                <tr>
+                    <td>적색 (Red)</td>
+                    <td>620-750</td>
+                    <td>엽록소 흡수, NDVI 계산</td>
+                </tr>
+                <tr>
+                    <td>적색 경계 (Red Edge)</td>
+                    <td>690-730</td>
+                    <td>조기 스트레스 감지, 영양 상태</td>
+                </tr>
+                <tr>
+                    <td>근적외선 (NIR)</td>
+                    <td>750-900</td>
+                    <td>식물 바이오매스, NDVI 계산</td>
+                </tr>
+                <tr>
+                    <td>단파 적외선 (SWIR)</td>
+                    <td>900-1700</td>
+                    <td>수분 함량, 토양 수분</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.3.2 식생 지수 계산</h3>
+
+        <pre><code>class VegetationIndices {
+  // NDVI: 정규화 식생 지수 (-1 ~ 1)
+  calculateNDVI(redBand, nirBand) {
+    return (nirBand - redBand) / (nirBand + redBand + 0.0001);
+  }
+
+  // EVI: 향상된 식생 지수 (대기 효과 보정)
+  calculateEVI(redBand, nirBand, blueBand) {
+    const G = 2.5;
+    const C1 = 6.0;
+    const C2 = 7.5;
+    const L = 1.0;
+    
+    return G * ((nirBand - redBand) / 
+      (nirBand + C1 * redBand - C2 * blueBand + L));
+  }
+
+  // GNDVI: 녹색 정규화 식생 지수
+  calculateGNDVI(greenBand, nirBand) {
+    return (nirBand - greenBand) / (nirBand + greenBand + 0.0001);
+  }
+
+  // NDRE: 정규화 차분 적색 경계 지수
+  calculateNDRE(redEdgeBand, nirBand) {
+    return (nirBand - redEdgeBand) / (nirBand + redEdgeBand + 0.0001);
+  }
+
+  // 종합 건강 점수 (0-100)
+  calculateHealthScore(indices) {
+    const ndvi = indices.ndvi;
+    const evi = indices.evi;
+    const gndvi = indices.gndvi;
+    
+    // 가중 평균
+    const healthScore = (
+      ndvi * 0.4 + 
+      (evi / 2.5) * 0.3 +  // EVI 정규화
+      gndvi * 0.3
+    ) * 100;
+    
+    return Math.max(0, Math.min(100, healthScore));
+  }
+}</code></pre>
+
+        <h3>4.3.3 작물 및 잡초 분류를 위한 딥러닝</h3>
+
+        <pre><code>class CropWeedClassifier {
+  constructor() {
+    this.model = this.loadPretrainedModel('mobilenet-v3-crop-weed');
+  }
+
+  async classify(image) {
+    // 1. 이미지 전처리
+    const preprocessed = this.preprocess(image);
+    
+    // 2. 객체 감지 (YOLO 또는 Faster R-CNN)
+    const detections = await this.model.detect(preprocessed);
+    
+    // 3. 각 감지된 객체 분류
+    const classified = detections.map(detection => {
+      return {
+        boundingBox: detection.bbox,
+        class: detection.class,  // 'CROP' 또는 'WEED'
+        species: detection.species,  // 'corn', 'dandelion', etc.
+        confidence: detection.confidence,
+        position: this.pixelToWorldCoordinates(
+          detection.bbox.center, 
+          this.cameraParams
+        )
+      };
+    });
+    
+    return classified;
+  }
+
+  preprocess(image) {
+    // 표준 ML 전처리
+    return image
+      .resize(416, 416)
+      .normalize(mean=[0.485, 0.456, 0.406], 
+                std=[0.229, 0.224, 0.225])
+      .toTensor();
+  }
+}</code></pre>
+
+        <div class="info-box">
+            <h3>전이 학습 및 도메인 적응</h3>
+            <p>농업 AI 모델은 종종 ImageNet과 같은 대규모 데이터셋에서 사전 훈련된 다음, 특정 작물 및 지역 조건에 대해 미세 조정됩니다. 이 전이 학습 접근 방식은 제한된 농업 데이터로 높은 정확도를 달성할 수 있게 합니다. 예: MobileNet 백본 + 맞춤형 작물/잡초 헤드 = 농장당 1000-5000개 이미지로 90%+ 정확도</p>
+        </div>
+
+        <h2>4.4 레이더 시스템</h2>
+
+        <p>레이더는 비, 안개 또는 어둠 속에서도 장거리 감지를 제공합니다. 이는 악천후 작업 및 안전 응용 프로그램에 중요합니다.</p>
+
+        <h3>4.4.1 레이더 데이터 처리</h3>
+
+        <pre><code>class RadarProcessor {
+  processRadarData(radarReturns) {
+    // 1. 도플러 처리: 움직이는 객체 식별
+    const movingObjects = radarReturns.filter(r => 
+      Math.abs(r.dopplerShift) > 0.5);  // 0.5 m/s 임계값
+    
+    // 2. 거리 및 방위각 추정
+    const targets = movingObjects.map(obj => {
+      return {
+        range: obj.range,
+        azimuth: obj.azimuth,
+        velocity: this.dopplerToVelocity(obj.dopplerShift),
+        rcs: obj.radarCrossSection
+      };
+    });
+    
+    // 3. 객체 유형 분류 (RCS 기반)
+    const classified = targets.map(target => {
+      return {
+        ...target,
+        type: this.classifyByRCS(target.rcs, target.velocity)
+      };
+    });
+    
+    return classified;
+  }
+
+  classifyByRCS(rcs, velocity) {
+    if (rcs > 10 && velocity > 5) {
+      return { type: "VEHICLE", confidence: 0.85 };
+    } else if (rcs < 1 && velocity < 3) {
+      return { type: "HUMAN", confidence: 0.75 };
+    } else if (rcs > 5 && velocity < 1) {
+      return { type: "LARGE_ANIMAL", confidence: 0.70 };
+    } else {
+      return { type: "UNKNOWN", confidence: 0.50 };
+    }
+  }
+}</code></pre>
+
+        <h2>4.5 센서 융합 알고리즘</h2>
+
+        <p>다중 센서의 데이터를 결합하는 것은 견고한 인식을 위해 필수적입니다. WIA 표준은 확장 칼만 필터(EKF) 및 입자 필터와 같은 여러 융합 알고리즘을 지원합니다.</p>
+
+        <h3>4.5.1 다중 센서 데이터 융합</h3>
+
+        <pre><code>class MultiSensorFusion {
+  constructor() {
+    this.ekf = new ExtendedKalmanFilter();
+    this.objectTracks = new Map();
+  }
+
+  fuse(lidarData, cameraData, radarData, gpsData) {
+    // 1. 데이터 동기화 (타임스탬프 정렬)
+    const synchronized = this.synchronizeData(
+      lidarData, cameraData, radarData, gpsData);
+    
+    // 2. 객체 수준 융합
+    const fusedObjects = this.fuseObjects(
+      synchronized.lidar.obstacles,
+      synchronized.camera.detections,
+      synchronized.radar.targets
+    );
+    
+    // 3. 신뢰도 점수 계산
+    fusedObjects.forEach(obj => {
+      obj.confidence = this.calculateConfidence(obj);
+    });
+    
+    // 4. 추적 업데이트
+    this.updateTracks(fusedObjects);
+    
+    return fusedObjects;
+  }
+
+  fuseObjects(lidarObstacles, cameraDetections, radarTargets) {
+    const fusedObjects = [];
+    
+    // 각 LiDAR 장애물에 대해
+    for (const obstacle of lidarObstacles) {
+      const fusedObj = { ...obstacle, sources: ['lidar'] };
+      
+      // 가까운 카메라 감지 찾기
+      const nearbyCamera = cameraDetections.find(cam => 
+        distance(obstacle.position, cam.position) < 2.0);
+      
+      if (nearbyCamera) {
+        fusedObj.class = nearbyCamera.class;
+        fusedObj.species = nearbyCamera.species;
+        fusedObj.sources.push('camera');
+      }
+      
+      // 가까운 레이더 목표 찾기
+      const nearbyRadar = radarTargets.find(rad => 
+        distance(obstacle.position, rad.position) < 3.0);
+      
+      if (nearbyRadar) {
+        fusedObj.velocity = nearbyRadar.velocity;
+        fusedObj.sources.push('radar');
+      }
+      
+      fusedObjects.push(fusedObj);
+    }
+    
+    return fusedObjects;
+  }
+
+  calculateConfidence(fusedObject) {
+    const numSources = fusedObject.sources.length;
+    
+    // 다중 센서 확인은 신뢰도 증가
+    const baseConfidence = 0.5;
+    const sourceBonus = 0.25 * numSources;
+    
+    return Math.min(1.0, baseConfidence + sourceBonus);
+  }
+}</code></pre>
+
+        <h2>4.6 환경 센서 통합</h2>
+
+        <p>환경 센서는 작동 조건 및 작물 건강에 대한 컨텍스트 정보를 제공합니다.</p>
+
+        <h3>4.6.1 토양 센서 데이터</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>센서 유형</th>
+                    <th>측정 항목</th>
+                    <th>농업 응용</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>토양 수분</td>
+                    <td>용적 수분 함량 (%)</td>
+                    <td>관개 결정, 가변 비율 물 공급</td>
+                </tr>
+                <tr>
+                    <td>토양 온도</td>
+                    <td>섭씨 온도</td>
+                    <td>파종 시기, 작물 성장 단계</td>
+                </tr>
+                <tr>
+                    <td>전기 전도도 (EC)</td>
+                    <td>dS/m</td>
+                    <td>토양 염도, 영양 가용성</td>
+                </tr>
+                <tr>
+                    <td>pH</td>
+                    <td>0-14 척도</td>
+                    <td>영양 흡수, 석회 적용</td>
+                </tr>
+                <tr>
+                    <td>NPK 센서</td>
+                    <td>질소, 인, 칼륨 (ppm)</td>
+                    <td>가변 비율 비료 적용</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.6.2 기상 센서 통합</h3>
+
+        <pre><code>class WeatherMonitor {
+  async checkOperatingConditions() {
+    const weather = await this.getCurrentWeather();
+    
+    const conditions = {
+      canOperate: true,
+      restrictions: [],
+      recommendations: []
+    };
+    
+    // 풍속 확인
+    if (weather.windSpeed > 40) {
+      conditions.canOperate = false;
+      conditions.restrictions.push("Wind speed too high for spraying");
+    } else if (weather.windSpeed > 25) {
+      conditions.restrictions.push("Reduce spraying precision");
+    }
+    
+    // 강우량 확인
+    if (weather.precipitation > 5) {
+      conditions.canOperate = false;
+      conditions.restrictions.push("Heavy rain - field operations suspended");
+    } else if (weather.precipitation > 1) {
+      conditions.recommendations.push("Consider delaying until rain stops");
+    }
+    
+    // 온도 확인
+    if (weather.temperature < -5 || weather.temperature > 45) {
+      conditions.canOperate = false;
+      conditions.restrictions.push("Temperature outside safe range");
+    }
+    
+    // 토양 수분 확인
+    if (weather.soilMoisture > 80) {
+      conditions.restrictions.push("Soil too wet - risk of compaction");
+    } else if (weather.soilMoisture < 20) {
+      conditions.recommendations.push("Consider irrigation before seeding");
+    }
+    
+    return conditions;
+  }
+}</code></pre>
+
+        <div class="key-takeaways">
+            <h2>핵심 요약</h2>
+            <ul>
+                <li>다중 센서 융합은 RTK-GNSS, LiDAR, 카메라, 레이더 및 IMU를 결합하여 견고한 환경 인식을 제공합니다</li>
+                <li>LiDAR 포인트 클라우드 처리는 필터링, 지면 분할, 클러스터링 및 객체 분류를 포함합니다</li>
+                <li>다중 스펙트럼 이미징은 NDVI, EVI 및 기타 식생 지수를 통해 작물 건강을 평가합니다</li>
+                <li>딥러닝 모델은 작물과 잡초를 90%+ 정확도로 분류하며, 전이 학습을 통해 제한된 데이터로 훈련됩니다</li>
+                <li>레이더 시스템은 악천후 조건에서 장거리 감지를 제공하여 안전 응용 프로그램을 가능하게 합니다</li>
+                <li>센서 융합 알고리즘은 여러 소스의 데이터를 결합하여 신뢰도 점수를 계산하고 시간 경과에 따라 객체를 추적합니다</li>
+                <li>환경 센서는 토양 수분, 온도 및 기상 조건을 모니터링하여 작동 결정을 안내합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>다중 센서 시스템 아키텍처에서 센서 우선순위 계층을 설명하세요. 각 센서 유형이 특정 우선순위 수준에 할당되는 이유는 무엇입니까?</li>
+                <li>LiDAR 포인트 클라우드 처리 파이프라인의 다섯 가지 주요 단계를 설명하세요. 각 단계가 장애물 감지 정확도에 어떻게 기여합니까?</li>
+                <li>다중 스펙트럼 이미징에서 다양한 스펙트럼 밴드(청색, 녹색, 적색, 적색 경계, NIR, SWIR)의 역할을 비교하세요. 각 밴드가 어떤 농업 정보를 제공합니까?</li>
+                <li>NDVI, EVI, GNDVI 및 NDRE의 차이를 분석하세요. 각 식생 지수를 언제 사용해야 하며, 어떻게 작물 건강 점수를 계산합니까?</li>
+                <li>작물 및 잡초 분류를 위한 딥러닝이 전통적인 규칙 기반 방법에 비해 어떤 이점을 제공하는지 논의하세요. 전이 학습이 농업 AI에서 어떤 역할을 합니까?</li>
+                <li>다중 센서 융합 알고리즘이 LiDAR, 카메라 및 레이더 데이터를 어떻게 결합하는지 설명하세요. 신뢰도 점수는 어떻게 계산되며, 왜 중요합니까?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-03.html" class="nav-button">← 이전 장</a>
+            <a href="chapter-05.html" class="nav-button">다음 장: API 인터페이스 →</a>
+        </div>
+
+        </div>
+</body>
+</html>

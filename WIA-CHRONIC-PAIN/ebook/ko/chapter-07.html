@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 7: 운영 및 분석 | WIA-CHRONIC-PAIN</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 7: 운영 및 분석</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong> 효과적인 환자 온보딩 워크플로우를 설계하고, 데이터 분석 파이프라인을 구현하며, 결과 추적 방법론을 수립하고, 만성 통증 관리에서 지속적인 개선을 주도하는 운영 메트릭을 정의합니다.
+    </div>
+
+    <h2>환자 온보딩</h2>
+
+    <p>성공적인 만성 통증 관리는 효과적인 환자 온보딩에 달려 있습니다. 온보딩 프로세스는 지속적인 참여의 기초를 확립하여 환자가 시스템 사용 방법을 이해하고 통증 관리 여정에서 지원받는다고 느끼도록 합니다. WIA-CHRONIC-PAIN 표준은 포괄적인 온보딩 프레임워크를 정의합니다.</p>
+
+    <p>온보딩은 철저함과 단순함의 균형을 맞춰야 합니다. 만성 통증 환자는 종종 인지적 어려움, 피로, 복잡한 시스템에 대한 좌절감을 경험합니다. 온보딩 프로세스는 환자가 즉시 추적을 시작할 수 있도록 하면서 기능을 점진적으로 소개하는 진보적이어야 합니다.</p>
+
+    <h3>온보딩 워크플로우</h3>
+
+    <pre><code>interface OnboardingWorkflow {
+  phases: OnboardingPhase[];
+  personalizations: PersonalizationConfig;
+  checkpoints: Checkpoint[];
+  support: SupportConfig;
+}
+
+const onboardingPhases: OnboardingPhase[] = [
+  {
+    name: '등록',
+    duration: '5분',
+    steps: [
+      { id: 'create_account', required: true },
+      { id: 'verify_email', required: true },
+      { id: 'accept_terms', required: true },
+      { id: 'consent_capture', required: true }
+    ]
+  },
+  {
+    name: '프로필 설정',
+    duration: '10분',
+    steps: [
+      { id: 'demographics', required: true },
+      { id: 'pain_conditions', required: true },
+      { id: 'current_medications', required: false },
+      { id: 'treatment_history', required: false }
+    ]
+  },
+  {
+    name: '앱 튜토리얼',
+    duration: '5분',
+    steps: [
+      { id: 'first_pain_log', required: true },
+      { id: 'explore_features', required: false },
+      { id: 'notification_setup', required: true }
+    ]
+  },
+  {
+    name: '케어 팀 연결',
+    duration: '변동',
+    steps: [
+      { id: 'provider_invitation', required: false },
+      { id: 'ehr_connection', required: false },
+      { id: 'wearable_pairing', required: false }
+    ]
+  }
+];
+
+class OnboardingManager {
+  async startOnboarding(userId: string): Promise<OnboardingSession> {
+    const session = await this.createSession(userId);
+
+    // 추천 소스에 따라 개인화 결정
+    const referralContext = await this.getReferralContext(userId);
+    const personalization = this.determinePersonalization(referralContext);
+
+    // 진행 추적 초기화
+    await this.initializeProgress(session.id, onboardingPhases);
+
+    // 환영 커뮤니케이션 전송
+    await this.sendWelcome(userId, personalization);
+
+    return session;
+  }
+
+  async completeStep(
+    sessionId: string,
+    stepId: string,
+    data: StepData
+  ): Promise<StepResult> {
+    // 단계 완료 검증
+    const validation = await this.validateStep(stepId, data);
+
+    if (!validation.valid) {
+      return { completed: false, errors: validation.errors };
+    }
+
+    // 단계 데이터 저장
+    await this.saveStepData(sessionId, stepId, data);
+
+    // 진행 업데이트
+    const progress = await this.updateProgress(sessionId, stepId);
+
+    return {
+      completed: true,
+      progress,
+      nextStep: this.getNextStep(progress)
+    };
+  }
+}</code></pre>
+
+    <h2>데이터 분석 파이프라인</h2>
+
+    <p>만성 통증 관리 플랫폼은 처리, 분석되고 실행 가능한 통찰력으로 변환되어야 하는 방대한 양의 데이터를 생성합니다. WIA-CHRONIC-PAIN 표준은 강력한 데이터 분석 파이프라인 아키텍처를 지정합니다.</p>
+
+    <h3>파이프라인 아키텍처</h3>
+
+    <pre><code>{
+  "pipeline_stages": {
+    "ingestion": {
+      "sources": ["mobile_app", "wearables", "ehr", "manual_entry"],
+      "technology": "Apache Kafka",
+      "validation": "Schema Registry"
+    },
+    "processing": {
+      "stream": "실시간용 Apache Flink",
+      "batch": "이력용 Apache Spark",
+      "transformations": ["normalization", "enrichment", "aggregation"]
+    },
+    "storage": {
+      "raw": "S3 데이터 레이크",
+      "processed": "TimescaleDB",
+      "aggregated": "PostgreSQL",
+      "ml_features": "Feature Store"
+    },
+    "analysis": {
+      "descriptive": "표준 메트릭 및 리포트",
+      "diagnostic": "패턴 식별",
+      "predictive": "ML 모델 추론",
+      "prescriptive": "권장 사항"
+    },
+    "presentation": {
+      "dashboards": "실시간 시각화",
+      "reports": "예정된 및 임시",
+      "alerts": "임계값 기반 알림"
+    }
+  }
+}</code></pre>
+
+    <h3>스트림 처리</h3>
+
+    <pre><code>class PainDataStreamProcessor {
+  private flink: FlinkEnvironment;
+
+  async configureStream(): Promise<void> {
+    const painEvents = this.flink
+      .fromKafka('pain-events')
+      .map(event => this.parseEvent(event))
+      .filter(event => this.validateEvent(event));
+
+    // 실시간 집계
+    const hourlyAggregates = painEvents
+      .keyBy(event => event.patientId)
+      .window(TumblingEventTimeWindows.of(Time.hours(1)))
+      .aggregate({
+        count: Aggregators.count(),
+        avgPain: Aggregators.avg('intensity'),
+        maxPain: Aggregators.max('intensity'),
+        locations: Aggregators.collectSet('location')
+      });
+
+    // 패턴 감지
+    const patterns = painEvents
+      .keyBy(event => event.patientId)
+      .process(new PainPatternDetector());
+
+    // 알림 생성
+    const alerts = patterns
+      .filter(pattern => pattern.requiresAlert)
+      .map(pattern => this.createAlert(pattern));
+
+    // 다양한 대상으로 싱크
+    hourlyAggregates.addSink(this.timescaleDBSink());
+    patterns.addSink(this.patternStoreSink());
+    alerts.addSink(this.alertServiceSink());
+  }
+}</code></pre>
+
+    <h2>결과 추적</h2>
+
+    <p>결과 측정은 가치를 입증하고 케어 품질을 개선하는 데 필수적입니다. WIA-CHRONIC-PAIN 표준은 임상 가이드라인 및 가치 기반 케어 요구 사항에 맞춘 포괄적인 결과 메트릭을 정의합니다.</p>
+
+    <div class="highlight">
+        <strong>가치 기반 결과:</strong> 의료는 점점 더 양보다 결과에 초점을 맞추고 있습니다. 만성 통증 관리 플랫폼은 통증 감소, 기능 개선, 삶의 질 향상을 포함하여 환자, 제공자 및 지불자에게 중요한 결과를 추적하고 보고해야 합니다.
+    </div>
+
+    <h3>결과 메트릭 프레임워크</h3>
+
+    <table>
+        <tr>
+            <th>범주</th>
+            <th>메트릭</th>
+            <th>정의</th>
+            <th>목표</th>
+        </tr>
+        <tr>
+            <td>통증</td>
+            <td>통증 강도 변화</td>
+            <td>기준선에서 평균 NRS 변화</td>
+            <td>30% 감소</td>
+        </tr>
+        <tr>
+            <td>통증</td>
+            <td>반응률</td>
+            <td>임상적 의미 있는 개선을 달성한 비율</td>
+            <td>환자의 50%</td>
+        </tr>
+        <tr>
+            <td>기능</td>
+            <td>신체 기능</td>
+            <td>PROMIS 신체 기능 T-점수 변화</td>
+            <td>5점 개선</td>
+        </tr>
+        <tr>
+            <td>기능</td>
+            <td>직장 복귀</td>
+            <td>직장/활동에 복귀한 비율</td>
+            <td>추적만</td>
+        </tr>
+        <tr>
+            <td>이용</td>
+            <td>응급실 방문</td>
+            <td>환자당 통증 관련 응급실 방문</td>
+            <td>25% 감소</td>
+        </tr>
+        <tr>
+            <td>안전</td>
+            <td>오피오이드 감소</td>
+            <td>오피오이드 환자의 MME 감소</td>
+            <td>20% 감소</td>
+        </tr>
+        <tr>
+            <td>참여</td>
+            <td>앱 복약 순응</td>
+            <td>주간 평가를 완료한 비율</td>
+            <td>70% 복약 순응</td>
+        </tr>
+    </table>
+
+    <pre><code>class OutcomeTracker {
+  async calculatePatientOutcomes(
+    patientId: string,
+    period: DateRange
+  ): Promise<OutcomeMetrics> {
+    // 기준 메트릭 가져오기
+    const baseline = await this.getBaselineMetrics(patientId);
+
+    // 현재 메트릭 가져오기
+    const current = await this.getCurrentMetrics(patientId, period);
+
+    // 변화 계산
+    const changes = this.calculateChanges(baseline, current);
+
+    // 목표 진행 평가
+    const goals = await this.evaluateGoals(patientId, changes);
+
+    return {
+      patientId,
+      evaluationPeriod: period,
+      baseline,
+      current,
+      changes,
+      goals
+    };
+  }
+
+  calculateChanges(
+    baseline: BaselineMetrics,
+    current: CurrentMetrics
+  ): MetricChanges {
+    return {
+      painIntensity: {
+        absolute: current.avgPain - baseline.avgPain,
+        percent: ((current.avgPain - baseline.avgPain) / baseline.avgPain) * 100,
+        clinicallySignificant: Math.abs(current.avgPain - baseline.avgPain) >= 2
+      },
+      physicalFunction: {
+        absolute: current.physicalFunction - baseline.physicalFunction,
+        clinicallySignificant: Math.abs(
+          current.physicalFunction - baseline.physicalFunction
+        ) >= 5
+      },
+      medicationAdherence: {
+        current: current.medicationAdherence,
+        trend: this.calculateTrend(current.adherenceHistory)
+      }
+    };
+  }
+}</code></pre>
+
+    <h2>인구 건강 분석</h2>
+
+    <p>개별 환자 결과 외에도 플랫폼은 품질 개선, 연구 및 의료 시스템 최적화를 위한 인구 수준 분석을 지원합니다.</p>
+
+    <pre><code>class PopulationAnalytics {
+  async generatePopulationReport(
+    organizationId: string,
+    period: DateRange
+  ): Promise<PopulationReport> {
+    const patients = await this.getOrganizationPatients(organizationId);
+
+    // 결과 집계
+    const outcomes = await Promise.all(
+      patients.map(p => this.outcomeTracker.calculatePatientOutcomes(p.id, period))
+    );
+
+    // 인구 메트릭 계산
+    const populationMetrics = {
+      totalPatients: patients.length,
+      activePatients: outcomes.filter(o => o.current.isActive).length,
+      averagePainReduction: this.mean(
+        outcomes.map(o => o.changes.painIntensity.percent)
+      ),
+      responseRate: outcomes.filter(
+        o => o.changes.painIntensity.clinicallySignificant &&
+             o.changes.painIntensity.absolute < 0
+      ).length / outcomes.length,
+      functionalImprovement: this.mean(
+        outcomes.map(o => o.changes.physicalFunction.absolute)
+      ),
+      adherenceRate: this.mean(
+        outcomes.map(o => o.changes.medicationAdherence.current)
+      )
+    };
+
+    // 세그먼트 분석
+    const segments = await this.analyzeSegments(outcomes);
+
+    // 고위험 환자 식별
+    const highRisk = this.identifyHighRisk(outcomes);
+
+    return {
+      period,
+      populationMetrics,
+      segments,
+      highRisk,
+      recommendations: this.generateRecommendations(populationMetrics, segments, highRisk),
+      benchmarks: await this.getBenchmarks()
+    };
+  }
+}</code></pre>
+
+    <h2>운영 메트릭</h2>
+
+    <p>시스템 운영 메트릭은 플랫폼 신뢰성과 성능을 보장합니다. 이러한 메트릭은 인프라 결정을 안내하고 환자 케어에 영향을 미치기 전에 운영 문제를 식별합니다.</p>
+
+    <h3>주요 운영 메트릭</h3>
+
+    <pre><code>interface OperationalMetrics {
+  availability: {
+    uptime: number;
+    incidents: Incident[];
+    mttr: number; // 평균 복구 시간
+  };
+  performance: {
+    apiLatency: LatencyStats;
+    pageLoadTime: LatencyStats;
+    syncLatency: LatencyStats;
+  };
+  engagement: {
+    dailyActiveUsers: number;
+    weeklyActiveUsers: number;
+    monthlyActiveUsers: number;
+    sessionDuration: number;
+    featureUsage: FeatureUsage[];
+  };
+  data: {
+    painLogsPerDay: number;
+    assessmentsCompleted: number;
+    dataCompleteness: number;
+  };
+  support: {
+    ticketVolume: number;
+    responseTime: number;
+    resolutionTime: number;
+    satisfaction: number;
+  };
+}
+
+class OperationalMonitor {
+  async collectMetrics(): Promise<OperationalMetrics> {
+    const [
+      availability,
+      performance,
+      engagement,
+      data,
+      support
+    ] = await Promise.all([
+      this.collectAvailabilityMetrics(),
+      this.collectPerformanceMetrics(),
+      this.collectEngagementMetrics(),
+      this.collectDataMetrics(),
+      this.collectSupportMetrics()
+    ]);
+
+    // SLO에 대해 확인
+    const sloViolations = this.checkSLOs({
+      availability,
+      performance,
+      engagement
+    });
+
+    if (sloViolations.length > 0) {
+      await this.alertOnSLOViolations(sloViolations);
+    }
+
+    return { availability, performance, engagement, data, support };
+  }
+}</code></pre>
+
+    <h2>지속적인 개선</h2>
+
+    <p>WIA-CHRONIC-PAIN 표준은 데이터 기반 의사 결정과 체계적인 품질 개선 프로세스를 통한 지속적인 개선을 강조합니다.</p>
+
+    <div class="highlight">
+        <strong>품질 개선 주기:</strong> Plan-Do-Study-Act(PDSA) 주기가 체계적인 개선을 주도합니다. 플랫폼은 개선 기회를 식별하고, 변경을 구현하고, 결과를 측정하고, 성공적인 개입을 확장하는 데 필요한 데이터와 분석을 제공합니다.
+    </div>
+
+    <pre><code>interface QualityImprovement {
+  initiative: {
+    id: string;
+    name: string;
+    objective: string;
+    metrics: string[];
+    owner: string;
+  };
+  baseline: MetricSnapshot;
+  target: MetricTarget;
+  interventions: Intervention[];
+  measurements: Measurement[];
+  status: 'planning' | 'active' | 'evaluating' | 'complete';
+  results: ImprovementResults;
+}</code></pre>
+
+    <p>이 챕터에서는 환자 온보딩부터 고급 분석 및 지속적인 개선까지 만성 통증 관리 플랫폼을 운영하는 운영적 측면을 다루었습니다. 이러한 운영 기능은 플랫폼이 최고 수준의 신뢰성과 성능을 유지하면서 환자, 제공자 및 의료 기관에 지속적인 가치를 제공하도록 보장합니다.</p>
+</body>
+</html>

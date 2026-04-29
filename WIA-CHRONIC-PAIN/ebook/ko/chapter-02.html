@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 2: 시스템 아키텍처 | WIA-CHRONIC-PAIN</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 2: 시스템 아키텍처</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong> 웨어러블 통합, 모바일 애플리케이션, 클라우드 인프라, 종단 통증 추적을 위한 데이터 모델을 포함한 포괄적인 통증 관리 시스템 아키텍처를 설계합니다.
+    </div>
+
+    <h2>아키텍처 개요</h2>
+
+    <p>WIA-CHRONIC-PAIN 표준은 포괄적인 만성 통증 관리를 지원하는 다중 계층 아키텍처를 정의합니다. 이 아키텍처는 웨어러블 기기의 실시간 데이터, 모바일 애플리케이션의 환자 보고 결과, 의료 시스템의 임상 데이터, 패턴 인식 및 예측을 위한 분석 워크로드를 처리해야 합니다.</p>
+
+    <p>아키텍처는 이벤트 기반 통신을 갖춘 마이크로서비스 패턴을 따르며, 구성 요소의 독립적인 확장과 기술 선택의 유연성을 가능하게 합니다. 각 계층은 보안과 프라이버시를 기본 요구 사항으로 설계되어 시스템 전체에서 HIPAA 준수를 보장합니다.</p>
+
+    <h3>핵심 아키텍처 계층</h3>
+
+    <pre><code>{
+  "architecture_layers": {
+    "presentation": {
+      "patient_mobile": ["iOS", "Android", "PWA"],
+      "provider_web": "React SPA",
+      "admin_console": "내부 도구"
+    },
+    "api_gateway": {
+      "technology": "Kong/AWS API Gateway",
+      "features": ["rate_limiting", "authentication", "request_routing"]
+    },
+    "service_layer": {
+      "pain_tracking_service": "통증 로그 및 평가 처리",
+      "medication_service": "약물 데이터 및 알림 관리",
+      "analytics_service": "패턴 인식 및 ML 추론",
+      "notification_service": "알림 및 통신",
+      "integration_service": "외부 시스템 연결"
+    },
+    "data_layer": {
+      "primary_database": "암호화된 PostgreSQL",
+      "time_series_db": "센서 데이터용 TimescaleDB",
+      "cache": "세션 및 실시간 데이터용 Redis",
+      "search": "임상 노트용 Elasticsearch"
+    },
+    "infrastructure": {
+      "compute": "AWS/GCP/Azure의 Kubernetes",
+      "messaging": "Apache Kafka",
+      "storage": "S3 호환 객체 스토리지"
+    }
+  }
+}</code></pre>
+
+    <h2>웨어러블 기기 통합</h2>
+
+    <p>웨어러블 기기는 환자 보고 통증 평가를 보완하는 객관적인 생리학적 데이터를 제공합니다. WIA-CHRONIC-PAIN 표준은 일반적인 웨어러블 플랫폼에 대한 통합 프로토콜과 통증 관리와 관련된 생리학적 메트릭에 대한 데이터 형식을 정의합니다.</p>
+
+    <h3>지원 웨어러블 플랫폼</h3>
+
+    <ul>
+        <li><strong>Apple HealthKit:</strong> 심박수, 활동 및 수면 데이터를 위한 Apple Watch 및 호환 기기와의 통합</li>
+        <li><strong>Google Fit:</strong> 포괄적인 건강 메트릭을 위한 Android 생태계 통합</li>
+        <li><strong>Fitbit Web API:</strong> 심박변이도 및 수면 단계를 포함한 Fitbit 기기 데이터 접근</li>
+        <li><strong>Garmin Connect:</strong> 활동 및 스트레스 데이터를 위한 Garmin 기기와의 통합</li>
+        <li><strong>Samsung Health:</strong> Galaxy Watch 기기에 대한 Samsung 생태계 지원</li>
+        <li><strong>커스텀 BLE 기기:</strong> 특수 통증 모니터링 기기에 대한 직접 Bluetooth LE 통합</li>
+    </ul>
+
+    <pre><code>interface WearableIntegration {
+  platform: WearablePlatform;
+  capabilities: DataCapability[];
+  sync_frequency: SyncFrequency;
+  authentication: OAuth2Config;
+}
+
+interface WearableDataPoint {
+  source: {
+    platform: WearablePlatform;
+    device_id: string;
+    device_model: string;
+  };
+  timestamp: string;
+  metric_type: MetricType;
+  value: number;
+  unit: string;
+  quality: 'high' | 'medium' | 'low';
+  metadata: Record<string, unknown>;
+}
+
+enum MetricType {
+  HEART_RATE = 'heart_rate',
+  HEART_RATE_VARIABILITY = 'hrv',
+  STEPS = 'steps',
+  ACTIVITY_MINUTES = 'activity_minutes',
+  SLEEP_DURATION = 'sleep_duration',
+  SLEEP_QUALITY = 'sleep_quality',
+  SKIN_TEMPERATURE = 'skin_temperature',
+  ELECTRODERMAL_ACTIVITY = 'eda',
+  RESPIRATORY_RATE = 'respiratory_rate',
+  BLOOD_OXYGEN = 'spo2'
+}</code></pre>
+
+    <h3>통증에 대한 생리학적 마커</h3>
+
+    <p>연구에 따르면 만성 통증 상태와 상관관계가 있는 여러 생리학적 마커가 확인되었습니다. WIA-CHRONIC-PAIN 아키텍처는 이러한 마커의 수집 및 분석을 지원합니다:</p>
+
+    <table>
+        <tr>
+            <th>마커</th>
+            <th>통증 관련성</th>
+            <th>데이터 소스</th>
+        </tr>
+        <tr>
+            <td>심박변이도</td>
+            <td>낮은 HRV는 만성 통증 상태와 연관</td>
+            <td>웨어러블, ECG 기기</td>
+        </tr>
+        <tr>
+            <td>수면 품질</td>
+            <td>통증 강도와 양방향 관계</td>
+            <td>수면 추적기, 활동기록</td>
+        </tr>
+        <tr>
+            <td>활동 수준</td>
+            <td>감소된 활동은 통증 발작을 나타냄</td>
+            <td>가속도계, 만보계</td>
+        </tr>
+        <tr>
+            <td>피부 전기 활동</td>
+            <td>스트레스 및 통증 반응 지표</td>
+            <td>특수 센서</td>
+        </tr>
+        <tr>
+            <td>피부 온도</td>
+            <td>염증 및 자율 신경 변화</td>
+            <td>온도 센서</td>
+        </tr>
+    </table>
+
+    <h2>모바일 애플리케이션 아키텍처</h2>
+
+    <p>환자용 모바일 애플리케이션은 통증 기록, 약물 추적 및 치료 관리를 위한 주요 인터페이스입니다. 아키텍처는 오프라인 기능, 효율적인 배터리 사용 및 원활한 동기화를 지원해야 합니다.</p>
+
+    <div class="highlight">
+        <strong>설계 원칙:</strong> 모바일 애플리케이션은 통증 기록을 위한 사용 용이성과 최소한의 마찰을 우선시합니다. 만성 통증 환자는 종종 인지적 영향을 경험하므로 인터페이스는 단순하고 직관적이어야 하며 다양한 수준의 사용자 능력을 수용해야 합니다.
+    </div>
+
+    <h3>애플리케이션 구조</h3>
+
+    <pre><code>// React Native 애플리케이션 구조
+src/
+├── components/
+│   ├── pain/
+│   │   ├── PainSlider.tsx
+│   │   ├── BodyMap.tsx
+│   │   ├── QualitySelector.tsx
+│   │   └── QuickLog.tsx
+│   ├── medication/
+│   │   ├── MedicationList.tsx
+│   │   ├── DoseTracker.tsx
+│   │   └── ReminderSettings.tsx
+│   └── common/
+│       ├── Button.tsx
+│       ├── Card.tsx
+│       └── Modal.tsx
+├── screens/
+│   ├── DashboardScreen.tsx
+│   ├── PainLogScreen.tsx
+│   ├── MedicationScreen.tsx
+│   ├── ReportsScreen.tsx
+│   └── SettingsScreen.tsx
+├── services/
+│   ├── api.ts
+│   ├── sync.ts
+│   ├── wearable.ts
+│   └── notifications.ts
+├── stores/
+│   ├── painStore.ts
+│   ├── medicationStore.ts
+│   └── userStore.ts
+└── utils/
+    ├── encryption.ts
+    ├── validation.ts
+    └── analytics.ts</code></pre>
+
+    <h3>오프라인 우선 데이터 전략</h3>
+
+    <p>만성 통증 관리에는 네트워크 연결이 불가능한 경우에도 일관된 데이터 수집이 필요합니다. WIA-CHRONIC-PAIN 아키텍처는 오프라인 우선 접근 방식을 의무화합니다.</p>
+
+    <pre><code>class OfflineSyncManager {
+  private db: LocalDatabase;
+  private syncQueue: SyncQueue;
+
+  async logPain(entry: PainLogEntry): Promise<void> {
+    // 항상 로컬에 먼저 저장
+    const localId = await this.db.savePainLog(entry);
+
+    // 동기화 대기열에 추가
+    await this.syncQueue.add({
+      type: 'PAIN_LOG',
+      localId,
+      data: entry,
+      timestamp: Date.now(),
+      priority: 'high'
+    });
+
+    // 온라인인 경우 즉시 동기화 시도
+    if (await this.isOnline()) {
+      this.processSyncQueue();
+    }
+  }
+
+  async processSyncQueue(): Promise<void> {
+    const pending = await this.syncQueue.getPending();
+
+    for (const item of pending) {
+      try {
+        const response = await this.api.sync(item);
+        await this.db.updateServerId(item.localId, response.serverId);
+        await this.syncQueue.markComplete(item.id);
+      } catch (error) {
+        if (this.isRetryable(error)) {
+          await this.syncQueue.reschedule(item.id);
+        } else {
+          await this.syncQueue.markFailed(item.id, error);
+        }
+      }
+    }
+  }
+}</code></pre>
+
+    <h2>클라우드 인프라</h2>
+
+    <p>클라우드 인프라는 HIPAA 준수, 고가용성 및 탄력적 확장을 지원해야 합니다. WIA-CHRONIC-PAIN 표준은 클라우드에 구애받지 않지만 주요 클라우드 플랫폼에 대한 참조 아키텍처를 제공합니다.</p>
+
+    <h3>Kubernetes 배포 아키텍처</h3>
+
+    <pre><code>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pain-tracking-service
+  namespace: chronic-pain
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: pain-tracking
+  template:
+    metadata:
+      labels:
+        app: pain-tracking
+    spec:
+      containers:
+      - name: pain-tracking
+        image: wia/pain-tracking-service:1.0.0
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: url
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: encryption
+              key: key
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10</code></pre>
+
+    <h2>데이터 모델</h2>
+
+    <p>포괄적인 데이터 모델은 만성 통증의 다차원적 특성을 캡처하는 데 필수적입니다. WIA-CHRONIC-PAIN 표준은 핵심 엔티티와 그 관계를 정의합니다.</p>
+
+    <h3>핵심 엔티티 모델</h3>
+
+    <pre><code>-- 환자 엔티티
+CREATE TABLE patients (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    external_id VARCHAR(255) UNIQUE,
+    demographics JSONB ENCRYPTED,
+    conditions TEXT[] ENCRYPTED,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 통증 로그 항목
+CREATE TABLE pain_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id UUID REFERENCES patients(id),
+    timestamp TIMESTAMPTZ NOT NULL,
+    intensity INTEGER CHECK (intensity >= 0 AND intensity <= 10),
+    locations JSONB NOT NULL,
+    qualities TEXT[],
+    triggers TEXT[],
+    context JSONB,
+    source VARCHAR(50) DEFAULT 'patient_app',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 시계열 최적화를 위한 하이퍼테이블 생성
+SELECT create_hypertable('pain_logs', 'timestamp');
+
+-- 약물 기록
+CREATE TABLE medications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id UUID REFERENCES patients(id),
+    name VARCHAR(255) NOT NULL,
+    dosage VARCHAR(100),
+    frequency JSONB,
+    start_date DATE,
+    end_date DATE,
+    prescriber VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'active'
+);</code></pre>
+
+    <h2>이벤트 기반 아키텍처</h2>
+
+    <p>시스템은 서비스 간의 느슨한 결합과 실시간 데이터 처리를 위해 이벤트 기반 아키텍처를 사용합니다. Apache Kafka가 중앙 이벤트 버스 역할을 합니다.</p>
+
+    <div class="highlight">
+        <strong>이벤트 소싱:</strong> 통증 로그 및 약물 이벤트는 불변 이벤트로 저장되어 완전한 감사 추적을 가능하게 하고 어느 시점에서든 환자 상태를 재구성할 수 있습니다.
+    </div>
+
+    <pre><code>interface PainLoggedEvent {
+  eventType: 'PAIN_LOGGED';
+  eventId: string;
+  timestamp: string;
+  patientId: string;
+  payload: {
+    intensity: number;
+    locations: PainLocation[];
+    qualities: string[];
+    triggers: string[];
+  };
+  metadata: {
+    source: string;
+    version: string;
+    correlationId: string;
+  };
+}
+
+// Kafka 토픽 구성
+const topics = {
+  'pain-events': {
+    partitions: 12,
+    replication: 3,
+    retention: '365d',
+    config: {
+      'cleanup.policy': 'compact,delete'
+    }
+  },
+  'medication-events': {
+    partitions: 6,
+    replication: 3,
+    retention: '365d'
+  },
+  'analytics-events': {
+    partitions: 24,
+    replication: 3,
+    retention: '30d'
+  }
+};</code></pre>
+
+    <h2>확장성 고려 사항</h2>
+
+    <p>아키텍처는 지속적인 데이터 스트림을 가진 수백만 명의 환자를 지원하도록 확장되어야 합니다. 주요 확장성 패턴은 다음과 같습니다:</p>
+
+    <ul>
+        <li><strong>수평 확장:</strong> 여러 노드에 복제된 상태 비저장 서비스</li>
+        <li><strong>데이터베이스 샤딩:</strong> 지리적 지역별로 분할된 환자 데이터</li>
+        <li><strong>캐싱:</strong> 자주 접근하는 데이터에 대한 Redis 클러스터</li>
+        <li><strong>CDN:</strong> 엣지 위치에서 캐시된 정적 자산 및 API 응답</li>
+        <li><strong>비동기 처리:</strong> 비동기적으로 처리되는 무거운 분석 워크로드</li>
+    </ul>
+
+    <p>이 아키텍처는 WIA-CHRONIC-PAIN 표준의 요구 사항을 충족하면서 디지털 헬스 솔루션의 혁신을 가능하게 하는 강력하고 확장 가능한 만성 통증 관리 시스템을 구축하기 위한 기초를 제공합니다.</p>
+</body>
+</html>

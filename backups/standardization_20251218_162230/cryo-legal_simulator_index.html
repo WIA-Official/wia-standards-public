@@ -1,0 +1,1709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CRYO-LEGAL Simulator - Legal Status Standards for Cryopreserved Individuals</title>
+</head>
+<body>
+<pre id="output">
+================================================================================
+CRYO-LEGAL SIMULATOR
+Legal Status Standards for Cryopreserved Individuals
+================================================================================
+
+<a href="../../index.html">[WIA Standards Home]</a>
+
+Loading simulator...
+</pre>
+
+<script>
+const CryoLegalSimulator = (function() {
+    // Legal Status Types
+    const LegalStatus = {
+        LIVING: 'LIVING',
+        LEGALLY_DECEASED: 'LEGALLY_DECEASED',
+        PRESERVED_STATUS: 'PRESERVED_STATUS',
+        REVIVAL_PENDING: 'REVIVAL_PENDING',
+        LEGALLY_RESTORED: 'LEGALLY_RESTORED',
+        PERMANENT_DEATH: 'PERMANENT_DEATH'
+    };
+
+    // Document Types
+    const DocumentType = {
+        DEATH_CERTIFICATE: 'DEATH_CERTIFICATE',
+        PRESERVATION_DECLARATION: 'PRESERVATION_DECLARATION',
+        RESTORATION_CERTIFICATE: 'RESTORATION_CERTIFICATE',
+        COURT_ORDER: 'COURT_ORDER',
+        GUARDIANSHIP_ORDER: 'GUARDIANSHIP_ORDER',
+        TRUST_DOCUMENT: 'TRUST_DOCUMENT',
+        POWER_OF_ATTORNEY: 'POWER_OF_ATTORNEY',
+        IDENTITY_VERIFICATION: 'IDENTITY_VERIFICATION'
+    };
+
+    // Document Status
+    const DocumentStatus = {
+        DRAFT: 'DRAFT',
+        PENDING_SIGNATURE: 'PENDING_SIGNATURE',
+        SIGNED: 'SIGNED',
+        NOTARIZED: 'NOTARIZED',
+        FILED: 'FILED',
+        APOSTILLED: 'APOSTILLED',
+        ACTIVE: 'ACTIVE',
+        SUPERSEDED: 'SUPERSEDED',
+        REVOKED: 'REVOKED'
+    };
+
+    // Restoration Stages
+    const RestorationStage = {
+        INITIATED: 'INITIATED',
+        IDENTITY_VERIFICATION: 'IDENTITY_VERIFICATION',
+        MEDICAL_CLEARANCE: 'MEDICAL_CLEARANCE',
+        LEGAL_REVIEW: 'LEGAL_REVIEW',
+        COURT_PETITION: 'COURT_PETITION',
+        COURT_HEARING: 'COURT_HEARING',
+        RESTORATION_GRANTED: 'RESTORATION_GRANTED',
+        RIGHTS_RESTORATION: 'RIGHTS_RESTORATION',
+        COMPLETED: 'COMPLETED'
+    };
+
+    // Recognition Status
+    const RecognitionStatus = {
+        FULL: 'FULL',
+        PARTIAL: 'PARTIAL',
+        PENDING: 'PENDING',
+        NOT_RECOGNIZED: 'NOT_RECOGNIZED'
+    };
+
+    // Guardianship Scope
+    const GuardianshipScope = {
+        PERSONAL: 'personal_decisions',
+        MEDICAL: 'medical_decisions',
+        FINANCIAL: 'financial_decisions',
+        LEGAL: 'legal_representation',
+        REVIVAL: 'revival_decisions'
+    };
+
+    // Valid Status Transitions
+    const validTransitions = {
+        [LegalStatus.LIVING]: [LegalStatus.LEGALLY_DECEASED],
+        [LegalStatus.LEGALLY_DECEASED]: [LegalStatus.PRESERVED_STATUS],
+        [LegalStatus.PRESERVED_STATUS]: [LegalStatus.REVIVAL_PENDING, LegalStatus.PERMANENT_DEATH],
+        [LegalStatus.REVIVAL_PENDING]: [LegalStatus.LEGALLY_RESTORED, LegalStatus.PRESERVED_STATUS, LegalStatus.PERMANENT_DEATH],
+        [LegalStatus.LEGALLY_RESTORED]: [],
+        [LegalStatus.PERMANENT_DEATH]: []
+    };
+
+    // State
+    let state = {
+        records: [],
+        documents: [],
+        jurisdictions: [],
+        restorations: [],
+        guardianships: [],
+        currentSection: 'main'
+    };
+
+    // Sample Jurisdictions
+    const sampleJurisdictions = [
+        { code: 'US-CA', name: 'California, USA', treatyMember: true, recognitionStatus: RecognitionStatus.FULL },
+        { code: 'US-AZ', name: 'Arizona, USA', treatyMember: true, recognitionStatus: RecognitionStatus.FULL },
+        { code: 'CH', name: 'Switzerland', treatyMember: true, recognitionStatus: RecognitionStatus.FULL },
+        { code: 'KR', name: 'South Korea', treatyMember: true, recognitionStatus: RecognitionStatus.FULL },
+        { code: 'JP', name: 'Japan', treatyMember: false, recognitionStatus: RecognitionStatus.PARTIAL },
+        { code: 'AU', name: 'Australia', treatyMember: false, recognitionStatus: RecognitionStatus.PENDING },
+        { code: 'GB', name: 'United Kingdom', treatyMember: true, recognitionStatus: RecognitionStatus.FULL }
+    ];
+
+    // Utility Functions
+    function generateId(prefix) {
+        return prefix + '-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    }
+
+    function formatDate(date) {
+        return date.toISOString().split('T')[0];
+    }
+
+    function formatDateTime(date) {
+        return date.toISOString().replace('T', ' ').substr(0, 19);
+    }
+
+    // Legal Status Record Class
+    class LegalStatusRecord {
+        constructor(subjectName, identityId, jurisdiction) {
+            this.recordId = generateId('LSR');
+            this.subjectId = generateId('SUB');
+            this.subjectName = subjectName;
+            this.identityId = identityId;
+            this.currentStatus = LegalStatus.LIVING;
+            this.statusHistory = [{
+                fromStatus: null,
+                toStatus: LegalStatus.LIVING,
+                timestamp: new Date(),
+                authority: 'SYSTEM',
+                reason: 'Initial record creation'
+            }];
+            this.primaryJurisdiction = jurisdiction;
+            this.jurisdictions = [jurisdiction];
+            this.documents = [];
+            this.guardianship = null;
+            this.createdAt = new Date();
+            this.updatedAt = new Date();
+        }
+
+        canTransitionTo(newStatus) {
+            return validTransitions[this.currentStatus].includes(newStatus);
+        }
+
+        transition(newStatus, authority, reason, documents = []) {
+            if (!this.canTransitionTo(newStatus)) {
+                throw new Error(`Invalid transition from ${this.currentStatus} to ${newStatus}`);
+            }
+
+            const transition = {
+                fromStatus: this.currentStatus,
+                toStatus: newStatus,
+                timestamp: new Date(),
+                authority: authority,
+                reason: reason,
+                documentIds: documents
+            };
+
+            this.statusHistory.push(transition);
+            this.currentStatus = newStatus;
+            this.updatedAt = new Date();
+
+            return transition;
+        }
+    }
+
+    // Document Class
+    class LegalDocument {
+        constructor(type, recordId, title, jurisdiction) {
+            this.documentId = generateId('DOC');
+            this.type = type;
+            this.recordId = recordId;
+            this.title = title;
+            this.jurisdiction = jurisdiction;
+            this.status = DocumentStatus.DRAFT;
+            this.signatures = [];
+            this.notarization = null;
+            this.apostille = null;
+            this.createdAt = new Date();
+            this.updatedAt = new Date();
+        }
+
+        sign(signerName, signerRole) {
+            if (this.status !== DocumentStatus.DRAFT && this.status !== DocumentStatus.PENDING_SIGNATURE) {
+                throw new Error(`Cannot sign document in ${this.status} status`);
+            }
+
+            this.signatures.push({
+                signerName: signerName,
+                signerRole: signerRole,
+                timestamp: new Date(),
+                signatureHash: generateId('SIG')
+            });
+
+            this.status = DocumentStatus.SIGNED;
+            this.updatedAt = new Date();
+        }
+
+        notarize(notaryName, notaryId, jurisdiction) {
+            if (this.status !== DocumentStatus.SIGNED) {
+                throw new Error('Document must be signed before notarization');
+            }
+
+            this.notarization = {
+                notaryName: notaryName,
+                notaryId: notaryId,
+                jurisdiction: jurisdiction,
+                timestamp: new Date(),
+                sealNumber: generateId('SEAL')
+            };
+
+            this.status = DocumentStatus.NOTARIZED;
+            this.updatedAt = new Date();
+        }
+
+        apostille(issuingAuthority, destinationCountry) {
+            if (this.status !== DocumentStatus.NOTARIZED && this.status !== DocumentStatus.FILED) {
+                throw new Error('Document must be notarized before apostille');
+            }
+
+            this.apostille = {
+                issuingAuthority: issuingAuthority,
+                destinationCountry: destinationCountry,
+                timestamp: new Date(),
+                certificateNumber: generateId('APO')
+            };
+
+            this.status = DocumentStatus.APOSTILLED;
+            this.updatedAt = new Date();
+        }
+    }
+
+    // Restoration Workflow Class
+    class RestorationWorkflow {
+        constructor(recordId, initiatedBy) {
+            this.workflowId = generateId('RWF');
+            this.recordId = recordId;
+            this.stage = RestorationStage.INITIATED;
+            this.initiatedBy = initiatedBy;
+            this.stages = [{
+                stage: RestorationStage.INITIATED,
+                timestamp: new Date(),
+                completedBy: initiatedBy,
+                notes: 'Restoration workflow initiated'
+            }];
+            this.tasks = this.generateTasks();
+            this.createdAt = new Date();
+            this.updatedAt = new Date();
+        }
+
+        generateTasks() {
+            return [
+                { taskId: generateId('TSK'), stage: RestorationStage.IDENTITY_VERIFICATION, description: 'Verify biological identity', status: 'pending' },
+                { taskId: generateId('TSK'), stage: RestorationStage.IDENTITY_VERIFICATION, description: 'Verify legal identity documents', status: 'pending' },
+                { taskId: generateId('TSK'), stage: RestorationStage.MEDICAL_CLEARANCE, description: 'Complete medical evaluation', status: 'pending' },
+                { taskId: generateId('TSK'), stage: RestorationStage.MEDICAL_CLEARANCE, description: 'Obtain cognitive assessment', status: 'pending' },
+                { taskId: generateId('TSK'), stage: RestorationStage.LEGAL_REVIEW, description: 'Review all legal documents', status: 'pending' },
+                { taskId: generateId('TSK'), stage: RestorationStage.LEGAL_REVIEW, description: 'Verify jurisdiction compliance', status: 'pending' },
+                { taskId: generateId('TSK'), stage: RestorationStage.COURT_PETITION, description: 'Prepare court petition', status: 'pending' },
+                { taskId: generateId('TSK'), stage: RestorationStage.COURT_PETITION, description: 'File with appropriate court', status: 'pending' },
+                { taskId: generateId('TSK'), stage: RestorationStage.COURT_HEARING, description: 'Attend court hearing', status: 'pending' },
+                { taskId: generateId('TSK'), stage: RestorationStage.RESTORATION_GRANTED, description: 'Obtain court order', status: 'pending' },
+                { taskId: generateId('TSK'), stage: RestorationStage.RIGHTS_RESTORATION, description: 'Restore civil rights', status: 'pending' },
+                { taskId: generateId('TSK'), stage: RestorationStage.RIGHTS_RESTORATION, description: 'Update government records', status: 'pending' }
+            ];
+        }
+
+        advanceStage(completedBy, notes) {
+            const stageOrder = Object.values(RestorationStage);
+            const currentIndex = stageOrder.indexOf(this.stage);
+
+            if (currentIndex >= stageOrder.length - 1) {
+                throw new Error('Workflow already completed');
+            }
+
+            const nextStage = stageOrder[currentIndex + 1];
+
+            this.stages.push({
+                stage: nextStage,
+                timestamp: new Date(),
+                completedBy: completedBy,
+                notes: notes
+            });
+
+            this.stage = nextStage;
+            this.updatedAt = new Date();
+
+            return nextStage;
+        }
+
+        completeTask(taskId, completedBy) {
+            const task = this.tasks.find(t => t.taskId === taskId);
+            if (!task) throw new Error('Task not found');
+
+            task.status = 'completed';
+            task.completedBy = completedBy;
+            task.completedAt = new Date();
+            this.updatedAt = new Date();
+
+            return task;
+        }
+    }
+
+    // Guardianship Class
+    class Guardianship {
+        constructor(recordId, guardianName, guardianId, scope) {
+            this.guardianshipId = generateId('GRD');
+            this.recordId = recordId;
+            this.guardian = {
+                name: guardianName,
+                guardianId: guardianId,
+                appointedAt: new Date()
+            };
+            this.scope = scope;
+            this.status = 'ACTIVE';
+            this.courtOrder = null;
+            this.createdAt = new Date();
+            this.updatedAt = new Date();
+        }
+
+        addCourtOrder(orderNumber, court, judge) {
+            this.courtOrder = {
+                orderNumber: orderNumber,
+                court: court,
+                judge: judge,
+                issuedAt: new Date()
+            };
+            this.updatedAt = new Date();
+        }
+
+        terminate(reason, terminatedBy) {
+            this.status = 'TERMINATED';
+            this.terminatedAt = new Date();
+            this.terminationReason = reason;
+            this.terminatedBy = terminatedBy;
+            this.updatedAt = new Date();
+        }
+    }
+
+    // Render Functions
+    function render(content) {
+        document.getElementById('output').innerHTML = content;
+    }
+
+    function renderMainMenu() {
+        const output = `
+================================================================================
+CRYO-LEGAL SIMULATOR
+Legal Status Standards for Cryopreserved Individuals
+================================================================================
+
+<a href="../../index.html">[WIA Standards Home]</a>
+
+--------------------------------------------------------------------------------
+MAIN MENU
+--------------------------------------------------------------------------------
+
+[1] <a href="#" onclick="CryoLegalSimulator.showSection('records')">Legal Status Records</a>     - Manage legal status records
+[2] <a href="#" onclick="CryoLegalSimulator.showSection('documents')">Document Management</a>      - Create and process legal documents
+[3] <a href="#" onclick="CryoLegalSimulator.showSection('jurisdictions')">Jurisdiction Recognition</a> - Multi-jurisdiction handling
+[4] <a href="#" onclick="CryoLegalSimulator.showSection('restoration')">Restoration Workflow</a>     - Legal restoration process
+[5] <a href="#" onclick="CryoLegalSimulator.showSection('guardianship')">Guardianship Management</a>  - Guardian appointments
+[6] <a href="#" onclick="CryoLegalSimulator.showSection('transitions')">Status Transitions</a>       - Legal status changes
+[7] <a href="#" onclick="CryoLegalSimulator.showSection('dashboard')">Integration Dashboard</a>    - System overview
+[8] <a href="#" onclick="CryoLegalSimulator.showSection('query')">Query Records</a>            - Search and filter
+
+--------------------------------------------------------------------------------
+SYSTEM STATUS
+--------------------------------------------------------------------------------
+
+    Records:        ${state.records.length}
+    Documents:      ${state.documents.length}
+    Restorations:   ${state.restorations.length}
+    Guardianships:  ${state.guardianships.length}
+    Jurisdictions:  ${sampleJurisdictions.length}
+
+--------------------------------------------------------------------------------
+LEGAL STATUS FLOW
+--------------------------------------------------------------------------------
+
+    LIVING --> LEGALLY_DECEASED --> PRESERVED_STATUS --> REVIVAL_PENDING --> LEGALLY_RESTORED
+                                          |
+                                          v
+                                   PERMANENT_DEATH
+
+--------------------------------------------------------------------------------
+
+    "Hongik Ingan" - Legal frameworks must evolve to protect all individuals,
+    including those preserved for future revival.
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderRecordsSection() {
+        let recordsList = '';
+        if (state.records.length === 0) {
+            recordsList = '    No records found. Create a new record to begin.\n';
+        } else {
+            state.records.forEach((record, index) => {
+                recordsList += `
+    [${index + 1}] ${record.recordId}
+        Subject:      ${record.subjectName}
+        Identity ID:  ${record.identityId}
+        Status:       ${record.currentStatus}
+        Jurisdiction: ${record.primaryJurisdiction}
+        Documents:    ${record.documents.length}
+        Created:      ${formatDate(record.createdAt)}
+        <a href="#" onclick="CryoLegalSimulator.viewRecord('${record.recordId}')">[View]</a> <a href="#" onclick="CryoLegalSimulator.showTransitionForm('${record.recordId}')">[Transition]</a>
+`;
+            });
+        }
+
+        const output = `
+================================================================================
+LEGAL STATUS RECORDS
+================================================================================
+
+<a href="#" onclick="CryoLegalSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+CREATE NEW RECORD
+--------------------------------------------------------------------------------
+
+    Subject Name:   <input type="text" id="subjectName" size="30" value="Kim Preservation">
+    Identity ID:    <input type="text" id="identityId" size="30" value="CID-2075-KR-001">
+    Jurisdiction:   <select id="jurisdiction">
+                      <option value="KR">South Korea</option>
+                      <option value="US-CA">California, USA</option>
+                      <option value="CH">Switzerland</option>
+                      <option value="JP">Japan</option>
+                      <option value="GB">United Kingdom</option>
+                    </select>
+
+    <a href="#" onclick="CryoLegalSimulator.createRecord()">[Create Record]</a>
+
+--------------------------------------------------------------------------------
+EXISTING RECORDS (${state.records.length})
+--------------------------------------------------------------------------------
+${recordsList}
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderDocumentsSection() {
+        let documentsList = '';
+        if (state.documents.length === 0) {
+            documentsList = '    No documents found. Create a document from a record.\n';
+        } else {
+            state.documents.forEach((doc, index) => {
+                documentsList += `
+    [${index + 1}] ${doc.documentId}
+        Type:         ${doc.type}
+        Title:        ${doc.title}
+        Status:       ${doc.status}
+        Jurisdiction: ${doc.jurisdiction}
+        Signatures:   ${doc.signatures.length}
+        Created:      ${formatDate(doc.createdAt)}
+        <a href="#" onclick="CryoLegalSimulator.viewDocument('${doc.documentId}')">[View]</a> <a href="#" onclick="CryoLegalSimulator.processDocument('${doc.documentId}')">[Process]</a>
+`;
+            });
+        }
+
+        let recordOptions = '<option value="">Select Record</option>';
+        state.records.forEach(record => {
+            recordOptions += `<option value="${record.recordId}">${record.recordId} - ${record.subjectName}</option>`;
+        });
+
+        const output = `
+================================================================================
+DOCUMENT MANAGEMENT
+================================================================================
+
+<a href="#" onclick="CryoLegalSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+CREATE NEW DOCUMENT
+--------------------------------------------------------------------------------
+
+    Record:         <select id="docRecordId">${recordOptions}</select>
+    Document Type:  <select id="docType">
+                      <option value="DEATH_CERTIFICATE">Death Certificate</option>
+                      <option value="PRESERVATION_DECLARATION">Preservation Declaration</option>
+                      <option value="RESTORATION_CERTIFICATE">Restoration Certificate</option>
+                      <option value="COURT_ORDER">Court Order</option>
+                      <option value="GUARDIANSHIP_ORDER">Guardianship Order</option>
+                      <option value="IDENTITY_VERIFICATION">Identity Verification</option>
+                    </select>
+    Title:          <input type="text" id="docTitle" size="40" value="Official Legal Document">
+    Jurisdiction:   <select id="docJurisdiction">
+                      <option value="KR">South Korea</option>
+                      <option value="US-CA">California, USA</option>
+                      <option value="CH">Switzerland</option>
+                    </select>
+
+    <a href="#" onclick="CryoLegalSimulator.createDocument()">[Create Document]</a>
+
+--------------------------------------------------------------------------------
+DOCUMENT STATUS FLOW
+--------------------------------------------------------------------------------
+
+    DRAFT --> PENDING_SIGNATURE --> SIGNED --> NOTARIZED --> FILED --> APOSTILLED
+                                                    |
+                                                    v
+                                                 ACTIVE
+
+--------------------------------------------------------------------------------
+EXISTING DOCUMENTS (${state.documents.length})
+--------------------------------------------------------------------------------
+${documentsList}
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderJurisdictionsSection() {
+        let jurisdictionsList = '';
+        sampleJurisdictions.forEach((jur, index) => {
+            const treatyBadge = jur.treatyMember ? '[Treaty Member]' : '';
+            jurisdictionsList += `
+    [${index + 1}] ${jur.code}
+        Name:        ${jur.name}
+        Status:      ${jur.recognitionStatus} ${treatyBadge}
+`;
+        });
+
+        const output = `
+================================================================================
+JURISDICTION RECOGNITION
+================================================================================
+
+<a href="#" onclick="CryoLegalSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+RECOGNITION STATUS TYPES
+--------------------------------------------------------------------------------
+
+    FULL:           Complete recognition of cryopreservation legal status
+    PARTIAL:        Limited recognition, case-by-case basis
+    PENDING:        Recognition under review
+    NOT_RECOGNIZED: No legal framework for cryopreservation status
+
+--------------------------------------------------------------------------------
+CHECK JURISDICTION RECOGNITION
+--------------------------------------------------------------------------------
+
+    From Jurisdiction: <select id="fromJur">
+                         <option value="KR">South Korea</option>
+                         <option value="US-CA">California, USA</option>
+                         <option value="CH">Switzerland</option>
+                         <option value="JP">Japan</option>
+                       </select>
+
+    To Jurisdiction:   <select id="toJur">
+                         <option value="US-CA">California, USA</option>
+                         <option value="KR">South Korea</option>
+                         <option value="GB">United Kingdom</option>
+                         <option value="AU">Australia</option>
+                       </select>
+
+    <a href="#" onclick="CryoLegalSimulator.checkRecognition()">[Check Recognition]</a>
+
+--------------------------------------------------------------------------------
+REGISTERED JURISDICTIONS (${sampleJurisdictions.length})
+--------------------------------------------------------------------------------
+${jurisdictionsList}
+--------------------------------------------------------------------------------
+TREATY INFORMATION
+--------------------------------------------------------------------------------
+
+    International Cryopreservation Legal Status Treaty (ICLST)
+
+    Treaty Members: ${sampleJurisdictions.filter(j => j.treatyMember).length}
+    Full Recognition: ${sampleJurisdictions.filter(j => j.recognitionStatus === RecognitionStatus.FULL).length}
+
+    Treaty provides:
+      - Mutual recognition of preservation status
+      - Standardized document requirements
+      - Cross-border restoration procedures
+      - Guardian authority portability
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderRestorationSection() {
+        let workflowsList = '';
+        if (state.restorations.length === 0) {
+            workflowsList = '    No restoration workflows. Initiate from a record in REVIVAL_PENDING status.\n';
+        } else {
+            state.restorations.forEach((wf, index) => {
+                const record = state.records.find(r => r.recordId === wf.recordId);
+                const completedTasks = wf.tasks.filter(t => t.status === 'completed').length;
+                workflowsList += `
+    [${index + 1}] ${wf.workflowId}
+        Record:        ${wf.recordId} (${record ? record.subjectName : 'Unknown'})
+        Stage:         ${wf.stage}
+        Tasks:         ${completedTasks}/${wf.tasks.length} completed
+        Initiated:     ${formatDate(wf.createdAt)}
+        <a href="#" onclick="CryoLegalSimulator.viewWorkflow('${wf.workflowId}')">[View]</a> <a href="#" onclick="CryoLegalSimulator.advanceWorkflow('${wf.workflowId}')">[Advance]</a>
+`;
+            });
+        }
+
+        let eligibleRecords = '<option value="">Select Record</option>';
+        state.records.filter(r => r.currentStatus === LegalStatus.REVIVAL_PENDING).forEach(record => {
+            eligibleRecords += `<option value="${record.recordId}">${record.recordId} - ${record.subjectName}</option>`;
+        });
+
+        const output = `
+================================================================================
+RESTORATION WORKFLOW
+================================================================================
+
+<a href="#" onclick="CryoLegalSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+RESTORATION STAGES
+--------------------------------------------------------------------------------
+
+    INITIATED
+        |
+        v
+    IDENTITY_VERIFICATION  --> Verify biological and legal identity
+        |
+        v
+    MEDICAL_CLEARANCE      --> Complete medical evaluation
+        |
+        v
+    LEGAL_REVIEW           --> Review all legal documents
+        |
+        v
+    COURT_PETITION         --> Prepare and file court petition
+        |
+        v
+    COURT_HEARING          --> Attend court hearing
+        |
+        v
+    RESTORATION_GRANTED    --> Obtain court order
+        |
+        v
+    RIGHTS_RESTORATION     --> Restore civil rights
+        |
+        v
+    COMPLETED              --> Full legal personhood restored
+
+--------------------------------------------------------------------------------
+INITIATE RESTORATION
+--------------------------------------------------------------------------------
+
+    Record (REVIVAL_PENDING): <select id="restoreRecordId">${eligibleRecords}</select>
+    Initiated By:             <input type="text" id="initiatedBy" size="30" value="Legal Counsel">
+
+    <a href="#" onclick="CryoLegalSimulator.initiateRestoration()">[Initiate Restoration]</a>
+
+--------------------------------------------------------------------------------
+ACTIVE WORKFLOWS (${state.restorations.length})
+--------------------------------------------------------------------------------
+${workflowsList}
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderGuardianshipSection() {
+        let guardianshipsList = '';
+        if (state.guardianships.length === 0) {
+            guardianshipsList = '    No guardianships established.\n';
+        } else {
+            state.guardianships.forEach((grd, index) => {
+                const record = state.records.find(r => r.recordId === grd.recordId);
+                guardianshipsList += `
+    [${index + 1}] ${grd.guardianshipId}
+        Record:    ${grd.recordId} (${record ? record.subjectName : 'Unknown'})
+        Guardian:  ${grd.guardian.name}
+        Scope:     ${grd.scope.join(', ')}
+        Status:    ${grd.status}
+        Created:   ${formatDate(grd.createdAt)}
+        <a href="#" onclick="CryoLegalSimulator.viewGuardianship('${grd.guardianshipId}')">[View]</a>
+`;
+            });
+        }
+
+        let recordOptions = '<option value="">Select Record</option>';
+        state.records.filter(r => r.currentStatus === LegalStatus.PRESERVED_STATUS ||
+                                  r.currentStatus === LegalStatus.REVIVAL_PENDING).forEach(record => {
+            recordOptions += `<option value="${record.recordId}">${record.recordId} - ${record.subjectName}</option>`;
+        });
+
+        const output = `
+================================================================================
+GUARDIANSHIP MANAGEMENT
+================================================================================
+
+<a href="#" onclick="CryoLegalSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+GUARDIANSHIP SCOPE OPTIONS
+--------------------------------------------------------------------------------
+
+    personal_decisions   - Personal care and living arrangements
+    medical_decisions    - Healthcare and medical treatment decisions
+    financial_decisions  - Financial management and transactions
+    legal_representation - Legal representation and court matters
+    revival_decisions    - Decisions regarding revival procedures
+
+--------------------------------------------------------------------------------
+APPOINT GUARDIAN
+--------------------------------------------------------------------------------
+
+    Record:         <select id="grdRecordId">${recordOptions}</select>
+    Guardian Name:  <input type="text" id="guardianName" size="30" value="Park Guardian">
+    Guardian ID:    <input type="text" id="guardianId" size="30" value="GRD-2075-001">
+    Scope:          <input type="checkbox" id="scope_personal" checked> Personal
+                    <input type="checkbox" id="scope_medical" checked> Medical
+                    <input type="checkbox" id="scope_financial" checked> Financial
+                    <input type="checkbox" id="scope_legal"> Legal
+                    <input type="checkbox" id="scope_revival" checked> Revival
+
+    <a href="#" onclick="CryoLegalSimulator.appointGuardian()">[Appoint Guardian]</a>
+
+--------------------------------------------------------------------------------
+ACTIVE GUARDIANSHIPS (${state.guardianships.length})
+--------------------------------------------------------------------------------
+${guardianshipsList}
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderTransitionsSection() {
+        let transitionHistory = '';
+        state.records.forEach(record => {
+            record.statusHistory.forEach(trans => {
+                transitionHistory += `
+    ${formatDateTime(trans.timestamp)}
+        Record:   ${record.recordId} (${record.subjectName})
+        From:     ${trans.fromStatus || 'N/A'}
+        To:       ${trans.toStatus}
+        By:       ${trans.authority}
+        Reason:   ${trans.reason}
+`;
+            });
+        });
+
+        if (!transitionHistory) {
+            transitionHistory = '    No transitions recorded.\n';
+        }
+
+        const output = `
+================================================================================
+STATUS TRANSITIONS
+================================================================================
+
+<a href="#" onclick="CryoLegalSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+VALID TRANSITIONS
+--------------------------------------------------------------------------------
+
+    From LIVING:
+        --> LEGALLY_DECEASED     (Death declaration)
+
+    From LEGALLY_DECEASED:
+        --> PRESERVED_STATUS     (Cryopreservation initiated)
+
+    From PRESERVED_STATUS:
+        --> REVIVAL_PENDING      (Revival procedure initiated)
+        --> PERMANENT_DEATH      (Preservation terminated)
+
+    From REVIVAL_PENDING:
+        --> LEGALLY_RESTORED     (Revival successful, rights restored)
+        --> PRESERVED_STATUS     (Revival paused, return to preservation)
+        --> PERMANENT_DEATH      (Revival failed)
+
+    From LEGALLY_RESTORED:
+        (Terminal state - no further transitions)
+
+    From PERMANENT_DEATH:
+        (Terminal state - no further transitions)
+
+--------------------------------------------------------------------------------
+TRANSITION HISTORY
+--------------------------------------------------------------------------------
+${transitionHistory}
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderDashboard() {
+        const statusCounts = {
+            [LegalStatus.LIVING]: 0,
+            [LegalStatus.LEGALLY_DECEASED]: 0,
+            [LegalStatus.PRESERVED_STATUS]: 0,
+            [LegalStatus.REVIVAL_PENDING]: 0,
+            [LegalStatus.LEGALLY_RESTORED]: 0,
+            [LegalStatus.PERMANENT_DEATH]: 0
+        };
+
+        state.records.forEach(record => {
+            statusCounts[record.currentStatus]++;
+        });
+
+        const documentStatusCounts = {};
+        state.documents.forEach(doc => {
+            documentStatusCounts[doc.status] = (documentStatusCounts[doc.status] || 0) + 1;
+        });
+
+        let docStatusDisplay = '';
+        Object.entries(documentStatusCounts).forEach(([status, count]) => {
+            docStatusDisplay += `        ${status}: ${count}\n`;
+        });
+
+        if (!docStatusDisplay) {
+            docStatusDisplay = '        No documents\n';
+        }
+
+        const output = `
+================================================================================
+INTEGRATION DASHBOARD
+================================================================================
+
+<a href="#" onclick="CryoLegalSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+LEGAL STATUS OVERVIEW
+--------------------------------------------------------------------------------
+
+    +------------------------------------------------------------------+
+    | Status              | Count | Percentage                         |
+    +------------------------------------------------------------------+
+    | LIVING              | ${String(statusCounts[LegalStatus.LIVING]).padEnd(5)} | ${state.records.length ? ((statusCounts[LegalStatus.LIVING]/state.records.length)*100).toFixed(1) : 0}%
+    | LEGALLY_DECEASED    | ${String(statusCounts[LegalStatus.LEGALLY_DECEASED]).padEnd(5)} | ${state.records.length ? ((statusCounts[LegalStatus.LEGALLY_DECEASED]/state.records.length)*100).toFixed(1) : 0}%
+    | PRESERVED_STATUS    | ${String(statusCounts[LegalStatus.PRESERVED_STATUS]).padEnd(5)} | ${state.records.length ? ((statusCounts[LegalStatus.PRESERVED_STATUS]/state.records.length)*100).toFixed(1) : 0}%
+    | REVIVAL_PENDING     | ${String(statusCounts[LegalStatus.REVIVAL_PENDING]).padEnd(5)} | ${state.records.length ? ((statusCounts[LegalStatus.REVIVAL_PENDING]/state.records.length)*100).toFixed(1) : 0}%
+    | LEGALLY_RESTORED    | ${String(statusCounts[LegalStatus.LEGALLY_RESTORED]).padEnd(5)} | ${state.records.length ? ((statusCounts[LegalStatus.LEGALLY_RESTORED]/state.records.length)*100).toFixed(1) : 0}%
+    | PERMANENT_DEATH     | ${String(statusCounts[LegalStatus.PERMANENT_DEATH]).padEnd(5)} | ${state.records.length ? ((statusCounts[LegalStatus.PERMANENT_DEATH]/state.records.length)*100).toFixed(1) : 0}%
+    +------------------------------------------------------------------+
+    | TOTAL               | ${String(state.records.length).padEnd(5)} | 100%
+    +------------------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+DOCUMENT STATUS SUMMARY
+--------------------------------------------------------------------------------
+
+${docStatusDisplay}
+--------------------------------------------------------------------------------
+RESTORATION WORKFLOW STATUS
+--------------------------------------------------------------------------------
+
+    Total Workflows:    ${state.restorations.length}
+    In Progress:        ${state.restorations.filter(w => w.stage !== RestorationStage.COMPLETED).length}
+    Completed:          ${state.restorations.filter(w => w.stage === RestorationStage.COMPLETED).length}
+
+--------------------------------------------------------------------------------
+GUARDIANSHIP STATUS
+--------------------------------------------------------------------------------
+
+    Total Guardianships: ${state.guardianships.length}
+    Active:              ${state.guardianships.filter(g => g.status === 'ACTIVE').length}
+    Terminated:          ${state.guardianships.filter(g => g.status === 'TERMINATED').length}
+
+--------------------------------------------------------------------------------
+INTEGRATION POINTS
+--------------------------------------------------------------------------------
+
+    [!] CRYO-CONSENT:  Consent verification for legal actions
+    [!] CRYO-IDENTITY: Identity verification for restoration
+    [!] CRYO-REVIVAL:  Revival status triggers legal restoration
+    [!] CRYO-ASSET:    Asset restoration upon legal restoration
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderQuerySection() {
+        const output = `
+================================================================================
+QUERY RECORDS
+================================================================================
+
+<a href="#" onclick="CryoLegalSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+SEARCH BY STATUS
+--------------------------------------------------------------------------------
+
+    Status: <select id="queryStatus">
+              <option value="">All Statuses</option>
+              <option value="LIVING">LIVING</option>
+              <option value="LEGALLY_DECEASED">LEGALLY_DECEASED</option>
+              <option value="PRESERVED_STATUS">PRESERVED_STATUS</option>
+              <option value="REVIVAL_PENDING">REVIVAL_PENDING</option>
+              <option value="LEGALLY_RESTORED">LEGALLY_RESTORED</option>
+              <option value="PERMANENT_DEATH">PERMANENT_DEATH</option>
+            </select>
+
+    <a href="#" onclick="CryoLegalSimulator.queryByStatus()">[Search]</a>
+
+--------------------------------------------------------------------------------
+SEARCH BY JURISDICTION
+--------------------------------------------------------------------------------
+
+    Jurisdiction: <select id="queryJurisdiction">
+                    <option value="">All Jurisdictions</option>
+                    <option value="KR">South Korea</option>
+                    <option value="US-CA">California, USA</option>
+                    <option value="CH">Switzerland</option>
+                    <option value="JP">Japan</option>
+                    <option value="GB">United Kingdom</option>
+                  </select>
+
+    <a href="#" onclick="CryoLegalSimulator.queryByJurisdiction()">[Search]</a>
+
+--------------------------------------------------------------------------------
+SEARCH BY NAME
+--------------------------------------------------------------------------------
+
+    Name: <input type="text" id="queryName" size="30">
+
+    <a href="#" onclick="CryoLegalSimulator.queryByName()">[Search]</a>
+
+--------------------------------------------------------------------------------
+RESULTS
+--------------------------------------------------------------------------------
+
+<div id="queryResults">    Enter search criteria and click Search.</div>
+
+================================================================================
+`;
+        render(output);
+    }
+
+    // Action Functions
+    function createRecord() {
+        const name = document.getElementById('subjectName').value;
+        const identityId = document.getElementById('identityId').value;
+        const jurisdiction = document.getElementById('jurisdiction').value;
+
+        if (!name || !identityId) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        const record = new LegalStatusRecord(name, identityId, jurisdiction);
+        state.records.push(record);
+
+        alert(`Record created: ${record.recordId}`);
+        renderRecordsSection();
+    }
+
+    function viewRecord(recordId) {
+        const record = state.records.find(r => r.recordId === recordId);
+        if (!record) {
+            alert('Record not found');
+            return;
+        }
+
+        let historyDisplay = '';
+        record.statusHistory.forEach((trans, index) => {
+            historyDisplay += `
+        [${index + 1}] ${formatDateTime(trans.timestamp)}
+            ${trans.fromStatus || 'N/A'} --> ${trans.toStatus}
+            Authority: ${trans.authority}
+            Reason: ${trans.reason}
+`;
+        });
+
+        const relatedDocs = state.documents.filter(d => d.recordId === recordId);
+        let docsDisplay = relatedDocs.length > 0 ?
+            relatedDocs.map(d => `        ${d.documentId}: ${d.type} (${d.status})`).join('\n') :
+            '        No documents';
+
+        const guardianship = state.guardianships.find(g => g.recordId === recordId && g.status === 'ACTIVE');
+        let guardianDisplay = guardianship ?
+            `        Guardian: ${guardianship.guardian.name}\n        Scope: ${guardianship.scope.join(', ')}` :
+            '        No active guardianship';
+
+        const output = `
+================================================================================
+RECORD DETAILS: ${record.recordId}
+================================================================================
+
+<a href="#" onclick="CryoLegalSimulator.showSection('records')">[Back to Records]</a>
+
+--------------------------------------------------------------------------------
+BASIC INFORMATION
+--------------------------------------------------------------------------------
+
+    Record ID:        ${record.recordId}
+    Subject ID:       ${record.subjectId}
+    Subject Name:     ${record.subjectName}
+    Identity ID:      ${record.identityId}
+    Current Status:   ${record.currentStatus}
+    Primary Jurisdiction: ${record.primaryJurisdiction}
+    Created:          ${formatDateTime(record.createdAt)}
+    Updated:          ${formatDateTime(record.updatedAt)}
+
+--------------------------------------------------------------------------------
+STATUS HISTORY
+--------------------------------------------------------------------------------
+${historyDisplay}
+--------------------------------------------------------------------------------
+RELATED DOCUMENTS
+--------------------------------------------------------------------------------
+
+${docsDisplay}
+
+--------------------------------------------------------------------------------
+GUARDIANSHIP
+--------------------------------------------------------------------------------
+
+${guardianDisplay}
+
+--------------------------------------------------------------------------------
+AVAILABLE ACTIONS
+--------------------------------------------------------------------------------
+
+    <a href="#" onclick="CryoLegalSimulator.showTransitionForm('${recordId}')">[Transition Status]</a>
+    <a href="#" onclick="CryoLegalSimulator.createDocumentForRecord('${recordId}')">[Create Document]</a>
+    <a href="#" onclick="CryoLegalSimulator.showSection('records')">[Back]</a>
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function showTransitionForm(recordId) {
+        const record = state.records.find(r => r.recordId === recordId);
+        if (!record) {
+            alert('Record not found');
+            return;
+        }
+
+        const possibleTransitions = validTransitions[record.currentStatus];
+        let transitionOptions = '';
+        possibleTransitions.forEach(status => {
+            transitionOptions += `<option value="${status}">${status}</option>`;
+        });
+
+        if (possibleTransitions.length === 0) {
+            transitionOptions = '<option value="">No transitions available (terminal state)</option>';
+        }
+
+        const output = `
+================================================================================
+STATUS TRANSITION: ${record.recordId}
+================================================================================
+
+<a href="#" onclick="CryoLegalSimulator.viewRecord('${recordId}')">[Back to Record]</a>
+
+--------------------------------------------------------------------------------
+CURRENT STATUS
+--------------------------------------------------------------------------------
+
+    Record:     ${record.recordId}
+    Subject:    ${record.subjectName}
+    Status:     ${record.currentStatus}
+
+--------------------------------------------------------------------------------
+TRANSITION FORM
+--------------------------------------------------------------------------------
+
+    New Status: <select id="newStatus">${transitionOptions}</select>
+
+    Authority:  <input type="text" id="transAuthority" size="30" value="Legal Authority">
+
+    Reason:     <input type="text" id="transReason" size="50" value="Status transition per legal proceedings">
+
+    <a href="#" onclick="CryoLegalSimulator.executeTransition('${recordId}')">[Execute Transition]</a>
+
+--------------------------------------------------------------------------------
+VALID TRANSITIONS FROM ${record.currentStatus}
+--------------------------------------------------------------------------------
+
+${possibleTransitions.length > 0 ?
+    possibleTransitions.map(s => `    --> ${s}`).join('\n') :
+    '    (Terminal state - no further transitions possible)'}
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function executeTransition(recordId) {
+        const record = state.records.find(r => r.recordId === recordId);
+        if (!record) {
+            alert('Record not found');
+            return;
+        }
+
+        const newStatus = document.getElementById('newStatus').value;
+        const authority = document.getElementById('transAuthority').value;
+        const reason = document.getElementById('transReason').value;
+
+        if (!newStatus) {
+            alert('Please select a new status');
+            return;
+        }
+
+        try {
+            record.transition(newStatus, authority, reason);
+            alert(`Status transitioned to ${newStatus}`);
+            viewRecord(recordId);
+        } catch (error) {
+            alert('Transition failed: ' + error.message);
+        }
+    }
+
+    function createDocument() {
+        const recordId = document.getElementById('docRecordId').value;
+        const type = document.getElementById('docType').value;
+        const title = document.getElementById('docTitle').value;
+        const jurisdiction = document.getElementById('docJurisdiction').value;
+
+        if (!recordId || !type || !title) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        const doc = new LegalDocument(type, recordId, title, jurisdiction);
+        state.documents.push(doc);
+
+        const record = state.records.find(r => r.recordId === recordId);
+        if (record) {
+            record.documents.push(doc.documentId);
+        }
+
+        alert(`Document created: ${doc.documentId}`);
+        renderDocumentsSection();
+    }
+
+    function createDocumentForRecord(recordId) {
+        state.currentRecordId = recordId;
+        renderDocumentsSection();
+        setTimeout(() => {
+            document.getElementById('docRecordId').value = recordId;
+        }, 100);
+    }
+
+    function viewDocument(documentId) {
+        const doc = state.documents.find(d => d.documentId === documentId);
+        if (!doc) {
+            alert('Document not found');
+            return;
+        }
+
+        let signaturesDisplay = doc.signatures.length > 0 ?
+            doc.signatures.map(s => `        ${s.signerName} (${s.signerRole}) - ${formatDateTime(s.timestamp)}`).join('\n') :
+            '        No signatures';
+
+        let notarizationDisplay = doc.notarization ?
+            `        Notary: ${doc.notarization.notaryName}
+        Seal: ${doc.notarization.sealNumber}
+        Date: ${formatDateTime(doc.notarization.timestamp)}` :
+            '        Not notarized';
+
+        let apostilleDisplay = doc.apostille ?
+            `        Authority: ${doc.apostille.issuingAuthority}
+        Destination: ${doc.apostille.destinationCountry}
+        Certificate: ${doc.apostille.certificateNumber}` :
+            '        No apostille';
+
+        const output = `
+================================================================================
+DOCUMENT DETAILS: ${doc.documentId}
+================================================================================
+
+<a href="#" onclick="CryoLegalSimulator.showSection('documents')">[Back to Documents]</a>
+
+--------------------------------------------------------------------------------
+BASIC INFORMATION
+--------------------------------------------------------------------------------
+
+    Document ID:   ${doc.documentId}
+    Type:          ${doc.type}
+    Title:         ${doc.title}
+    Record ID:     ${doc.recordId}
+    Jurisdiction:  ${doc.jurisdiction}
+    Status:        ${doc.status}
+    Created:       ${formatDateTime(doc.createdAt)}
+    Updated:       ${formatDateTime(doc.updatedAt)}
+
+--------------------------------------------------------------------------------
+SIGNATURES
+--------------------------------------------------------------------------------
+
+${signaturesDisplay}
+
+--------------------------------------------------------------------------------
+NOTARIZATION
+--------------------------------------------------------------------------------
+
+${notarizationDisplay}
+
+--------------------------------------------------------------------------------
+APOSTILLE
+--------------------------------------------------------------------------------
+
+${apostilleDisplay}
+
+--------------------------------------------------------------------------------
+ACTIONS
+--------------------------------------------------------------------------------
+
+    <a href="#" onclick="CryoLegalSimulator.signDocument('${documentId}')">[Sign]</a>
+    <a href="#" onclick="CryoLegalSimulator.notarizeDocument('${documentId}')">[Notarize]</a>
+    <a href="#" onclick="CryoLegalSimulator.apostilleDocument('${documentId}')">[Apostille]</a>
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function processDocument(documentId) {
+        viewDocument(documentId);
+    }
+
+    function signDocument(documentId) {
+        const doc = state.documents.find(d => d.documentId === documentId);
+        if (!doc) {
+            alert('Document not found');
+            return;
+        }
+
+        const signerName = prompt('Enter signer name:', 'John Doe');
+        const signerRole = prompt('Enter signer role:', 'Legal Representative');
+
+        if (signerName && signerRole) {
+            try {
+                doc.sign(signerName, signerRole);
+                alert('Document signed successfully');
+                viewDocument(documentId);
+            } catch (error) {
+                alert('Signing failed: ' + error.message);
+            }
+        }
+    }
+
+    function notarizeDocument(documentId) {
+        const doc = state.documents.find(d => d.documentId === documentId);
+        if (!doc) {
+            alert('Document not found');
+            return;
+        }
+
+        const notaryName = prompt('Enter notary name:', 'Jane Notary');
+        const notaryId = prompt('Enter notary ID:', 'NOT-2075-001');
+
+        if (notaryName && notaryId) {
+            try {
+                doc.notarize(notaryName, notaryId, doc.jurisdiction);
+                alert('Document notarized successfully');
+                viewDocument(documentId);
+            } catch (error) {
+                alert('Notarization failed: ' + error.message);
+            }
+        }
+    }
+
+    function apostilleDocument(documentId) {
+        const doc = state.documents.find(d => d.documentId === documentId);
+        if (!doc) {
+            alert('Document not found');
+            return;
+        }
+
+        const authority = prompt('Enter issuing authority:', 'Ministry of Foreign Affairs');
+        const destination = prompt('Enter destination country:', 'Switzerland');
+
+        if (authority && destination) {
+            try {
+                doc.apostille(authority, destination);
+                alert('Apostille added successfully');
+                viewDocument(documentId);
+            } catch (error) {
+                alert('Apostille failed: ' + error.message);
+            }
+        }
+    }
+
+    function checkRecognition() {
+        const fromJur = document.getElementById('fromJur').value;
+        const toJur = document.getElementById('toJur').value;
+
+        const fromInfo = sampleJurisdictions.find(j => j.code === fromJur);
+        const toInfo = sampleJurisdictions.find(j => j.code === toJur);
+
+        let result = '';
+
+        if (fromInfo && toInfo) {
+            const bothTreaty = fromInfo.treatyMember && toInfo.treatyMember;
+            const recognition = bothTreaty ? RecognitionStatus.FULL :
+                               (fromInfo.treatyMember || toInfo.treatyMember) ? RecognitionStatus.PARTIAL :
+                               RecognitionStatus.PENDING;
+
+            result = `
+    RECOGNITION CHECK RESULT
+    ========================
+
+    From: ${fromInfo.name} (${fromInfo.code})
+        Treaty Member: ${fromInfo.treatyMember ? 'Yes' : 'No'}
+        Status: ${fromInfo.recognitionStatus}
+
+    To: ${toInfo.name} (${toInfo.code})
+        Treaty Member: ${toInfo.treatyMember ? 'Yes' : 'No'}
+        Status: ${toInfo.recognitionStatus}
+
+    Mutual Recognition: ${recognition}
+
+    ${bothTreaty ?
+        '[OK] Full mutual recognition under ICLST treaty' :
+        '[!] Limited recognition - additional documentation may be required'}
+`;
+        }
+
+        alert(result);
+    }
+
+    function initiateRestoration() {
+        const recordId = document.getElementById('restoreRecordId').value;
+        const initiatedBy = document.getElementById('initiatedBy').value;
+
+        if (!recordId) {
+            alert('Please select a record in REVIVAL_PENDING status');
+            return;
+        }
+
+        const record = state.records.find(r => r.recordId === recordId);
+        if (record.currentStatus !== LegalStatus.REVIVAL_PENDING) {
+            alert('Record must be in REVIVAL_PENDING status');
+            return;
+        }
+
+        const workflow = new RestorationWorkflow(recordId, initiatedBy);
+        state.restorations.push(workflow);
+
+        alert(`Restoration workflow initiated: ${workflow.workflowId}`);
+        renderRestorationSection();
+    }
+
+    function viewWorkflow(workflowId) {
+        const workflow = state.restorations.find(w => w.workflowId === workflowId);
+        if (!workflow) {
+            alert('Workflow not found');
+            return;
+        }
+
+        const record = state.records.find(r => r.recordId === workflow.recordId);
+
+        let stagesDisplay = workflow.stages.map(s =>
+            `        ${s.stage}: ${formatDateTime(s.timestamp)} by ${s.completedBy}`
+        ).join('\n');
+
+        let tasksDisplay = workflow.tasks.map(t =>
+            `        [${t.status === 'completed' ? 'X' : ' '}] ${t.description} (${t.stage})`
+        ).join('\n');
+
+        const output = `
+================================================================================
+RESTORATION WORKFLOW: ${workflow.workflowId}
+================================================================================
+
+<a href="#" onclick="CryoLegalSimulator.showSection('restoration')">[Back to Restoration]</a>
+
+--------------------------------------------------------------------------------
+WORKFLOW INFORMATION
+--------------------------------------------------------------------------------
+
+    Workflow ID:   ${workflow.workflowId}
+    Record ID:     ${workflow.recordId}
+    Subject:       ${record ? record.subjectName : 'Unknown'}
+    Current Stage: ${workflow.stage}
+    Initiated By:  ${workflow.initiatedBy}
+    Created:       ${formatDateTime(workflow.createdAt)}
+
+--------------------------------------------------------------------------------
+STAGE HISTORY
+--------------------------------------------------------------------------------
+
+${stagesDisplay}
+
+--------------------------------------------------------------------------------
+TASKS
+--------------------------------------------------------------------------------
+
+${tasksDisplay}
+
+--------------------------------------------------------------------------------
+ACTIONS
+--------------------------------------------------------------------------------
+
+    <a href="#" onclick="CryoLegalSimulator.advanceWorkflow('${workflowId}')">[Advance to Next Stage]</a>
+    <a href="#" onclick="CryoLegalSimulator.completeWorkflowTask('${workflowId}')">[Complete Task]</a>
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function advanceWorkflow(workflowId) {
+        const workflow = state.restorations.find(w => w.workflowId === workflowId);
+        if (!workflow) {
+            alert('Workflow not found');
+            return;
+        }
+
+        const completedBy = prompt('Completed by:', 'Legal Officer');
+        const notes = prompt('Notes:', 'Stage requirements met');
+
+        if (completedBy) {
+            try {
+                const newStage = workflow.advanceStage(completedBy, notes);
+                alert(`Advanced to stage: ${newStage}`);
+
+                // If restoration is granted, update the record status
+                if (newStage === RestorationStage.COMPLETED) {
+                    const record = state.records.find(r => r.recordId === workflow.recordId);
+                    if (record && record.currentStatus === LegalStatus.REVIVAL_PENDING) {
+                        record.transition(LegalStatus.LEGALLY_RESTORED, completedBy, 'Restoration workflow completed');
+                    }
+                }
+
+                viewWorkflow(workflowId);
+            } catch (error) {
+                alert('Advance failed: ' + error.message);
+            }
+        }
+    }
+
+    function completeWorkflowTask(workflowId) {
+        const workflow = state.restorations.find(w => w.workflowId === workflowId);
+        if (!workflow) {
+            alert('Workflow not found');
+            return;
+        }
+
+        const pendingTasks = workflow.tasks.filter(t => t.status === 'pending');
+        if (pendingTasks.length === 0) {
+            alert('All tasks completed');
+            return;
+        }
+
+        const taskList = pendingTasks.map((t, i) => `${i + 1}. ${t.description}`).join('\n');
+        const selection = prompt(`Select task to complete:\n${taskList}`, '1');
+
+        if (selection) {
+            const index = parseInt(selection) - 1;
+            if (index >= 0 && index < pendingTasks.length) {
+                const completedBy = prompt('Completed by:', 'Legal Officer');
+                if (completedBy) {
+                    workflow.completeTask(pendingTasks[index].taskId, completedBy);
+                    alert('Task completed');
+                    viewWorkflow(workflowId);
+                }
+            }
+        }
+    }
+
+    function appointGuardian() {
+        const recordId = document.getElementById('grdRecordId').value;
+        const guardianName = document.getElementById('guardianName').value;
+        const guardianId = document.getElementById('guardianId').value;
+
+        if (!recordId || !guardianName || !guardianId) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        const scope = [];
+        if (document.getElementById('scope_personal').checked) scope.push(GuardianshipScope.PERSONAL);
+        if (document.getElementById('scope_medical').checked) scope.push(GuardianshipScope.MEDICAL);
+        if (document.getElementById('scope_financial').checked) scope.push(GuardianshipScope.FINANCIAL);
+        if (document.getElementById('scope_legal').checked) scope.push(GuardianshipScope.LEGAL);
+        if (document.getElementById('scope_revival').checked) scope.push(GuardianshipScope.REVIVAL);
+
+        if (scope.length === 0) {
+            alert('Please select at least one scope');
+            return;
+        }
+
+        const guardianship = new Guardianship(recordId, guardianName, guardianId, scope);
+        state.guardianships.push(guardianship);
+
+        const record = state.records.find(r => r.recordId === recordId);
+        if (record) {
+            record.guardianship = guardianship.guardianshipId;
+        }
+
+        alert(`Guardian appointed: ${guardianship.guardianshipId}`);
+        renderGuardianshipSection();
+    }
+
+    function viewGuardianship(guardianshipId) {
+        const grd = state.guardianships.find(g => g.guardianshipId === guardianshipId);
+        if (!grd) {
+            alert('Guardianship not found');
+            return;
+        }
+
+        const record = state.records.find(r => r.recordId === grd.recordId);
+
+        let courtOrderDisplay = grd.courtOrder ?
+            `        Order Number: ${grd.courtOrder.orderNumber}
+        Court: ${grd.courtOrder.court}
+        Judge: ${grd.courtOrder.judge}
+        Issued: ${formatDateTime(grd.courtOrder.issuedAt)}` :
+            '        No court order attached';
+
+        const output = `
+================================================================================
+GUARDIANSHIP DETAILS: ${grd.guardianshipId}
+================================================================================
+
+<a href="#" onclick="CryoLegalSimulator.showSection('guardianship')">[Back to Guardianship]</a>
+
+--------------------------------------------------------------------------------
+BASIC INFORMATION
+--------------------------------------------------------------------------------
+
+    Guardianship ID: ${grd.guardianshipId}
+    Record ID:       ${grd.recordId}
+    Subject:         ${record ? record.subjectName : 'Unknown'}
+    Status:          ${grd.status}
+    Created:         ${formatDateTime(grd.createdAt)}
+
+--------------------------------------------------------------------------------
+GUARDIAN INFORMATION
+--------------------------------------------------------------------------------
+
+    Name:        ${grd.guardian.name}
+    Guardian ID: ${grd.guardian.guardianId}
+    Appointed:   ${formatDateTime(grd.guardian.appointedAt)}
+
+--------------------------------------------------------------------------------
+SCOPE OF AUTHORITY
+--------------------------------------------------------------------------------
+
+${grd.scope.map(s => `    [X] ${s}`).join('\n')}
+
+--------------------------------------------------------------------------------
+COURT ORDER
+--------------------------------------------------------------------------------
+
+${courtOrderDisplay}
+
+--------------------------------------------------------------------------------
+ACTIONS
+--------------------------------------------------------------------------------
+
+    <a href="#" onclick="CryoLegalSimulator.addCourtOrder('${guardianshipId}')">[Add Court Order]</a>
+    <a href="#" onclick="CryoLegalSimulator.terminateGuardianship('${guardianshipId}')">[Terminate]</a>
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function addCourtOrder(guardianshipId) {
+        const grd = state.guardianships.find(g => g.guardianshipId === guardianshipId);
+        if (!grd) {
+            alert('Guardianship not found');
+            return;
+        }
+
+        const orderNumber = prompt('Court order number:', 'CO-2075-001');
+        const court = prompt('Court name:', 'Seoul Family Court');
+        const judge = prompt('Judge name:', 'Judge Kim');
+
+        if (orderNumber && court && judge) {
+            grd.addCourtOrder(orderNumber, court, judge);
+            alert('Court order added');
+            viewGuardianship(guardianshipId);
+        }
+    }
+
+    function terminateGuardianship(guardianshipId) {
+        const grd = state.guardianships.find(g => g.guardianshipId === guardianshipId);
+        if (!grd) {
+            alert('Guardianship not found');
+            return;
+        }
+
+        const reason = prompt('Termination reason:', 'Subject legally restored');
+        const terminatedBy = prompt('Terminated by:', 'Court Order');
+
+        if (reason && terminatedBy) {
+            grd.terminate(reason, terminatedBy);
+            alert('Guardianship terminated');
+            viewGuardianship(guardianshipId);
+        }
+    }
+
+    function queryByStatus() {
+        const status = document.getElementById('queryStatus').value;
+        const results = status ?
+            state.records.filter(r => r.currentStatus === status) :
+            state.records;
+
+        displayQueryResults(results, `Status: ${status || 'All'}`);
+    }
+
+    function queryByJurisdiction() {
+        const jurisdiction = document.getElementById('queryJurisdiction').value;
+        const results = jurisdiction ?
+            state.records.filter(r => r.primaryJurisdiction === jurisdiction) :
+            state.records;
+
+        displayQueryResults(results, `Jurisdiction: ${jurisdiction || 'All'}`);
+    }
+
+    function queryByName() {
+        const name = document.getElementById('queryName').value.toLowerCase();
+        const results = name ?
+            state.records.filter(r => r.subjectName.toLowerCase().includes(name)) :
+            state.records;
+
+        displayQueryResults(results, `Name contains: "${name}"`);
+    }
+
+    function displayQueryResults(records, criteria) {
+        let html = `    Query: ${criteria}\n    Found: ${records.length} records\n\n`;
+
+        if (records.length === 0) {
+            html += '    No records found matching criteria.\n';
+        } else {
+            records.forEach(record => {
+                html += `    ${record.recordId} | ${record.subjectName} | ${record.currentStatus} | ${record.primaryJurisdiction}\n`;
+            });
+        }
+
+        document.getElementById('queryResults').innerText = html;
+    }
+
+    function showSection(section) {
+        state.currentSection = section;
+        switch(section) {
+            case 'main': renderMainMenu(); break;
+            case 'records': renderRecordsSection(); break;
+            case 'documents': renderDocumentsSection(); break;
+            case 'jurisdictions': renderJurisdictionsSection(); break;
+            case 'restoration': renderRestorationSection(); break;
+            case 'guardianship': renderGuardianshipSection(); break;
+            case 'transitions': renderTransitionsSection(); break;
+            case 'dashboard': renderDashboard(); break;
+            case 'query': renderQuerySection(); break;
+            default: renderMainMenu();
+        }
+    }
+
+    // Initialize
+    function init() {
+        // Load sample data
+        state.jurisdictions = sampleJurisdictions;
+        renderMainMenu();
+    }
+
+    // Public API
+    return {
+        init: init,
+        showSection: showSection,
+        createRecord: createRecord,
+        viewRecord: viewRecord,
+        showTransitionForm: showTransitionForm,
+        executeTransition: executeTransition,
+        createDocument: createDocument,
+        createDocumentForRecord: createDocumentForRecord,
+        viewDocument: viewDocument,
+        processDocument: processDocument,
+        signDocument: signDocument,
+        notarizeDocument: notarizeDocument,
+        apostilleDocument: apostilleDocument,
+        checkRecognition: checkRecognition,
+        initiateRestoration: initiateRestoration,
+        viewWorkflow: viewWorkflow,
+        advanceWorkflow: advanceWorkflow,
+        completeWorkflowTask: completeWorkflowTask,
+        appointGuardian: appointGuardian,
+        viewGuardianship: viewGuardianship,
+        addCourtOrder: addCourtOrder,
+        terminateGuardianship: terminateGuardianship,
+        queryByStatus: queryByStatus,
+        queryByJurisdiction: queryByJurisdiction,
+        queryByName: queryByName
+    };
+})();
+
+// Initialize on load
+window.onload = CryoLegalSimulator.init;
+</script>
+</body>
+</html>

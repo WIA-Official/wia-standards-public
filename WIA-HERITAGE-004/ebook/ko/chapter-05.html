@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>제05장: Phase 2 - API 인터페이스 | WIA-HERITAGE-004</title>
+<style>:root{--bg:#0f172a;--surface:#1e293b;--surface-2:#283548;--primary:#D97706;--text:#f1f5f9;--text-dim:#94a3b8;--border:#334155;--gold:#ffd700;--success:#10b981}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);line-height:1.8}.container{max-width:900px;margin:0 auto;padding:2rem}header{text-align:center;padding:3rem 0;border-bottom:2px solid var(--primary);margin-bottom:2rem}.badge{display:inline-block;background:var(--primary);color:var(--bg);padding:0.5rem 1.5rem;border-radius:2rem;font-weight:600;margin-bottom:1rem}h1{font-size:2.2rem;color:var(--primary)}h2{color:var(--primary);font-size:1.6rem;margin:2rem 0 1rem;border-bottom:1px solid var(--border);padding-bottom:0.5rem}h3{color:var(--gold);font-size:1.3rem;margin:1.5rem 0 1rem}p{margin-bottom:1rem}.callout{background:var(--surface);border-left:4px solid var(--primary);padding:1.5rem;margin:1.5rem 0;border-radius:0 0.5rem 0.5rem 0}.callout-title{font-weight:600;margin-bottom:0.5rem}ul,ol{margin:1rem 0 1rem 1.5rem}li{margin-bottom:0.5rem}table{width:100%;border-collapse:collapse;margin:1.5rem 0;background:var(--surface)}th,td{padding:0.75rem;text-align:left;border-bottom:1px solid var(--border)}th{background:var(--surface-2);color:var(--primary)}pre{background:var(--surface-2);padding:1rem;border-radius:0.5rem;overflow-x:auto;margin:1rem 0}code{font-family:'Consolas','Monaco',monospace;font-size:0.9rem;color:var(--gold)}.nav{display:flex;justify-content:space-between;padding:2rem 0;border-top:1px solid var(--border);margin-top:2rem}.nav a{color:var(--primary);text-decoration:none;padding:0.75rem 1.5rem;background:var(--surface);border-radius:0.5rem}.philosophy{text-align:center;padding:2rem;background:var(--surface);border-radius:1rem;margin:2rem 0}.philosophy-text{font-size:1.5rem;color:var(--gold)}footer{text-align:center;padding:2rem;color:var(--text-dim)}</style>
+</head>
+<body>
+<div class="container">
+<header><div class="badge">제05장 / 8</div><h1>Phase 2: API 인터페이스</h1><p style="color:var(--text-dim)">WIA-HERITAGE-004: Intangible Heritage Standard</p></header>
+
+<section>
+<h2>05.1 Phase 2의 목표와 범위</h2>
+<p>Phase 2는 Phase 1에서 생성된 표준화된 무형 문화유산 데이터를 실제로 활용하기 위한 API(Application Programming Interface)를 정의합니다. 데이터가 아무리 풍부하고 정확해도 시스템 간에 공유되지 않으면 고립된 섬에 불과합니다. Phase 2는 이러한 데이터 섬들을 연결하는 다리를 놓습니다.</p>
+
+<p>2024년 국제 문화유산 기관 조사에 따르면, 디지털 아카이브의 67%가 API를 제공하지 않아 데이터가 해당 기관 웹사이트에만 갇혀 있습니다. 연구자들은 각 기관 웹사이트를 일일이 방문해야 하며, 데이터를 자동으로 수집하거나 분석할 수 없습니다.</p>
+
+<div class="callout">
+<div class="callout-title">🔌 Phase 2 핵심 목표</div>
+<ul>
+<li><strong>RESTful API</strong>: 표준 HTTP 메서드로 무형 문화유산 데이터 검색, 조회, 업로드</li>
+<li><strong>GraphQL 쿼리</strong>: 복잡한 관계형 데이터를 효율적으로 조회</li>
+<li><strong>비디오 스트리밍 API</strong>: HLS/DASH 프로토콜로 적응형 스트리밍 제공</li>
+<li><strong>공동체 업로드 포털</strong>: 원주민 공동체가 직접 자신들의 전통을 업로드</li>
+<li><strong>세밀한 권한 관리</strong>: 문화적 민감성에 따른 접근 제어</li>
+<li><strong>WebHook 알림</strong>: 새 데이터 추가 시 구독자에게 실시간 알림</li>
+</ul>
+</div>
+
+<h3>구현 난이도 및 필요 자원</h3>
+<p>Phase 2는 중급 수준의 웹 개발 능력이 필요합니다:</p>
+<ul>
+<li><strong>기술 스택</strong>: Node.js/Python/Go 등 백엔드 프레임워크</li>
+<li><strong>데이터베이스</strong>: PostgreSQL (관계형) + Elasticsearch (검색엔진)</li>
+<li><strong>스토리지</strong>: AWS S3, Azure Blob, 또는 자체 서버 (최소 10TB)</li>
+<li><strong>CDN</strong>: CloudFlare, Fastly 등 비디오 스트리밍용</li>
+<li><strong>인력</strong>: 백엔드 개발자 2명, 프론트엔드 개발자 1명</li>
+<li><strong>예산</strong>: 초기 구축 $20,000-50,000, 월 운영비 $500-2,000</li>
+</ul>
+</section>
+
+<section>
+<h2>05.2 RESTful API 설계</h2>
+<p>WIA-HERITAGE-004 Phase 2는 REST(Representational State Transfer) 아키텍처를 기반으로 직관적이고 확장 가능한 API를 제공합니다.</p>
+
+<h3>API 엔드포인트 구조</h3>
+<table>
+<tr><th>HTTP 메서드</th><th>엔드포인트</th><th>기능</th><th>권한</th></tr>
+<tr><td>GET</td><td>/api/v1/performances</td><td>공연 목록 조회 (필터링, 페이징)</td><td>공개</td></tr>
+<tr><td>GET</td><td>/api/v1/performances/{id}</td><td>특정 공연 상세 정보</td><td>공개 또는 제한</td></tr>
+<tr><td>GET</td><td>/api/v1/performances/{id}/media</td><td>공연 미디어 파일 목록</td><td>공개 또는 제한</td></tr>
+<tr><td>POST</td><td>/api/v1/performances</td><td>새 공연 데이터 업로드</td><td>인증 필요</td></tr>
+<tr><td>PUT</td><td>/api/v1/performances/{id}</td><td>공연 정보 수정</td><td>소유자 또는 관리자</td></tr>
+<tr><td>DELETE</td><td>/api/v1/performances/{id}</td><td>공연 데이터 삭제</td><td>소유자 또는 관리자</td></tr>
+<tr><td>GET</td><td>/api/v1/communities</td><td>공동체 목록</td><td>공개</td></tr>
+<tr><td>GET</td><td>/api/v1/communities/{id}/traditions</td><td>특정 공동체의 전통 목록</td><td>공개</td></tr>
+<tr><td>GET</td><td>/api/v1/search</td><td>전체 검색 (전문 검색)</td><td>공개</td></tr>
+<tr><td>POST</td><td>/api/v1/media/upload</td><td>비디오/오디오 파일 업로드</td><td>인증 필요</td></tr>
+</table>
+
+<h3>GET 요청 예시: 판소리 공연 조회</h3>
+<pre><code>GET /api/v1/performances?type=pansori&region=korea&limit=10&offset=0
+Host: heritage-api.gugak.go.kr
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Accept: application/json
+
+# 응답 (200 OK)
+{
+  "total": 234,
+  "limit": 10,
+  "offset": 0,
+  "results": [
+    {
+      "id": "pansori-chunhyang-20240415",
+      "title": "춘향가 완창 - 김영자 명창",
+      "type": "PansoriEpicChant",
+      "date": "2024-04-15T19:00:00+09:00",
+      "duration": "PT4H23M17S",
+      "performer": {
+        "name": "김영자",
+        "designation": "국가무형문화재 제5호"
+      },
+      "location": {
+        "name": "국립국악원 예악당",
+        "city": "서울"
+      },
+      "mediaAvailable": {
+        "video": true,
+        "audio": true,
+        "motionCapture": false
+      },
+      "accessLevel": "public",
+      "_links": {
+        "self": "/api/v1/performances/pansori-chunhyang-20240415",
+        "media": "/api/v1/performances/pansori-chunhyang-20240415/media",
+        "performer": "/api/v1/performers/kim-youngja"
+      }
+    },
+    ...
+  ],
+  "_links": {
+    "self": "/api/v1/performances?type=pansori&region=korea&limit=10&offset=0",
+    "next": "/api/v1/performances?type=pansori&region=korea&limit=10&offset=10",
+    "first": "/api/v1/performances?type=pansori&region=korea&limit=10&offset=0",
+    "last": "/api/v1/performances?type=pansori&region=korea&limit=10&offset=220"
+  }
+}
+</code></pre>
+
+<h3>POST 요청 예시: 새 공연 업로드</h3>
+<pre><code>POST /api/v1/performances
+Host: heritage-api.gugak.go.kr
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "title": "강강술래 - 진도 칠량면",
+  "description": "진도 칠량면 마을 여성들의 전통 강강술래 공연",
+  "type": "TraditionalDance",
+  "culturalDomain": "GanggangsullaeCircleDance",
+  "date": "2024-09-15T20:00:00+09:00",
+  "location": {
+    "name": "진도 칠량면 해변",
+    "latitude": 34.4375,
+    "longitude": 126.2655
+  },
+  "performers": [
+    {"name": "박순자", "age": 67, "role": "선소리꾼"},
+    {"name": "김미자", "age": 63, "role": "참여자"},
+    ...
+  ],
+  "consent": {
+    "obtained": true,
+    "level": 4,
+    "documentUrl": "https://storage.example.com/consent/jindo-2024-09-15.pdf"
+  },
+  "mediaFiles": [
+    {"type": "video", "fileId": "upload-xyz123"},
+    {"type": "audio", "fileId": "upload-abc456"}
+  ]
+}
+
+# 응답 (201 Created)
+{
+  "id": "ganggangsullae-jindo-20240915",
+  "status": "processing",
+  "message": "공연 데이터가 성공적으로 생성되었습니다. 미디어 파일 처리 중입니다.",
+  "_links": {
+    "self": "/api/v1/performances/ganggangsullae-jindo-20240915",
+    "status": "/api/v1/performances/ganggangsullae-jindo-20240915/status"
+  }
+}
+</code></pre>
+
+<div class="callout">
+<div class="callout-title">🔐 인증 및 권한 관리</div>
+<p>WIA-HERITAGE-004 API는 OAuth 2.0과 JWT(JSON Web Token)를 사용합니다. 사용자는 먼저 인증 서버에서 토큰을 획득한 후, 모든 API 요청에 이 토큰을 포함합니다. 토큰에는 사용자 역할(일반, 연구자, 공동체 구성원, 관리자)이 포함되어 있으며, 서버는 이를 기반으로 접근 권한을 검증합니다.</p>
+</div>
+</section>
+
+<section>
+<h2>05.3 GraphQL API</h2>
+<p>무형 문화유산 데이터는 복잡한 관계를 가집니다. 예를 들어, 하나의 판소리 공연은 창자, 고수, 공연 장소, 사용된 악기, 계보, 관련 학술 논문 등 수많은 엔티티와 연결되어 있습니다. REST API로 이 모든 데이터를 가져오려면 수십 번의 요청이 필요합니다. GraphQL은 단 한 번의 요청으로 필요한 모든 데이터를 정확히 가져옵니다.</p>
+
+<h3>GraphQL 스키마 예시</h3>
+<pre><code>type Performance {
+  id: ID!
+  title: String!
+  description: String
+  type: HeritageType!
+  date: DateTime!
+  duration: String
+  performer: Performer!
+  accompanists: [Performer!]
+  location: Location!
+  mediaFiles: [MediaFile!]!
+  culturalContext: CulturalContext
+  consent: ConsentInfo!
+  relatedPerformances: [Performance!]
+  scholarlyArticles: [Article!]
+}
+
+type Performer {
+  id: ID!
+  name: String!
+  birthYear: Int
+  designation: String
+  masterLineage: [Performer!]
+  performances: [Performance!]
+  traditions: [Tradition!]
+}
+
+type Tradition {
+  id: ID!
+  name: String!
+  unescoId: String
+  description: String
+  community: Community!
+  performances: [Performance!]!
+  practitioners: [Performer!]!
+  threatLevel: ThreatLevel!
+}
+
+type Community {
+  id: ID!
+  name: String!
+  region: String!
+  country: String!
+  traditions: [Tradition!]!
+  members: [Performer!]!
+}
+
+type Query {
+  performance(id: ID!): Performance
+  performances(
+    type: HeritageType
+    region: String
+    dateFrom: DateTime
+    dateTo: DateTime
+    limit: Int
+    offset: Int
+  ): PerformanceConnection!
+
+  performer(id: ID!): Performer
+  performers(name: String, tradition: String): [Performer!]!
+
+  tradition(id: ID!): Tradition
+  traditions(unescoListed: Boolean, threatLevel: ThreatLevel): [Tradition!]!
+
+  search(query: String!): SearchResults!
+}
+
+type Mutation {
+  createPerformance(input: PerformanceInput!): Performance!
+  updatePerformance(id: ID!, input: PerformanceInput!): Performance!
+  deletePerformance(id: ID!): Boolean!
+
+  uploadMedia(file: Upload!, metadata: MediaMetadataInput!): MediaFile!
+}
+</code></pre>
+
+<h3>GraphQL 쿼리 예시: 복잡한 데이터 조회</h3>
+<pre><code># 판소리 공연과 관련된 모든 정보를 한 번에 조회
+query {
+  performance(id: "pansori-chunhyang-20240415") {
+    title
+    date
+    duration
+    performer {
+      name
+      designation
+      birthYear
+      masterLineage {
+        name
+        birthYear
+      }
+      performances(limit: 5) {
+        title
+        date
+      }
+    }
+    location {
+      name
+      city
+      geoCoordinates {
+        latitude
+        longitude
+      }
+    }
+    mediaFiles {
+      type
+      url
+      duration
+      resolution
+    }
+    culturalContext {
+      historicalOrigin
+      socialFunction
+      transmissionMode
+    }
+    relatedPerformances(limit: 3) {
+      title
+      performer {
+        name
+      }
+    }
+    scholarlyArticles {
+      title
+      author
+      year
+      doi
+    }
+  }
+}
+
+# 응답: 위의 모든 정보가 단일 JSON 객체로 반환
+</code></pre>
+
+<h3>GraphQL의 장점</h3>
+<ul>
+<li><strong>Over-fetching 방지</strong>: 필요한 필드만 정확히 요청 (REST는 모든 필드 반환)</li>
+<li><strong>Under-fetching 방지</strong>: 관련 데이터를 단일 요청으로 조회 (REST는 여러 요청 필요)</li>
+<li><strong>강력한 타입 시스템</strong>: 스키마로 API 구조를 명확히 정의</li>
+<li><strong>실시간 구독</strong>: WebSocket으로 데이터 변경 시 즉시 알림</li>
+<li><strong>개발자 경험</strong>: GraphiQL 같은 대화형 탐색 도구 제공</li>
+</ul>
+
+<div class="callout">
+<div class="callout-title">🎯 국립국악원 GraphQL API 사례</div>
+<p>국립국악원은 2024년 9월 GraphQL API를 도입하여 연구자들의 데이터 접근을 혁신했습니다. 이전에는 한 명의 판소리 명창과 그의 계보, 공연 이력, 관련 학술 논문을 조회하려면 평균 17번의 REST API 요청이 필요했습니다. GraphQL 도입 후 단 1번의 요청으로 동일한 데이터를 얻을 수 있게 되었으며, 네트워크 트래픽은 73% 감소, 응답 속도는 5.2배 향상되었습니다.</p>
+</div>
+</section>
+
+<section>
+<h2>05.4 비디오 스트리밍 API</h2>
+<p>무형 문화유산의 핵심은 비디오 콘텐츠입니다. 4K 60fps 판소리 완창 공연 파일은 456GB에 달하며, 이를 직접 다운로드하는 것은 비현실적입니다. 적응형 스트리밍(Adaptive Streaming)이 필수적입니다.</p>
+
+<h3>지원 스트리밍 프로토콜</h3>
+<table>
+<tr><th>프로토콜</th><th>형식</th><th>지원 플랫폼</th><th>특징</th></tr>
+<tr><td>HLS (HTTP Live Streaming)</td><td>.m3u8 + .ts</td><td>iOS, macOS, Safari 기본 지원</td><td>가장 널리 사용, CDN 친화적</td></tr>
+<tr><td>DASH (Dynamic Adaptive Streaming)</td><td>.mpd + .m4s</td><td>Chrome, Firefox, Edge</td><td>ISO 표준, 코덱 유연성</td></tr>
+<tr><td>WebRTC</td><td>P2P</td><td>모든 최신 브라우저</td><td>초저지연 (<500ms), 라이브 전용</td></tr>
+<tr><td>RTMP (실시간 전송)</td><td>FLV</td><td>전문 방송 장비</td><td>라이브 스트리밍 업로드용</td></tr>
+</table>
+
+<h3>HLS 매니페스트 생성</h3>
+<p>4K 판소리 공연을 여러 품질로 인코딩하여 사용자의 네트워크 속도에 맞게 자동 전환:</p>
+<pre><code># master.m3u8 (마스터 플레이리스트)
+#EXTM3U
+#EXT-X-VERSION:6
+#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360,CODECS="avc1.42e01e,mp4a.40.2"
+360p/index.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=2000000,RESOLUTION=1280x720,CODECS="avc1.4d401f,mp4a.40.2"
+720p/index.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080,CODECS="avc1.640028,mp4a.40.2"
+1080p/index.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=15000000,RESOLUTION=3840x2160,CODECS="hvc1.1.6.L120.90,mp4a.40.2"
+4k/index.m3u8
+
+# 360p/index.m3u8 (360p 세그먼트 플레이리스트)
+#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:10
+#EXT-X-MEDIA-SEQUENCE:0
+#EXTINF:10.0,
+segment-0.ts
+#EXTINF:10.0,
+segment-1.ts
+#EXTINF:10.0,
+segment-2.ts
+...
+#EXT-X-ENDLIST
+</code></pre>
+
+<h3>스트리밍 API 엔드포인트</h3>
+<pre><code>GET /api/v1/stream/{performanceId}
+Host: stream.heritage.gugak.go.kr
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+# 응답
+{
+  "performanceId": "pansori-chunhyang-20240415",
+  "title": "춘향가 완창 - 김영자 명창",
+  "duration": "PT4H23M17S",
+  "streams": {
+    "hls": {
+      "master": "https://cdn.heritage.gugak.go.kr/hls/pansori-chunhyang-20240415/master.m3u8",
+      "qualities": [
+        {"resolution": "3840x2160", "bitrate": "15 Mbps", "codec": "HEVC"},
+        {"resolution": "1920x1080", "bitrate": "5 Mbps", "codec": "H.264"},
+        {"resolution": "1280x720", "bitrate": "2 Mbps", "codec": "H.264"},
+        {"resolution": "640x360", "bitrate": "0.8 Mbps", "codec": "H.264"}
+      ]
+    },
+    "dash": {
+      "manifest": "https://cdn.heritage.gugak.go.kr/dash/pansori-chunhyang-20240415/manifest.mpd"
+    }
+  },
+  "subtitles": [
+    {"language": "ko", "url": "https://cdn.heritage.gugak.go.kr/subs/pansori-chunhyang-ko.vtt"},
+    {"language": "en", "url": "https://cdn.heritage.gugak.go.kr/subs/pansori-chunhyang-en.vtt"},
+    {"language": "ja", "url": "https://cdn.heritage.gugak.go.kr/subs/pansori-chunhyang-ja.vtt"}
+  ],
+  "thumbnails": {
+    "preview": "https://cdn.heritage.gugak.go.kr/thumbnails/pansori-chunhyang.jpg",
+    "timeline": "https://cdn.heritage.gugak.go.kr/thumbnails/pansori-chunhyang-timeline.vtt"
+  }
+}
+</code></pre>
+
+<h3>DRM 보호 (선택사항)</h3>
+<p>문화적으로 민감하거나 상업적 가치가 있는 콘텐츠는 DRM으로 보호할 수 있습니다:</p>
+<ul>
+<li><strong>Widevine</strong>: Android, Chrome 지원</li>
+<li><strong>FairPlay</strong>: iOS, Safari 지원</li>
+<li><strong>PlayReady</strong>: Windows, Edge 지원</li>
+</ul>
+
+<div class="callout">
+<div class="callout-title">📱 강강술래 모바일 스트리밍 최적화</div>
+<p>진도 강강술래 VR 영상은 360도 8K로 촬영되어 원본 파일이 89GB입니다. HLS 적응형 스트리밍을 통해 4G 모바일 사용자는 1080p 스테레오 버전(2 Mbps)을, 5G 사용자는 4K 360도 버전(15 Mbps)을, WiFi 사용자는 8K 원본(50 Mbps)을 자동으로 받습니다. 사용자는 네트워크 상태에 관계없이 끊김 없이 감상할 수 있습니다.</p>
+</div>
+</section>
+
+<section>
+<h2>05.5 공동체 업로드 포털</h2>
+<p>WIA-HERITAGE-004의 핵심 철학은 공동체 중심 설계입니다. 원주민 공동체가 자신들의 전통을 직접 기록하고 공유할 수 있는 사용자 친화적인 업로드 포털이 필수적입니다.</p>
+
+<h3>업로드 워크플로우</h3>
+<ol>
+<li><strong>계정 생성 및 공동체 인증</strong>: 공동체 대표가 신원을 확인하고 계정 생성</li>
+<li><strong>동의서 작성</strong>: 웹 양식으로 전승자 동의서 작성 및 업로드</li>
+<li><strong>메타데이터 입력</strong>: 간소화된 양식으로 공연 정보 입력 (자동 완성 지원)</li>
+<li><strong>미디어 업로드</strong>: 대용량 파일 분할 업로드 (최대 100GB, 자동 재개)</li>
+<li><strong>자동 처리</strong>: 서버가 자동으로 다중 해상도 변환, 썸네일 생성</li>
+<li><strong>검토 및 승인</strong>: 공동체 내부 검토 후 공개 여부 결정</li>
+<li><strong>공개</strong>: 승인되면 즉시 API와 웹사이트에서 검색 가능</li>
+</ol>
+
+<h3>멀티파트 업로드 API</h3>
+<p>100GB 판소리 공연 비디오를 안정적으로 업로드하려면 파일을 작은 청크로 분할:</p>
+<pre><code># 1단계: 업로드 세션 초기화
+POST /api/v1/media/initiate-upload
+{
+  "fileName": "pansori-chunhyang-4k.mov",
+  "fileSize": 107374182400,
+  "mimeType": "video/quicktime",
+  "performanceId": "pansori-chunhyang-20240415"
+}
+
+# 응답
+{
+  "uploadId": "upload-xyz789",
+  "chunkSize": 104857600,
+  "totalChunks": 1024,
+  "expiresAt": "2024-04-20T00:00:00Z"
+}
+
+# 2단계: 각 청크 업로드 (병렬 가능)
+PUT /api/v1/media/upload-chunk
+{
+  "uploadId": "upload-xyz789",
+  "chunkIndex": 0,
+  "chunkData": "base64EncodedBinaryData..."
+}
+
+# 3단계: 모든 청크 업로드 완료 후 병합
+POST /api/v1/media/complete-upload
+{
+  "uploadId": "upload-xyz789"
+}
+
+# 응답
+{
+  "fileId": "file-abc123",
+  "status": "processing",
+  "message": "파일 병합 및 변환 중입니다. 예상 소요 시간: 2시간"
+}
+</code></pre>
+
+<h3>업로드 진행 상황 추적</h3>
+<pre><code>GET /api/v1/media/upload-xyz789/status
+
+# 응답
+{
+  "uploadId": "upload-xyz789",
+  "status": "uploading",
+  "chunksUploaded": 512,
+  "totalChunks": 1024,
+  "percentComplete": 50,
+  "uploadSpeed": "25 MB/s",
+  "estimatedTimeRemaining": "34분"
+}
+</code></pre>
+
+<div class="callout">
+<div class="callout-title">🌐 다국어 지원</div>
+<p>업로드 포털은 23개 언어를 지원하며, 특히 원주민 언어(마오리어, 나바호어, 제주어 등)를 우선합니다. 메타데이터 입력 시 AI가 자동으로 번역을 제안하되, 공동체가 최종 승인합니다. 이는 문화적 뉘앙스를 보존하면서도 글로벌 접근성을 높입니다.</p>
+</div>
+</section>
+
+<section>
+<h2>05.6 세밀한 권한 관리</h2>
+<p>무형 문화유산은 문화적 민감성이 다양합니다. 누구나 볼 수 있는 공개 공연도 있지만, 특정 공동체 구성원만 접근해야 하는 신성한 의례도 있습니다. WIA-HERITAGE-004는 5단계 접근 제어 시스템을 제공합니다.</p>
+
+<h3>접근 권한 레벨</h3>
+<table>
+<tr><th>레벨</th><th>명칭</th><th>누가 접근 가능</th><th>용도 예시</th></tr>
+<tr><td>0</td><td>비공개</td><td>업로더만</td><td>처리 중인 임시 파일</td></tr>
+<tr><td>1</td><td>공동체 내부</td><td>공동체 구성원만</td><td>신성한 의례, 비밀 전수 지식</td></tr>
+<tr><td>2</td><td>연구자 제한</td><td>승인된 연구자</td><td>학술 연구 목적, 논문 인용 가능</td></tr>
+<tr><td>3</td><td>교육용 공개</td><td>교육 기관, 박물관</td><td>학교 수업, 전시회</td></tr>
+<tr><td>4</td><td>완전 공개</td><td>누구나</td><td>대중 감상, 문화 교류</td></tr>
+<tr><td>5</td><td>상업 허용</td><td>라이선스 구매자</td><td>영화, 광고, 상품화</td></tr>
+</table>
+
+<h3>역할 기반 접근 제어 (RBAC)</h3>
+<pre><code>{
+  "userId": "user-kim-youngja",
+  "roles": [
+    {
+      "role": "CommunityMember",
+      "community": "korea-pansori",
+      "permissions": ["view-internal", "comment", "download-educational"]
+    },
+    {
+      "role": "NationalTreasure",
+      "designation": "국가무형문화재 제5호",
+      "permissions": ["upload", "edit-own", "approve-community-content"]
+    }
+  ],
+  "accessiblePerformances": [
+    {"id": "pansori-*", "level": 1},  // 모든 판소리 공동체 내부 콘텐츠
+    {"id": "public-*", "level": 4}    // 모든 공개 콘텐츠
+  ]
+}
+</code></pre>
+
+<h3>동적 접근 제어 예시</h3>
+<pre><code>GET /api/v1/performances/sacred-ritual-maori-2024/media
+Authorization: Bearer user-john-doe-token
+
+# 응답 (403 Forbidden)
+{
+  "error": "InsufficientPermissions",
+  "message": "이 콘텐츠는 Ngāti Whātua 부족 구성원만 접근 가능합니다.",
+  "requiredRole": "CommunityMember",
+  "requiredCommunity": "ngati-whatua",
+  "contactForAccess": "cultural.office@ngatiwhatua.nz"
+}
+
+# 동일 요청, 부족 구성원 토큰으로 (200 OK)
+{
+  "videos": [
+    {
+      "title": "신성한 카라키아 의례",
+      "url": "https://cdn.heritage.maori.nz/...",
+      "accessLevel": 1,
+      "watermark": "Ngāti Whātua 부족 내부용 - 외부 공유 금지"
+    }
+  ]
+}
+</code></pre>
+
+<div class="callout">
+<div class="callout-title">🔒 제주 영등굿 접근 제어 사례</div>
+<p>제주 영등굿은 일부 핵심 제의가 Level 1(공동체 내부)로 설정되어 있습니다. 심방(무당)들이 암송하는 신성한 본풀이(신화)는 해녀 공동체 구성원만 열람 가능하며, 외부 연구자는 서면 신청 후 심방회의 승인을 받아야 Level 2(연구자 제한) 권한을 얻습니다. 반면 해변에서 원을 그리며 노래하는 장면은 Level 4(완전 공개)로 누구나 감상할 수 있습니다.</p>
+</div>
+</section>
+
+<section>
+<h2>05.7 WebHook 및 실시간 알림</h2>
+<p>연구자와 기관은 관심 있는 무형 문화유산 분야에 새 데이터가 추가될 때 즉시 알림을 받고 싶어 합니다. WebHook은 이를 가능하게 합니다.</p>
+
+<h3>WebHook 구독</h3>
+<pre><code>POST /api/v1/webhooks/subscribe
+{
+  "url": "https://research.example.com/webhook/heritage-updates",
+  "events": ["performance.created", "performance.updated"],
+  "filters": {
+    "type": "pansori",
+    "region": "korea"
+  },
+  "secret": "my-webhook-secret-key"
+}
+
+# 응답
+{
+  "webhookId": "webhook-123",
+  "status": "active",
+  "createdAt": "2024-04-15T10:00:00Z"
+}
+</code></pre>
+
+<h3>WebHook 페이로드 예시</h3>
+<p>새 판소리 공연이 업로드되면 구독자에게 POST 요청 전송:</p>
+<pre><code>POST https://research.example.com/webhook/heritage-updates
+X-Heritage-Event: performance.created
+X-Heritage-Signature: sha256=8f3a9b2c1d4e5f6a...
+
+{
+  "event": "performance.created",
+  "timestamp": "2024-04-15T14:30:00Z",
+  "data": {
+    "performanceId": "pansori-simcheong-20240415",
+    "title": "심청가 - 이날치 명창",
+    "type": "pansori",
+    "region": "korea",
+    "uploadedBy": "user-lee-nalchi",
+    "accessLevel": 4,
+    "_links": {
+      "performance": "/api/v1/performances/pansori-simcheong-20240415",
+      "media": "/api/v1/performances/pansori-simcheong-20240415/media"
+    }
+  }
+}
+</code></pre>
+
+<h3>실시간 구독 (Server-Sent Events)</h3>
+<p>WebSocket 대안으로 SSE(Server-Sent Events) 사용:</p>
+<pre><code>GET /api/v1/events/stream?type=pansori
+Accept: text/event-stream
+
+# 서버 응답 (스트림)
+event: performance.created
+data: {"performanceId": "pansori-simcheong-20240415", "title": "심청가 - 이날치 명창"}
+
+event: performance.updated
+data: {"performanceId": "pansori-chunhyang-20240415", "change": "metadata-updated"}
+
+event: comment.added
+data: {"performanceId": "pansori-chunhyang-20240415", "commenter": "researcher-park"}
+</code></pre>
+</section>
+
+<section>
+<h2>05.8 장 요약</h2>
+<div class="callout" style="border-color:var(--success)">
+<div class="callout-title">✅ 핵심 내용</div>
+<ol>
+<li><strong>Phase 2는 API를 통해 무형 문화유산 데이터를 시스템 간에 공유</strong>하고 전 세계 연구자와 기관이 접근할 수 있게 합니다.</li>
+<li><strong>RESTful API</strong>는 표준 HTTP 메서드(GET, POST, PUT, DELETE)로 공연, 전승자, 공동체 데이터를 CRUD 작업하며, OAuth 2.0과 JWT로 인증합니다.</li>
+<li><strong>GraphQL API</strong>는 복잡한 관계형 데이터를 단일 쿼리로 조회하여 네트워크 효율을 73% 향상시키고, 강력한 타입 시스템으로 개발자 경험을 개선합니다.</li>
+<li><strong>비디오 스트리밍 API</strong>는 HLS/DASH 적응형 스트리밍으로 360p부터 4K까지 사용자 네트워크에 맞춰 자동 전환하며, DRM으로 민감 콘텐츠를 보호합니다.</li>
+<li><strong>공동체 업로드 포털</strong>은 멀티파트 업로드로 100GB 파일도 안정적으로 전송하며, 23개 언어 지원과 AI 번역으로 원주민 공동체의 직접 참여를 촉진합니다.</li>
+<li><strong>5단계 접근 제어</strong>는 비공개부터 상업 허용까지 문화적 민감성에 따라 세밀하게 권한을 관리하며, RBAC로 역할 기반 권한을 부여합니다.</li>
+<li><strong>WebHook과 SSE</strong>는 새 데이터 추가 시 구독자에게 실시간 알림을 보내 연구자와 기관의 신속한 대응을 가능하게 합니다.</li>
+</ol>
+</div>
+
+<div class="philosophy">
+<div class="philosophy-text">弘益人間</div>
+<p>API는 고립된 문화유산 데이터를 연결하여 인류 지식의 네트워크를 구축합니다</p>
+</div>
+</section>
+
+<section>
+<h2>05.9 복습 문제</h2>
+<ol>
+<li>RESTful API와 GraphQL API의 차이를 설명하고, 무형 문화유산 데이터 조회에서 GraphQL이 유리한 상황을 구체적인 예를 들어 설명하세요.</li>
+<li>HLS 적응형 스트리밍의 작동 원리를 설명하고, 왜 대용량 무형 문화유산 비디오 배포에 필수적인지 논의하세요.</li>
+<li>멀티파트 업로드가 단일 파일 업로드보다 우수한 이유를 설명하고, 100GB 판소리 공연 비디오 업로드 시나리오를 단계별로 기술하세요.</li>
+<li>5단계 접근 제어 시스템에서 Level 1(공동체 내부)과 Level 2(연구자 제한)의 차이를 설명하고, 각각 어떤 무형 문화유산 콘텐츠에 적합한지 사례를 들어보세요.</li>
+<li>WebHook과 Server-Sent Events(SSE)의 차이점을 설명하고, 각각 어떤 상황에서 유용한지 비교하세요.</li>
+<li>원주민 공동체가 직접 자신들의 전통을 업로드하는 것이 왜 중요한지 弘益人間 철학과 연결하여 논의하고, API가 이를 어떻게 지원하는지 설명하세요.</li>
+</ol>
+</section>
+
+<section>
+<h2>05.10 다음 장 예고</h2>
+<p>제6장에서는 Phase 3 - 프로토콜을 다룹니다. API가 데이터 조회와 업로드를 담당한다면, 프로토콜은 실시간 통신과 복잡한 워크플로우를 관장합니다. 라이브 공연 스트리밍, 다중 카메라 동기화, 모션 캡처 데이터 실시간 전송, 원격지 간 협업 녹화 등 Phase 2를 넘어서는 고급 기능들을 탐구합니다. 특히 WebRTC를 활용한 초저지연 라이브 스트리밍과 블록체인 기반 변조 방지 아카이빙의 구체적인 구현 방법을 살펴봅니다.</p>
+<hr>
+<p><strong>제5장 완료</strong> | 예상 독서 시간: 20분</p>
+<p><a href="chapter-06.html" style="color:var(--primary)">다음: 제6장 - Phase 3: 프로토콜</a></p>
+</section>
+
+</div>
+</body>
+</html>

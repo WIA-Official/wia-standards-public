@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>제05장 | WIA-LANG-001</title>
+<style>:root{--bg:#0f172a;--surface:#1e293b;--surface-2:#283548;--primary:#10B981;--text:#f1f5f9;--text-dim:#94a3b8;--border:#334155;--gold:#ffd700;--success:#10b981}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);line-height:1.8}.container{max-width:900px;margin:0 auto;padding:2rem}header{text-align:center;padding:3rem 0;border-bottom:2px solid var(--primary);margin-bottom:2rem}.badge{display:inline-block;background:var(--primary);color:var(--bg);padding:0.5rem 1.5rem;border-radius:2rem;font-weight:600;margin-bottom:1rem}h1{font-size:2.2rem;color:var(--primary)}h2{color:var(--primary);font-size:1.6rem;margin:2rem 0 1rem;border-bottom:1px solid var(--border);padding-bottom:0.5rem}h3{color:var(--gold);font-size:1.3rem;margin:1.5rem 0 1rem}h4{color:var(--text);font-size:1.1rem;margin:1rem 0 0.5rem}p{margin-bottom:1rem}.callout{background:var(--surface);border-left:4px solid var(--primary);padding:1.5rem;margin:1.5rem 0;border-radius:0 0.5rem 0.5rem 0}.callout-title{font-weight:600;margin-bottom:0.5rem}ul,ol{margin:1rem 0 1rem 1.5rem}li{margin-bottom:0.5rem}table{width:100%;border-collapse:collapse;margin:1.5rem 0;background:var(--surface)}th,td{padding:0.75rem;text-align:left;border-bottom:1px solid var(--border)}th{background:var(--surface-2);color:var(--primary)}.nav{display:flex;justify-content:space-between;padding:2rem 0;border-top:1px solid var(--border);margin-top:2rem}.nav a{color:var(--primary);text-decoration:none;padding:0.75rem 1.5rem;background:var(--surface);border-radius:0.5rem}.philosophy{text-align:center;padding:2rem;background:var(--surface);border-radius:1rem;margin:2rem 0}.philosophy-text{font-size:1.5rem;color:var(--gold)}footer{text-align:center;padding:2rem;color:var(--text-dim)}code{background:var(--surface-2);padding:0.2rem 0.5rem;border-radius:0.3rem;font-family:'Courier New',monospace;color:var(--gold)}.code-block{background:var(--surface-2);padding:1rem;border-radius:0.5rem;margin:1rem 0;overflow-x:auto}pre{margin:0;color:var(--text)}</style>
+</head>
+<body>
+<div class="container">
+<header><div class="badge">제05장 / 8</div><h1>2단계: API 인터페이스</h1><p style="color:var(--text-dim)">WIA-LANG-001</p></header>
+
+<section>
+<h2>05.1 API 설계 원칙</h2>
+
+<p>WIA-LANG-001 API는 RESTful 아키텍처를 기반으로 설계되며, 언어 처리 서비스를 표준화된 방식으로 제공합니다.</p>
+
+<div class="callout">
+<div class="callout-title">🎯 핵심 설계 원칙</div>
+<ul>
+<li><strong>일관성</strong>: 모든 엔드포인트가 동일한 패턴 따름</li>
+<li><strong>확장성</strong>: 새로운 언어 및 기능 쉽게 추가</li>
+<li><strong>버전 관리</strong>: URL 기반 버전 관리 (/v1/, /v2/)</li>
+<li><strong>오류 처리</strong>: 명확하고 일관된 오류 응답</li>
+<li><strong>보안</strong>: OAuth 2.0, API 키 인증 지원</li>
+<li><strong>성능</strong>: 페이지네이션, 캐싱, 비동기 처리</li>
+</ul>
+</div>
+
+<h3>RESTful 리소스 구조</h3>
+
+<table>
+<tr><th>리소스</th><th>엔드포인트</th><th>HTTP 메서드</th><th>설명</th></tr>
+<tr>
+<td>언어</td>
+<td>/v1/languages</td>
+<td>GET</td>
+<td>지원 언어 목록</td>
+</tr>
+<tr>
+<td>ASR</td>
+<td>/v1/asr/transcribe</td>
+<td>POST</td>
+<td>음성-텍스트 변환</td>
+</tr>
+<tr>
+<td>TTS</td>
+<td>/v1/tts/synthesize</td>
+<td>POST</td>
+<td>텍스트-음성 합성</td>
+</tr>
+<tr>
+<td>MT</td>
+<td>/v1/mt/translate</td>
+<td>POST</td>
+<td>기계 번역</td>
+</tr>
+<tr>
+<td>NLU</td>
+<td>/v1/nlu/analyze</td>
+<td>POST</td>
+<td>자연어 이해</td>
+</tr>
+<tr>
+<td>작업</td>
+<td>/v1/jobs/{id}</td>
+<td>GET</td>
+<td>비동기 작업 상태 조회</td>
+</tr>
+</table>
+
+<h3>공통 요청 헤더</h3>
+
+<div class="code-block">
+<pre>
+Authorization: Bearer {api_key}
+Content-Type: application/json
+Accept: application/json
+Accept-Language: en-US,ko-KR
+X-Request-ID: {unique_request_id}
+X-Client-Version: wia-sdk-python/1.0.0
+</pre>
+</div>
+
+<h3>공통 응답 형식</h3>
+
+<div class="code-block">
+<pre>
+{
+  "status": "success" | "error",
+  "data": {
+    // 실제 응답 데이터
+  },
+  "metadata": {
+    "requestId": "req_abc123xyz",
+    "timestamp": "2025-01-15T14:30:00Z",
+    "processingTime": 1.234,
+    "apiVersion": "v1"
+  },
+  "error": {  // status가 "error"일 때만
+    "code": "INVALID_LANGUAGE_CODE",
+    "message": "Language code 'xyz' is not supported",
+    "details": {
+      "supportedLanguages": ["haw", "nav", "chr", ...]
+    }
+  }
+}
+</pre>
+</div>
+
+</section>
+
+<section>
+<h2>05.2 ASR API (자동 음성 인식)</h2>
+
+<p>ASR API는 오디오 파일 또는 스트림을 텍스트로 변환합니다.</p>
+
+<h3>기본 전사 요청</h3>
+
+<div class="code-block">
+<pre>
+POST /v1/asr/transcribe
+Content-Type: multipart/form-data
+
+{
+  "audio": (binary file),
+  "language": "haw",
+  "model": "base" | "large" | "whisper",
+  "returnTimestamps": true,
+  "returnConfidence": true,
+  "enablePunctuation": true,
+  "enableDiarization": false,
+  "customVocabulary": ["Pele", "Hiʻiaka", "ʻŌlelo Hawaiʻi"]
+}
+</pre>
+</div>
+
+<h3>응답 예시</h3>
+
+<div class="code-block">
+<pre>
+{
+  "status": "success",
+  "data": {
+    "transcription": "ʻO Pele ka wahine ʻai honua.",
+    "language": "haw",
+    "duration": 2.34,
+    "confidence": 0.96,
+    "words": [
+      {
+        "word": "ʻO",
+        "start": 0.12,
+        "end": 0.28,
+        "confidence": 0.98
+      },
+      {
+        "word": "Pele",
+        "start": 0.32,
+        "end": 0.68,
+        "confidence": 0.99
+      },
+      {
+        "word": "ka",
+        "start": 0.72,
+        "end": 0.84,
+        "confidence": 0.97
+      },
+      {
+        "word": "wahine",
+        "start": 0.88,
+        "end": 1.32,
+        "confidence": 0.95
+      },
+      {
+        "word": "ʻai",
+        "start": 1.36,
+        "end": 1.56,
+        "confidence": 0.94
+      },
+      {
+        "word": "honua",
+        "start": 1.60,
+        "end": 2.12,
+        "confidence": 0.96
+      }
+    ]
+  },
+  "metadata": {
+    "requestId": "asr_req_001",
+    "timestamp": "2025-01-15T14:30:00Z",
+    "processingTime": 0.89,
+    "model": "wia-haw-base-v1"
+  }
+}
+</pre>
+</div>
+
+<h3>스트리밍 ASR (WebSocket)</h3>
+
+<div class="code-block">
+<pre>
+// WebSocket 연결
+ws://api.wia.org/v1/asr/stream?language=nav&model=base
+
+// 클라이언트 → 서버 (오디오 청크)
+{
+  "type": "audio",
+  "data": "base64_encoded_audio_chunk",
+  "sequence": 1
+}
+
+// 서버 → 클라이언트 (중간 결과)
+{
+  "type": "partial",
+  "text": "Yáʼátʼééh",
+  "confidence": 0.87,
+  "isFinal": false
+}
+
+// 서버 → 클라이언트 (최종 결과)
+{
+  "type": "final",
+  "text": "Yáʼátʼééh shimá.",
+  "confidence": 0.95,
+  "isFinal": true,
+  "duration": 1.8
+}
+</pre>
+</div>
+
+<h3>언어별 모델 지원</h3>
+
+<table>
+<tr><th>언어</th><th>ISO 639-3</th><th>사용 가능 모델</th><th>WER</th></tr>
+<tr>
+<td>하와이어</td>
+<td>haw</td>
+<td>base, large</td>
+<td>12.3%</td>
+</tr>
+<tr>
+<td>나바호어</td>
+<td>nav</td>
+<td>base, large</td>
+<td>15.7%</td>
+</tr>
+<tr>
+<td>체로키어</td>
+<td>chr</td>
+<td>base</td>
+<td>18.4%</td>
+</tr>
+<tr>
+<td>마오리어</td>
+<td>mri</td>
+<td>base, large</td>
+<td>11.2%</td>
+</tr>
+</table>
+
+</section>
+
+<section>
+<h2>05.3 TTS API (텍스트 음성 합성)</h2>
+
+<p>TTS API는 텍스트를 자연스러운 음성으로 변환합니다.</p>
+
+<h3>기본 합성 요청</h3>
+
+<div class="code-block">
+<pre>
+POST /v1/tts/synthesize
+Content-Type: application/json
+
+{
+  "text": "Aloha kākou. E komo mai i ka hale.",
+  "language": "haw",
+  "voice": "female_elder_kupuna_mary",
+  "speakingRate": 1.0,
+  "pitch": 0.0,
+  "audioFormat": "wav" | "mp3" | "ogg",
+  "sampleRate": 24000,
+  "enableSSML": false,
+  "emotionalTone": "neutral" | "joyful" | "solemn"
+}
+</pre>
+</div>
+
+<h3>응답 (오디오 데이터)</h3>
+
+<div class="code-block">
+<pre>
+{
+  "status": "success",
+  "data": {
+    "audioUrl": "https://cdn.wia.org/tts/outputs/abc123.wav",
+    "audioBase64": "UklGRiQAAABXQVZFZm10IBAAAAABAAEA...",
+    "duration": 3.2,
+    "wordTimestamps": [
+      {"word": "Aloha", "start": 0.0, "end": 0.6},
+      {"word": "kākou", "start": 0.7, "end": 1.2},
+      {"word": "E", "start": 1.5, "end": 1.65},
+      {"word": "komo", "start": 1.7, "end": 2.1},
+      {"word": "mai", "start": 2.15, "end": 2.45},
+      {"word": "i", "start": 2.5, "end": 2.58},
+      {"word": "ka", "start": 2.6, "end": 2.75},
+      {"word": "hale", "start": 2.8, "end": 3.2}
+    ]
+  },
+  "metadata": {
+    "requestId": "tts_req_002",
+    "voice": "wia-haw-female-elder-v1",
+    "model": "tacotron2-hifigan",
+    "processingTime": 0.45
+  }
+}
+</pre>
+</div>
+
+<h3>SSML 지원</h3>
+
+<div class="code-block">
+<pre>
+{
+  "text": "<speak>
+    <p>
+      <prosody rate='slow' pitch='+2st'>
+        Aloha kākou.
+      </prosody>
+    </p>
+    <break time='500ms'/>
+    <p>
+      E komo mai i ka hale.
+    </p>
+  </speak>",
+  "language": "haw",
+  "voice": "female_elder",
+  "enableSSML": true
+}
+</pre>
+</div>
+
+<h3>음성 옵션</h3>
+
+<table>
+<tr><th>언어</th><th>음성 ID</th><th>성별</th><th>연령대</th><th>MOS 점수</th></tr>
+<tr>
+<td>하와이어</td>
+<td>haw_female_elder_kupuna_mary</td>
+<td>여성</td>
+<td>60+</td>
+<td>4.2</td>
+</tr>
+<tr>
+<td>하와이어</td>
+<td>haw_male_adult_keola</td>
+<td>남성</td>
+<td>30-50</td>
+<td>4.0</td>
+</tr>
+<tr>
+<td>나바호어</td>
+<td>nav_female_elder</td>
+<td>여성</td>
+<td>70+</td>
+<td>3.9</td>
+</tr>
+<tr>
+<td>체로키어</td>
+<td>chr_male_elder</td>
+<td>남성</td>
+<td>65+</td>
+<td>3.8</td>
+</tr>
+</table>
+
+</section>
+
+<section>
+<h2>05.4 MT API (기계 번역)</h2>
+
+<p>MT API는 소스 언어를 타겟 언어로 번역합니다.</p>
+
+<h3>기본 번역 요청</h3>
+
+<div class="code-block">
+<pre>
+POST /v1/mt/translate
+Content-Type: application/json
+
+{
+  "text": "Kei te haere au ki te kura.",
+  "sourceLanguage": "mri",
+  "targetLanguage": "en",
+  "model": "base" | "large",
+  "returnAlternatives": true,
+  "maxAlternatives": 3,
+  "domain": "general" | "education" | "medical",
+  "formalityLevel": "informal" | "neutral" | "formal"
+}
+</pre>
+</div>
+
+<h3>응답 예시</h3>
+
+<div class="code-block">
+<pre>
+{
+  "status": "success",
+  "data": {
+    "translation": "I am going to school.",
+    "alternatives": [
+      {
+        "text": "I'm heading to school.",
+        "confidence": 0.89
+      },
+      {
+        "text": "I am going to the school.",
+        "confidence": 0.82
+      }
+    ],
+    "sourceLanguage": "mri",
+    "targetLanguage": "en",
+    "confidence": 0.94,
+    "wordAlignments": [
+      {"source": "Kei te", "target": "am", "confidence": 0.92},
+      {"source": "haere", "target": "going", "confidence": 0.96},
+      {"source": "au", "target": "I", "confidence": 0.98},
+      {"source": "ki te", "target": "to", "confidence": 0.91},
+      {"source": "kura", "target": "school", "confidence": 0.95}
+    ]
+  },
+  "metadata": {
+    "requestId": "mt_req_003",
+    "model": "wia-mri-en-base-v1",
+    "bleuScore": 0.87,
+    "processingTime": 0.23
+  }
+}
+</pre>
+</div>
+
+<h3>배치 번역</h3>
+
+<div class="code-block">
+<pre>
+POST /v1/mt/translate/batch
+Content-Type: application/json
+
+{
+  "texts": [
+    "Kia ora.",
+    "Kei te pēhea koe?",
+    "Ka pai."
+  ],
+  "sourceLanguage": "mri",
+  "targetLanguage": "en"
+}
+
+// 응답
+{
+  "status": "success",
+  "data": {
+    "translations": [
+      {"text": "Hello.", "confidence": 0.98},
+      {"text": "How are you?", "confidence": 0.95},
+      {"text": "Good.", "confidence": 0.92}
+    ]
+  }
+}
+</pre>
+</div>
+
+<h3>지원 언어 쌍</h3>
+
+<table>
+<tr><th>소스</th><th>타겟</th><th>BLEU 점수</th><th>모델 크기</th></tr>
+<tr>
+<td>마오리어</td>
+<td>영어</td>
+<td>32.4</td>
+<td>560M</td>
+</tr>
+<tr>
+<td>하와이어</td>
+<td>영어</td>
+<td>28.7</td>
+<td>560M</td>
+</tr>
+<tr>
+<td>나바호어</td>
+<td>영어</td>
+<td>24.3</td>
+<td>560M</td>
+</tr>
+<tr>
+<td>영어</td>
+<td>마오리어</td>
+<td>29.1</td>
+<td>560M</td>
+</tr>
+</table>
+
+</section>
+
+<section>
+<h2>05.5 NLU API (자연어 이해)</h2>
+
+<p>NLU API는 텍스트의 의미, 감정, 개체명 등을 분석합니다.</p>
+
+<h3>종합 분석 요청</h3>
+
+<div class="code-block">
+<pre>
+POST /v1/nlu/analyze
+Content-Type: application/json
+
+{
+  "text": "ʻO Pele ka wahine ʻai honua. Noho ʻo ia ma Kīlauea.",
+  "language": "haw",
+  "features": [
+    "entities",
+    "sentiment",
+    "syntax",
+    "morphology",
+    "semanticRoles"
+  ]
+}
+</pre>
+</div>
+
+<h3>응답 예시</h3>
+
+<div class="code-block">
+<pre>
+{
+  "status": "success",
+  "data": {
+    "entities": [
+      {
+        "text": "Pele",
+        "type": "PERSON",
+        "subtype": "DEITY",
+        "start": 2,
+        "end": 6,
+        "confidence": 0.99,
+        "culturalContext": "Hawaiian volcano goddess"
+      },
+      {
+        "text": "Kīlauea",
+        "type": "LOCATION",
+        "subtype": "VOLCANO",
+        "start": 42,
+        "end": 49,
+        "confidence": 0.98,
+        "coordinates": {"lat": 19.4069, "lon": -155.2834}
+      }
+    ],
+    "sentiment": {
+      "overall": "neutral",
+      "score": 0.02,
+      "confidence": 0.87
+    },
+    "syntax": [
+      {
+        "sentence": "ʻO Pele ka wahine ʻai honua.",
+        "tokens": [
+          {
+            "text": "ʻO",
+            "lemma": "ʻo",
+            "pos": "PART",
+            "tag": "TOP",
+            "dependency": "mark",
+            "head": 1
+          },
+          {
+            "text": "Pele",
+            "lemma": "Pele",
+            "pos": "PROPN",
+            "tag": "PERSON",
+            "dependency": "nsubj",
+            "head": 3
+          },
+          {
+            "text": "ka",
+            "lemma": "ka",
+            "pos": "DET",
+            "tag": "DEF",
+            "dependency": "det",
+            "head": 3
+          },
+          {
+            "text": "wahine",
+            "lemma": "wahine",
+            "pos": "NOUN",
+            "tag": "COMMON",
+            "dependency": "root",
+            "head": 0
+          },
+          {
+            "text": "ʻai",
+            "lemma": "ʻai",
+            "pos": "VERB",
+            "tag": "ACT",
+            "dependency": "acl:relcl",
+            "head": 3
+          },
+          {
+            "text": "honua",
+            "lemma": "honua",
+            "pos": "NOUN",
+            "tag": "COMMON",
+            "dependency": "obj",
+            "head": 4
+          }
+        ]
+      }
+    ],
+    "morphology": {
+      "analysis": [
+        {
+          "word": "wahine",
+          "morphemes": [
+            {"form": "wahine", "gloss": "woman", "type": "root"}
+          ]
+        },
+        {
+          "word": "ʻai",
+          "morphemes": [
+            {"form": "ʻai", "gloss": "eat/devour", "type": "verb_root"}
+          ]
+        }
+      ]
+    },
+    "semanticRoles": [
+      {
+        "predicate": "ʻai",
+        "arguments": [
+          {"role": "A0", "text": "Pele", "label": "agent"},
+          {"role": "A1", "text": "honua", "label": "patient"}
+        ]
+      }
+    ]
+  },
+  "metadata": {
+    "requestId": "nlu_req_004",
+    "model": "wia-haw-nlu-v1",
+    "processingTime": 0.67
+  }
+}
+</pre>
+</div>
+
+</section>
+
+<section>
+<h2>05.6 인증 및 보안</h2>
+
+<h3>API 키 인증</h3>
+
+<div class="code-block">
+<pre>
+# API 키 발급
+POST /v1/auth/keys
+Authorization: Bearer {user_jwt_token}
+
+{
+  "name": "My Hawaiian App",
+  "permissions": ["asr:read", "tts:read", "mt:read"],
+  "rateLimit": {
+    "requestsPerMinute": 60,
+    "requestsPerDay": 10000
+  }
+}
+
+# 응답
+{
+  "apiKey": "wia_live_abc123xyz789...",
+  "secretKey": "EXAMPLE_API_KEY_REPLACE_ME...",
+  "createdAt": "2025-01-15T10:00:00Z",
+  "expiresAt": "2026-01-15T10:00:00Z"
+}
+
+# API 사용
+curl -X POST https://api.wia.org/v1/asr/transcribe \
+  -H "Authorization: Bearer wia_live_abc123xyz789..." \
+  -F "audio=@recording.wav" \
+  -F "language=haw"
+</pre>
+</div>
+
+<h3>OAuth 2.0 인증</h3>
+
+<div class="code-block">
+<pre>
+# 1. 인증 코드 요청
+GET /v1/oauth/authorize?
+  client_id=YOUR_CLIENT_ID&
+  redirect_uri=https://yourapp.com/callback&
+  response_type=code&
+  scope=asr.read+tts.read+mt.read
+
+# 2. 액세스 토큰 교환
+POST /v1/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code&
+code=AUTH_CODE&
+client_id=YOUR_CLIENT_ID&
+client_secret=YOUR_CLIENT_SECRET&
+redirect_uri=https://yourapp.com/callback
+
+# 응답
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "refresh_abc123...",
+  "scope": "asr.read tts.read mt.read"
+}
+</pre>
+</div>
+
+<h3>요청 제한 (Rate Limiting)</h3>
+
+<table>
+<tr><th>플랜</th><th>분당 요청</th><th>일일 요청</th><th>동시 요청</th><th>가격</th></tr>
+<tr>
+<td>Free</td>
+<td>10</td>
+<td>1,000</td>
+<td>2</td>
+<td>$0</td>
+</tr>
+<tr>
+<td>Basic</td>
+<td>60</td>
+<td>10,000</td>
+<td>10</td>
+<td>$29/월</td>
+</tr>
+<tr>
+<td>Pro</td>
+<td>300</td>
+<td>100,000</td>
+<td>50</td>
+<td>$99/월</td>
+</tr>
+<tr>
+<td>Enterprise</td>
+<td>무제한</td>
+<td>무제한</td>
+<td>무제한</td>
+<td>협의</td>
+</tr>
+</table>
+
+</section>
+
+<section>
+<h2>05.7 오류 처리</h2>
+
+<h3>표준 오류 코드</h3>
+
+<table>
+<tr><th>HTTP 상태</th><th>오류 코드</th><th>설명</th></tr>
+<tr>
+<td>400</td>
+<td>INVALID_REQUEST</td>
+<td>잘못된 요청 형식</td>
+</tr>
+<tr>
+<td>401</td>
+<td>UNAUTHORIZED</td>
+<td>인증 실패</td>
+</tr>
+<tr>
+<td>403</td>
+<td>FORBIDDEN</td>
+<td>권한 부족</td>
+</tr>
+<tr>
+<td>404</td>
+<td>NOT_FOUND</td>
+<td>리소스 없음</td>
+</tr>
+<tr>
+<td>429</td>
+<td>RATE_LIMIT_EXCEEDED</td>
+<td>요청 제한 초과</td>
+</tr>
+<tr>
+<td>500</td>
+<td>INTERNAL_ERROR</td>
+<td>서버 오류</td>
+</tr>
+<tr>
+<td>503</td>
+<td>SERVICE_UNAVAILABLE</td>
+<td>서비스 일시 중단</td>
+</tr>
+</table>
+
+<h3>오류 응답 예시</h3>
+
+<div class="code-block">
+<pre>
+{
+  "status": "error",
+  "error": {
+    "code": "LANGUAGE_NOT_SUPPORTED",
+    "message": "The language 'xyz' is not currently supported",
+    "details": {
+      "requestedLanguage": "xyz",
+      "supportedLanguages": [
+        {"code": "haw", "name": "Hawaiian"},
+        {"code": "nav", "name": "Navajo"},
+        {"code": "chr", "name": "Cherokee"},
+        {"code": "mri", "name": "Māori"}
+      ],
+      "suggestion": "Please use one of the supported language codes"
+    },
+    "timestamp": "2025-01-15T14:30:00Z",
+    "requestId": "req_error_001",
+    "documentation": "https://docs.wia.org/errors/LANGUAGE_NOT_SUPPORTED"
+  }
+}
+</pre>
+</div>
+
+</section>
+
+<section>
+<h2>05.8 SDK 및 클라이언트 라이브러리</h2>
+
+<h3>Python SDK 예제</h3>
+
+<div class="code-block">
+<pre>
+# 설치
+pip install wia-lang-sdk
+
+# 사용 예제
+from wia import WIAClient
+
+# 클라이언트 초기화
+client = WIAClient(api_key="wia_live_abc123...")
+
+# ASR
+transcription = client.asr.transcribe(
+    audio_file="recording.wav",
+    language="haw",
+    return_timestamps=True
+)
+print(transcription.text)
+
+# TTS
+audio = client.tts.synthesize(
+    text="Aloha kākou",
+    language="haw",
+    voice="female_elder"
+)
+audio.save("output.wav")
+
+# MT
+translation = client.mt.translate(
+    text="Kei te haere au ki te kura",
+    source_language="mri",
+    target_language="en"
+)
+print(translation.text)
+
+# NLU
+analysis = client.nlu.analyze(
+    text="ʻO Pele ka wahine ʻai honua",
+    language="haw",
+    features=["entities", "sentiment", "syntax"]
+)
+print(analysis.entities)
+</pre>
+</div>
+
+<h3>JavaScript/TypeScript SDK</h3>
+
+<div class="code-block">
+<pre>
+// 설치
+npm install @wia/lang-sdk
+
+// 사용 예제
+import { WIAClient } from '@wia/lang-sdk';
+
+const client = new WIAClient({
+  apiKey: 'wia_live_abc123...'
+});
+
+// ASR
+const transcription = await client.asr.transcribe({
+  audioFile: './recording.wav',
+  language: 'haw',
+  returnTimestamps: true
+});
+
+console.log(transcription.text);
+
+// TTS
+const audio = await client.tts.synthesize({
+  text: 'Aloha kākou',
+  language: 'haw',
+  voice: 'female_elder'
+});
+
+await audio.save('output.wav');
+</pre>
+</div>
+
+</section>
+
+<section>
+<h2>05.9 복습 문제</h2>
+
+<div class="callout">
+<div class="callout-title">📝 이해도 확인</div>
+<ol>
+<li>RESTful API 설계의 핵심 원칙은 무엇인가요?</li>
+<li>ASR API의 스트리밍 모드와 배치 모드의 차이점은?</li>
+<li>TTS API에서 SSML이 필요한 이유는?</li>
+<li>MT API의 BLEU 점수가 의미하는 것은?</li>
+<li>NLU API에서 제공하는 분석 기능들을 나열하세요.</li>
+<li>API 키 인증과 OAuth 2.0의 차이점은?</li>
+<li>Rate Limiting이 필요한 이유는?</li>
+<li>오류 응답에 requestId가 포함되는 이유는?</li>
+<li>SDK 사용의 장점은 직접 HTTP 요청 대비 무엇인가요?</li>
+<li>비동기 작업 처리가 필요한 경우는 언제인가요?</li>
+</ol>
+</div>
+
+</section>
+
+<section>
+<h2>05.10 장 요약</h2>
+
+<div class="callout" style="border-color:var(--success)">
+<div class="callout-title">✅ 제05장 핵심 내용</div>
+<ul>
+<li>RESTful 아키텍처 기반 표준화된 API 설계</li>
+<li>ASR API: 음성-텍스트 변환, 스트리밍 지원, 타임스탬프</li>
+<li>TTS API: 텍스트-음성 합성, SSML 지원, 다양한 음성 옵션</li>
+<li>MT API: 기계 번역, 배치 처리, 단어 정렬</li>
+<li>NLU API: 개체명 인식, 감정 분석, 형태소 분석</li>
+<li>인증: API 키, OAuth 2.0, Rate Limiting</li>
+<li>오류 처리: 표준 오류 코드, 상세 오류 메시지</li>
+<li>SDK: Python, JavaScript/TypeScript 지원</li>
+</ul>
+</div>
+
+<div class="philosophy">
+<div class="philosophy-text">弘益人間</div>
+<p>표준 API로 모든 개발자에게 언어 기술을 제공합니다</p>
+</div>
+
+</section>
+
+</div>
+</body>
+</html>

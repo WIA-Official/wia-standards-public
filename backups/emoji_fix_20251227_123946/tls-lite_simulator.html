@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA TLS-LITE - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #14B8A6;
+            --primary-dark: #0D9488;
+            --secondary: #F59E0B;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #5EEAD4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .handshake-viz { display: flex; justify-content: space-between; align-items: flex-start; padding: 30px; background: var(--bg); border-radius: 12px; margin: 20px 0; position: relative; }
+        .endpoint { width: 120px; text-align: center; }
+        .endpoint-icon { font-size: 3rem; margin-bottom: 10px; }
+        .endpoint-name { font-weight: 600; }
+        .messages { flex: 1; display: flex; flex-direction: column; gap: 15px; padding: 0 30px; }
+        .message { display: flex; align-items: center; gap: 10px; padding: 10px 15px; border-radius: 8px; font-size: 0.85rem; opacity: 0; animation: fadeIn 0.5s forwards; }
+        .message.client { background: rgba(20, 184, 166, 0.2); justify-content: flex-start; }
+        .message.server { background: rgba(245, 158, 11, 0.2); justify-content: flex-end; }
+        .message .arrow { color: var(--primary); }
+        @keyframes fadeIn { to { opacity: 1; } }
+
+        .cipher-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }
+        .cipher-card { background: var(--bg); border: 2px solid var(--border); border-radius: 10px; padding: 20px; cursor: pointer; transition: all 0.2s; }
+        .cipher-card:hover { border-color: var(--primary); }
+        .cipher-card.selected { border-color: var(--primary); background: rgba(20, 184, 166, 0.1); }
+        .cipher-name { font-weight: 600; color: var(--primary); margin-bottom: 5px; }
+        .cipher-code { font-family: monospace; font-size: 0.8rem; color: var(--text-muted); }
+
+        .key-viz { background: linear-gradient(135deg, #134e4a, #0d3d3d); border-radius: 12px; padding: 30px; margin: 20px 0; text-align: center; }
+        .key-pair { display: flex; justify-content: center; gap: 50px; margin: 20px 0; }
+        .key-box { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 20px; min-width: 200px; }
+        .key-label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px; }
+        .key-value { font-family: monospace; font-size: 0.75rem; word-break: break-all; color: var(--primary); }
+
+        .compare-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .compare-table th, .compare-table td { padding: 15px; text-align: left; border-bottom: 1px solid var(--border); }
+        .compare-table th { color: var(--primary); background: var(--bg); }
+        .compare-table .highlight { color: var(--secondary); font-weight: 600; }
+        .compare-table .better { color: #10b981; }
+        .compare-table .worse { color: #ef4444; }
+
+        .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .metric-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .metric-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .metric-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .toggle-row:last-child { border-bottom: none; }
+        .toggle-switch { position: relative; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 26px; transition: 0.3s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(24px); }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .cipher-grid { grid-template-columns: 1fr; }
+            .metric-grid { grid-template-columns: repeat(2, 1fr); }
+            .key-pair { flex-direction: column; gap: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">TLS-LITE</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🔒 WIA TLS-LITE</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Lightweight TLS for IoT" data-ko="IoT용 경량 TLS">Lightweight TLS for IoT</h1>
+            <p data-en="Secure connections for resource-constrained devices" data-ko="리소스 제한 장치를 위한 보안 연결">Secure IoT connections</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🤝 Handshake" data-ko="🤝 핸드셰이크">🤝 Handshake</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🔐 Cipher" data-ko="🔐 암호화">🔐 Cipher</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🔑 Keys" data-ko="🔑 키">🔑 Keys</div>
+            <div class="tab" onclick="showPanel(3)" data-en="⚡ 0-RTT" data-ko="⚡ 0-RTT">⚡ 0-RTT</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📊 Compare" data-ko="📊 비교">📊 Compare</div>
+        </div>
+
+        <!-- Panel 0: Handshake -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🤝 1-RTT Handshake" data-ko="🤝 1-RTT 핸드셰이크">🤝 1-RTT Handshake</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Full handshake in single round-trip" data-ko="단일 왕복으로 완전한 핸드셰이크">Single round-trip handshake</p>
+
+            <div class="handshake-viz">
+                <div class="endpoint">
+                    <div class="endpoint-icon">📱</div>
+                    <div class="endpoint-name">Client</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">IoT Device</div>
+                </div>
+                <div class="messages" id="handshakeMessages">
+                    <!-- Messages will be added by JS -->
+                </div>
+                <div class="endpoint">
+                    <div class="endpoint-icon">🖥️</div>
+                    <div class="endpoint-name">Server</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Gateway</div>
+                </div>
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value">1</div>
+                    <div class="metric-label">RTT</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">&lt;100ms</div>
+                    <div class="metric-label" data-en="Handshake Time" data-ko="핸드셰이크 시간">Time</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">&lt;8KB</div>
+                    <div class="metric-label">RAM</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">&lt;20KB</div>
+                    <div class="metric-label" data-en="Code Size" data-ko="코드 크기">Code</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runHandshake()" data-en="🤝 Run Handshake" data-ko="🤝 핸드셰이크 실행">🤝 Run</button>
+            </div>
+            <div class="output" id="handshakeOutput"></div>
+        </div>
+
+        <!-- Panel 1: Cipher -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🔐 Cipher Suites" data-ko="🔐 암호화 스위트">🔐 Cipher Suites</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Optimized cipher suites for IoT" data-ko="IoT에 최적화된 암호화 스위트">Optimized for IoT</p>
+
+            <div class="cipher-grid">
+                <div class="cipher-card selected" onclick="selectCipher('chacha')">
+                    <div class="cipher-name">ChaCha20-Poly1305</div>
+                    <div class="cipher-code">WIA_TLS_LITE_CHACHA20_POLY1305_SHA256 (0x1301)</div>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 10px;" data-en="Best for software implementations" data-ko="소프트웨어 구현에 최적">Best for software</p>
+                </div>
+                <div class="cipher-card" onclick="selectCipher('aes')">
+                    <div class="cipher-name">AES-128-GCM</div>
+                    <div class="cipher-code">WIA_TLS_LITE_AES_128_GCM_SHA256 (0x1302)</div>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 10px;" data-en="Best with hardware AES" data-ko="하드웨어 AES와 함께 최적">Best with HW AES</p>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="testCipher()" data-en="🔐 Test Encryption" data-ko="🔐 암호화 테스트">🔐 Test</button>
+            </div>
+            <div class="output" id="cipherOutput"></div>
+        </div>
+
+        <!-- Panel 2: Keys -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🔑 Key Exchange (X25519)" data-ko="🔑 키 교환 (X25519)">🔑 Key Exchange</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Curve25519 ECDH key exchange" data-ko="Curve25519 ECDH 키 교환">Curve25519 ECDH</p>
+
+            <div class="key-viz">
+                <div class="key-pair">
+                    <div class="key-box">
+                        <div class="key-label" data-en="Client Public Key" data-ko="클라이언트 공개키">Client Public</div>
+                        <div class="key-value" id="clientPubKey">Click Generate...</div>
+                    </div>
+                    <div class="key-box">
+                        <div class="key-label" data-en="Server Public Key" data-ko="서버 공개키">Server Public</div>
+                        <div class="key-value" id="serverPubKey">Click Generate...</div>
+                    </div>
+                </div>
+                <div class="key-box" style="margin-top: 20px; max-width: 400px; margin-left: auto; margin-right: auto;">
+                    <div class="key-label" data-en="Shared Secret" data-ko="공유 비밀">Shared Secret</div>
+                    <div class="key-value" id="sharedSecret">...</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="generateKeys()" data-en="🔑 Generate Keys" data-ko="🔑 키 생성">🔑 Generate</button>
+            </div>
+            <div class="output" id="keysOutput"></div>
+        </div>
+
+        <!-- Panel 3: 0-RTT -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="⚡ 0-RTT Resumption" data-ko="⚡ 0-RTT 재연결">⚡ 0-RTT Resumption</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Instant reconnection with PSK" data-ko="PSK로 즉시 재연결">Instant reconnection</p>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value">0</div>
+                    <div class="metric-label">RTT</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">&lt;10ms</div>
+                    <div class="metric-label" data-en="Resume Time" data-ko="재연결 시간">Resume</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">PSK</div>
+                    <div class="metric-label" data-en="Pre-Shared Key" data-ko="사전 공유 키">Mode</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">✅</div>
+                    <div class="metric-label" data-en="Early Data" data-ko="조기 데이터">Early Data</div>
+                </div>
+            </div>
+
+            <div style="background: var(--bg); border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <div class="toggle-row">
+                    <span data-en="Enable 0-RTT" data-ko="0-RTT 활성화">Enable 0-RTT</span>
+                    <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="toggle-row">
+                    <span data-en="Early Data" data-ko="조기 데이터">Early Data</span>
+                    <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="toggle-row">
+                    <span data-en="Replay Protection" data-ko="재생 공격 방지">Replay Protection</span>
+                    <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="testResume()" data-en="⚡ Test 0-RTT" data-ko="⚡ 0-RTT 테스트">⚡ Test</button>
+            </div>
+            <div class="output" id="resumeOutput"></div>
+        </div>
+
+        <!-- Panel 4: Compare -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="📊 TLS-LITE vs TLS 1.3" data-ko="📊 TLS-LITE vs TLS 1.3">📊 Comparison</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Resource comparison with standard TLS" data-ko="표준 TLS와 리소스 비교">Resource comparison</p>
+
+            <table class="compare-table">
+                <thead>
+                    <tr>
+                        <th data-en="Metric" data-ko="지표">Metric</th>
+                        <th>TLS 1.3</th>
+                        <th>WIA TLS-LITE</th>
+                        <th data-en="Improvement" data-ko="개선">Improvement</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td data-en="Handshake RTT" data-ko="핸드셰이크 RTT">Handshake</td>
+                        <td>2-RTT</td>
+                        <td class="better">1-RTT</td>
+                        <td class="better">50% faster</td>
+                    </tr>
+                    <tr>
+                        <td data-en="Code Size" data-ko="코드 크기">Code Size</td>
+                        <td>~100KB</td>
+                        <td class="better">&lt;20KB</td>
+                        <td class="better">5x smaller</td>
+                    </tr>
+                    <tr>
+                        <td data-en="RAM Usage" data-ko="RAM 사용">RAM</td>
+                        <td>~40KB</td>
+                        <td class="better">&lt;8KB</td>
+                        <td class="better">5x less</td>
+                    </tr>
+                    <tr>
+                        <td data-en="Flash Usage" data-ko="플래시 사용">Flash</td>
+                        <td>~200KB</td>
+                        <td class="better">&lt;50KB</td>
+                        <td class="better">4x less</td>
+                    </tr>
+                    <tr>
+                        <td data-en="Handshake Time" data-ko="핸드셰이크 시간">Time</td>
+                        <td>~500ms</td>
+                        <td class="better">&lt;100ms</td>
+                        <td class="better">5x faster</td>
+                    </tr>
+                    <tr>
+                        <td data-en="Cipher Suites" data-ko="암호 스위트">Ciphers</td>
+                        <td>5+</td>
+                        <td>2</td>
+                        <td data-en="Optimized" data-ko="최적화">Optimized</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="exportComparison()" data-en="📊 Export Report" data-ko="📊 보고서 내보내기">📊 Export</button>
+            </div>
+            <div class="output" id="compareOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA TLS-LITE: Secure IoT everywhere" data-ko="WIA TLS-LITE: 어디서나 안전한 IoT">Secure IoT everywhere</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.toLowerCase() === lang));
+            document.querySelectorAll('[data-en]').forEach(el => el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en'));
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function selectCipher(cipher) {
+            document.querySelectorAll('.cipher-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.cipher-card').classList.add('selected');
+        }
+
+        function runHandshake() {
+            const msgs = document.getElementById('handshakeMessages');
+            msgs.innerHTML = '';
+            const messages = [
+                { dir: 'client', text: 'ClientHello + key_share (X25519)', delay: 0 },
+                { dir: 'server', text: 'ServerHello + key_share', delay: 500 },
+                { dir: 'server', text: 'EncryptedExtensions', delay: 700 },
+                { dir: 'server', text: 'Certificate + CertificateVerify', delay: 900 },
+                { dir: 'server', text: 'Finished', delay: 1100 },
+                { dir: 'client', text: 'Finished', delay: 1500 },
+                { dir: 'client', text: '[Application Data] ✅', delay: 1800 }
+            ];
+            messages.forEach((m, i) => {
+                setTimeout(() => {
+                    const div = document.createElement('div');
+                    div.className = `message ${m.dir}`;
+                    div.innerHTML = `<span class="arrow">${m.dir === 'client' ? '→' : '←'}</span> ${m.text}`;
+                    div.style.animationDelay = '0s';
+                    msgs.appendChild(div);
+                }, m.delay);
+            });
+            setTimeout(() => {
+                document.getElementById('handshakeOutput').textContent = JSON.stringify({
+                    protocol: 'WIA-TLS-LITE', version: '1.0', rtt: 1, timeMs: 87,
+                    cipher: 'ChaCha20-Poly1305', keyExchange: 'X25519', signature: 'Ed25519',
+                    message: currentLang === 'ko' ? '핸드셰이크 완료!' : 'Handshake complete!'
+                }, null, 2);
+            }, 2000);
+        }
+
+        function testCipher() {
+            const selected = document.querySelector('.cipher-card.selected .cipher-name').textContent;
+            document.getElementById('cipherOutput').textContent = JSON.stringify({
+                cipher: selected, keySize: selected.includes('ChaCha') ? 256 : 128,
+                mode: selected.includes('ChaCha') ? 'Stream' : 'AEAD',
+                tagSize: 128, nonceSize: 96,
+                benchmark: { encryptMbps: 250, decryptMbps: 245 },
+                message: currentLang === 'ko' ? '암호화 테스트 완료' : 'Cipher test complete'
+            }, null, 2);
+        }
+
+        function generateKeys() {
+            const randHex = (len) => Array.from({length: len}, () => Math.floor(Math.random()*16).toString(16)).join('');
+            document.getElementById('clientPubKey').textContent = randHex(64);
+            document.getElementById('serverPubKey').textContent = randHex(64);
+            document.getElementById('sharedSecret').textContent = randHex(64);
+            document.getElementById('keysOutput').textContent = JSON.stringify({
+                keyExchange: 'X25519 (Curve25519)', keySize: 256,
+                clientPublic: '32 bytes', serverPublic: '32 bytes', sharedSecret: '32 bytes',
+                derivation: 'HKDF-SHA256',
+                message: currentLang === 'ko' ? '키 교환 완료' : 'Key exchange complete'
+            }, null, 2);
+        }
+
+        function testResume() {
+            document.getElementById('resumeOutput').textContent = JSON.stringify({
+                mode: '0-RTT Resumption', rtt: 0, timeMs: 8,
+                pskIdentity: 'session_ticket_12345', earlyData: true, earlyDataSize: '4KB max',
+                replayProtection: 'Single-use ticket',
+                message: currentLang === 'ko' ? '0-RTT 재연결 성공!' : '0-RTT resumption successful!'
+            }, null, 2);
+        }
+
+        function exportComparison() {
+            document.getElementById('compareOutput').textContent = JSON.stringify({
+                comparison: 'WIA-TLS-LITE vs TLS 1.3',
+                improvements: {
+                    handshake: '50% faster (1-RTT vs 2-RTT)',
+                    codeSize: '5x smaller (<20KB vs ~100KB)',
+                    ramUsage: '5x less (<8KB vs ~40KB)',
+                    flashUsage: '4x less (<50KB vs ~200KB)',
+                    handshakeTime: '5x faster (<100ms vs ~500ms)'
+                },
+                targetDevices: ['ESP32', 'STM32', 'nRF52', 'Arduino'],
+                message: currentLang === 'ko' ? '비교 보고서 생성됨' : 'Comparison report generated'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang('en'));
+    </script>
+</body>
+</html>

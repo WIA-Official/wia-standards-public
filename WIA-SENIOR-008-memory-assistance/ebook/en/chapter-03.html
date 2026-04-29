@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Reminder APIs | WIA-SENIOR-008</title>
+    <style>
+        :root { --primary: #6366F1; --bg: #0f172a; --text: #f8fafc; --card-bg: #1e293b; --border: #334155; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); padding: 40px 20px; line-height: 1.8; margin: 0; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.5em; margin-bottom: 0.5em; border-bottom: 3px solid var(--primary); padding-bottom: 0.3em; }
+        h2 { color: var(--primary); font-size: 1.8em; margin-top: 1.5em; margin-bottom: 0.8em; }
+        h3 { color: var(--primary); font-size: 1.3em; margin-top: 1.2em; }
+        .intro-box { background: var(--card-bg); border-left: 4px solid var(--primary); padding: 20px; margin: 30px 0; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; background: var(--card-bg); border-radius: 8px; overflow: hidden; }
+        th { background: var(--primary); color: white; padding: 15px; text-align: left; font-weight: 600; }
+        td { padding: 12px 15px; border-bottom: 1px solid var(--border); }
+        tr:last-child td { border-bottom: none; }
+        .code-block { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.9em; }
+        .key-takeaways { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border: 2px solid var(--primary); border-radius: 12px; padding: 25px; margin: 30px 0; }
+        .key-takeaways h3 { margin-top: 0; color: var(--primary); }
+        .key-takeaways ul { margin: 15px 0; padding-left: 25px; }
+        .key-takeaways li { margin: 10px 0; line-height: 1.6; }
+        .review-questions { background: var(--card-bg); border-radius: 12px; padding: 25px; margin: 30px 0; }
+        .review-questions h3 { margin-top: 0; color: var(--primary); }
+        .review-questions ol { margin: 15px 0; padding-left: 25px; }
+        .review-questions li { margin: 15px 0; line-height: 1.6; }
+        .navigation { margin-top: 50px; padding-top: 30px; border-top: 2px solid var(--primary); display: flex; justify-content: space-between; align-items: center; }
+        a { color: var(--primary); text-decoration: none; font-weight: 600; transition: opacity 0.3s; }
+        a:hover { opacity: 0.8; }
+        .footer { margin-top: 50px; text-align: center; color: var(--primary); font-size: 1.2em; padding: 20px; border-top: 2px solid var(--primary); }
+        .highlight { background: rgba(99, 102, 241, 0.2); padding: 2px 6px; border-radius: 4px; color: var(--primary); font-weight: 600; }
+        .note { background: rgba(99, 102, 241, 0.1); border-left: 4px solid var(--primary); padding: 15px; margin: 20px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 3: Reminder APIs</h1>
+
+        <div class="intro-box">
+            <p><strong>Learning Objectives:</strong></p>
+            <ul>
+                <li>Understand RESTful API design principles for reminder systems</li>
+                <li>Learn authentication and security best practices for medical data</li>
+                <li>Explore reminder CRUD operations and batch processing</li>
+                <li>Master webhook integration and event-driven architectures</li>
+                <li>Implement client SDKs in TypeScript and Python</li>
+            </ul>
+        </div>
+
+        <h2>3.1 API Architecture Overview</h2>
+
+        <p>The WIA-SENIOR-008 Reminder API provides a comprehensive, standards-compliant interface for creating, managing, and delivering memory assistance reminders. Built on REST principles with GraphQL alternatives for complex queries, the API prioritizes <span class="highlight">reliability, security, and ease of integration</span>.</p>
+
+        <h3>3.1.1 Core API Principles</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Principle</th>
+                    <th>Description</th>
+                    <th>Implementation</th>
+                    <th>Benefit</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Resource-Oriented</td>
+                    <td>RESTful resources for reminders, users, schedules</td>
+                    <td>Noun-based endpoints, HTTP verbs</td>
+                    <td>Intuitive, predictable API structure</td>
+                </tr>
+                <tr>
+                    <td>Stateless</td>
+                    <td>Each request contains all necessary information</td>
+                    <td>JWT tokens, no server-side sessions</td>
+                    <td>Horizontal scalability, reliability</td>
+                </tr>
+                <tr>
+                    <td>Versioned</td>
+                    <td>API version in URL path</td>
+                    <td>/v1/, /v2/ prefixes</td>
+                    <td>Backward compatibility, safe evolution</td>
+                </tr>
+                <tr>
+                    <td>HATEOAS</td>
+                    <td>Hypermedia links in responses</td>
+                    <td>_links object with related resources</td>
+                    <td>Self-documenting, client discoverability</td>
+                </tr>
+                <tr>
+                    <td>Idempotent</td>
+                    <td>Repeated requests have same effect</td>
+                    <td>Idempotency keys for POST requests</td>
+                    <td>Safe retries, fault tolerance</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>3.1.2 Base API Structure</h3>
+
+        <div class="code-block">
+<pre>// WIA-SENIOR-008 Reminder API - Base Configuration
+const API_BASE_URL = 'https://api.wia-senior.org/v1';
+
+// API Resource Structure
+interface ReminderAPI {
+  // Core Resources
+  reminders: '/reminders',           // Reminder CRUD operations
+  users: '/users',                   // User management
+  schedules: '/schedules',           // Recurring schedules
+  templates: '/templates',           // Reminder templates
+
+  // Supporting Resources
+  medications: '/medications',       // Medication database
+  contacts: '/contacts',             // Emergency contacts
+  events: '/events',                 // Calendar events
+
+  // Analytics & Reporting
+  analytics: '/analytics',           // Usage analytics
+  reports: '/reports',               // Adherence reports
+
+  // Real-time
+  websocket: 'wss://ws.wia-senior.org/v1',  // WebSocket endpoint
+
+  // Administration
+  admin: '/admin',                   // Admin operations
+  health: '/health'                  // System health check
+}
+
+// Standard Response Format
+interface APIResponse&lt;T&gt; {
+  success: boolean;
+  data?: T;
+  error?: {
+    code: string;
+    message: string;
+    details?: any;
+  };
+  meta: {
+    timestamp: string;
+    requestId: string;
+    version: string;
+  };
+  _links?: {
+    self: string;
+    related?: Record&lt;string, string&gt;;
+  };
+}
+
+// Pagination
+interface PaginatedResponse&lt;T&gt; extends APIResponse&lt;T[]&gt; {
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    totalItems: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
+  };
+  _links: {
+    self: string;
+    first: string;
+    last: string;
+    next?: string;
+    previous?: string;
+  };
+}
+</pre>
+        </div>
+
+        <h2>3.2 Authentication & Security</h2>
+
+        <p>Memory assistance systems handle sensitive health information requiring robust security measures. The WIA-SENIOR-008 API implements multiple layers of security including OAuth 2.0, JWT tokens, API keys, and comprehensive audit logging.</p>
+
+        <h3>3.2.1 Authentication Methods</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Method</th>
+                    <th>Use Case</th>
+                    <th>Security Level</th>
+                    <th>Implementation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>OAuth 2.0</td>
+                    <td>User-facing applications</td>
+                    <td>High - delegated authorization</td>
+                    <td>Authorization Code flow with PKCE</td>
+                </tr>
+                <tr>
+                    <td>JWT Tokens</td>
+                    <td>Mobile apps, SPAs</td>
+                    <td>High - stateless, signed</td>
+                    <td>RS256 signed, short-lived access tokens</td>
+                </tr>
+                <tr>
+                    <td>API Keys</td>
+                    <td>Server-to-server integration</td>
+                    <td>Medium - requires secure storage</td>
+                    <td>UUID v4, rate-limited, IP-restricted</td>
+                </tr>
+                <tr>
+                    <td>mTLS</td>
+                    <td>High-security enterprise</td>
+                    <td>Very High - certificate-based</td>
+                    <td>Client certificates, bi-directional SSL</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-block">
+<pre>// OAuth 2.0 Authentication Flow
+class ReminderAPIClient {
+  private accessToken: string | null = null;
+  private refreshToken: string | null = null;
+
+  // Step 1: Initiate OAuth flow
+  async initiateOAuth(): Promise&lt;string&gt; {
+    const params = new URLSearchParams({
+      client_id: this.clientId,
+      response_type: 'code',
+      redirect_uri: this.redirectUri,
+      scope: 'reminders:read reminders:write users:read',
+      state: this.generateState(),
+      code_challenge: this.generateCodeChallenge(),
+      code_challenge_method: 'S256'
+    });
+
+    return `${this.authUrl}/authorize?${params.toString()}`;
+  }
+
+  // Step 2: Exchange authorization code for tokens
+  async exchangeCodeForTokens(code: string): Promise&lt;TokenResponse&gt; {
+    const response = await fetch(`${this.authUrl}/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: this.redirectUri,
+        client_id: this.clientId,
+        code_verifier: this.codeVerifier
+      })
+    });
+
+    const tokens = await response.json();
+    this.accessToken = tokens.access_token;
+    this.refreshToken = tokens.refresh_token;
+
+    // Schedule token refresh before expiration
+    this.scheduleTokenRefresh(tokens.expires_in);
+
+    return tokens;
+  }
+
+  // Step 3: Refresh access token
+  async refreshAccessToken(): Promise&lt;TokenResponse&gt; {
+    if (!this.refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    const response = await fetch(`${this.authUrl}/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: this.refreshToken,
+        client_id: this.clientId
+      })
+    });
+
+    const tokens = await response.json();
+    this.accessToken = tokens.access_token;
+
+    if (tokens.refresh_token) {
+      this.refreshToken = tokens.refresh_token;
+    }
+
+    this.scheduleTokenRefresh(tokens.expires_in);
+    return tokens;
+  }
+
+  // Make authenticated API request
+  async request&lt;T&gt;(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise&lt;APIResponse&lt;T&gt;&gt; {
+    // Ensure we have valid access token
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.refreshAccessToken();
+    }
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${this.accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Request-ID': this.generateRequestId()
+      }
+    });
+
+    if (response.status === 401) {
+      // Token expired, refresh and retry
+      await this.refreshAccessToken();
+      return this.request(endpoint, options);
+    }
+
+    return response.json();
+  }
+}
+
+// Security Headers
+const SECURITY_HEADERS = {
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'X-XSS-Protection': '1; mode=block',
+  'Content-Security-Policy': "default-src 'self'",
+  'Referrer-Policy': 'strict-origin-when-cross-origin'
+};
+</pre>
+        </div>
+
+        <h2>3.3 Reminder CRUD Operations</h2>
+
+        <p>The core functionality of the Reminder API revolves around creating, reading, updating, and deleting reminders. These operations support both simple one-time reminders and complex recurring schedules.</p>
+
+        <h3>3.3.1 Reminder Resource Schema</h3>
+
+        <div class="code-block">
+<pre>// Complete Reminder Resource Definition
+interface Reminder {
+  // Identity
+  id: string;                          // UUID v4
+  userId: string;                      // Owner user ID
+  createdAt: string;                   // ISO 8601 timestamp
+  updatedAt: string;
+  version: number;                     // Optimistic locking
+
+  // Core Properties
+  title: string;                       // Max 200 chars
+  description?: string;                // Max 2000 chars
+  category: ReminderCategory;          // medication, appointment, task, etc.
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+
+  // Timing
+  scheduledTime: string;               // ISO 8601 timestamp
+  timezone: string;                    // IANA timezone
+  duration?: number;                   // Duration in minutes
+  leadTime?: number;                   // Advance notice in minutes
+
+  // Recurrence
+  recurrence?: {
+    pattern: 'daily' | 'weekly' | 'monthly' | 'custom';
+    interval: number;                  // Every N days/weeks/months
+    daysOfWeek?: number[];             // 0=Sunday, 6=Saturday
+    daysOfMonth?: number[];            // 1-31
+    endDate?: string;                  // When recurrence stops
+    exceptions?: string[];             // Dates to skip
+  };
+
+  // Location
+  location?: {
+    name?: string;
+    address?: string;
+    coordinates?: {
+      latitude: number;
+      longitude: number;
+    };
+    radius?: number;                   // Geofence radius in meters
+    trigger?: 'arrival' | 'departure' | 'proximity';
+  };
+
+  // Delivery
+  delivery: {
+    channels: DeliveryChannel[];       // phone, email, sms, push, voice, etc.
+    escalation?: {
+      enabled: boolean;
+      steps: EscalationStep[];
+    };
+    confirmation?: {
+      required: boolean;
+      timeout: number;                 // Seconds before escalation
+    };
+  };
+
+  // Content Customization
+  content?: {
+    message?: string;                  // Custom message text
+    audioUrl?: string;                 // Custom audio file
+    imageUrl?: string;                 // Visual reminder image
+    actionUrl?: string;                // Deep link or URL
+  };
+
+  // Medication-Specific (if category === 'medication')
+  medication?: {
+    name: string;
+    dosage: string;
+    form: 'pill' | 'liquid' | 'injection' | 'inhaler';
+    instructions?: string;
+    refillDate?: string;
+    prescriberId?: string;
+    ndc?: string;                      // National Drug Code
+  };
+
+  // Status & Tracking
+  status: 'active' | 'completed' | 'snoozed' | 'cancelled' | 'missed';
+  completionHistory?: {
+    timestamp: string;
+    status: 'completed' | 'missed' | 'snoozed';
+    respondedAt?: string;
+    method?: string;
+  }[];
+
+  // Metadata
+  tags?: string[];
+  metadata?: Record&lt;string, any&gt;;     // Extensibility
+
+  // Links
+  _links: {
+    self: string;
+    user: string;
+    schedule?: string;
+    analytics?: string;
+  };
+}
+
+// Create Reminder Request
+interface CreateReminderRequest {
+  title: string;
+  category: ReminderCategory;
+  scheduledTime: string;
+  // ... other optional fields from Reminder interface
+}
+
+// Update Reminder Request
+interface UpdateReminderRequest {
+  version: number;                     // For optimistic locking
+  // Any Reminder fields to update (except id, userId, createdAt)
+}
+</pre>
+        </div>
+
+        <h3>3.3.2 CRUD Endpoint Examples</h3>
+
+        <div class="code-block">
+<pre>// CREATE - POST /v1/reminders
+async function createReminder(
+  data: CreateReminderRequest
+): Promise&lt;APIResponse&lt;Reminder&gt;&gt; {
+  const response = await client.request('/reminders', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+  return response;
+}
+
+// Example: Create medication reminder
+const medicationReminder = await createReminder({
+  title: 'Take morning blood pressure medication',
+  category: 'medication',
+  priority: 'high',
+  scheduledTime: '2025-01-15T08:00:00-05:00',
+  timezone: 'America/New_York',
+  recurrence: {
+    pattern: 'daily',
+    interval: 1,
+    endDate: '2025-12-31T23:59:59-05:00'
+  },
+  delivery: {
+    channels: ['push', 'voice'],
+    escalation: {
+      enabled: true,
+      steps: [
+        { delay: 300, channels: ['push', 'sms'] },
+        { delay: 900, channels: ['voice', 'caregiver_alert'] }
+      ]
+    },
+    confirmation: {
+      required: true,
+      timeout: 600
+    }
+  },
+  medication: {
+    name: 'Lisinopril',
+    dosage: '10mg',
+    form: 'pill',
+    instructions: 'Take with food and full glass of water'
+  }
+});
+
+// READ - GET /v1/reminders/:id
+async function getReminder(id: string): Promise&lt;APIResponse&lt;Reminder&gt;&gt; {
+  return await client.request(`/reminders/${id}`);
+}
+
+// LIST - GET /v1/reminders with filters
+async function listReminders(filters: {
+  status?: string[];
+  category?: string[];
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise&lt;PaginatedResponse&lt;Reminder&gt;&gt; {
+  const params = new URLSearchParams();
+
+  if (filters.status) params.append('status', filters.status.join(','));
+  if (filters.category) params.append('category', filters.category.join(','));
+  if (filters.startDate) params.append('start_date', filters.startDate);
+  if (filters.endDate) params.append('end_date', filters.endDate);
+  params.append('page', String(filters.page || 1));
+  params.append('page_size', String(filters.pageSize || 50));
+
+  return await client.request(`/reminders?${params.toString()}`);
+}
+
+// UPDATE - PUT /v1/reminders/:id
+async function updateReminder(
+  id: string,
+  updates: UpdateReminderRequest
+): Promise&lt;APIResponse&lt;Reminder&gt;&gt; {
+  return await client.request(`/reminders/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates)
+  });
+}
+
+// PATCH - PATCH /v1/reminders/:id (partial update)
+async function patchReminder(
+  id: string,
+  patches: Partial&lt;Reminder&gt;
+): Promise&lt;APIResponse&lt;Reminder&gt;&gt; {
+  return await client.request(`/reminders/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patches)
+  });
+}
+
+// DELETE - DELETE /v1/reminders/:id
+async function deleteReminder(id: string): Promise&lt;APIResponse&lt;void&gt;&gt; {
+  return await client.request(`/reminders/${id}`, {
+    method: 'DELETE'
+  });
+}
+
+// BATCH OPERATIONS - POST /v1/reminders/batch
+async function batchCreateReminders(
+  reminders: CreateReminderRequest[]
+): Promise&lt;APIResponse&lt;{
+  created: Reminder[];
+  failed: { index: number; error: string }[];
+}&gt;&gt; {
+  return await client.request('/reminders/batch', {
+    method: 'POST',
+    body: JSON.stringify({ reminders })
+  });
+}
+</pre>
+        </div>
+
+        <h2>3.4 Webhook Integration</h2>
+
+        <p>Webhooks enable event-driven architecture where external systems receive real-time notifications about reminder events. This is essential for integrating memory assistance systems with caregiving platforms, healthcare systems, and family portals.</p>
+
+        <h3>3.4.1 Webhook Event Types</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Event Type</th>
+                    <th>Trigger</th>
+                    <th>Payload Includes</th>
+                    <th>Typical Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>reminder.created</td>
+                    <td>New reminder created</td>
+                    <td>Complete reminder object</td>
+                    <td>Sync with calendar, notify caregivers</td>
+                </tr>
+                <tr>
+                    <td>reminder.delivered</td>
+                    <td>Reminder sent to user</td>
+                    <td>Reminder ID, delivery method, timestamp</td>
+                    <td>Track delivery success rates</td>
+                </tr>
+                <tr>
+                    <td>reminder.acknowledged</td>
+                    <td>User confirms seeing reminder</td>
+                    <td>Reminder ID, response time, method</td>
+                    <td>Update adherence tracking</td>
+                </tr>
+                <tr>
+                    <td>reminder.completed</td>
+                    <td>Task marked as done</td>
+                    <td>Reminder ID, completion time, proof</td>
+                    <td>Healthcare compliance reporting</td>
+                </tr>
+                <tr>
+                    <td>reminder.missed</td>
+                    <td>Reminder not acknowledged in time</td>
+                    <td>Reminder ID, scheduled time, severity</td>
+                    <td>Alert caregivers, escalate</td>
+                </tr>
+                <tr>
+                    <td>reminder.escalated</td>
+                    <td>Escalation step triggered</td>
+                    <td>Reminder ID, escalation level, contacts</td>
+                    <td>Emergency notifications</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-block">
+<pre>// Webhook Configuration
+interface WebhookConfig {
+  id: string;
+  url: string;                         // HTTPS endpoint to receive events
+  events: string[];                    // Event types to subscribe to
+  secret: string;                      // For HMAC signature verification
+  active: boolean;
+  retryPolicy: {
+    maxAttempts: number;
+    backoffMultiplier: number;
+    maxBackoffSeconds: number;
+  };
+  filters?: {
+    userId?: string[];                 // Only events for these users
+    category?: string[];               // Only specific reminder categories
+    priority?: string[];               // Only certain priorities
+  };
+  headers?: Record&lt;string, string&gt;;   // Custom HTTP headers
+}
+
+// Webhook Payload Structure
+interface WebhookPayload {
+  event: string;                       // e.g., "reminder.completed"
+  timestamp: string;                   // ISO 8601 timestamp
+  data: {
+    reminder: Reminder;
+    previousState?: Partial&lt;Reminder&gt;; // For update events
+    metadata?: any;                    // Event-specific data
+  };
+  signature: string;                   // HMAC-SHA256 signature
+}
+
+// Verify Webhook Signature
+function verifyWebhookSignature(
+  payload: string,
+  signature: string,
+  secret: string
+): boolean {
+  const crypto = require('crypto');
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
+}
+
+// Handle Webhook Event (Express.js example)
+app.post('/webhooks/reminder-events', (req, res) => {
+  const signature = req.headers['x-wia-signature'];
+  const payload = JSON.stringify(req.body);
+
+  // Verify signature
+  if (!verifyWebhookSignature(payload, signature, WEBHOOK_SECRET)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  // Process event
+  const event: WebhookPayload = req.body;
+
+  switch (event.event) {
+    case 'reminder.missed':
+      // Alert caregiver
+      alertCaregiver(event.data.reminder);
+      break;
+
+    case 'reminder.completed':
+      // Update adherence records
+      updateAdherenceRecord(event.data.reminder);
+      break;
+
+    case 'reminder.escalated':
+      // Send emergency notification
+      sendEmergencyNotification(event.data.reminder);
+      break;
+  }
+
+  // Acknowledge receipt
+  res.status(200).json({ received: true });
+});
+
+// Register Webhook
+async function registerWebhook(
+  config: Omit&lt;WebhookConfig, 'id' | 'secret'&gt;
+): Promise&lt;APIResponse&lt;WebhookConfig&gt;&gt; {
+  return await client.request('/webhooks', {
+    method: 'POST',
+    body: JSON.stringify(config)
+  });
+}
+</pre>
+        </div>
+
+        <h2>3.5 Rate Limiting & Performance</h2>
+
+        <p>To ensure fair usage and system stability, the WIA-SENIOR-008 API implements comprehensive rate limiting. Understanding these limits is essential for building robust, production-ready integrations.</p>
+
+        <h3>3.5.1 Rate Limit Tiers</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Tier</th>
+                    <th>Requests/Minute</th>
+                    <th>Requests/Hour</th>
+                    <th>Burst Allowance</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Free</td>
+                    <td>60</td>
+                    <td>1,000</td>
+                    <td>10</td>
+                    <td>Development, testing</td>
+                </tr>
+                <tr>
+                    <td>Basic</td>
+                    <td>300</td>
+                    <td>10,000</td>
+                    <td>50</td>
+                    <td>Small practices, individual caregivers</td>
+                </tr>
+                <tr>
+                    <td>Professional</td>
+                    <td>1,200</td>
+                    <td>50,000</td>
+                    <td>200</td>
+                    <td>Medium organizations, care facilities</td>
+                </tr>
+                <tr>
+                    <td>Enterprise</td>
+                    <td>Custom</td>
+                    <td>Custom</td>
+                    <td>Custom</td>
+                    <td>Large healthcare systems, research institutions</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="note">
+            <strong>Rate Limit Headers:</strong> Every API response includes rate limit headers: X-RateLimit-Limit (total allowed), X-RateLimit-Remaining (requests left), X-RateLimit-Reset (Unix timestamp when limit resets). Clients should respect these headers and implement exponential backoff when approaching limits.
+        </div>
+
+        <div class="key-takeaways">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>RESTful Design:</strong> The WIA-SENIOR-008 Reminder API follows REST principles with resource-oriented endpoints, stateless operations, and HATEOAS links for discoverability.</li>
+                <li><strong>Robust Security:</strong> Multiple authentication methods (OAuth 2.0, JWT, API keys, mTLS) ensure appropriate security for different use cases while protecting sensitive health data.</li>
+                <li><strong>Comprehensive CRUD:</strong> Full create, read, update, delete operations with support for batch processing, pagination, and filtering enable efficient reminder management at scale.</li>
+                <li><strong>Event-Driven Integration:</strong> Webhooks provide real-time notifications of reminder events, enabling seamless integration with caregiving platforms and healthcare systems.</li>
+                <li><strong>Production-Ready:</strong> Rate limiting, error handling, optimistic locking, and idempotency keys ensure the API is reliable and ready for production deployment.</li>
+                <li><strong>Developer-Friendly:</strong> Clear documentation, consistent response formats, and SDKs in multiple languages lower the barrier to integration and reduce development time.</li>
+                <li><strong>Extensible Architecture:</strong> Metadata fields, custom tags, and versioning allow the API to evolve while maintaining backward compatibility and supporting diverse use cases.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li><strong>Explain the five core principles of the WIA-SENIOR-008 Reminder API architecture.</strong> How does each principle contribute to a robust, scalable API design?</li>
+
+                <li><strong>Compare OAuth 2.0, JWT tokens, and API keys as authentication methods.</strong> When would you choose each method, and what are their relative security trade-offs?</li>
+
+                <li><strong>Describe the complete lifecycle of a recurring medication reminder.</strong> Include creation via API, scheduled delivery, user acknowledgment, and webhook notifications to caregivers.</li>
+
+                <li><strong>What is an idempotency key, and why is it important for reminder APIs?</strong> Provide a concrete example of when idempotency prevents problems.</li>
+
+                <li><strong>Design a webhook integration for a care facility management system.</strong> Which events should be subscribed to, how should signatures be verified, and what retry logic is appropriate?</li>
+
+                <li><strong>Explain how rate limiting protects the API and its users.</strong> What should a client do when it approaches or exceeds rate limits?</li>
+
+                <li><strong>How does the API support complex reminder scenarios like medication with food requirements?</strong> Describe how you would model this using the API's data structures.</li>
+
+                <li><strong>What role does HATEOAS play in the API design?</strong> Provide an example of how hypermedia links make the API more usable and maintainable.</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-02.html">← Previous Chapter: Cognitive Support Systems</a>
+            <a href="chapter-04.html">Next Chapter: Daily Task Management →</a>
+        </div>
+
+        </div>
+</body>
+</html>

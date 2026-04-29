@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: 성능 최적화 | WIA-ROB-009</title>
+    <style>
+        :root { --bg: #0f172a; --surface: #1e293b; --primary: #8B5CF6; --text: #f1f5f9; --text-dim: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: var(--text); line-height: 2.0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: rgba(255, 255, 255, 0.05); padding: 30px; border-radius: 15px; margin-bottom: 30px; backdrop-filter: blur(10px); }
+        h1 { font-size: 2.5em; background: linear-gradient(45deg, var(--primary), #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 10px; }
+        h2 { color: var(--primary); font-size: 2em; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid rgba(139, 92, 246, 0.3); }
+        h3 { color: #a78bfa; font-size: 1.5em; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; text-align: justify; }
+        .content { background: rgba(255, 255, 255, 0.03); padding: 40px; border-radius: 15px; margin: 20px 0; }
+        .highlight { background: rgba(139, 92, 246, 0.1); border-left: 4px solid var(--primary); padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .callout { background: rgba(139, 92, 246, 0.05); border: 2px solid var(--primary); padding: 25px; margin: 25px 0; border-radius: 10px; }
+        .nav { display: flex; justify-content: space-between; margin: 40px 0; }
+        .btn { background: linear-gradient(45deg, var(--primary), #a78bfa); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; transition: transform 0.2s; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(139, 92, 246, 0.4); }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid rgba(139, 92, 246, 0.2); }
+        th { background: rgba(139, 92, 246, 0.2); color: #a78bfa; font-weight: 600; }
+        .philosophy { background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(167, 139, 250, 0.1)); border: 2px solid var(--primary); padding: 30px; margin: 40px 0; border-radius: 15px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📈 7장: 성능 최적화</h1>
+            <p style="color: #a78bfa; font-size: 1.2em;">플릿 효율성 및 처리량 극대화</p>
+        </header>
+
+        <div class="content">
+            <h2>7.1 성능 메트릭 및 KPI</h2>
+
+            <p>측정할 수 없으면 개선할 수 없습니다. 효과적인 성능 최적화는 올바른 메트릭을 정의하고, 정확하게 측정하고, 지속적으로 분석하는 것으로 시작됩니다. WIA-ROB-009 표준은 물류 로봇 성능을 평가하기 위한 핵심 성능 지표(KPI)를 정의합니다.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>KPI 카테고리</th>
+                        <th>메트릭</th>
+                        <th>목표 값</th>
+                        <th>측정 방법</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>처리량</td>
+                        <td>시간당 작업</td>
+                        <td>8-12</td>
+                        <td>완료 작업 / 시간</td>
+                    </tr>
+                    <tr>
+                        <td>효율성</td>
+                        <td>활용률</td>
+                        <td>75-85%</td>
+                        <td>활성 시간 / 총 시간</td>
+                    </tr>
+                    <tr>
+                        <td>품질</td>
+                        <td>오류율</td>
+                        <td>&lt; 0.1%</td>
+                        <td>오류 / 총 작업</td>
+                    </tr>
+                    <tr>
+                        <td>에너지</td>
+                        <td>작업당 kWh</td>
+                        <td>0.04-0.07</td>
+                        <td>소비 에너지 / 작업</td>
+                    </tr>
+                    <tr>
+                        <td>신뢰성</td>
+                        <td>MTBF</td>
+                        <td>&gt; 2000h</td>
+                        <td>운영 시간 / 고장</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>7.2 경로 및 작업 최적화</h2>
+
+            <p>효율적인 경로와 작업 할당은 플릿 성능을 극대화하는 데 중요합니다. 최적화는 여러 수준에서 발생합니다: 개별 로봇 경로, 작업 시퀀싱 및 플릿 수준 조정.</p>
+
+            <h3>동적 경로 재계획</h3>
+            <p>정적 경로 계획은 초기 조건에 최적일 수 있지만 창고 조건이 변경됨에 따라 최적이 아닐 수 있습니다. 동적 재계획 알고리즘은 지속적으로 경로를 재평가하고 새로운 장애물, 교통 패턴 또는 우선순위 변경에 적응합니다.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>최적화 기술</th>
+                        <th>개선 영역</th>
+                        <th>예상 이득</th>
+                        <th>복잡도</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>경로 평활화</td>
+                        <td>이동 시간</td>
+                        <td>10-15%</td>
+                        <td>낮음</td>
+                    </tr>
+                    <tr>
+                        <td>작업 배칭</td>
+                        <td>처리량</td>
+                        <td>20-30%</td>
+                        <td>중간</td>
+                    </tr>
+                    <tr>
+                        <td>예측 배치</td>
+                        <td>응답 시간</td>
+                        <td>25-40%</td>
+                        <td>높음</td>
+                    </tr>
+                    <tr>
+                        <td>부하 균형</td>
+                        <td>플릿 활용</td>
+                        <td>15-25%</td>
+                        <td>중간</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>7.3 에너지 효율성</h2>
+
+            <p>에너지 소비는 운영 비용과 환경 영향에 직접적인 영향을 미칩니다. 효율적인 에너지 관리는 비용을 절감할 뿐만 아니라 배터리 수명을 연장하고 가동 시간을 증가시킵니다.</p>
+
+            <h3>재생 제동</h3>
+            <p>현대 로봇은 감속 중에 재생 제동을 사용하여 에너지를 배터리로 다시 캡처합니다. 이것은 특히 빈번한 정지 및 시작 작업에서 에너지 소비를 10-20% 줄일 수 있습니다.</p>
+
+            <h3>속도 프로파일 최적화</h3>
+            <p>일정한 고속으로 작동하는 것이 항상 가장 효율적인 것은 아닙니다. 지능적인 속도 프로파일은 필요할 때 가속하고, 효율적인 순항 속도를 유지하며, 에너지 낭비적인 급제동을 피하기 위해 부드럽게 감속합니다.</p>
+
+            <h2>7.4 예측 유지보수</h2>
+
+            <p>반응적 유지보수(고장이 발생할 때 수리)는 비용이 많이 들고 파괴적입니다. 예방적 유지보수(일정에 따른 서비스)는 개선되지만 때때로 불필요한 작업으로 이어집니다. 예측 유지보수는 데이터를 사용하여 고장이 발생하기 전에 예측하여 최소한의 중단으로 적시 서비스를 가능하게 합니다.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>유지보수 전략</th>
+                        <th>작동 중단시간</th>
+                        <th>비용</th>
+                        <th>신뢰성</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>반응적</td>
+                        <td>높음</td>
+                        <td>높음</td>
+                        <td>낮음</td>
+                    </tr>
+                    <tr>
+                        <td>예방적</td>
+                        <td>중간</td>
+                        <td>중간</td>
+                        <td>중간</td>
+                    </tr>
+                    <tr>
+                        <td>예측적</td>
+                        <td>낮음</td>
+                        <td>낮음</td>
+                        <td>높음</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>7.5 지속적 개선 프로세스</h2>
+
+            <p>최적화는 일회성 활동이 아니라 지속적인 프로세스입니다. 최고의 시스템은 데이터를 수집하고, 패턴을 분석하고, 개선을 구현하고, 결과를 측정하는 피드백 루프를 구현합니다.</p>
+
+            <div class="philosophy">
+                <h3 style="color: #ffd700; font-size: 1.8em; margin-bottom: 15px;">弘益人間 (홍익인간)</h3>
+                <p style="font-size: 1.1em; line-height: 1.8; color: var(--text);">
+                    성능 최적화는 단순히 로봇을 더 빠르게 만드는 것이 아닙니다. 이는 에너지 소비를 줄이고, 리소스를 보존하고, 비용을 절감하여 자동화를 더 많은 조직에 접근 가능하게 만드는 것입니다. 효율적인 시스템은 더 적은 에너지를 사용하고, 더 적은 폐기물을 생성하며, 더 나은 근무 조건을 만듭니다. 이것이 바로 널리 인간과 환경을 이롭게 하는 방법입니다.
+                </p>
+            </div>
+
+            <div class="callout">
+                <h3>🎯 다음 장 미리보기</h3>
+                <p>
+                    8장에서는 물류 로봇의 미래를 탐구합니다. AI 통합, 협업 로봇, 자율 배송, 지속 가능성 및 차세대 물류 자동화 기술의 신흥 동향에 대해 배우게 됩니다.
+                </p>
+            </div>
+
+            <h2>핵심 요약</h2>
+            <div class="highlight">
+                <h3>📌 6가지 핵심 요점</h3>
+                <ol>
+                    <li><strong>메트릭 중심:</strong> 올바른 KPI를 정의하고 측정하는 것이 최적화의 기초입니다.</li>
+                    <li><strong>다층 최적화:</strong> 경로, 작업, 플릿 수준에서 최적화가 필요합니다.</li>
+                    <li><strong>에너지 효율:</strong> 재생 제동과 속도 최적화가 에너지 비용을 줄입니다.</li>
+                    <li><strong>예측 유지보수:</strong> 데이터 기반 예측이 작동 중단시간과 비용을 줄입니다.</li>
+                    <li><strong>지속적 개선:</strong> 피드백 루프가 지속적인 성능 향상을 가능하게 합니다.</li>
+                    <li><strong>전체적 접근:</strong> 진정한 최적화는 모든 시스템 측면을 고려합니다.</li>
+                </ol>
+            </div>
+
+            
+            <h2>7.6 데이터 분석 및 예측 유지보수</h2>
+            <p>WIA-ROB-009는 데이터 기반 의사결정을 통한 운영 최적화를 강조합니다:</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>분석 유형</th>
+                        <th>목적</th>
+                        <th>기술</th>
+                        <th>빈도</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>실시간 모니터링</td>
+                        <td>즉각적 문제 감지</td>
+                        <td>스트림 처리</td>
+                        <td>연속적</td>
+                    </tr>
+                    <tr>
+                        <td>성능 분석</td>
+                        <td>효율성 최적화</td>
+                        <td>통계 분석</td>
+                        <td>일일</td>
+                    </tr>
+                    <tr>
+                        <td>예측 유지보수</td>
+                        <td>고장 예방</td>
+                        <td>머신러닝</td>
+                        <td>주간</td>
+                    </tr>
+                    <tr>
+                        <td>트렌드 분석</td>
+                        <td>장기 계획</td>
+                        <td>시계열 분석</td>
+                        <td>월간</td>
+                    </tr>
+                    <tr>
+                        <td>벤치마킹</td>
+                        <td>산업 표준 비교</td>
+                        <td>비교 분석</td>
+                        <td>분기별</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>7.7 다중 창고 관리</h2>
+            <p>여러 창고 시설을 효율적으로 관리하기 위한 전략:</p>
+            <ul>
+                <li><strong>중앙 집중식 대시보드:</strong> 모든 창고의 통합 뷰</li>
+                <li><strong>표준화된 프로세스:</strong> 일관된 운영 절차 및 KPI</li>
+                <li><strong>리소스 공유:</strong> 로봇 및 인력의 창고 간 이동 최적화</li>
+                <li><strong>베스트 프랙티스 공유:</strong> 우수 사례의 빠른 전파</li>
+                <li><strong>통합 보고:</strong> 기업 전체 성능 가시성</li>
+                <li><strong>재해 복구:</strong> 한 창고 문제 시 다른 창고로 작업 이전</li>
+            </ul>
+
+            <h2>7.8 지속적 개선 프레임워크</h2>
+            <p>Kaizen 및 Lean 원칙을 적용한 운영 개선:</p>
+            <pre><code>// 개선 사이클
+{{
+  "continuousImprovement": {{
+    "plan": {{
+      "activities": [
+        "현재 성능 베이스라인 설정",
+        "개선 기회 식별",
+        "우선순위 결정",
+        "목표 및 메트릭 정의"
+      ]
+    }},
+    "do": {{
+      "activities": [
+        "파일럿 프로젝트 실행",
+        "데이터 수집",
+        "팀 교육",
+        "소규모 테스트"
+      ]
+    }},
+    "check": {{
+      "activities": [
+        "결과 측정",
+        "목표 대비 성과 평가",
+        "부작용 확인",
+        "피드백 수집"
+      ]
+    }},
+    "act": {{
+      "activities": [
+        "성공 시 전체 롤아웃",
+        "프로세스 표준화",
+        "문서화 업데이트",
+        "다음 개선 대상 선정"
+      ]
+    }},
+    "frequency": "quarterly",
+    "stakeholders": ["operations", "it", "management", "floor_workers"]
+  }}
+}}</code></pre>
+
+            <h2>7.9 계절적 변동 관리</h2>
+            <p>전자상거래 피크 시즌(블랙 프라이데이, 크리스마스 등)에 대비한 용량 계획:</p>
+            <ul>
+                <li><strong>수요 예측:</strong> 과거 데이터 기반 피크 시즌 물량 예측</li>
+                <li><strong>로봇 용량 증설:</strong> 임시 로봇 리스 또는 유휴 로봇 재배치</li>
+                <li><strong>교대 근무 확대:</strong> 추가 인력 채용 및 교육</li>
+                <li><strong>프로세스 간소화:</strong> 비핵심 작업 일시 중단</li>
+                <li><strong>예비 부품 재고:</strong> 주요 부품 사전 확보로 다운타임 최소화</li>
+                <li><strong>성능 모니터링 강화:</strong> 문제 조기 감지를 위한 실시간 대시보드</li>
+            </ul>
+<h2>복습 질문</h2>
+            <div class="highlight">
+                <h3>💭 이해도 점검</h3>
+                <ol>
+                    <li>물류 로봇의 5가지 주요 KPI 카테고리는 무엇인가요?</li>
+                    <li>동적 경로 재계획이 정적 계획보다 나은 이유는 무엇인가요?</li>
+                    <li>재생 제동은 어떻게 작동하며 에너지를 얼마나 절약하나요?</li>
+                    <li>예측 유지보수가 예방적 유지보수보다 나은 이유는 무엇인가요?</li>
+                    <li>지속적 개선 프로세스의 핵심 단계는 무엇인가요?</li>
+                    <li>작업 배칭이 처리량을 어떻게 개선하나요?</li>
+                </ol>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CRYO-FACILITY Simulator</title>
+</head>
+<body>
+<pre id="app">
+================================================================================
+CRYO-FACILITY SIMULATOR
+Cryopreservation Facility Certification System
+================================================================================
+
+[1] Facilities        [5] Monitoring
+[2] Certification     [6] Transfers
+[3] Inspections       [7] Risk Assessment
+[4] Storage Units     [8] Dashboard
+
+Enter section number: <input type="text" id="sectionInput" size="2" onkeypress="if(event.key==='Enter')navigate()">
+<button onclick="navigate()">[Go]</button>
+
+================================================================================
+<div id="content">
+Select a section above to begin.
+</div>
+================================================================================
+Status: <span id="status">Ready</span>
+================================================================================
+</pre>
+
+<script>
+const state = {
+  facilities: [
+    {
+      id: 'FAC-2075-US-000001',
+      name: 'CryoLife Institute',
+      country: 'USA',
+      city: 'Phoenix',
+      certificationLevel: 'LEVEL_3_ADVANCED',
+      certificationStatus: 'CERTIFIED',
+      operationalStatus: 'OPERATIONAL',
+      totalCapacity: 150,
+      currentOccupancy: 98,
+      certificationScore: 87,
+      lastInspection: '2075-09-15',
+      redundancyLevel: '2N',
+      autonomyHours: 336,
+      cryogenAutonomyDays: 21,
+      insuranceCoverage: ['GENERAL_LIABILITY', 'PROPERTY', 'PATIENT_PROTECTION', 'PROFESSIONAL_LIABILITY'],
+      yearsOfRunway: 12
+    },
+    {
+      id: 'FAC-2075-CH-000001',
+      name: 'Swiss Preservation AG',
+      country: 'Switzerland',
+      city: 'Zurich',
+      certificationLevel: 'LEVEL_4_EXCELLENCE',
+      certificationStatus: 'CERTIFIED',
+      operationalStatus: 'OPERATIONAL',
+      totalCapacity: 250,
+      currentOccupancy: 187,
+      certificationScore: 96,
+      lastInspection: '2075-11-01',
+      redundancyLevel: '2N+1',
+      autonomyHours: 720,
+      cryogenAutonomyDays: 45,
+      insuranceCoverage: ['GENERAL_LIABILITY', 'PROPERTY', 'PATIENT_PROTECTION', 'PROFESSIONAL_LIABILITY', 'BUSINESS_INTERRUPTION', 'CYBER'],
+      yearsOfRunway: 28
+    },
+    {
+      id: 'FAC-2075-JP-000001',
+      name: 'Tokyo Cryo Center',
+      country: 'Japan',
+      city: 'Tokyo',
+      certificationLevel: 'LEVEL_2_STANDARD',
+      certificationStatus: 'CERTIFIED',
+      operationalStatus: 'OPERATIONAL',
+      totalCapacity: 80,
+      currentOccupancy: 45,
+      certificationScore: 74,
+      lastInspection: '2075-08-20',
+      redundancyLevel: 'N+1',
+      autonomyHours: 168,
+      cryogenAutonomyDays: 14,
+      insuranceCoverage: ['GENERAL_LIABILITY', 'PROPERTY', 'PATIENT_PROTECTION'],
+      yearsOfRunway: 6
+    },
+    {
+      id: 'FAC-2075-AU-000001',
+      name: 'Southern Cross Cryonics',
+      country: 'Australia',
+      city: 'Melbourne',
+      certificationLevel: 'LEVEL_1_BASIC',
+      certificationStatus: 'PROVISIONAL',
+      operationalStatus: 'LIMITED_OPERATIONS',
+      totalCapacity: 30,
+      currentOccupancy: 12,
+      certificationScore: 58,
+      lastInspection: '2075-10-05',
+      redundancyLevel: 'N',
+      autonomyHours: 72,
+      cryogenAutonomyDays: 7,
+      insuranceCoverage: ['GENERAL_LIABILITY', 'PROPERTY'],
+      yearsOfRunway: 3
+    }
+  ],
+  storageUnits: [
+    { id: 'UNIT-001', facilityId: 'FAC-2075-US-000001', type: 'DEWAR_LARGE', capacity: 20, occupancy: 18, temperature: 77.3, status: 'GOOD' },
+    { id: 'UNIT-002', facilityId: 'FAC-2075-US-000001', type: 'DEWAR_LARGE', capacity: 20, occupancy: 15, temperature: 77.1, status: 'GOOD' },
+    { id: 'UNIT-003', facilityId: 'FAC-2075-US-000001', type: 'DEWAR_MEDIUM', capacity: 10, occupancy: 8, temperature: 77.4, status: 'WARNING' },
+    { id: 'UNIT-004', facilityId: 'FAC-2075-CH-000001', type: 'DEWAR_LARGE', capacity: 25, occupancy: 22, temperature: 77.0, status: 'GOOD' },
+    { id: 'UNIT-005', facilityId: 'FAC-2075-CH-000001', type: 'DEWAR_LARGE', capacity: 25, occupancy: 24, temperature: 77.1, status: 'GOOD' }
+  ],
+  inspections: [
+    { id: 'INS-2075-001', facilityId: 'FAC-2075-US-000001', type: 'ANNUAL_AUDIT', date: '2075-09-15', result: 'PASS', score: 87 },
+    { id: 'INS-2075-002', facilityId: 'FAC-2075-CH-000001', type: 'ANNUAL_AUDIT', date: '2075-11-01', result: 'PASS', score: 96 },
+    { id: 'INS-2075-003', facilityId: 'FAC-2075-JP-000001', type: 'ANNUAL_AUDIT', date: '2075-08-20', result: 'PASS_WITH_CONDITIONS', score: 74 },
+    { id: 'INS-2075-004', facilityId: 'FAC-2075-AU-000001', type: 'INITIAL_CERTIFICATION', date: '2075-10-05', result: 'REMEDIATION_REQUIRED', score: 58 }
+  ],
+  alerts: [
+    { id: 'ALT-001', facilityId: 'FAC-2075-US-000001', severity: 'WARNING', source: 'UNIT-003', message: 'Temperature variance detected', time: '2075-12-17T08:30:00Z', acknowledged: false },
+    { id: 'ALT-002', facilityId: 'FAC-2075-AU-000001', severity: 'INFO', source: 'POWER', message: 'Backup generator test scheduled', time: '2075-12-17T06:00:00Z', acknowledged: true }
+  ],
+  transfers: [],
+  selectedFacility: null
+};
+
+function navigate() {
+  const section = document.getElementById('sectionInput').value;
+  const content = document.getElementById('content');
+
+  switch(section) {
+    case '1': showFacilities(); break;
+    case '2': showCertification(); break;
+    case '3': showInspections(); break;
+    case '4': showStorageUnits(); break;
+    case '5': showMonitoring(); break;
+    case '6': showTransfers(); break;
+    case '7': showRiskAssessment(); break;
+    case '8': showDashboard(); break;
+    default: content.innerHTML = 'Invalid section. Enter 1-8.';
+  }
+  document.getElementById('sectionInput').value = '';
+}
+
+function showFacilities() {
+  let html = `
+FACILITIES MANAGEMENT
+================================================================================
+
+Registered Facilities:
+
++----------------------------------------------------------------------------+
+| ID                  | Name                    | Level  | Status      | Cap |
++----------------------------------------------------------------------------+`;
+
+  state.facilities.forEach(f => {
+    const level = f.certificationLevel.replace('LEVEL_', 'L').replace('_BASIC', '').replace('_STANDARD', '').replace('_ADVANCED', '').replace('_EXCELLENCE', '');
+    html += `
+| ${f.id.padEnd(19)} | ${f.name.substring(0,23).padEnd(23)} | ${level.padEnd(6)} | ${f.operationalStatus.substring(0,11).padEnd(11)} | ${(f.currentOccupancy + '/' + f.totalCapacity).padStart(3)} |`;
+  });
+
+  html += `
++----------------------------------------------------------------------------+
+
+Actions:
+  [V] View Details    [R] Register New    [U] Update Status
+
+Facility ID to view: <input type="text" id="facilityIdInput" size="20">
+<button onclick="viewFacility()">[View]</button>
+<button onclick="showRegisterFacility()">[Register New]</button>
+
+<div id="facilityDetail"></div>`;
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function viewFacility() {
+  const id = document.getElementById('facilityIdInput').value;
+  const facility = state.facilities.find(f => f.id === id);
+
+  if (!facility) {
+    document.getElementById('facilityDetail').innerHTML = '[!] Facility not found';
+    return;
+  }
+
+  state.selectedFacility = facility;
+
+  const detail = `
+================================================================================
+FACILITY DETAILS: ${facility.name}
+================================================================================
+
+[ID] Basic Information:
+  Facility ID:      ${facility.id}
+  Name:             ${facility.name}
+  Location:         ${facility.city}, ${facility.country}
+  Operational:      ${facility.operationalStatus}
+
+[ID] Certification:
+  Level:            ${facility.certificationLevel}
+  Status:           ${facility.certificationStatus}
+  Score:            ${facility.certificationScore}/100
+  Last Inspection:  ${facility.lastInspection}
+
+[ID] Capacity:
+  Total Capacity:   ${facility.totalCapacity} patients
+  Current:          ${facility.currentOccupancy} patients
+  Available:        ${facility.totalCapacity - facility.currentOccupancy} slots
+
+[ID] Infrastructure:
+  Redundancy:       ${facility.redundancyLevel}
+  Power Autonomy:   ${facility.autonomyHours} hours
+  Cryogen Supply:   ${facility.cryogenAutonomyDays} days
+
+[ID] Financial:
+  Years of Runway:  ${facility.yearsOfRunway} years
+  Insurance:        ${facility.insuranceCoverage.length} policies
+
+Status Actions:
+  <button onclick="updateFacilityStatus('OPERATIONAL')">[Operational]</button>
+  <button onclick="updateFacilityStatus('LIMITED_OPERATIONS')">[Limited]</button>
+  <button onclick="updateFacilityStatus('MAINTENANCE')">[Maintenance]</button>
+  <button onclick="updateFacilityStatus('EMERGENCY')">[Emergency]</button>
+`;
+
+  document.getElementById('facilityDetail').innerHTML = detail;
+}
+
+function updateFacilityStatus(newStatus) {
+  if (!state.selectedFacility) return;
+
+  const facility = state.facilities.find(f => f.id === state.selectedFacility.id);
+  if (facility) {
+    facility.operationalStatus = newStatus;
+    setStatus('Facility status updated to: ' + newStatus);
+    viewFacility();
+  }
+}
+
+function showRegisterFacility() {
+  document.getElementById('facilityDetail').innerHTML = `
+================================================================================
+REGISTER NEW FACILITY
+================================================================================
+
+<label>Name: <input type="text" id="newFacilityName" size="30"></label>
+<label>Country (2-letter): <input type="text" id="newFacilityCountry" size="3" maxlength="2"></label>
+<label>City: <input type="text" id="newFacilityCity" size="20"></label>
+<label>Capacity: <input type="number" id="newFacilityCapacity" size="5" value="50"></label>
+
+<button onclick="registerFacility()">[Register]</button>
+`;
+}
+
+function registerFacility() {
+  const name = document.getElementById('newFacilityName').value;
+  const country = document.getElementById('newFacilityCountry').value.toUpperCase();
+  const city = document.getElementById('newFacilityCity').value;
+  const capacity = parseInt(document.getElementById('newFacilityCapacity').value);
+
+  if (!name || !country || !city) {
+    setStatus('All fields required');
+    return;
+  }
+
+  const id = 'FAC-2075-' + country + '-' + String(state.facilities.filter(f => f.country === country).length + 1).padStart(6, '0');
+
+  state.facilities.push({
+    id,
+    name,
+    country,
+    city,
+    certificationLevel: null,
+    certificationStatus: 'PENDING',
+    operationalStatus: 'PRE_OPERATIONAL',
+    totalCapacity: capacity,
+    currentOccupancy: 0,
+    certificationScore: 0,
+    lastInspection: null,
+    redundancyLevel: 'N',
+    autonomyHours: 0,
+    cryogenAutonomyDays: 0,
+    insuranceCoverage: [],
+    yearsOfRunway: 0
+  });
+
+  setStatus('Facility registered: ' + id);
+  showFacilities();
+}
+
+function showCertification() {
+  let html = `
+CERTIFICATION MANAGEMENT
+================================================================================
+
+Certification Levels:
+  LEVEL_1_BASIC      - Minimum standards, N redundancy, 72h autonomy
+  LEVEL_2_STANDARD   - Enhanced redundancy (N+1), 168h autonomy
+  LEVEL_3_ADVANCED   - Full redundancy (2N), 336h autonomy, 24/7 staffing
+  LEVEL_4_EXCELLENCE - Gold standard (2N+1), 720h autonomy, research capable
+
++----------------------------------------------------------------------------+
+| Facility            | Level          | Status     | Score | Expires      |
++----------------------------------------------------------------------------+`;
+
+  state.facilities.forEach(f => {
+    const level = f.certificationLevel || 'PENDING';
+    const expiry = f.certificationStatus === 'CERTIFIED' ? '2076-' + f.lastInspection.substring(5) : '-';
+    html += `
+| ${f.id.padEnd(19)} | ${level.padEnd(14)} | ${f.certificationStatus.padEnd(10)} | ${String(f.certificationScore).padStart(5)} | ${expiry.padEnd(12)} |`;
+  });
+
+  html += `
++----------------------------------------------------------------------------+
+
+Actions:
+  [A] Apply for Certification    [R] Request Renewal    [S] View Score
+
+Facility ID: <input type="text" id="certFacilityId" size="20">
+<button onclick="applyCertification()">[Apply]</button>
+<button onclick="viewCertScore()">[View Score]</button>
+
+<div id="certDetail"></div>`;
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function applyCertification() {
+  const id = document.getElementById('certFacilityId').value;
+  const facility = state.facilities.find(f => f.id === id);
+
+  if (!facility) {
+    document.getElementById('certDetail').innerHTML = '[!] Facility not found';
+    return;
+  }
+
+  // Simulate certification application
+  document.getElementById('certDetail').innerHTML = `
+================================================================================
+CERTIFICATION APPLICATION: ${facility.name}
+================================================================================
+
+Eligibility Check:
+  [OK] Facility registered
+  [OK] Legal entity verified
+  ${facility.operationalStatus === 'PRE_OPERATIONAL' ? '[!] Facility not yet operational' : '[OK] Facility operational'}
+
+Requested Level: <select id="requestedLevel">
+  <option value="LEVEL_1_BASIC">LEVEL_1_BASIC</option>
+  <option value="LEVEL_2_STANDARD">LEVEL_2_STANDARD</option>
+  <option value="LEVEL_3_ADVANCED">LEVEL_3_ADVANCED</option>
+  <option value="LEVEL_4_EXCELLENCE">LEVEL_4_EXCELLENCE</option>
+</select>
+
+<button onclick="submitCertApplication('${id}')">[Submit Application]</button>
+`;
+}
+
+function submitCertApplication(facilityId) {
+  const level = document.getElementById('requestedLevel').value;
+  const facility = state.facilities.find(f => f.id === facilityId);
+
+  if (facility) {
+    facility.certificationStatus = 'PENDING';
+    // Schedule initial inspection
+    const inspectionId = 'INS-2075-' + String(state.inspections.length + 1).padStart(3, '0');
+    state.inspections.push({
+      id: inspectionId,
+      facilityId: facilityId,
+      type: 'INITIAL_CERTIFICATION',
+      date: new Date().toISOString().split('T')[0],
+      result: null,
+      score: null
+    });
+
+    setStatus('Application submitted. Inspection scheduled: ' + inspectionId);
+    showCertification();
+  }
+}
+
+function viewCertScore() {
+  const id = document.getElementById('certFacilityId').value;
+  const facility = state.facilities.find(f => f.id === id);
+
+  if (!facility) {
+    document.getElementById('certDetail').innerHTML = '[!] Facility not found';
+    return;
+  }
+
+  // Simulate score breakdown
+  const scores = {
+    INFRASTRUCTURE: Math.min(100, facility.autonomyHours / 7.2 + 20),
+    SAFETY: facility.certificationScore * 0.9 + 10,
+    REDUNDANCY: facility.redundancyLevel === '2N+1' ? 95 : facility.redundancyLevel === '2N' ? 80 : facility.redundancyLevel === 'N+1' ? 65 : 40,
+    PERSONNEL: facility.certificationScore * 0.8 + 15,
+    FINANCIAL: Math.min(100, facility.yearsOfRunway * 4),
+    DOCUMENTATION: facility.certificationScore * 0.85 + 10,
+    EMERGENCY: facility.cryogenAutonomyDays * 3,
+    PATIENT_CARE: facility.certificationScore
+  };
+
+  let html = `
+================================================================================
+CERTIFICATION SCORE BREAKDOWN: ${facility.name}
+================================================================================
+
+Category Scores (Weight):
+`;
+
+  const weights = { INFRASTRUCTURE: 0.20, SAFETY: 0.20, REDUNDANCY: 0.15, PERSONNEL: 0.10, FINANCIAL: 0.15, DOCUMENTATION: 0.05, EMERGENCY: 0.10, PATIENT_CARE: 0.05 };
+  let weighted = 0;
+
+  for (const [cat, score] of Object.entries(scores)) {
+    const bar = '[' + '='.repeat(Math.floor(score/5)) + ' '.repeat(20 - Math.floor(score/5)) + ']';
+    html += `  ${cat.padEnd(14)} ${bar} ${score.toFixed(0).padStart(3)}/100 (${(weights[cat]*100).toFixed(0)}%)\n`;
+    weighted += score * weights[cat];
+  }
+
+  html += `
+--------------------------------------------------------------------------------
+TOTAL WEIGHTED SCORE: ${weighted.toFixed(1)}/100
+
+Level Achieved: ${weighted >= 95 ? 'LEVEL_4_EXCELLENCE' : weighted >= 85 ? 'LEVEL_3_ADVANCED' : weighted >= 70 ? 'LEVEL_2_STANDARD' : weighted >= 50 ? 'LEVEL_1_BASIC' : 'NOT CERTIFIED'}
+`;
+
+  document.getElementById('certDetail').innerHTML = html;
+}
+
+function showInspections() {
+  let html = `
+INSPECTIONS
+================================================================================
+
+Inspection Types:
+  INITIAL_CERTIFICATION  - First certification
+  ANNUAL_AUDIT          - Yearly compliance review
+  UNANNOUNCED           - Random spot check
+  RENEWAL               - Certification renewal
+
+Recent Inspections:
++----------------------------------------------------------------------------+
+| ID            | Facility            | Type           | Date       | Result |
++----------------------------------------------------------------------------+`;
+
+  state.inspections.forEach(i => {
+    const result = i.result || 'PENDING';
+    html += `
+| ${i.id.padEnd(13)} | ${i.facilityId.padEnd(19)} | ${i.type.substring(0,14).padEnd(14)} | ${i.date} | ${result.substring(0,6).padEnd(6)} |`;
+  });
+
+  html += `
++----------------------------------------------------------------------------+
+
+Actions:
+  [S] Schedule Inspection    [R] Submit Report    [V] View Details
+
+<button onclick="scheduleInspection()">[Schedule New]</button>
+
+<div id="inspectionDetail"></div>`;
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function scheduleInspection() {
+  document.getElementById('inspectionDetail').innerHTML = `
+================================================================================
+SCHEDULE INSPECTION
+================================================================================
+
+Facility ID: <input type="text" id="schedFacilityId" size="20">
+Type: <select id="schedType">
+  <option value="ANNUAL_AUDIT">ANNUAL_AUDIT</option>
+  <option value="UNANNOUNCED">UNANNOUNCED</option>
+  <option value="RENEWAL">RENEWAL</option>
+  <option value="SPECIAL">SPECIAL</option>
+</select>
+Date: <input type="date" id="schedDate">
+
+<button onclick="createInspection()">[Create]</button>
+`;
+}
+
+function createInspection() {
+  const facilityId = document.getElementById('schedFacilityId').value;
+  const type = document.getElementById('schedType').value;
+  const date = document.getElementById('schedDate').value;
+
+  if (!state.facilities.find(f => f.id === facilityId)) {
+    setStatus('Facility not found');
+    return;
+  }
+
+  const id = 'INS-2075-' + String(state.inspections.length + 1).padStart(3, '0');
+  state.inspections.push({ id, facilityId, type, date, result: null, score: null });
+
+  setStatus('Inspection scheduled: ' + id);
+  showInspections();
+}
+
+function showStorageUnits() {
+  let html = `
+STORAGE UNITS
+================================================================================
+
+Unit Types:
+  DEWAR_LARGE    - >500L capacity
+  DEWAR_MEDIUM   - 100-500L capacity
+  DEWAR_SMALL    - <100L capacity
+  MECHANICAL     - Mechanical freezer
+
+Storage Units:
++----------------------------------------------------------------------------+
+| Unit ID    | Facility            | Type         | Cap  | Occ  | Temp (K)  |
++----------------------------------------------------------------------------+`;
+
+  state.storageUnits.forEach(u => {
+    const statusIcon = u.status === 'GOOD' ? '[OK]' : u.status === 'WARNING' ? '[!]' : '[!!]';
+    html += `
+| ${u.id.padEnd(10)} | ${u.facilityId.padEnd(19)} | ${u.type.padEnd(12)} | ${String(u.capacity).padStart(4)} | ${String(u.occupancy).padStart(4)} | ${u.temperature.toFixed(1).padStart(7)} ${statusIcon} |`;
+  });
+
+  html += `
++----------------------------------------------------------------------------+
+
+Actions:
+  [A] Add Unit    [M] Maintenance    [T] Temperature Log
+
+<button onclick="addStorageUnit()">[Add Unit]</button>
+
+<div id="unitDetail"></div>`;
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function addStorageUnit() {
+  document.getElementById('unitDetail').innerHTML = `
+================================================================================
+ADD STORAGE UNIT
+================================================================================
+
+Facility ID: <input type="text" id="unitFacilityId" size="20">
+Type: <select id="unitType">
+  <option value="DEWAR_LARGE">DEWAR_LARGE</option>
+  <option value="DEWAR_MEDIUM">DEWAR_MEDIUM</option>
+  <option value="DEWAR_SMALL">DEWAR_SMALL</option>
+  <option value="MECHANICAL_FREEZER">MECHANICAL_FREEZER</option>
+</select>
+Capacity: <input type="number" id="unitCapacity" value="20" size="5">
+
+<button onclick="createUnit()">[Create]</button>
+`;
+}
+
+function createUnit() {
+  const facilityId = document.getElementById('unitFacilityId').value;
+  const type = document.getElementById('unitType').value;
+  const capacity = parseInt(document.getElementById('unitCapacity').value);
+
+  if (!state.facilities.find(f => f.id === facilityId)) {
+    setStatus('Facility not found');
+    return;
+  }
+
+  const id = 'UNIT-' + String(state.storageUnits.length + 1).padStart(3, '0');
+  state.storageUnits.push({
+    id, facilityId, type, capacity, occupancy: 0, temperature: 77.0 + Math.random() * 0.5, status: 'GOOD'
+  });
+
+  setStatus('Storage unit added: ' + id);
+  showStorageUnits();
+}
+
+function showMonitoring() {
+  let html = `
+REAL-TIME MONITORING
+================================================================================
+
+System Status by Facility:
+`;
+
+  state.facilities.forEach(f => {
+    const alerts = state.alerts.filter(a => a.facilityId === f.id && !a.acknowledged);
+    const statusIcon = alerts.some(a => a.severity === 'CRITICAL') ? '[!!]' :
+                       alerts.some(a => a.severity === 'WARNING') ? '[!]' : '[OK]';
+
+    html += `
+${statusIcon} ${f.name} (${f.id})
+    Power: [OK]  Cooling: [OK]  Cryogen: ${f.cryogenAutonomyDays > 14 ? '[OK]' : '[!]'}  Monitoring: [OK]
+    Active Alerts: ${alerts.length}
+`;
+  });
+
+  html += `
+================================================================================
+ACTIVE ALERTS:
++----------------------------------------------------------------------------+
+| Alert ID  | Facility            | Severity | Source    | Message          |
++----------------------------------------------------------------------------+`;
+
+  state.alerts.filter(a => !a.acknowledged).forEach(a => {
+    html += `
+| ${a.id.padEnd(9)} | ${a.facilityId.padEnd(19)} | ${a.severity.padEnd(8)} | ${a.source.padEnd(9)} | ${a.message.substring(0,16).padEnd(16)} |`;
+  });
+
+  html += `
++----------------------------------------------------------------------------+
+
+Alert ID to acknowledge: <input type="text" id="alertId" size="10">
+<button onclick="acknowledgeAlert()">[Acknowledge]</button>
+<button onclick="createAlert()">[Simulate Alert]</button>
+
+<div id="monitorDetail"></div>`;
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function acknowledgeAlert() {
+  const id = document.getElementById('alertId').value;
+  const alert = state.alerts.find(a => a.id === id);
+
+  if (alert) {
+    alert.acknowledged = true;
+    setStatus('Alert acknowledged: ' + id);
+    showMonitoring();
+  } else {
+    setStatus('Alert not found');
+  }
+}
+
+function createAlert() {
+  const id = 'ALT-' + String(state.alerts.length + 1).padStart(3, '0');
+  const severities = ['INFO', 'WARNING', 'CRITICAL'];
+  const messages = ['Temperature variance', 'Cryogen level low', 'Power fluctuation', 'Sensor offline'];
+
+  state.alerts.push({
+    id,
+    facilityId: state.facilities[Math.floor(Math.random() * state.facilities.length)].id,
+    severity: severities[Math.floor(Math.random() * 3)],
+    source: 'UNIT-00' + Math.floor(Math.random() * 5 + 1),
+    message: messages[Math.floor(Math.random() * messages.length)],
+    time: new Date().toISOString(),
+    acknowledged: false
+  });
+
+  setStatus('Alert created: ' + id);
+  showMonitoring();
+}
+
+function showTransfers() {
+  let html = `
+TRANSFER MANAGEMENT
+================================================================================
+
+Transfer Types:
+  BANKRUPTCY          - Facility bankruptcy
+  VOLUNTARY_CLOSURE   - Planned closure
+  MERGER_ACQUISITION  - Facility acquisition
+  EMERGENCY_EVACUATION - Emergency transfer
+
+Active Transfers:
+`;
+
+  if (state.transfers.length === 0) {
+    html += `  No active transfers.
+
+`;
+  } else {
+    html += `+----------------------------------------------------------------------------+
+| Transfer ID | Origin              | Destination         | Status      | Pts |
++----------------------------------------------------------------------------+`;
+    state.transfers.forEach(t => {
+      html += `
+| ${t.id.padEnd(11)} | ${t.originId.padEnd(19)} | ${t.destinationId.padEnd(19)} | ${t.status.padEnd(11)} | ${String(t.patients).padStart(3)} |`;
+    });
+    html += `
++----------------------------------------------------------------------------+`;
+  }
+
+  html += `
+Actions:
+  [I] Initiate Transfer    [C] Complete Phase    [V] View Plan
+
+<button onclick="initiateTransfer()">[Initiate Transfer]</button>
+
+<div id="transferDetail"></div>`;
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function initiateTransfer() {
+  let options = state.facilities.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+
+  document.getElementById('transferDetail').innerHTML = `
+================================================================================
+INITIATE TRANSFER
+================================================================================
+
+Transfer Type: <select id="transferType">
+  <option value="BANKRUPTCY">BANKRUPTCY</option>
+  <option value="VOLUNTARY_CLOSURE">VOLUNTARY_CLOSURE</option>
+  <option value="EMERGENCY_EVACUATION">EMERGENCY_EVACUATION</option>
+</select>
+
+Origin Facility: <select id="transferOrigin">${options}</select>
+Destination: <select id="transferDest">${options}</select>
+
+<button onclick="createTransfer()">[Create Transfer Plan]</button>
+`;
+}
+
+function createTransfer() {
+  const type = document.getElementById('transferType').value;
+  const originId = document.getElementById('transferOrigin').value;
+  const destId = document.getElementById('transferDest').value;
+
+  if (originId === destId) {
+    setStatus('Origin and destination must be different');
+    return;
+  }
+
+  const origin = state.facilities.find(f => f.id === originId);
+  const dest = state.facilities.find(f => f.id === destId);
+
+  if (dest.totalCapacity - dest.currentOccupancy < origin.currentOccupancy) {
+    setStatus('Destination has insufficient capacity');
+    return;
+  }
+
+  const id = 'TXF-2075-' + String(state.transfers.length + 1).padStart(3, '0');
+
+  state.transfers.push({
+    id,
+    type,
+    originId,
+    destinationId: destId,
+    patients: origin.currentOccupancy,
+    status: 'PLANNING',
+    phases: [
+      { num: 1, name: 'Regulatory Approval', status: 'PENDING' },
+      { num: 2, name: 'Preparation', status: 'PENDING' },
+      { num: 3, name: 'Patient Transfer', status: 'PENDING' },
+      { num: 4, name: 'Closeout', status: 'PENDING' }
+    ]
+  });
+
+  setStatus('Transfer initiated: ' + id);
+  showTransfers();
+}
+
+function showRiskAssessment() {
+  let html = `
+RISK ASSESSMENT
+================================================================================
+
+Facility ID: <input type="text" id="riskFacilityId" size="20">
+<button onclick="assessRisk()">[Assess Risk]</button>
+
+<div id="riskDetail"></div>`;
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function assessRisk() {
+  const id = document.getElementById('riskFacilityId').value;
+  const facility = state.facilities.find(f => f.id === id);
+
+  if (!facility) {
+    document.getElementById('riskDetail').innerHTML = '[!] Facility not found';
+    return;
+  }
+
+  // Calculate risk scores
+  const risks = [
+    {
+      category: 'OPERATIONAL',
+      factors: [
+        { name: 'Power Failure', likelihood: facility.redundancyLevel === '2N+1' ? 0.05 : facility.redundancyLevel === '2N' ? 0.1 : 0.2, impact: 0.9 },
+        { name: 'Cryogen Supply', likelihood: facility.cryogenAutonomyDays > 21 ? 0.1 : 0.3, impact: 0.8 }
+      ]
+    },
+    {
+      category: 'FINANCIAL',
+      factors: [
+        { name: 'Reserve Depletion', likelihood: Math.max(0, 1 - facility.yearsOfRunway / 10), impact: 0.95 }
+      ]
+    },
+    {
+      category: 'TECHNICAL',
+      factors: [
+        { name: 'Equipment Failure', likelihood: 0.15, impact: 0.6 }
+      ]
+    }
+  ];
+
+  let overallRisk = 0;
+  let html = `
+================================================================================
+RISK ASSESSMENT: ${facility.name}
+================================================================================
+
+`;
+
+  risks.forEach(cat => {
+    html += `[${cat.category}]\n`;
+    cat.factors.forEach(f => {
+      const score = f.likelihood * f.impact;
+      overallRisk += score;
+      const level = score > 0.5 ? 'HIGH' : score > 0.2 ? 'MEDIUM' : 'LOW';
+      const bar = '[' + '='.repeat(Math.floor(score * 20)) + ' '.repeat(20 - Math.floor(score * 20)) + ']';
+      html += `  ${f.name.padEnd(20)} ${bar} ${(score * 100).toFixed(0)}% [${level}]\n`;
+      html += `    Likelihood: ${(f.likelihood * 100).toFixed(0)}%  Impact: ${(f.impact * 100).toFixed(0)}%\n`;
+    });
+    html += '\n';
+  });
+
+  overallRisk = overallRisk / 4;
+  const overallLevel = overallRisk > 0.5 ? 'CRITICAL' : overallRisk > 0.3 ? 'HIGH' : overallRisk > 0.15 ? 'MEDIUM' : 'LOW';
+
+  html += `--------------------------------------------------------------------------------
+OVERALL RISK SCORE: ${(overallRisk * 100).toFixed(1)}% [${overallLevel}]
+
+Priority Actions:
+`;
+
+  if (facility.yearsOfRunway < 5) html += `  [!] Increase financial reserves (current: ${facility.yearsOfRunway} years)\n`;
+  if (facility.cryogenAutonomyDays < 14) html += `  [!] Increase cryogen reserves (current: ${facility.cryogenAutonomyDays} days)\n`;
+  if (facility.redundancyLevel === 'N') html += `  [!] Upgrade power redundancy\n`;
+  if (overallLevel === 'LOW') html += `  [OK] No urgent actions required\n`;
+
+  document.getElementById('riskDetail').innerHTML = html;
+}
+
+function showDashboard() {
+  const totalCapacity = state.facilities.reduce((a, f) => a + f.totalCapacity, 0);
+  const totalOccupancy = state.facilities.reduce((a, f) => a + f.currentOccupancy, 0);
+  const activeAlerts = state.alerts.filter(a => !a.acknowledged).length;
+  const certifiedFacilities = state.facilities.filter(f => f.certificationStatus === 'CERTIFIED').length;
+
+  let html = `
+GLOBAL DASHBOARD
+================================================================================
+
++----------------------------------+  +----------------------------------+
+|  TOTAL FACILITIES                |  |  CERTIFICATION STATUS            |
+|  ${String(state.facilities.length).padStart(4)}                           |  |  Certified: ${String(certifiedFacilities).padStart(2)}                    |
++----------------------------------+  +----------------------------------+
+
++----------------------------------+  +----------------------------------+
+|  GLOBAL CAPACITY                 |  |  ACTIVE ALERTS                   |
+|  ${String(totalOccupancy).padStart(4)} / ${String(totalCapacity).padStart(4)} patients          |  |  ${String(activeAlerts).padStart(4)} unacknowledged             |
++----------------------------------+  +----------------------------------+
+
+CAPACITY BY LEVEL:
+`;
+
+  const levels = ['LEVEL_1_BASIC', 'LEVEL_2_STANDARD', 'LEVEL_3_ADVANCED', 'LEVEL_4_EXCELLENCE'];
+  levels.forEach(level => {
+    const facilities = state.facilities.filter(f => f.certificationLevel === level);
+    const cap = facilities.reduce((a, f) => a + f.totalCapacity, 0);
+    const occ = facilities.reduce((a, f) => a + f.currentOccupancy, 0);
+    const pct = cap > 0 ? Math.round(occ / cap * 100) : 0;
+    const bar = '[' + '='.repeat(Math.floor(pct/5)) + ' '.repeat(20 - Math.floor(pct/5)) + ']';
+    html += `  ${level.padEnd(18)} ${bar} ${String(occ).padStart(4)}/${String(cap).padStart(4)} (${pct}%)\n`;
+  });
+
+  html += `
+FACILITIES BY OPERATIONAL STATUS:
+`;
+
+  const statuses = ['OPERATIONAL', 'LIMITED_OPERATIONS', 'MAINTENANCE', 'PRE_OPERATIONAL'];
+  statuses.forEach(status => {
+    const count = state.facilities.filter(f => f.operationalStatus === status).length;
+    html += `  ${status.padEnd(20)} ${'*'.repeat(count)} (${count})\n`;
+  });
+
+  html += `
+RECENT ACTIVITY:
+`;
+
+  state.inspections.slice(-3).reverse().forEach(i => {
+    html += `  [INS] ${i.date} - ${i.facilityId} - ${i.type}\n`;
+  });
+
+  state.alerts.slice(-3).reverse().forEach(a => {
+    html += `  [ALT] ${a.time.substring(0,10)} - ${a.facilityId} - ${a.message}\n`;
+  });
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function setStatus(msg) {
+  document.getElementById('status').textContent = msg;
+}
+
+// Initialize with dashboard
+showDashboard();
+</script>
+</body>
+</html>

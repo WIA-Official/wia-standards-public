@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA BCI - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #8B5CF6;
+            --primary-dark: #7C3AED;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 20px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 1rem; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-secondary:hover { border-color: var(--primary); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .sub-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .sub-section h4 { color: var(--primary); margin-bottom: 15px; font-size: 1rem; }
+
+        .signal-canvas { width: 100%; height: 200px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+
+        .channel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin: 20px 0; }
+        .channel-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .channel-item:hover { border-color: var(--primary); }
+        .channel-item.active { border-color: var(--secondary); background: rgba(16, 185, 129, 0.1); }
+        .channel-item .name { font-weight: 600; font-size: 0.9rem; }
+        .channel-item .value { font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; }
+
+        .paradigm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin: 20px 0; }
+        .paradigm-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .paradigm-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .paradigm-card.selected { border-color: var(--primary); background: rgba(139, 92, 246, 0.1); }
+        .paradigm-card .icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .paradigm-card .name { font-weight: 600; margin-bottom: 5px; }
+        .paradigm-card .desc { font-size: 0.8rem; color: var(--text-muted); }
+
+        .device-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .device-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; cursor: pointer; transition: all 0.2s; }
+        .device-card:hover { border-color: var(--primary); }
+        .device-card.selected { border-color: var(--primary); background: rgba(139, 92, 246, 0.1); }
+        .device-card .name { font-weight: 600; margin-bottom: 5px; }
+        .device-card .specs { font-size: 0.8rem; color: var(--text-muted); }
+
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .status-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .status-item .value { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+        .status-item .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .band-bars { display: flex; gap: 10px; margin: 20px 0; align-items: flex-end; height: 150px; }
+        .band-bar { flex: 1; background: linear-gradient(to top, var(--primary), var(--secondary)); border-radius: 4px 4px 0 0; transition: height 0.3s; position: relative; }
+        .band-bar .label { position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); font-size: 0.75rem; color: var(--text-muted); }
+        .band-bar .value { position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 0.8rem; font-weight: bold; }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">BCI</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com/reader/simulators/" target="_blank" data-en="🎮 109+ Simulators" data-ko="🎮 109+ 시뮬레이터">🎮 109+ Simulators</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🧠 WIA-BCI</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Brain-Computer Interface Standard" data-ko="뇌-컴퓨터 인터페이스 표준">Brain-Computer Interface Standard</h1>
+            <p data-en="Universal data format for EEG, EMG, EOG signals" data-ko="EEG, EMG, EOG 신호를 위한 통합 데이터 형식">Universal data format for neural signals</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📊 Data Format" data-ko="📊 데이터 형식">📊 Data Format</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🧠 Signal" data-ko="🧠 신호">🧠 Signal</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🎯 Paradigm" data-ko="🎯 패러다임">🎯 Paradigm</div>
+            <div class="tab" onclick="showPanel(3)" data-en="📡 Device" data-ko="📡 기기">📡 Device</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🔬 Analysis" data-ko="🔬 분석">🔬 Analysis</div>
+        </div>
+
+        <!-- Panel 0: Data Format -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="📊 Recording Data Format" data-ko="📊 녹화 데이터 형식">📊 Recording Data Format</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Configure BCI recording metadata" data-ko="BCI 녹화 메타데이터 설정">Configure BCI recording metadata</p>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Recording ID" data-ko="녹화 ID">Recording ID</label>
+                    <input type="text" id="recordingId" value="rec-20250118-001">
+                </div>
+                <div class="form-group">
+                    <label data-en="Session Type" data-ko="세션 유형">Session Type</label>
+                    <select id="sessionType">
+                        <option value="research" data-en="Research" data-ko="연구">Research</option>
+                        <option value="clinical" data-en="Clinical" data-ko="임상">Clinical</option>
+                        <option value="consumer" data-en="Consumer" data-ko="소비자">Consumer</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Duration (seconds)" data-ko="기간 (초)">Duration (seconds)</label>
+                    <input type="number" id="duration" value="3600">
+                </div>
+                <div class="form-group">
+                    <label data-en="Sampling Rate (Hz)" data-ko="샘플링 레이트 (Hz)">Sampling Rate (Hz)</label>
+                    <select id="samplingRate">
+                        <option value="128">128 Hz</option>
+                        <option value="250" selected>250 Hz</option>
+                        <option value="500">500 Hz</option>
+                        <option value="1000">1000 Hz</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Data Modalities" data-ko="데이터 모달리티">Data Modalities</h4>
+                <div class="channel-grid">
+                    <div class="channel-item active" onclick="toggleChannel(this)">
+                        <div class="name">EEG</div>
+                        <div class="value" data-en="Brainwaves" data-ko="뇌파">Brainwaves</div>
+                    </div>
+                    <div class="channel-item" onclick="toggleChannel(this)">
+                        <div class="name">EMG</div>
+                        <div class="value" data-en="Muscle" data-ko="근전도">Muscle</div>
+                    </div>
+                    <div class="channel-item" onclick="toggleChannel(this)">
+                        <div class="name">EOG</div>
+                        <div class="value" data-en="Eye Movement" data-ko="안전도">Eye Movement</div>
+                    </div>
+                    <div class="channel-item" onclick="toggleChannel(this)">
+                        <div class="name">ECG</div>
+                        <div class="value" data-en="Heart" data-ko="심전도">Heart</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="generateFormat()" data-en="📋 Generate Format" data-ko="📋 형식 생성">📋 Generate Format</button>
+            </div>
+            <div class="output" id="formatOutput"></div>
+        </div>
+
+        <!-- Panel 1: Signal -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🧠 Signal Visualization" data-ko="🧠 신호 시각화">🧠 Signal Visualization</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Simulate and visualize neural signals" data-ko="신경 신호 시뮬레이션 및 시각화">Simulate and visualize neural signals</p>
+
+            <div class="sub-section">
+                <h4 data-en="EEG Channels (10-20 System)" data-ko="EEG 채널 (10-20 시스템)">EEG Channels (10-20 System)</h4>
+                <div class="channel-grid">
+                    <div class="channel-item active"><div class="name">Fp1</div><div class="value">-12.3 μV</div></div>
+                    <div class="channel-item active"><div class="name">Fp2</div><div class="value">-8.7 μV</div></div>
+                    <div class="channel-item active"><div class="name">F3</div><div class="value">15.2 μV</div></div>
+                    <div class="channel-item active"><div class="name">F4</div><div class="value">11.8 μV</div></div>
+                    <div class="channel-item active"><div class="name">C3</div><div class="value">-5.4 μV</div></div>
+                    <div class="channel-item active"><div class="name">C4</div><div class="value">-3.2 μV</div></div>
+                    <div class="channel-item active"><div class="name">P3</div><div class="value">8.9 μV</div></div>
+                    <div class="channel-item active"><div class="name">P4</div><div class="value">7.1 μV</div></div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Signal Preview" data-ko="신호 미리보기">Signal Preview</h4>
+                <canvas id="signalCanvas" class="signal-canvas"></canvas>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="startSignal()" data-en="▶️ Start" data-ko="▶️ 시작">▶️ Start</button>
+                <button class="btn btn-secondary" onclick="stopSignal()" data-en="⏹️ Stop" data-ko="⏹️ 정지">⏹️ Stop</button>
+            </div>
+            <div class="output" id="signalOutput"></div>
+        </div>
+
+        <!-- Panel 2: Paradigm -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🎯 BCI Paradigms" data-ko="🎯 BCI 패러다임">🎯 BCI Paradigms</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Select experimental paradigm" data-ko="실험 패러다임 선택">Select experimental paradigm</p>
+
+            <div class="paradigm-grid">
+                <div class="paradigm-card selected" onclick="selectParadigm(this, 'motor_imagery')">
+                    <div class="icon">🖐️</div>
+                    <div class="name">Motor Imagery</div>
+                    <div class="desc" data-en="Imagine hand/foot movement" data-ko="손/발 움직임 상상">Imagine movement</div>
+                </div>
+                <div class="paradigm-card" onclick="selectParadigm(this, 'p300')">
+                    <div class="icon">⚡</div>
+                    <div class="name">P300 Speller</div>
+                    <div class="desc" data-en="Oddball detection" data-ko="이상 자극 탐지">Oddball detection</div>
+                </div>
+                <div class="paradigm-card" onclick="selectParadigm(this, 'ssvep')">
+                    <div class="icon">💡</div>
+                    <div class="name">SSVEP</div>
+                    <div class="desc" data-en="Visual flicker response" data-ko="시각 깜빡임 반응">Flicker response</div>
+                </div>
+                <div class="paradigm-card" onclick="selectParadigm(this, 'erp')">
+                    <div class="icon">📊</div>
+                    <div class="name">ERP</div>
+                    <div class="desc" data-en="Event-related potential" data-ko="사건 관련 전위">Event-related</div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Paradigm Configuration" data-ko="패러다임 설정">Paradigm Configuration</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Number of Classes" data-ko="클래스 수">Number of Classes</label>
+                        <select id="numClasses">
+                            <option value="2">2 (Left/Right)</option>
+                            <option value="4" selected>4 (L/R/Up/Down)</option>
+                            <option value="6">6 (Multi)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Trial Duration (s)" data-ko="시행 시간 (초)">Trial Duration (s)</label>
+                        <input type="number" id="trialDuration" value="4">
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runParadigm()" data-en="🎯 Run Paradigm" data-ko="🎯 패러다임 실행">🎯 Run Paradigm</button>
+            </div>
+            <div class="output" id="paradigmOutput"></div>
+        </div>
+
+        <!-- Panel 3: Device -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="📡 BCI Devices" data-ko="📡 BCI 기기">📡 BCI Devices</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Configure BCI device settings" data-ko="BCI 기기 설정 구성">Configure BCI device settings</p>
+
+            <div class="device-grid">
+                <div class="device-card selected" onclick="selectDevice(this, 'openbci')">
+                    <div class="name">🔬 OpenBCI Cyton</div>
+                    <div class="specs">8ch | 250Hz | 24-bit | $399</div>
+                </div>
+                <div class="device-card" onclick="selectDevice(this, 'emotiv')">
+                    <div class="name">🎧 Emotiv EPOC X</div>
+                    <div class="specs">14ch | 128Hz | 14-bit | $849</div>
+                </div>
+                <div class="device-card" onclick="selectDevice(this, 'muse')">
+                    <div class="name">🧘 Muse 2</div>
+                    <div class="specs">4ch | 256Hz | Consumer | $249</div>
+                </div>
+                <div class="device-card" onclick="selectDevice(this, 'neurosity')">
+                    <div class="name">💻 Neurosity Crown</div>
+                    <div class="specs">8ch | 256Hz | Focus | $999</div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Device Status" data-ko="기기 상태">Device Status</h4>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="value">✅</div>
+                        <div class="label" data-en="Connected" data-ko="연결됨">Connected</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="value">87%</div>
+                        <div class="label" data-en="Battery" data-ko="배터리">Battery</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="value">Good</div>
+                        <div class="label" data-en="Signal Quality" data-ko="신호 품질">Signal Quality</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="value">8</div>
+                        <div class="label" data-en="Channels" data-ko="채널">Channels</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="connectDevice()" data-en="🔗 Connect" data-ko="🔗 연결">🔗 Connect</button>
+                <button class="btn btn-secondary" onclick="calibrateDevice()" data-en="🎯 Calibrate" data-ko="🎯 보정">🎯 Calibrate</button>
+            </div>
+            <div class="output" id="deviceOutput"></div>
+        </div>
+
+        <!-- Panel 4: Analysis -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="🔬 Signal Analysis" data-ko="🔬 신호 분석">🔬 Signal Analysis</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Analyze frequency bands and extract features" data-ko="주파수 대역 분석 및 특징 추출">Analyze frequency bands and features</p>
+
+            <div class="sub-section">
+                <h4 data-en="Frequency Bands Power" data-ko="주파수 대역 파워">Frequency Bands Power</h4>
+                <div class="band-bars" id="bandBars">
+                    <div class="band-bar" style="height: 40%"><span class="value">12%</span><span class="label">Delta</span></div>
+                    <div class="band-bar" style="height: 55%"><span class="value">18%</span><span class="label">Theta</span></div>
+                    <div class="band-bar" style="height: 80%"><span class="value">32%</span><span class="label">Alpha</span></div>
+                    <div class="band-bar" style="height: 65%"><span class="value">25%</span><span class="label">Beta</span></div>
+                    <div class="band-bar" style="height: 35%"><span class="value">13%</span><span class="label">Gamma</span></div>
+                </div>
+            </div>
+
+            <div class="status-grid" style="margin-top: 40px;">
+                <div class="status-item">
+                    <div class="value">10.2 Hz</div>
+                    <div class="label" data-en="Peak Alpha" data-ko="피크 알파">Peak Alpha</div>
+                </div>
+                <div class="status-item">
+                    <div class="value">0.85</div>
+                    <div class="label" data-en="Alpha/Theta Ratio" data-ko="알파/세타 비율">Alpha/Theta</div>
+                </div>
+                <div class="status-item">
+                    <div class="value">Low</div>
+                    <div class="label" data-en="Artifact Level" data-ko="아티팩트 레벨">Artifact</div>
+                </div>
+                <div class="status-item">
+                    <div class="value">92%</div>
+                    <div class="label" data-en="Data Quality" data-ko="데이터 품질">Quality</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runAnalysis()" data-en="🔬 Analyze" data-ko="🔬 분석">🔬 Analyze</button>
+                <button class="btn btn-secondary" onclick="exportFeatures()" data-en="📤 Export Features" data-ko="📤 특징 내보내기">📤 Export Features</button>
+            </div>
+            <div class="output" id="analysisOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA-BCI: Brain-Computer Interface Standard" data-ko="WIA-BCI: 뇌-컴퓨터 인터페이스 표준">WIA-BCI: Brain-Computer Interface Standard</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let signalInterval = null;
+        let selectedParadigm = 'motor_imagery';
+        let selectedDevice = 'openbci';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+            if (index === 1) initCanvas();
+        }
+
+        function toggleChannel(el) {
+            el.classList.toggle('active');
+        }
+
+        function generateId() {
+            return 'xxxx-xxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16));
+        }
+
+        // Data Format
+        function generateFormat() {
+            const modalities = [];
+            document.querySelectorAll('#panel-0 .channel-item.active .name').forEach(el => {
+                modalities.push(el.textContent);
+            });
+
+            document.getElementById('formatOutput').textContent = JSON.stringify({
+                "$schema": "https://wia.live/schemas/bci/recording.schema.json",
+                "wia_version": "1.0.0",
+                "recording_id": document.getElementById('recordingId').value,
+                "session": {
+                    "type": document.getElementById('sessionType').value,
+                    "duration_seconds": parseInt(document.getElementById('duration').value),
+                    "sampling_rate_hz": parseInt(document.getElementById('samplingRate').value)
+                },
+                "modalities": modalities,
+                "channels": modalities.includes('EEG') ? 8 : 0,
+                "format": "binary_float32_le",
+                "timestamp": new Date().toISOString()
+            }, null, 2);
+        }
+
+        // Signal
+        let canvas, ctx;
+        function initCanvas() {
+            canvas = document.getElementById('signalCanvas');
+            ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        }
+
+        function drawSignal() {
+            if (!ctx) return;
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.strokeStyle = '#8B5CF6';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            for (let i = 0; i < canvas.width; i++) {
+                const y = canvas.height/2 + Math.sin(i/20 + Date.now()/200) * 30 + 
+                          Math.sin(i/10 + Date.now()/100) * 15 + 
+                          (Math.random() - 0.5) * 10;
+                if (i === 0) ctx.moveTo(i, y);
+                else ctx.lineTo(i, y);
+            }
+            ctx.stroke();
+            
+            // Grid
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i < canvas.height; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+        }
+
+        function startSignal() {
+            initCanvas();
+            if (signalInterval) clearInterval(signalInterval);
+            signalInterval = setInterval(drawSignal, 50);
+            document.getElementById('signalOutput').textContent = JSON.stringify({
+                status: '▶️ Signal Streaming',
+                channels: 8,
+                samplingRate: '250 Hz',
+                message: currentLang === 'ko' ? '신호 스트리밍 시작' : 'Signal streaming started'
+            }, null, 2);
+        }
+
+        function stopSignal() {
+            if (signalInterval) {
+                clearInterval(signalInterval);
+                signalInterval = null;
+            }
+            document.getElementById('signalOutput').textContent = JSON.stringify({
+                status: '⏹️ Signal Stopped',
+                message: currentLang === 'ko' ? '신호 스트리밍 중지' : 'Signal streaming stopped'
+            }, null, 2);
+        }
+
+        // Paradigm
+        function selectParadigm(el, paradigm) {
+            document.querySelectorAll('.paradigm-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedParadigm = paradigm;
+        }
+
+        function runParadigm() {
+            const paradigms = {
+                motor_imagery: { name: 'Motor Imagery', classes: ['Left Hand', 'Right Hand', 'Both Feet', 'Tongue'] },
+                p300: { name: 'P300 Speller', classes: ['Target', 'Non-Target'] },
+                ssvep: { name: 'SSVEP', classes: ['7Hz', '10Hz', '12Hz', '15Hz'] },
+                erp: { name: 'ERP', classes: ['Standard', 'Deviant'] }
+            };
+            
+            document.getElementById('paradigmOutput').textContent = JSON.stringify({
+                status: '🎯 Paradigm Running',
+                paradigm: paradigms[selectedParadigm].name,
+                classes: paradigms[selectedParadigm].classes,
+                numClasses: parseInt(document.getElementById('numClasses').value),
+                trialDuration: parseInt(document.getElementById('trialDuration').value),
+                message: currentLang === 'ko' ? '패러다임 실행 중' : 'Paradigm running'
+            }, null, 2);
+        }
+
+        // Device
+        function selectDevice(el, device) {
+            document.querySelectorAll('.device-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedDevice = device;
+        }
+
+        function connectDevice() {
+            const devices = {
+                openbci: { name: 'OpenBCI Cyton', channels: 8, rate: 250 },
+                emotiv: { name: 'Emotiv EPOC X', channels: 14, rate: 128 },
+                muse: { name: 'Muse 2', channels: 4, rate: 256 },
+                neurosity: { name: 'Neurosity Crown', channels: 8, rate: 256 }
+            };
+            
+            document.getElementById('deviceOutput').textContent = JSON.stringify({
+                status: '✅ Device Connected',
+                device: devices[selectedDevice],
+                firmware: '3.1.2',
+                battery: '87%',
+                signalQuality: 'Good',
+                message: currentLang === 'ko' ? '기기 연결됨' : 'Device connected'
+            }, null, 2);
+        }
+
+        function calibrateDevice() {
+            document.getElementById('deviceOutput').textContent = JSON.stringify({
+                status: '🎯 Calibration Complete',
+                impedance: {
+                    Fp1: '5.2 kΩ',
+                    Fp2: '4.8 kΩ',
+                    average: '5.0 kΩ'
+                },
+                offset: '0.0 μV',
+                message: currentLang === 'ko' ? '보정 완료' : 'Calibration complete'
+            }, null, 2);
+        }
+
+        // Analysis
+        function runAnalysis() {
+            const bands = ['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma'];
+            const powers = bands.map(() => Math.floor(Math.random() * 40) + 10);
+            const total = powers.reduce((a, b) => a + b, 0);
+            const normalized = powers.map(p => Math.round(p / total * 100));
+
+            document.querySelectorAll('.band-bar').forEach((bar, i) => {
+                bar.style.height = normalized[i] + '%';
+                bar.querySelector('.value').textContent = normalized[i] + '%';
+            });
+
+            document.getElementById('analysisOutput').textContent = JSON.stringify({
+                status: '🔬 Analysis Complete',
+                frequencyBands: {
+                    delta: { range: '0.5-4 Hz', power: normalized[0] + '%' },
+                    theta: { range: '4-8 Hz', power: normalized[1] + '%' },
+                    alpha: { range: '8-13 Hz', power: normalized[2] + '%' },
+                    beta: { range: '13-30 Hz', power: normalized[3] + '%' },
+                    gamma: { range: '30-100 Hz', power: normalized[4] + '%' }
+                },
+                peakAlpha: (Math.random() * 3 + 9).toFixed(1) + ' Hz',
+                alphaTheta: (Math.random() * 0.5 + 0.6).toFixed(2),
+                quality: '92%',
+                message: currentLang === 'ko' ? '분석 완료' : 'Analysis complete'
+            }, null, 2);
+        }
+
+        function exportFeatures() {
+            document.getElementById('analysisOutput').textContent = JSON.stringify({
+                status: '📤 Features Exported',
+                format: 'CSV',
+                features: ['band_power', 'peak_frequency', 'hjorth_params', 'entropy'],
+                file: 'features_' + generateId() + '.csv',
+                message: currentLang === 'ko' ? '특징 내보내기 완료' : 'Features exported'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang('en');
+        });
+    </script>
+</body>
+</html>

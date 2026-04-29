@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 4: 치료 추적 및 약물 관리 | WIA-CHRONIC-PAIN</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 4: 치료 추적 및 약물 관리</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong> 포괄적인 치료 추적 시스템을 구현하고, 복약 순응 모니터링 기능이 포함된 약물 관리 기능을 구축하며, 여러 치료 양식을 통합 플랫폼에 통합합니다.
+    </div>
+
+    <h2>포괄적인 치료 추적</h2>
+
+    <p>WIA-CHRONIC-PAIN 표준은 약물, 물리 치료, 심리적 중재 및 보완적 접근법을 통합 시스템에서 추적하는 프레임워크를 제공합니다.</p>
+
+    <h3>치료 양식 프레임워크</h3>
+
+    <pre><code>interface TreatmentModality {
+  category: TreatmentCategory;
+  type: string;
+  details: TreatmentDetails;
+  schedule: TreatmentSchedule;
+  tracking: TrackingConfig;
+  outcomes: OutcomeMetrics[];
+}
+
+enum TreatmentCategory {
+  PHARMACOLOGICAL = 'pharmacological',
+  PHYSICAL_THERAPY = 'physical_therapy',
+  PSYCHOLOGICAL = 'psychological',
+  INTERVENTIONAL = 'interventional',
+  COMPLEMENTARY = 'complementary',
+  LIFESTYLE = 'lifestyle',
+  DEVICE_BASED = 'device_based'
+}
+
+interface TreatmentPlan {
+  patientId: string;
+  startDate: string;
+  reviewDate: string;
+  goals: TreatmentGoal[];
+  modalities: TreatmentModality[];
+  provider: ProviderInfo;
+  notes: ClinicalNote[];
+}
+
+const sampleTreatmentPlan: TreatmentPlan = {
+  patientId: 'pt-12345',
+  startDate: '2024-01-15',
+  reviewDate: '2024-04-15',
+  goals: [
+    {
+      type: 'pain_reduction',
+      target: '평균 통증 7에서 5로 감소',
+      metric: 'average_nrs',
+      baseline: 7,
+      goal: 5
+    },
+    {
+      type: 'function',
+      target: '발작 없이 매일 30분 걷기',
+      metric: 'walking_tolerance',
+      baseline: 10,
+      goal: 30
+    }
+  ],
+  modalities: [
+    {
+      category: TreatmentCategory.PHARMACOLOGICAL,
+      type: 'NSAID',
+      details: { medication: 'naproxen', dose: '500mg', frequency: 'twice_daily' }
+    },
+    {
+      category: TreatmentCategory.PHYSICAL_THERAPY,
+      type: 'exercise_program',
+      details: { focus: 'core_strengthening', sessions: 2, duration: 45 }
+    }
+  ]
+};</code></pre>
+
+    <h2>약물 관리 시스템</h2>
+
+    <h3>약물 데이터 모델</h3>
+
+    <pre><code>interface Medication {
+  id: string;
+  patientId: string;
+  rxNormCode: string;
+  name: string;
+  genericName: string;
+  category: MedicationCategory;
+  dosage: {
+    amount: number;
+    unit: string;
+    form: DrugForm;
+  };
+  schedule: MedicationSchedule;
+  prescriber: ProviderInfo;
+  pharmacy: PharmacyInfo;
+  startDate: string;
+  endDate?: string;
+  instructions: string;
+  warnings: DrugWarning[];
+  interactions: DrugInteraction[];
+}
+
+enum MedicationCategory {
+  ANALGESIC_OPIOID = 'opioid',
+  ANALGESIC_NON_OPIOID = 'non_opioid',
+  NSAID = 'nsaid',
+  ANTIDEPRESSANT = 'antidepressant',
+  ANTICONVULSANT = 'anticonvulsant',
+  MUSCLE_RELAXANT = 'muscle_relaxant',
+  TOPICAL = 'topical',
+  ADJUVANT = 'adjuvant'
+}
+
+interface MedicationSchedule {
+  type: 'scheduled' | 'as_needed' | 'tapered';
+  frequency: {
+    times_per_day?: number;
+    specific_times?: string[];
+    interval_hours?: number;
+    days_of_week?: number[];
+  };
+  duration?: {
+    value: number;
+    unit: 'days' | 'weeks' | 'months';
+  };
+  taper?: TaperSchedule;
+  maxDailyDose?: number;
+  refillsRemaining?: number;
+}</code></pre>
+
+    <h3>복약 순응 모니터링</h3>
+
+    <div class="highlight">
+        <strong>복약 순응 메트릭:</strong> 시스템은 타이밍 순응, 용량 순응, 지속성을 추적합니다.
+    </div>
+
+    <pre><code>class MedicationAdherenceTracker {
+  private adherenceService: AdherenceService;
+  private alertManager: AlertManager;
+
+  async recordDose(dose: DoseRecord): Promise<DoseRecordResult> {
+    // 처방에 대해 용량 검증
+    const medication = await this.getMedication(dose.medicationId);
+    const validation = this.validateDose(dose, medication);
+
+    // 용량 기록 저장
+    await this.adherenceService.recordDose({
+      ...dose,
+      scheduledTime: this.findScheduledTime(dose.timestamp, medication.schedule),
+      timingDeviation: this.calculateTimingDeviation(dose, medication),
+      isValid: validation.isValid
+    });
+
+    // 복약 순응 메트릭 업데이트
+    await this.updateAdherenceMetrics(dose.patientId, medication.id);
+
+    // 문제 확인
+    await this.evaluateAdherenceConcerns(dose.patientId);
+
+    return {
+      recorded: true,
+      adherenceScore: await this.getCurrentAdherenceScore(dose.patientId),
+      feedback: this.generateFeedback(dose, medication)
+    };
+  }
+
+  async calculateAdherenceMetrics(
+    patientId: string,
+    medicationId: string,
+    period: TimePeriod
+  ): Promise<AdherenceMetrics> {
+    const doses = await this.getDoseHistory(patientId, medicationId, period);
+    const medication = await this.getMedication(medicationId);
+
+    const expectedDoses = this.calculateExpectedDoses(medication.schedule, period);
+    const takenDoses = doses.filter(d => d.status === 'taken').length;
+
+    return {
+      overallAdherence: takenDoses / expectedDoses,
+      timingAdherence: this.calculateTimingAdherence(doses, medication),
+      gapDays: this.findGapDays(doses, medication.schedule),
+      streaks: this.calculateStreaks(doses),
+      trend: this.calculateAdherenceTrend(doses)
+    };
+  }
+}</code></pre>
+
+    <h3>스마트 알림</h3>
+
+    <pre><code>class SmartReminderSystem {
+  async scheduleReminders(patientId: string): Promise<void> {
+    const medications = await this.getActiveMedications(patientId);
+    const preferences = await this.getPatientPreferences(patientId);
+    const behaviorModel = await this.getPatientBehaviorModel(patientId);
+
+    for (const med of medications) {
+      const optimalTimes = this.optimizeReminderTimes(med, behaviorModel);
+
+      for (const time of optimalTimes) {
+        await this.scheduleReminder({
+          patientId,
+          medicationId: med.id,
+          scheduledTime: time,
+          leadTime: behaviorModel.optimalLeadTime,
+          escalation: this.buildEscalationSequence(med, preferences),
+          snoozeOptions: preferences.allowSnooze ? [5, 15, 30] : []
+        });
+      }
+    }
+  }
+
+  buildEscalationSequence(
+    medication: Medication,
+    preferences: PatientPreferences
+  ): EscalationStep[] {
+    const isCritical = medication.category === 'opioid' || medication.isCritical;
+
+    return [
+      {
+        delay: 0,
+        channel: 'push_notification',
+        message: `${medication.name} 복용 시간입니다`
+      },
+      {
+        delay: preferences.escalationDelay || 15,
+        channel: 'push_notification',
+        message: `알림: ${medication.name} 복용 시간입니다`,
+        priority: 'high'
+      },
+      ...(isCritical ? [{
+        delay: 30,
+        channel: 'sms',
+        message: `중요: ${medication.name}을(를) 복용해 주세요`
+      }] : [])
+    ];
+  }
+}</code></pre>
+
+    <h2>치료 효과 분석</h2>
+
+    <table>
+        <tr>
+            <th>메트릭</th>
+            <th>설명</th>
+            <th>계산 방법</th>
+        </tr>
+        <tr>
+            <td>통증 감소</td>
+            <td>통증 강도의 평균 감소</td>
+            <td>치료 전/후 NRS 비교</td>
+        </tr>
+        <tr>
+            <td>반응률</td>
+            <td>임상적 개선을 달성한 비율</td>
+            <td>30% 또는 2점 NRS 감소</td>
+        </tr>
+        <tr>
+            <td>효과 발현 시간</td>
+            <td>의미 있는 반응까지의 기간</td>
+            <td>지속적인 개선까지의 일수</td>
+        </tr>
+        <tr>
+            <td>효과 지속 시간</td>
+            <td>혜택이 지속되는 기간</td>
+            <td>복용과 통증 복귀 사이의 시간</td>
+        </tr>
+        <tr>
+            <td>기능적 개선</td>
+            <td>일상 기능의 변화</td>
+            <td>활동 수준, BPI 간섭</td>
+        </tr>
+    </table>
+
+    <pre><code>class TreatmentEffectivenessAnalyzer {
+  async analyzeMedicationEffectiveness(
+    patientId: string,
+    medicationId: string
+  ): Promise<EffectivenessAnalysis> {
+    const medication = await this.getMedication(medicationId);
+    const doses = await this.getDoseHistory(patientId, medicationId);
+    const painData = await this.getPainData(patientId);
+
+    // 각 복용량 주변의 통증 수준 분석
+    const doseEffects = doses.map(dose => {
+      const painBefore = this.getPainNearTime(painData, dose.timestamp, -60);
+      const painAfter = this.getPainNearTime(painData, dose.timestamp,
+        medication.expectedOnsetMinutes + medication.expectedDurationMinutes / 2);
+
+      return {
+        dose,
+        painBefore,
+        painAfter,
+        reduction: painBefore - painAfter,
+        onsetTime: this.findOnsetTime(painData, dose),
+        duration: this.findEffectDuration(painData, dose)
+      };
+    });
+
+    return {
+      medication: medication.name,
+      averageReduction: this.mean(doseEffects.map(e => e.reduction)),
+      responseRate: doseEffects.filter(e => e.reduction >= 2).length / doseEffects.length,
+      averageOnset: this.mean(doseEffects.map(e => e.onsetTime)),
+      averageDuration: this.mean(doseEffects.map(e => e.duration)),
+      trend: this.analyzeTrend(doseEffects),
+      recommendation: this.generateRecommendation(doseEffects, medication)
+    };
+  }
+}</code></pre>
+
+    <h2>물리 치료 추적</h2>
+
+    <pre><code>interface PhysicalTherapySession {
+  id: string;
+  patientId: string;
+  sessionType: 'in_clinic' | 'telehealth' | 'home_program';
+  therapist?: ProviderInfo;
+  date: string;
+  duration: number;
+  exercises: ExerciseRecord[];
+  assessment: {
+    painBefore: number;
+    painAfter: number;
+    functionTests: FunctionTest[];
+    progress: string;
+  };
+  homeProgram: HomeExercise[];
+  nextSession: string;
+}
+
+interface HomeExercise {
+  exerciseId: string;
+  name: string;
+  category: ExerciseCategory;
+  instructions: string;
+  videoUrl?: string;
+  sets: number;
+  reps: number;
+  holdSeconds?: number;
+  frequency: ExerciseFrequency;
+  precautions: string[];
+}
+
+class PhysicalTherapyTracker {
+  async logHomeExercise(
+    patientId: string,
+    exerciseId: string,
+    completion: ExerciseCompletion
+  ): Promise<void> {
+    await this.storage.insert({
+      patientId,
+      exerciseId,
+      timestamp: new Date().toISOString(),
+      completed: completion.setsCompleted,
+      prescribed: completion.setsPrescribed,
+      painDuring: completion.painLevel,
+      difficulty: completion.perceivedDifficulty,
+      notes: completion.notes
+    });
+
+    // 적절한 경우 운동 진행 업데이트
+    await this.evaluateProgression(patientId, exerciseId);
+
+    // 복약 순응 추적
+    await this.updateExerciseAdherence(patientId);
+  }
+}</code></pre>
+
+    <h2>심리적 중재 추적</h2>
+
+    <div class="highlight">
+        <strong>근거 기반 접근법:</strong> CBT, ACT, 마음챙김 기반 중재에 대한 추적을 지원합니다.
+    </div>
+
+    <pre><code>interface PsychologicalIntervention {
+  type: 'CBT' | 'ACT' | 'mindfulness' | 'biofeedback' | 'relaxation';
+  sessions: TherapySession[];
+  skills: SkillProgress[];
+  homework: HomeworkAssignment[];
+  outcomes: PsychologicalOutcome[];
+}
+
+interface SkillProgress {
+  skillName: string;
+  category: 'cognitive' | 'behavioral' | 'mindfulness' | 'relaxation';
+  introduced: string;
+  practiceLog: SkillPractice[];
+  proficiency: 'learning' | 'developing' | 'proficient' | 'mastered';
+  applicationExamples: string[];
+}
+
+const cbtSkills = [
+  { name: '사고 도전', category: 'cognitive' },
+  { name: '활동 페이싱', category: 'behavioral' },
+  { name: '이완 기법', category: 'relaxation' }
+];</code></pre>
+
+    <h2>통합 치료 대시보드</h2>
+
+    <pre><code>interface TreatmentDashboard {
+  patient: PatientSummary;
+  currentTreatments: {
+    medications: MedicationSummary[];
+    therapies: TherapySummary[];
+    selfManagement: SelfManagementSummary[];
+  };
+  adherence: {
+    overall: number;
+    byModality: Record<string, number>;
+    trend: AdherenceTrend;
+  };
+  effectiveness: {
+    painTrend: TrendAnalysis;
+    functionTrend: TrendAnalysis;
+    qualityOfLife: QoLTrend;
+  };
+  recommendations: TreatmentRecommendation[];
+  upcomingActions: ScheduledAction[];
+}</code></pre>
+</body>
+</html>

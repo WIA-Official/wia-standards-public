@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 6: 의료 시스템 통합 | WIA-CHRONIC-PAIN</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 6: 의료 시스템 통합</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong> FHIR 표준을 사용한 EHR 통합을 구현하고, 원격 의료 플랫폼과 연결하며, 제공자 대시보드를 구축하고, 만성 통증 관리를 위한 생태계 연결을 가능하게 하는 API를 설계합니다.
+    </div>
+
+    <h2>의료 상호 운용성 개요</h2>
+
+    <p>만성 통증 관리 시스템은 가치를 제공하기 위해 더 넓은 의료 생태계와 원활하게 통합되어야 합니다. 이 통합은 여러 제공자 간의 케어 조정을 가능하게 하고, 데이터 입력 부담을 줄이며, 임상 결정이 이루어지는 곳에서 통증 관리 데이터를 사용할 수 있도록 합니다. WIA-CHRONIC-PAIN 표준은 상호 운용성과 보안 및 프라이버시의 균형을 맞추는 통합 요구 사항을 지정합니다.</p>
+
+    <p>의료 상호 운용성은 HL7 FHIR과 같은 현대 표준의 채택과 함께 크게 발전했습니다. 이 표준은 이러한 발전을 수용하면서 의료 환경에서 여전히 널리 사용되는 레거시 시스템과의 연결에 대한 지침을 제공합니다.</p>
+
+    <h3>통합 아키텍처</h3>
+
+    <pre><code>{
+  "integration_architecture": {
+    "standards_supported": {
+      "fhir": {
+        "version": "R4",
+        "profiles": ["US Core", "Pain Management IG"],
+        "operations": ["read", "search", "create", "update", "batch"]
+      },
+      "hl7v2": {
+        "versions": ["2.5.1", "2.7"],
+        "messages": ["ADT", "ORM", "ORU", "MDM"]
+      },
+      "cda": {
+        "version": "R2",
+        "templates": ["CCD", "Pain Assessment"]
+      }
+    },
+    "integration_patterns": {
+      "synchronous": "실시간 쿼리를 위한 RESTful API",
+      "asynchronous": "대량 데이터를 위한 메시지 큐",
+      "subscription": "이벤트 알림을 위한 웹훅"
+    },
+    "security": {
+      "authentication": "SMART on FHIR",
+      "authorization": "OAuth 2.0 스코프",
+      "encryption": "TLS 1.3"
+    }
+  }
+}</code></pre>
+
+    <h2>FHIR 통합</h2>
+
+    <p>Fast Healthcare Interoperability Resources(FHIR)는 의료 데이터 교환을 위한 현대 표준입니다. WIA-CHRONIC-PAIN 표준은 FHIR R4를 주요 통합 프로토콜로 사용하며, 통증 관리 데이터에 대한 특정 프로파일을 제공합니다.</p>
+
+    <h3>통증 관련 FHIR 리소스</h3>
+
+    <table>
+        <tr>
+            <th>리소스</th>
+            <th>통증 관리 용도</th>
+            <th>주요 요소</th>
+        </tr>
+        <tr>
+            <td>Observation</td>
+            <td>통증 강도 평가</td>
+            <td>code, valueInteger, bodySite, effectiveDateTime</td>
+        </tr>
+        <tr>
+            <td>Condition</td>
+            <td>만성 통증 진단</td>
+            <td>code, bodySite, onset, severity</td>
+        </tr>
+        <tr>
+            <td>MedicationStatement</td>
+            <td>현재 통증 약물</td>
+            <td>medication, dosage, status, reasonCode</td>
+        </tr>
+        <tr>
+            <td>CarePlan</td>
+            <td>통증 관리 계획</td>
+            <td>activity, goal, addresses</td>
+        </tr>
+        <tr>
+            <td>Questionnaire/Response</td>
+            <td>통증 평가 (BPI 등)</td>
+            <td>item, answer, questionnaire reference</td>
+        </tr>
+    </table>
+
+    <h3>FHIR 통증 관찰 리소스</h3>
+
+    <pre><code>{
+  "resourceType": "Observation",
+  "id": "pain-intensity-12345",
+  "meta": {
+    "profile": ["http://wia.org/fhir/StructureDefinition/pain-intensity"]
+  },
+  "status": "final",
+  "category": [{
+    "coding": [{
+      "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+      "code": "survey",
+      "display": "Survey"
+    }]
+  }],
+  "code": {
+    "coding": [{
+      "system": "http://loinc.org",
+      "code": "72514-3",
+      "display": "통증 심각도 - 0-10 구두 숫자 평가"
+    }]
+  },
+  "subject": {
+    "reference": "Patient/patient-12345"
+  },
+  "effectiveDateTime": "2024-01-15T14:30:00Z",
+  "valueInteger": 6,
+  "bodySite": {
+    "coding": [{
+      "system": "http://snomed.info/sct",
+      "code": "182343007",
+      "display": "요추 구조"
+    }]
+  }
+}</code></pre>
+
+    <h3>SMART on FHIR 통합</h3>
+
+    <p>SMART on FHIR는 애플리케이션이 EHR 시스템과 통합하는 표준화된 방법을 제공합니다. WIA-CHRONIC-PAIN 표준에는 원활한 EHR 통합을 위한 SMART 앱 실행 지원이 포함됩니다.</p>
+
+    <pre><code>class SMARTAuthClient {
+  private config: SMARTConfig;
+
+  async launchFromEHR(launchParams: LaunchParams): Promise<AuthResult> {
+    // 실행 컨텍스트 추출
+    const { iss, launch } = launchParams;
+
+    // 권한 부여 엔드포인트 검색
+    const metadata = await this.getConformance(iss);
+    const authEndpoint = metadata.rest[0].security.extension
+      .find(e => e.url.includes('authorize')).valueUri;
+    const tokenEndpoint = metadata.rest[0].security.extension
+      .find(e => e.url.includes('token')).valueUri;
+
+    // 권한 부여 요청 구성
+    const authUrl = new URL(authEndpoint);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('client_id', this.config.clientId);
+    authUrl.searchParams.set('redirect_uri', this.config.redirectUri);
+    authUrl.searchParams.set('scope', this.config.scopes.join(' '));
+    authUrl.searchParams.set('state', this.generateState());
+    authUrl.searchParams.set('aud', iss);
+    authUrl.searchParams.set('launch', launch);
+
+    // 권한 부여로 리디렉션
+    return { authorizationUrl: authUrl.toString() };
+  }
+
+  async exchangeCodeForToken(
+    code: string,
+    tokenEndpoint: string
+  ): Promise<TokenResponse> {
+    const response = await fetch(tokenEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: this.config.redirectUri,
+        client_id: this.config.clientId
+      })
+    });
+
+    const tokens = await response.json();
+
+    return {
+      accessToken: tokens.access_token,
+      tokenType: tokens.token_type,
+      expiresIn: tokens.expires_in,
+      scope: tokens.scope,
+      patient: tokens.patient,
+      encounter: tokens.encounter
+    };
+  }
+}</code></pre>
+
+    <h2>EHR 시스템 통합</h2>
+
+    <p>주요 전자 건강 기록 시스템과의 통합은 일관된 내부 데이터 모델을 유지하면서 각 플랫폼의 특정 API 및 워크플로우에 적응해야 합니다.</p>
+
+    <div class="highlight">
+        <strong>지원 EHR 플랫폼:</strong> WIA-CHRONIC-PAIN 표준은 Epic, Cerner, Allscripts, athenahealth 및 기타 주요 EHR 플랫폼에 대한 통합 가이드를 제공합니다. 각 통합은 가능한 경우 플랫폼의 FHIR API를 활용하고, 필요시 독점 API로 대체합니다.
+    </div>
+
+    <h3>EHR 통합 서비스</h3>
+
+    <pre><code>class EHRIntegrationService {
+  private adapters: Map<EHRPlatform, EHRAdapter>;
+
+  async syncPatientData(
+    patientId: string,
+    ehrConnection: EHRConnection
+  ): Promise<SyncResult> {
+    const adapter = this.adapters.get(ehrConnection.platform);
+
+    // EHR에서 환자 데이터 가져오기
+    const ehrData = await adapter.fetchPatientData(
+      ehrConnection,
+      patientId,
+      {
+        resources: ['Condition', 'MedicationStatement', 'Observation'],
+        dateRange: { start: '2023-01-01', end: 'now' }
+      }
+    );
+
+    // 내부 형식으로 변환
+    const transformedData = this.transformEHRData(ehrData, adapter.mapping);
+
+    // 기존 데이터와 조정
+    const reconciled = await this.reconcileData(patientId, transformedData);
+
+    // 동기화된 데이터 저장
+    await this.storage.savePatientData(reconciled);
+
+    return {
+      status: 'success',
+      resourcesSynced: reconciled.resources.length,
+      conflicts: reconciled.conflicts,
+      lastSyncTime: new Date().toISOString()
+    };
+  }
+
+  async pushPainData(
+    patientId: string,
+    ehrConnection: EHRConnection,
+    painData: PainData[]
+  ): Promise<PushResult> {
+    const adapter = this.adapters.get(ehrConnection.platform);
+
+    // 통증 데이터를 FHIR 관찰로 변환
+    const observations = painData.map(pd =>
+      this.createPainObservation(pd, adapter.mapping)
+    );
+
+    // 배치 제출을 위한 번들 생성
+    const bundle = {
+      resourceType: 'Bundle',
+      type: 'batch',
+      entry: observations.map(obs => ({
+        resource: obs,
+        request: {
+          method: 'POST',
+          url: 'Observation'
+        }
+      }))
+    };
+
+    // EHR에 제출
+    const result = await adapter.submitBundle(ehrConnection, bundle);
+
+    return {
+      status: 'success',
+      submitted: observations.length,
+      accepted: result.entry.filter(e => e.response.status.startsWith('2')).length
+    };
+  }
+}</code></pre>
+
+    <h2>원격 의료 플랫폼 통합</h2>
+
+    <p>원격 의료는 만성 통증 관리에 필수적이 되어 원격 상담 및 모니터링을 가능하게 합니다. WIA-CHRONIC-PAIN 표준은 주요 원격 의료 플랫폼과의 통합을 지원합니다.</p>
+
+    <pre><code>class TelehealthService {
+  async scheduleVisit(
+    patientId: string,
+    providerId: string,
+    visitType: VisitType
+  ): Promise<ScheduledVisit> {
+    // 제공자 가용성 확인
+    const availability = await this.getProviderAvailability(
+      providerId,
+      visitType.duration
+    );
+
+    // 환자 선호도 가져오기
+    const preferences = await this.getPatientPreferences(patientId);
+
+    // 최적의 시간대 찾기
+    const slot = this.findOptimalSlot(availability, preferences);
+
+    // 원격 의료 플랫폼에서 방문 생성
+    const visit = await this.telehealthAdapter.createVisit({
+      patientId,
+      providerId,
+      startTime: slot.start,
+      duration: visitType.duration,
+      visitType: visitType.code,
+      prepareInstructions: this.getPrepareInstructions(visitType)
+    });
+
+    // 최근 통증 데이터로 방문 컨텍스트 사전 채우기
+    await this.prepareVisitContext(visit.id, patientId);
+
+    return visit;
+  }
+
+  async prepareVisitContext(visitId: string, patientId: string): Promise<void> {
+    // 최근 통증 데이터 수집
+    const recentPain = await this.getPainSummary(patientId, { days: 14 });
+    const medications = await this.getCurrentMedications(patientId);
+    const adherence = await this.getAdherenceMetrics(patientId);
+
+    // 방문 요약 생성
+    const summary = {
+      painTrend: recentPain.trend,
+      averagePain: recentPain.average,
+      peakPain: recentPain.max,
+      currentMedications: medications,
+      adherenceRate: adherence.overall,
+      recentTriggers: recentPain.identifiedTriggers,
+      patientConcerns: await this.getPatientConcerns(patientId)
+    };
+
+    // 방문에 첨부
+    await this.telehealthAdapter.attachVisitContext(visitId, summary);
+  }
+}</code></pre>
+
+    <h2>제공자 대시보드</h2>
+
+    <p>제공자 대시보드는 임상의에게 환자의 통증 관리 상태에 대한 포괄적인 보기를 제공하여 효율적인 케어 제공과 사전 예방적 개입을 가능하게 합니다.</p>
+
+    <h3>대시보드 구성 요소</h3>
+
+    <pre><code>interface ProviderDashboard {
+  patientPanel: {
+    totalPatients: number;
+    activePatients: number;
+    patientsNeedingAttention: PatientAlert[];
+  };
+  populationMetrics: {
+    averagePainScore: number;
+    adherenceRate: number;
+    responseRate: number;
+    outcomeDistribution: OutcomeDistribution;
+  };
+  tasks: {
+    pendingReviews: PendingReview[];
+    messageQueue: PatientMessage[];
+    refillRequests: RefillRequest[];
+    scheduledVisits: ScheduledVisit[];
+  };
+  analytics: {
+    painTrends: TrendData[];
+    treatmentEffectiveness: EffectivenessData[];
+    riskScores: RiskScore[];
+  };
+}</code></pre>
+
+    <h3>환자 알림 시스템</h3>
+
+    <pre><code>class ProviderAlertSystem {
+  async evaluatePatientAlerts(providerId: string): Promise<PatientAlert[]> {
+    const patients = await this.getProviderPatients(providerId);
+    const alerts: PatientAlert[] = [];
+
+    for (const patient of patients) {
+      // 통증 급증 확인
+      const painSpike = await this.checkPainSpike(patient.id);
+      if (painSpike) {
+        alerts.push({
+          patientId: patient.id,
+          patientName: patient.name,
+          alertType: 'PAIN_SPIKE',
+          severity: 'high',
+          message: `통증이 ${painSpike.baseline}에서 ${painSpike.current}로 증가`,
+          timestamp: painSpike.timestamp,
+          actionRequired: '통증 로그 검토 및 개입 고려'
+        });
+      }
+
+      // 약물 복약 순응 확인
+      const adherence = await this.getAdherence(patient.id);
+      if (adherence.overall < 0.7) {
+        alerts.push({
+          patientId: patient.id,
+          patientName: patient.name,
+          alertType: 'LOW_ADHERENCE',
+          severity: 'medium',
+          message: `약물 복약 순응 ${(adherence.overall * 100).toFixed(0)}%`,
+          timestamp: new Date().toISOString(),
+          actionRequired: '복약 순응 장벽에 대해 논의'
+        });
+      }
+    }
+
+    return alerts.sort((a, b) =>
+      this.severityOrder(b.severity) - this.severityOrder(a.severity)
+    );
+  }
+}</code></pre>
+
+    <h2>API 게이트웨이 및 개발자 포털</h2>
+
+    <p>WIA-CHRONIC-PAIN 표준에는 제3자 통합 및 생태계 개발을 가능하게 하는 API 설계 사양이 포함됩니다.</p>
+
+    <div class="highlight">
+        <strong>API 우선 설계:</strong> 모든 시스템 기능은 잘 문서화된 API를 통해 노출되어 통합 파트너, 연구자 및 개발자가 보안과 규정 준수를 유지하면서 통증 관리 플랫폼을 기반으로 구축할 수 있습니다.
+    </div>
+
+    <p>이 챕터에서는 효과적인 만성 통증 관리에 필요한 필수 의료 시스템 통합을 다루었습니다. FHIR 표준을 따르고 강력한 EHR, 원격 의료 및 약국 통합을 구현함으로써 WIA-CHRONIC-PAIN 플랫폼은 더 넓은 의료 생태계의 연결된 구성 요소가 되어 케어 조정과 환자 결과를 개선합니다.</p>
+</body>
+</html>

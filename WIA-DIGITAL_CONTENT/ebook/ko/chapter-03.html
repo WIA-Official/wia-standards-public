@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 03 - WIA-DIGITAL_CONTENT</title>
+    <style>:root{--primary:#8b5cf6;--primary-dark:#7c3aed}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;color:#334155;background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3)}.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:white;padding:40px;text-align:center}.header h1{font-size:2.5em;margin-bottom:10px}.content{padding:40px}.content h2{color:var(--primary-dark);margin:30px 0 20px;padding-bottom:10px;border-bottom:3px solid var(--primary)}.content p{margin:15px 0}.info-box{background:#dbeafe;border-left:5px solid var(--primary);padding:20px;margin:25px 0;border-radius:8px}.key-takeaways{background:linear-gradient(135deg,#d1fae5,#6ee7b7);padding:30px;margin:40px 0;border-radius:12px}.key-takeaways h3{color:#065f46;margin-bottom:20px}.navigation{display:flex;justify-content:space-between;margin-top:40px;padding-top:30px;border-top:2px solid #e2e8f0}.nav-button{background:var(--primary);color:white;padding:12px 24px;border-radius:8px;text-decoration:none}.footer{background:#0f172a;color:white;text-align:center;padding:30px}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📖 Chapter 03</h1>
+            <p>WIA-DIGITAL_CONTENT</p>
+        </div>
+        <div class="content">
+            <h2>1. 기술 구현 개요</h2>
+            <p>이 장에서는 WIA-DIGITAL_CONTENT 표준을 실제 시스템에 구현하는 방법을 단계별로 설명합니다. 네이버 웹툰이나 카카오페이지 같은 플랫폼을 개발한다고 가정하고, 개발 환경 설정부터 배포까지 전 과정을 다룹니다.</p>
+
+            <div class="info-box">
+                <h4>📌 학습 목표</h4>
+                <p>이 장을 마치면 다음 내용을 실습할 수 있습니다:</p>
+                <ul style="margin:10px 0 0 20px;line-height:1.8">
+                    <li>Node.js 및 TypeScript 개발 환경 구축</li>
+                    <li>WIA-DIGITAL_CONTENT SDK 설치 및 초기화</li>
+                    <li>메타데이터 생성 및 검증 실습</li>
+                    <li>DRM 암호화/복호화 구현</li>
+                    <li>RESTful API 서버 개발</li>
+                    <li>Docker 컨테이너화 및 배포</li>
+                </ul>
+            </div>
+
+            <h2>2. 개발 환경 설정</h2>
+            <p>WIA-DIGITAL_CONTENT를 구현하기 위해 필요한 소프트웨어와 도구를 설치합니다.</p>
+
+            <h3>2.1 필수 소프트웨어</h3>
+            <table style="width:100%;border-collapse:collapse;margin:20px 0">
+                <thead>
+                    <tr style="background:#7c3aed;color:white">
+                        <th style="padding:12px;border:1px solid #ddd">소프트웨어</th>
+                        <th style="padding:12px;border:1px solid #ddd">버전</th>
+                        <th style="padding:12px;border:1px solid #ddd">용도</th>
+                        <th style="padding:12px;border:1px solid #ddd">설치 명령</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>Node.js</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">20.x LTS</td>
+                        <td style="padding:10px;border:1px solid #ddd">JavaScript 런타임</td>
+                        <td style="padding:10px;border:1px solid #ddd">nvm install 20</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>PostgreSQL</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">15.x</td>
+                        <td style="padding:10px;border:1px solid #ddd">메타데이터 저장</td>
+                        <td style="padding:10px;border:1px solid #ddd">brew install postgresql@15</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>Redis</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">7.x</td>
+                        <td style="padding:10px;border:1px solid #ddd">세션 및 캐시</td>
+                        <td style="padding:10px;border:1px solid #ddd">brew install redis</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>Docker</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">24.x</td>
+                        <td style="padding:10px;border:1px solid #ddd">컨테이너화</td>
+                        <td style="padding:10px;border:1px solid #ddd">brew install docker</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>2.2 프로젝트 초기화</h3>
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+# 프로젝트 디렉토리 생성
+mkdir naver-webtoon-platform
+cd naver-webtoon-platform
+
+# package.json 생성
+npm init -y
+
+# TypeScript 및 필수 패키지 설치
+npm install typescript @types/node ts-node nodemon
+npm install express @types/express
+npm install @wia/digital-content-sdk
+npm install pg typeorm
+npm install redis
+npm install jsonwebtoken bcrypt
+npm install dotenv
+
+# TypeScript 설정
+npx tsc --init
+
+# 디렉토리 구조 생성
+mkdir -p src/{controllers,services,models,routes,middleware,utils}
+mkdir -p src/drm
+mkdir -p config
+mkdir -p tests</pre>
+
+            <h3>2.3 환경 변수 설정</h3>
+            <p>.env 파일을 생성하여 환경별 설정을 분리합니다:</p>
+
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+# .env
+NODE_ENV=development
+PORT=3000
+
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=webtoon_platform
+DB_USER=postgres
+DB_PASSWORD=your_password
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# WIA-DIGITAL_CONTENT
+WIA_API_KEY=wia_sk_test_abc123...
+WIA_API_SECRET=wia_ss_test_xyz789...
+WIA_ENCRYPTION_KEY=32_byte_encryption_key_here
+
+# JWT
+JWT_SECRET=your_jwt_secret_key
+JWT_EXPIRES_IN=7d
+
+# Storage
+CONTENT_STORAGE_PATH=/var/storage/webtoons
+CDN_URL=https://cdn.naver.net/webtoon</pre>
+
+            <h2>3. 메타데이터 관리 구현</h2>
+            <p>콘텐츠 메타데이터를 생성하고 관리하는 서비스를 구현합니다.</p>
+
+            <h3>3.1 데이터 모델 정의</h3>
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+// src/models/Content.ts
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+
+@Entity('contents')
+export class Content {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ type: 'jsonb' })
+  title: {
+    ko: string;
+    en?: string;
+    ja?: string;
+  };
+
+  @Column()
+  type: 'webtoon' | 'novel' | 'video';
+
+  @Column({ type: 'jsonb' })
+  creator: {
+    id: string;
+    name: string;
+    verified: boolean;
+  };
+
+  @Column('text', { array: true })
+  genre: string[];
+
+  @Column()
+  ageRating: string;
+
+  @Column({ type: 'jsonb' })
+  rights: {
+    copyrightHolder: string;
+    territory: string[];
+    validFrom: Date;
+    validUntil: Date;
+  };
+
+  @Column({ type: 'jsonb' })
+  technical: {
+    format: string;
+    resolution: string;
+    fileSize: number;
+  };
+
+  @Column({ default: 'draft' })
+  status: 'draft' | 'published' | 'archived';
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}</pre>
+
+            <h3>3.2 메타데이터 서비스</h3>
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+// src/services/MetadataService.ts
+import { WIADigitalContent } from '@wia/digital-content-sdk';
+import { Content } from '../models/Content';
+
+export class MetadataService {
+  private wia: WIADigitalContent;
+
+  constructor() {
+    this.wia = new WIADigitalContent({
+      apiKey: process.env.WIA_API_KEY,
+      apiSecret: process.env.WIA_API_SECRET
+    });
+  }
+
+  async createMetadata(contentData: Partial<Content>): Promise<Content> {
+    // WIA 메타데이터 검증
+    const validated = await this.wia.validateMetadata({
+      '@context': 'https://wia.org/standards/digital-content/v1.0',
+      '@type': 'Webtoon',
+      title: contentData.title,
+      creator: contentData.creator,
+      genre: contentData.genre,
+      ageRating: contentData.ageRating,
+      rights: contentData.rights
+    });
+
+    if (!validated.valid) {
+      throw new Error(`메타데이터 검증 실패: ${validated.errors.join(', ')}`);
+    }
+
+    // 데이터베이스에 저장
+    const content = new Content();
+    Object.assign(content, contentData);
+
+    return await content.save();
+  }
+
+  async getMetadata(contentId: string): Promise<Content> {
+    const content = await Content.findOne({ where: { id: contentId } });
+    if (!content) {
+      throw new Error('콘텐츠를 찾을 수 없습니다');
+    }
+    return content;
+  }
+}</pre>
+
+            <h2>4. DRM 암호화 구현</h2>
+            <p>콘텐츠 파일을 암호화하고 사용자에게 안전하게 제공하는 시스템을 구축합니다.</p>
+
+            <h3>4.1 DRM 서비스</h3>
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+// src/drm/DRMService.ts
+import crypto from 'crypto';
+import fs from 'fs/promises';
+import { WIADRM } from '@wia/digital-content-sdk';
+
+export class DRMService {
+  private drm: WIADRM;
+  private encryptionKey: Buffer;
+
+  constructor() {
+    this.drm = new WIADRM({
+      apiKey: process.env.WIA_API_KEY
+    });
+    this.encryptionKey = Buffer.from(process.env.WIA_ENCRYPTION_KEY, 'hex');
+  }
+
+  async encryptContent(filePath: string, contentId: string, userId: string): Promise<{
+    encryptedPath: string;
+    watermark: string;
+  }> {
+    // 1. 파일 읽기
+    const fileBuffer = await fs.readFile(filePath);
+
+    // 2. 워터마크 생성
+    const watermark = this.generateWatermark(contentId, userId);
+
+    // 3. AES-256-GCM 암호화
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-gcm', this.encryptionKey, iv);
+
+    const encrypted = Buffer.concat([
+      cipher.update(fileBuffer),
+      cipher.final()
+    ]);
+
+    const authTag = cipher.getAuthTag();
+
+    // 4. 암호화 메타데이터 저장
+    const encryptedData = {
+      iv: iv.toString('hex'),
+      authTag: authTag.toString('hex'),
+      content: encrypted.toString('base64'),
+      watermark: watermark
+    };
+
+    // 5. 암호화된 파일 저장
+    const encryptedPath = `${filePath}.encrypted`;
+    await fs.writeFile(encryptedPath, JSON.stringify(encryptedData));
+
+    // 6. WIA 라이선스 서버에 키 등록
+    await this.drm.registerLicense({
+      contentId,
+      userId,
+      encryptionKey: this.encryptionKey.toString('hex'),
+      iv: iv.toString('hex'),
+      permissions: {
+        validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30일
+        maxDevices: 3,
+        downloadable: true,
+        offlineAccess: true
+      }
+    });
+
+    return { encryptedPath, watermark };
+  }
+
+  private generateWatermark(contentId: string, userId: string): string {
+    const timestamp = Date.now();
+    const data = `${contentId}:${userId}:${timestamp}`;
+    return crypto.createHmac('sha256', this.encryptionKey)
+      .update(data)
+      .digest('hex');
+  }
+
+  async issueDecryptionKey(contentId: string, userId: string, deviceId: string): Promise<{
+    key: string;
+    iv: string;
+  }> {
+    // 사용자 권한 확인
+    const hasAccess = await this.checkUserAccess(contentId, userId);
+    if (!hasAccess) {
+      throw new Error('접근 권한이 없습니다');
+    }
+
+    // WIA 라이선스 서버에서 키 발급
+    const license = await this.drm.issueKey({
+      contentId,
+      userId,
+      deviceId
+    });
+
+    return {
+      key: license.encryptionKey,
+      iv: license.iv
+    };
+  }
+
+  private async checkUserAccess(contentId: string, userId: string): Promise<boolean> {
+    // 구매 내역 확인 로직
+    // 실제 구현에서는 데이터베이스 조회
+    return true;
+  }
+}</pre>
+
+            <h2>5. API 서버 개발</h2>
+            <p>RESTful API 엔드포인트를 구현하여 프론트엔드와 통신합니다.</p>
+
+            <h3>5.1 라우터 정의</h3>
+            <table style="width:100%;border-collapse:collapse;margin:20px 0">
+                <thead>
+                    <tr style="background:#7c3aed;color:white">
+                        <th style="padding:12px;border:1px solid #ddd">엔드포인트</th>
+                        <th style="padding:12px;border:1px solid #ddd">메서드</th>
+                        <th style="padding:12px;border:1px solid #ddd">설명</th>
+                        <th style="padding:12px;border:1px solid #ddd">인증</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd">/api/v1/contents</td>
+                        <td style="padding:10px;border:1px solid #ddd">GET</td>
+                        <td style="padding:10px;border:1px solid #ddd">콘텐츠 목록 조회</td>
+                        <td style="padding:10px;border:1px solid #ddd">선택</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd">/api/v1/contents</td>
+                        <td style="padding:10px;border:1px solid #ddd">POST</td>
+                        <td style="padding:10px;border:1px solid #ddd">새 콘텐츠 등록</td>
+                        <td style="padding:10px;border:1px solid #ddd">필수</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd">/api/v1/contents/:id</td>
+                        <td style="padding:10px;border:1px solid #ddd">GET</td>
+                        <td style="padding:10px;border:1px solid #ddd">콘텐츠 상세 조회</td>
+                        <td style="padding:10px;border:1px solid #ddd">선택</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd">/api/v1/drm/unlock</td>
+                        <td style="padding:10px;border:1px solid #ddd">POST</td>
+                        <td style="padding:10px;border:1px solid #ddd">복호화 키 발급</td>
+                        <td style="padding:10px;border:1px solid #ddd">필수</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd">/api/v1/settlements</td>
+                        <td style="padding:10px;border:1px solid #ddd">GET</td>
+                        <td style="padding:10px;border:1px solid #ddd">수익 정산 내역</td>
+                        <td style="padding:10px;border:1px solid #ddd">필수</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>5.2 컨트롤러 구현</h3>
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+// src/controllers/ContentController.ts
+import { Request, Response } from 'express';
+import { MetadataService } from '../services/MetadataService';
+import { DRMService } from '../drm/DRMService';
+
+export class ContentController {
+  private metadataService: MetadataService;
+  private drmService: DRMService;
+
+  constructor() {
+    this.metadataService = new MetadataService();
+    this.drmService = new DRMService();
+  }
+
+  // 콘텐츠 등록
+  async createContent(req: Request, res: Response) {
+    try {
+      const { title, creator, genre, file } = req.body;
+
+      // 1. 메타데이터 생성
+      const content = await this.metadataService.createMetadata({
+        title,
+        creator,
+        genre,
+        type: 'webtoon',
+        ageRating: '15+',
+        rights: {
+          copyrightHolder: creator.name,
+          territory: ['KR', 'JP', 'US'],
+          validFrom: new Date(),
+          validUntil: new Date('2030-12-31')
+        }
+      });
+
+      // 2. 파일 암호화
+      const { encryptedPath, watermark } = await this.drmService.encryptContent(
+        file.path,
+        content.id,
+        creator.id
+      );
+
+      res.status(201).json({
+        success: true,
+        data: {
+          contentId: content.id,
+          encryptedPath,
+          watermark
+        }
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // 콘텐츠 조회
+  async getContent(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const content = await this.metadataService.getMetadata(id);
+
+      res.json({
+        success: true,
+        data: content
+      });
+    } catch (error) {
+      res.status(404).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // DRM 키 발급
+  async unlockContent(req: Request, res: Response) {
+    try {
+      const { contentId, deviceId } = req.body;
+      const userId = req.user.id; // JWT에서 추출
+
+      const decryptionKey = await this.drmService.issueDecryptionKey(
+        contentId,
+        userId,
+        deviceId
+      );
+
+      res.json({
+        success: true,
+        data: decryptionKey
+      });
+    } catch (error) {
+      res.status(403).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+}</pre>
+
+            <h2>6. 인증 및 보안</h2>
+            <p>JWT 기반 인증과 미들웨어를 구현하여 API를 보호합니다.</p>
+
+            <h3>6.1 JWT 미들웨어</h3>
+            <div style="background:#f0fdf4;padding:20px;margin:20px 0;border-radius:8px">
+                <p><strong>인증 흐름</strong>:</p>
+                <ul style="margin-left:20px;margin-top:10px;line-height:1.8">
+                    <li>1. 사용자 로그인 시 JWT 발급</li>
+                    <li>2. 클라이언트는 요청 헤더에 JWT 포함</li>
+                    <li>3. 서버는 JWT 검증 후 요청 처리</li>
+                    <li>4. 만료된 JWT는 Refresh Token으로 갱신</li>
+                </ul>
+            </div>
+
+            <h2>7. 데이터베이스 스키마</h2>
+            <p>PostgreSQL 테이블 구조를 설계합니다.</p>
+
+            <table style="width:100%;border-collapse:collapse;margin:20px 0">
+                <thead>
+                    <tr style="background:#7c3aed;color:white">
+                        <th style="padding:12px;border:1px solid #ddd">테이블명</th>
+                        <th style="padding:12px;border:1px solid #ddd">주요 컬럼</th>
+                        <th style="padding:12px;border:1px solid #ddd">관계</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>contents</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">id, title, type, creator, metadata</td>
+                        <td style="padding:10px;border:1px solid #ddd">1:N episodes</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>episodes</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">id, content_id, number, file_path</td>
+                        <td style="padding:10px;border:1px solid #ddd">N:1 contents</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>licenses</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">id, content_id, type, revenue_share</td>
+                        <td style="padding:10px;border:1px solid #ddd">N:1 contents</td>
+                    </tr>
+                    <tr style="background:#f8f9fa">
+                        <td style="padding:10px;border:1px solid #ddd"><strong>purchases</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">id, user_id, episode_id, price</td>
+                        <td style="padding:10px;border:1px solid #ddd">N:1 episodes</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd"><strong>settlements</strong></td>
+                        <td style="padding:10px;border:1px solid #ddd">id, creator_id, amount, period</td>
+                        <td style="padding:10px;border:1px solid #ddd">N:1 creators</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>8. Docker 컨테이너화</h2>
+            <p>애플리케이션을 Docker로 컨테이너화하여 배포 간소화합니다.</p>
+
+            <h3>8.1 Dockerfile</h3>
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+# Dockerfile
+FROM node:20-alpine
+
+WORKDIR /app
+
+# 패키지 파일 복사 및 설치
+COPY package*.json ./
+RUN npm ci --only=production
+
+# 소스 코드 복사
+COPY . .
+
+# TypeScript 컴파일
+RUN npm run build
+
+# 포트 노출
+EXPOSE 3000
+
+# 애플리케이션 실행
+CMD ["node", "dist/index.js"]</pre>
+
+            <h3>8.2 docker-compose.yml</h3>
+            <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0">
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=postgres
+      - REDIS_HOST=redis
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: webtoon_platform
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:</pre>
+
+            <h2>9. 테스트 작성</h2>
+            <p>Jest를 사용하여 단위 테스트와 통합 테스트를 작성합니다.</p>
+
+            <div style="background:#fef2f2;padding:20px;margin:20px 0;border-left:5px solid #ef4444;border-radius:8px">
+                <h4 style="color:#991b1b;margin-bottom:10px">테스트 시나리오: 웹툰 업로드</h4>
+                <ul style="margin-left:20px;margin-top:10px;line-height:1.8">
+                    <li>1. 작가가 웹툰 에피소드를 업로드</li>
+                    <li>2. 메타데이터가 WIA 표준에 맞게 생성되는지 검증</li>
+                    <li>3. 파일이 정상적으로 암호화되는지 확인</li>
+                    <li>4. 라이선스가 서버에 등록되는지 확인</li>
+                    <li>5. 구매자가 복호화 키를 받을 수 있는지 테스트</li>
+                </ul>
+            </div>
+
+            <h2>10. 弘益人間: 개발자 친화적 도구</h2>
+            <p>WIA-DIGITAL_CONTENT는 개발자가 쉽게 사용할 수 있도록 풍부한 도구를 제공합니다.</p>
+
+            <div style="background:#fef3c7;padding:20px;margin:20px 0;border-radius:8px">
+                <h4 style="color:#92400e">CLI 도구</h4>
+                <p>명령줄에서 메타데이터 검증, DRM 테스트 등을 수행</p>
+
+                <h4 style="color:#92400e;margin-top:15px">SDK</h4>
+                <p>Node.js, Python, Java, Go 등 다양한 언어 지원</p>
+
+                <h4 style="color:#92400e;margin-top:15px">문서화</h4>
+                <p>OpenAPI 3.0 기반 자동 문서 생성 및 Swagger UI</p>
+
+                <h4 style="color:#92400e;margin-top:15px">개발자 포털</h4>
+                <p>테스트 환경, API 키 관리, 사용량 모니터링</p>
+            </div>
+
+            <h2>11. 요약 및 핵심 요점</h2>
+            <div class="key-takeaways">
+                <h3>🎯 핵심 요점</h3>
+                <ul>
+                    <li><strong>환경 설정</strong>: Node.js 20, PostgreSQL 15, Redis 7로 개발 환경 구축</li>
+                    <li><strong>메타데이터</strong>: TypeORM으로 데이터 모델 정의 및 WIA SDK로 검증</li>
+                    <li><strong>DRM</strong>: AES-256-GCM 암호화와 워터마킹 구현</li>
+                    <li><strong>API</strong>: Express.js 기반 RESTful 엔드포인트 개발</li>
+                    <li><strong>인증</strong>: JWT로 안전한 API 접근 제어</li>
+                    <li><strong>배포</strong>: Docker로 컨테이너화하여 배포 간소화</li>
+                    <li><strong>弘益人間</strong>: 개발자가 쉽게 사용할 수 있는 도구와 문서 제공 🌍</li>
+                </ul>
+            </div>
+
+            <h2>12. 생각해볼 질문</h2>
+            <div style="background:#ede9fe;padding:20px;margin:20px 0;border-radius:8px">
+                <ol style="margin-left:20px;line-height:2">
+                    <li>PostgreSQL 대신 MongoDB를 사용한다면 스키마 설계가 어떻게 달라질까요?</li>
+                    <li>DRM 암호화 키를 안전하게 관리하는 방법은 무엇일까요?</li>
+                    <li>API Rate Limiting을 어떻게 구현할 수 있을까요?</li>
+                    <li>대용량 파일(4K 영상 등)을 효율적으로 암호화하려면?</li>
+                    <li>마이크로서비스 아키텍처로 전환한다면 어떤 부분을 분리해야 할까요?</li>
+                </ol>
+            </div>
+
+            <h2>13. 다음 장에서는</h2>
+            <div style="background:#e0e7ff;padding:20px;margin:20px 0;border-radius:8px">
+                <p><strong>Chapter 04: 시스템 통합</strong>에서는 WIA-DIGITAL_CONTENT를 기존 시스템과 연동하는 방법을 다룹니다:</p>
+                <ul style="margin-left:20px;margin-top:10px;line-height:1.8">
+                    <li>레거시 시스템과의 통합 전략</li>
+                    <li>네이버/카카오 플랫폼 연동</li>
+                    <li>결제 시스템 통합</li>
+                    <li>CDN 및 스토리지 연동</li>
+                    <li>모니터링 및 로깅</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter-02.html" class="nav-button">← 이전</a>
+                <a href="chapter-04.html" class="nav-button">다음 →</a>
+            </div>
+        </div>
+        </div>
+</body>
+</html>

@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Cryopreservation Standard - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #06B6D4;
+            --primary-dark: #0891B2;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        /* Top Navigation */
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { display: flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 20px; align-items: center; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; }
+        .nav-links a:hover { color: var(--primary); }
+
+        /* Header */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        /* Hero */
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+
+        /* Tabs */
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        /* Panel */
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); }
+        .panel h3 { margin: 25px 0 15px; color: var(--text); font-size: 1.1rem; }
+
+        /* Form */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 1rem; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary); }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+
+        /* Radio/Checkbox */
+        .radio-group, .checkbox-group { margin: 10px 0; }
+        .radio-group label, .checkbox-group label { display: block; padding: 8px 12px; margin: 5px 0; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .radio-group label:hover, .checkbox-group label:hover { border-color: var(--primary); }
+        .radio-group input, .checkbox-group input { margin-right: 10px; }
+
+        /* Buttons */
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-center { display: flex; justify-content: center; margin-top: 20px; }
+
+        /* Output */
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Courier New', monospace; font-size: 0.85rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap; }
+
+        /* Table */
+        .styled-table { width: 100%; border-collapse: collapse; margin: 15px 0; background: var(--bg); border-radius: 8px; overflow: hidden; }
+        .styled-table th, .styled-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border); }
+        .styled-table th { background: var(--primary); color: white; font-weight: 600; }
+        .styled-table tr:hover { background: rgba(6, 182, 212, 0.1); }
+
+        /* Sub-section */
+        .sub-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .sub-section h4 { color: var(--primary); margin-bottom: 15px; font-size: 1rem; }
+
+        /* Footer */
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 1.8rem; }
+            .top-nav { flex-direction: column; gap: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Top Navigation -->
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">CRYO-PRESERVATION</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank">🏆 Certification</a>
+                    <a href="https://wiabook.com/reader/simulators/" target="_blank">🎮 109+ Simulators</a>
+                    <a href="https://wiabook.com" target="_blank">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">WIA-CRYO-PRESERVATION</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Cryopreservation Standard" data-ko="냉동보존 표준">Cryopreservation Standard</h1>
+            <p data-en="Preserving life for future generations" data-ko="미래 세대를 위한 생명 보존">Preserving life for future generations</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📊 Data Format" data-ko="📊 데이터 형식">📊 Data Format</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🔢 Algorithms" data-ko="🔢 알고리즘">🔢 Algorithms</div>
+            <div class="tab" onclick="showPanel(2)" data-en="📡 Protocol" data-ko="📡 프로토콜">📡 Protocol</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🔗 Integration" data-ko="🔗 통합">🔗 Integration</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🚨 Emergency" data-ko="🚨 비상">🚨 Emergency</div>
+        </div>
+
+        <!-- Panel 1: Data Format -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="Subject Registration & Reference" data-ko="대상 등록 및 참조">Subject Registration & Reference</h2>
+            
+            <div class="sub-section">
+                <h4 data-en="Register Subject" data-ko="대상 등록">Register Subject</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Subject Type" data-ko="대상 유형">Subject Type</label>
+                        <select id="subjectType">
+                            <option value="WHOLE_BODY">Whole Body</option>
+                            <option value="NEURO">Neuro (Head/Brain)</option>
+                            <option value="ORGAN">Organ</option>
+                            <option value="TISSUE">Tissue Sample</option>
+                            <option value="CELL_CULTURE">Cell Culture</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Species" data-ko="종">Species</label>
+                        <select id="species">
+                            <option value="HUMAN">Human</option>
+                            <option value="CANINE">Canine</option>
+                            <option value="FELINE">Feline</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Biological Age" data-ko="생물학적 나이">Biological Age</label>
+                        <input type="number" id="bioAge" value="45" min="0" max="150">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Blood Type" data-ko="혈액형">Blood Type</label>
+                        <select id="bloodType">
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                            <option value="O+" selected>O+</option>
+                            <option value="O-">O-</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="registerSubject()" data-en="Register Subject" data-ko="대상 등록">Register Subject</button>
+                </div>
+                <div class="output" id="subjectDoc"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Reference: VQI Grades" data-ko="참조: VQI 등급">Reference: VQI Grades</h4>
+                <table class="styled-table">
+                    <thead><tr><th>VQI Score</th><th data-en="Grade" data-ko="등급">Grade</th><th data-en="Assessment" data-ko="평가">Assessment</th></tr></thead>
+                    <tbody>
+                        <tr><td>0.95+</td><td>EXCELLENT</td><td data-en="Optimal preservation" data-ko="최적 보존">Optimal preservation</td></tr>
+                        <tr><td>0.85-0.94</td><td>GOOD</td><td data-en="Minor issues" data-ko="경미한 문제">Minor issues</td></tr>
+                        <tr><td>0.70-0.84</td><td>ACCEPTABLE</td><td data-en="Some concerns" data-ko="일부 우려">Some concerns</td></tr>
+                        <tr><td>0.50-0.69</td><td>MARGINAL</td><td data-en="Significant issues" data-ko="심각한 문제">Significant issues</td></tr>
+                        <tr><td>&lt;0.50</td><td>CRITICAL</td><td data-en="Severe damage" data-ko="심각한 손상">Severe damage</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Panel 2: Algorithms -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="CPA Protocol & VQI Calculator" data-ko="CPA 프로토콜 및 VQI 계산기">CPA Protocol & VQI Calculator</h2>
+            
+            <div class="sub-section">
+                <h4 data-en="CPA Protocol Designer" data-ko="CPA 프로토콜 설계">CPA Protocol Designer</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Target CPA Concentration (%)" data-ko="목표 CPA 농도 (%)">Target CPA (%)</label>
+                        <input type="number" id="targetCPA" value="60" min="10" max="80">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="DMSO (%)" data-ko="DMSO (%)">DMSO (%)</label>
+                        <input type="number" id="cpaDMSO" value="15" min="0" max="25">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Ethylene Glycol (%)" data-ko="에틸렌 글리콜 (%)">Ethylene Glycol (%)</label>
+                        <input type="number" id="cpaEG" value="15" min="0" max="25">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Loading Temperature (°C)" data-ko="로딩 온도 (°C)">Loading Temp (°C)</label>
+                        <input type="number" id="loadTemp" value="4" min="-5" max="25">
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="generateCPAProtocol()" data-en="Generate Protocol" data-ko="프로토콜 생성">Generate Protocol</button>
+                </div>
+                <div class="output" id="cpaDoc"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="VQI Calculator" data-ko="VQI 계산기">VQI Calculator</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Ice Fraction (%)" data-ko="얼음 비율 (%)">Ice Fraction (%)</label>
+                        <input type="number" id="iceFraction" value="2" min="0" max="100" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="CPA Distribution (%)" data-ko="CPA 분포 (%)">CPA Distribution (%)</label>
+                        <input type="number" id="cpaDistribution" value="92" min="0" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Cooling Adherence (%)" data-ko="냉각 준수 (%)">Cooling Adherence (%)</label>
+                        <input type="number" id="coolingAdherence" value="95" min="0" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Structural Integrity (%)" data-ko="구조적 완전성 (%)">Structural Integrity (%)</label>
+                        <input type="number" id="integrity" value="88" min="0" max="100">
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="calculateVQI()" data-en="Calculate VQI" data-ko="VQI 계산">Calculate VQI</button>
+                </div>
+                <div class="output" id="vqiDoc"></div>
+            </div>
+        </div>
+
+        <!-- Panel 3: Protocol -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="Cooling Profile & Alert System" data-ko="냉각 프로필 및 알림 시스템">Cooling Profile & Alert System</h2>
+            
+            <div class="sub-section">
+                <h4 data-en="Cooling Profile Simulator" data-ko="냉각 프로필 시뮬레이터">Cooling Profile Simulator</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Start Temperature (°C)" data-ko="시작 온도 (°C)">Start Temp (°C)</label>
+                        <input type="number" id="startTemp" value="4" min="-20" max="37">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Target Temperature (°C)" data-ko="목표 온도 (°C)">Target Temp (°C)</label>
+                        <input type="number" id="targetTemp" value="-196" min="-196" max="-80">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Cooling Rate (°C/min)" data-ko="냉각 속도 (°C/분)">Cooling Rate (°C/min)</label>
+                        <input type="number" id="coolingRate" value="1" min="0.1" max="10" step="0.1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label data-en="Cooling Strategy" data-ko="냉각 전략">Cooling Strategy</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="coolStrategy" value="CONTROLLED" checked> Controlled Rate</label>
+                        <label><input type="radio" name="coolStrategy" value="RAPID"> Rapid (Plunge)</label>
+                        <label><input type="radio" name="coolStrategy" value="STEP"> Step-wise</label>
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="simulateCooling()" data-en="Simulate Cooling" data-ko="냉각 시뮬레이션">Simulate Cooling</button>
+                </div>
+                <div class="output" id="coolingDoc"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Alert Simulator" data-ko="알림 시뮬레이터">Alert Simulator</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Alert Type" data-ko="알림 유형">Alert Type</label>
+                        <select id="alertType">
+                            <option value="TEMP_HIGH">Temperature Above Threshold</option>
+                            <option value="LN2_LOW">LN2 Level Low</option>
+                            <option value="POWER_FAILURE">Power Failure</option>
+                            <option value="SENSOR_ERROR">Sensor Malfunction</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Severity" data-ko="심각도">Severity</label>
+                        <select id="alertSeverity">
+                            <option value="WARNING">Warning</option>
+                            <option value="CRITICAL" selected>Critical</option>
+                            <option value="EMERGENCY">Emergency</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="simulateAlert()" data-en="Simulate Alert" data-ko="알림 시뮬레이션">Simulate Alert</button>
+                </div>
+                <div class="output" id="alertDoc"></div>
+            </div>
+        </div>
+
+        <!-- Panel 4: Integration -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="Storage & Transfer" data-ko="저장 및 이송">Storage & Transfer</h2>
+            
+            <div class="sub-section">
+                <h4 data-en="Storage Container Monitor" data-ko="저장 용기 모니터">Storage Container Monitor</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Container Type" data-ko="용기 유형">Container Type</label>
+                        <select id="containerType">
+                            <option value="DEWAR_SMALL">Small Dewar (&lt;50L)</option>
+                            <option value="DEWAR_MEDIUM" selected>Medium Dewar (50-200L)</option>
+                            <option value="DEWAR_LARGE">Large Dewar (200-500L)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Capacity (L)" data-ko="용량 (L)">Capacity (L)</label>
+                        <input type="number" id="capacity" value="150">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Current LN2 Level (%)" data-ko="현재 LN2 레벨 (%)">LN2 Level (%)</label>
+                        <input type="number" id="ln2Level" value="75" min="0" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Ambient Temp (°C)" data-ko="주변 온도 (°C)">Ambient Temp (°C)</label>
+                        <input type="number" id="ambientTemp" value="22" min="10" max="40">
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="analyzeContainer()" data-en="Analyze Container" data-ko="용기 분석">Analyze Container</button>
+                </div>
+                <div class="output" id="containerDoc"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Transfer Feasibility Check" data-ko="이송 가능성 확인">Transfer Feasibility Check</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Subject Type" data-ko="대상 유형">Subject Type</label>
+                        <select id="transferSubjectType">
+                            <option value="WHOLE_BODY">Whole Body</option>
+                            <option value="NEURO">Neuro</option>
+                            <option value="ORGAN">Organ</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Distance (km)" data-ko="거리 (km)">Distance (km)</label>
+                        <input type="number" id="distance" value="500">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Container Hold Time (hrs)" data-ko="용기 유지 시간 (시간)">Hold Time (hrs)</label>
+                        <input type="number" id="holdTime" value="72">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label data-en="Transport Method" data-ko="이송 방법">Transport Method</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="transport" value="GROUND" checked> Ground Vehicle</label>
+                        <label><input type="radio" name="transport" value="AIR"> Aircraft</label>
+                        <label><input type="radio" name="transport" value="HELICOPTER"> Helicopter</label>
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="checkTransferFeasibility()" data-en="Check Feasibility" data-ko="가능성 확인">Check Feasibility</button>
+                </div>
+                <div class="output" id="transferDoc"></div>
+            </div>
+        </div>
+
+        <!-- Panel 5: Emergency -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="Emergency Protocol" data-ko="비상 프로토콜">Emergency Protocol</h2>
+            
+            <div class="sub-section">
+                <h4 data-en="Emergency Response Simulator" data-ko="비상 대응 시뮬레이터">Emergency Response Simulator</h4>
+                <div class="form-group">
+                    <label data-en="Emergency Type" data-ko="비상 유형">Emergency Type</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="emergencyType" value="POWER_FAILURE" checked> 🔌 Power Failure</label>
+                        <label><input type="radio" name="emergencyType" value="LN2_SUPPLY"> ❄️ LN2 Supply Failure</label>
+                        <label><input type="radio" name="emergencyType" value="CONTAINER_BREACH"> 🔓 Container Breach</label>
+                        <label><input type="radio" name="emergencyType" value="FIRE"> 🔥 Fire</label>
+                        <label><input type="radio" name="emergencyType" value="NATURAL_DISASTER"> 🌊 Natural Disaster</label>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Backup Power Available" data-ko="백업 전원 가용">Backup Power</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="backupPower" value="YES" checked> Yes</label>
+                            <label><input type="radio" name="backupPower" value="NO"> No</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Time Since Detection (min)" data-ko="감지 후 경과 시간 (분)">Time Since Detection</label>
+                        <input type="number" id="timeSinceDetection" value="5" min="0" max="120">
+                    </div>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="executeEmergency()" data-en="Execute Protocol" data-ko="프로토콜 실행">Execute Protocol</button>
+                </div>
+                <div class="output" id="emergencyDoc"></div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Critical Temperature Points" data-ko="임계 온도 지점">Critical Temperature Points</h4>
+                <table class="styled-table">
+                    <thead><tr><th data-en="Temperature" data-ko="온도">Temperature</th><th data-en="Significance" data-ko="의미">Significance</th></tr></thead>
+                    <tbody>
+                        <tr><td>0°C</td><td data-en="Water freezing point" data-ko="물 어는점">Water freezing point</td></tr>
+                        <tr><td>-40°C</td><td data-en="Homogeneous nucleation" data-ko="균일 핵형성">Homogeneous nucleation</td></tr>
+                        <tr><td>-130°C</td><td data-en="Glass transition (Tg)" data-ko="유리 전이 (Tg)">Glass transition (Tg)</td></tr>
+                        <tr><td>-196°C</td><td data-en="LN2 storage temperature" data-ko="LN2 저장 온도">LN2 storage temperature</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="Preserving life for future generations" data-ko="미래 세대를 위한 생명 보존">Preserving life for future generations</p>
+            <p style="margin-top: 15px;">WIA - World Certification Industry Association</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Language Toggle
+        let currentLang = 'en';
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        // Tab Navigation
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function generateId() {
+            return 'xxxxxxxx-xxxx-4xxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                return (c == 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+        }
+
+        function registerSubject() {
+            const doc = {
+                "@context": "https://wia.org/contexts/cryo-preservation/v1",
+                "id": "subject:" + generateId(),
+                "type": "SubjectDocument",
+                "subjectType": document.getElementById('subjectType').value,
+                "species": document.getElementById('species').value,
+                "biologicalAge": parseInt(document.getElementById('bioAge').value),
+                "bloodType": document.getElementById('bloodType').value,
+                "status": "REGISTERED",
+                "registrationDate": new Date().toISOString(),
+                "preservationPlan": {
+                    "method": "VITRIFICATION",
+                    "facility": "PENDING_ASSIGNMENT"
+                }
+            };
+            document.getElementById('subjectDoc').textContent = JSON.stringify(doc, null, 2);
+        }
+
+        function generateCPAProtocol() {
+            const targetCPA = parseInt(document.getElementById('targetCPA').value);
+            const dmso = parseInt(document.getElementById('cpaDMSO').value);
+            const eg = parseInt(document.getElementById('cpaEG').value);
+            const loadTemp = parseInt(document.getElementById('loadTemp').value);
+            const totalCPA = dmso + eg;
+            
+            const steps = [];
+            let currentConc = 0;
+            while (currentConc < targetCPA) {
+                const nextConc = Math.min(currentConc + 5, targetCPA);
+                steps.push({ step: steps.length + 1, from: currentConc + "%", to: nextConc + "%", duration: "60 seconds" });
+                currentConc = nextConc;
+            }
+            
+            const protocol = {
+                protocolId: "CPA-" + generateId(),
+                targetConcentration: targetCPA + "%",
+                composition: { DMSO: dmso + "%", ethyleneGlycol: eg + "%" },
+                loadingTemperature: loadTemp + "°C",
+                steps: steps,
+                totalLoadingTime: (steps.length * 2) + " minutes",
+                validation: totalCPA >= 50 ? "✅ Within optimal range" : "⚠️ Review concentration"
+            };
+            document.getElementById('cpaDoc').textContent = JSON.stringify(protocol, null, 2);
+        }
+
+        function calculateVQI() {
+            const iceFraction = parseFloat(document.getElementById('iceFraction').value) / 100;
+            const cpaDistribution = parseFloat(document.getElementById('cpaDistribution').value) / 100;
+            const coolingAdherence = parseFloat(document.getElementById('coolingAdherence').value) / 100;
+            const integrity = parseFloat(document.getElementById('integrity').value) / 100;
+            
+            const iceScore = Math.max(0, 1 - (iceFraction / 0.10));
+            const vqi = (iceScore * 0.35) + (cpaDistribution * 0.25) + (coolingAdherence * 0.20) + (integrity * 0.20);
+            
+            let grade = vqi >= 0.95 ? "EXCELLENT" : vqi >= 0.85 ? "GOOD" : vqi >= 0.70 ? "ACCEPTABLE" : vqi >= 0.50 ? "MARGINAL" : "CRITICAL";
+            
+            document.getElementById('vqiDoc').textContent = JSON.stringify({
+                scores: { iceFraction: (iceFraction*100).toFixed(1)+"%", cpaDistribution: (cpaDistribution*100).toFixed(1)+"%", coolingAdherence: (coolingAdherence*100).toFixed(1)+"%", integrity: (integrity*100).toFixed(1)+"%" },
+                vqi: vqi.toFixed(4),
+                vqiPercent: (vqi * 100).toFixed(1) + "%",
+                grade: grade,
+                assessment: grade === "EXCELLENT" || grade === "GOOD" ? "✅ " + grade : "⚠️ " + grade
+            }, null, 2);
+        }
+
+        function simulateCooling() {
+            const startTemp = parseInt(document.getElementById('startTemp').value);
+            const targetTemp = parseInt(document.getElementById('targetTemp').value);
+            const strategy = document.querySelector('input[name="coolStrategy"]:checked').value;
+            const rate = parseFloat(document.getElementById('coolingRate').value);
+            
+            const segments = strategy === 'CONTROLLED' ? [
+                { phase: "Initial Cooling", from: startTemp+"°C", to: "0°C", rate: rate+"°C/min" },
+                { phase: "Nucleation Zone", from: "0°C", to: "-40°C", rate: (rate*2)+"°C/min", note: "⚠️ CRITICAL" },
+                { phase: "Pre-Vitrification", from: "-40°C", to: "-130°C", rate: rate+"°C/min" },
+                { phase: "Vitrification", from: "-130°C", to: targetTemp+"°C", rate: "Passive" }
+            ] : strategy === 'RAPID' ? [
+                { phase: "Plunge Cooling", from: startTemp+"°C", to: targetTemp+"°C", rate: "~200°C/min" }
+            ] : [
+                { phase: "Step 1", from: startTemp+"°C", to: "0°C" },
+                { phase: "Step 2", from: "0°C", to: "-40°C", note: "⚠️ Critical zone" },
+                { phase: "Step 3", from: "-40°C", to: "-130°C" },
+                { phase: "Step 4", from: "-130°C", to: targetTemp+"°C" }
+            ];
+            
+            document.getElementById('coolingDoc').textContent = JSON.stringify({ strategy, segments, criticalPoints: ["0°C: Freezing", "-40°C: Nucleation", "-130°C: Tg", "-196°C: LN2"] }, null, 2);
+        }
+
+        function simulateAlert() {
+            const alertType = document.getElementById('alertType').value;
+            const severity = document.getElementById('alertSeverity').value;
+            const alertTitles = { TEMP_HIGH: "Temperature Above Threshold", LN2_LOW: "LN2 Level Low", POWER_FAILURE: "Power Failure", SENSOR_ERROR: "Sensor Malfunction" };
+            
+            document.getElementById('alertDoc').textContent = JSON.stringify({
+                alert: { id: "alert-" + generateId(), type: alertType, severity: severity, title: alertTitles[alertType], timestamp: new Date().toISOString() },
+                response: { expectedResponseTime: severity === 'EMERGENCY' ? "5 minutes" : severity === 'CRITICAL' ? "15 minutes" : "1 hour" }
+            }, null, 2);
+        }
+
+        function analyzeContainer() {
+            const containerType = document.getElementById('containerType').value;
+            const capacity = parseInt(document.getElementById('capacity').value);
+            const ln2Level = parseInt(document.getElementById('ln2Level').value);
+            const ambientTemp = parseInt(document.getElementById('ambientTemp').value);
+            
+            const baseEvapRate = { 'DEWAR_SMALL': 0.8, 'DEWAR_MEDIUM': 0.5, 'DEWAR_LARGE': 0.3 }[containerType];
+            const evapRate = baseEvapRate * (1 + (ambientTemp - 20) * 0.02);
+            const currentVolume = (ln2Level / 100) * capacity;
+            const hoursToWarning = (currentVolume - 0.30 * capacity) / evapRate;
+            
+            let status = ln2Level < 20 ? "🚨 CRITICAL" : ln2Level < 30 ? "⚠️ WARNING" : "✅ NORMAL";
+            
+            document.getElementById('containerDoc').textContent = JSON.stringify({
+                container: { type: containerType, capacity: capacity + "L", currentLevel: ln2Level + "%" },
+                status: status,
+                evaporation: { rate: evapRate.toFixed(2) + " L/day" },
+                predictions: { hoursToWarning: hoursToWarning > 0 ? Math.round(hoursToWarning) + " hours" : "IMMEDIATE" }
+            }, null, 2);
+        }
+
+        function checkTransferFeasibility() {
+            const subjectType = document.getElementById('transferSubjectType').value;
+            const distance = parseInt(document.getElementById('distance').value);
+            const transport = document.querySelector('input[name="transport"]:checked').value;
+            const holdTime = parseInt(document.getElementById('holdTime').value);
+            
+            const speeds = { GROUND: 60, AIR: 500, HELICOPTER: 200 };
+            const transitHours = distance / speeds[transport] + 2;
+            const requiredHoldTime = transitHours * 2;
+            const feasible = holdTime >= requiredHoldTime;
+            
+            document.getElementById('transferDoc').textContent = JSON.stringify({
+                transfer: { subjectType, distance: distance + " km", transport },
+                transitTime: transitHours.toFixed(1) + " hours",
+                holdTime: holdTime + " hours",
+                requiredHoldTime: requiredHoldTime.toFixed(1) + " hours",
+                feasible: feasible ? "✅ Feasible" : "❌ Not Feasible - Increase hold time",
+                recommendation: feasible ? "Transfer approved" : "Address hold time issue"
+            }, null, 2);
+        }
+
+        function executeEmergency() {
+            const emergencyType = document.querySelector('input[name="emergencyType"]:checked').value;
+            const backupPower = document.querySelector('input[name="backupPower"]:checked').value === 'YES';
+            const timeSince = parseInt(document.getElementById('timeSinceDetection').value);
+            
+            const protocols = {
+                POWER_FAILURE: { title: "Power Failure Protocol", immediate: ["Verify UPS engaged", "Check container temps", "Monitor LN2 levels"], criticalTime: backupPower ? "8+ hours" : "4-6 hours" },
+                LN2_SUPPLY: { title: "LN2 Supply Failure", immediate: ["Check all container levels", "Contact backup suppliers", "Prioritize by criticality"], criticalTime: "Varies by container" },
+                CONTAINER_BREACH: { title: "Container Breach Protocol", immediate: ["⚠️ EVACUATE if LN2 leak", "Prepare emergency transfer", "Document conditions"], criticalTime: "IMMEDIATE" },
+                FIRE: { title: "Fire Emergency", immediate: ["🚨 ACTIVATE alarm", "🚨 EVACUATE personnel", "Call fire department"], criticalTime: "IMMEDIATE" },
+                NATURAL_DISASTER: { title: "Natural Disaster Protocol", immediate: ["Ensure personnel safety", "Assess structural integrity", "Check critical systems"], criticalTime: "Assess damage" }
+            };
+            
+            const protocol = protocols[emergencyType];
+            document.getElementById('emergencyDoc').textContent = JSON.stringify({
+                emergency: { type: emergencyType, timeSinceDetection: timeSince + " minutes", backupPower },
+                protocol: protocol,
+                currentPhase: timeSince < 5 ? "IMMEDIATE RESPONSE" : timeSince < 30 ? "SHORT-TERM ACTIONS" : "ONGOING MANAGEMENT"
+            }, null, 2);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() { registerSubject(); });
+    </script>
+</body>
+</html>

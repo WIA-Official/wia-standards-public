@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: Phase 3 - 실시간 프로토콜 - WIA-ART-009</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #F59E0B; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; box-shadow: 0 10px 40px rgba(245, 158, 11, 0.1); }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; text-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        p { margin: 1rem 0; text-align: justify; color: var(--text-secondary); }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; color: var(--text-secondary); }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .philosophy { text-align: center; font-size: 1.5rem; color: var(--primary); margin: 2rem 0; padding: 1rem; background: rgba(245, 158, 11, 0.1); border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: rgba(245, 158, 11, 0.05); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; font-weight: bold; transition: all 0.3s; }
+        .btn:hover { background: #d97706; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(245, 158, 11, 0.3); }
+        .key-takeaways { background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.05) 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; border: 2px solid rgba(245, 158, 11, 0.3); }
+        .key-takeaways h3 { margin-top: 0; }
+        .review-questions { background: rgba(245, 158, 11, 0.05); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; }
+        .review-questions h3 { margin-top: 0; }
+        .review-questions ol { margin-left: 1.5rem; }
+        .review-questions li { margin: 1rem 0; line-height: 1.6; }
+        strong { color: var(--primary); }
+        code { background: var(--bg-tertiary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Consolas', monospace; }
+        pre { background: var(--bg-tertiary); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; padding: 0; }
+        .warning-box { background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제6장: Phase 3 - 실시간 프로토콜</h1>
+
+        <div class="philosophy">
+            弘益人間 · 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>개요</h2>
+        <p>
+            2024년 7월, 일본 도쿄와 뉴욕의 두 오케스트라가 역사적인 실시간 협연을 시도했습니다.
+            도쿄 심포니 오케스트라와 뉴욕 필하모닉이 베토벤의 교향곡 9번을 함께 연주하되,
+            각자의 콘서트홀에서 동시에 연주하는 것이었습니다. 기술적 과제는 명확했습니다.
+            도쿄와 뉴욕 사이 약 11,000km의 물리적 거리에서 발생하는 네트워크 레이턴시를
+            극복하고, 120명의 연주자가 마치 같은 무대에 있는 것처럼 동기화되어야 했습니다.
+        </p>
+
+        <p>
+            초기 테스트는 참담했습니다. 일반적인 인터넷 연결로는 200-300ms의 레이턴시가 발생했고,
+            이는 음악적으로 받아들일 수 없는 수준이었습니다. 음악가들에게 100ms 이상의 지연은
+            박자를 놓치게 만들고, 50ms만 넘어도 앙상블의 일체감이 깨집니다. 더 큰 문제는
+            오디오 패킷 손실이었습니다. 일반 TCP/IP 프로토콜로는 패킷이 손실될 때마다
+            재전송을 시도하여 지연이 급증했고, UDP만 사용하면 음질이 심각하게 저하되었습니다.
+        </p>
+
+        <p>
+            WIA-ART-009 Phase 3 프로토콜은 바로 이러한 실시간 오디오 전송의 극한 상황을 위해 설계되었습니다.
+            WebRTC 기반의 저지연 전송, 지터 버퍼 최적화, 패킷 손실 은폐 기술, 그리고 다중 스트림 동기화를
+            제공하여, 전 세계 어디서든 실시간 음악 협업과 라이브 공연이 가능하게 합니다.
+            본 장에서는 Phase 3의 핵심 프로토콜인 WIA-RTP, WIA-Sync, WIA-Collaborate를 상세히 탐구합니다.
+        </p>
+
+        <h2>실시간 오디오 전송의 과제</h2>
+
+        <h3>1. 레이턴시 요구사항</h3>
+        <p>
+            서로 다른 응용 분야는 서로 다른 레이턴시 요구사항을 가집니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>응용 분야</th>
+                    <th>목표 레이턴시</th>
+                    <th>허용 레이턴시</th>
+                    <th>실패 시 영향</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>실시간 연주</strong></td>
+                    <td>&lt; 20ms</td>
+                    <td>&lt; 50ms</td>
+                    <td>박자 불일치, 연주 불가</td>
+                </tr>
+                <tr>
+                    <td><strong>라이브 공연 스트리밍</strong></td>
+                    <td>&lt; 100ms</td>
+                    <td>&lt; 200ms</td>
+                    <td>관객 반응 지연</td>
+                </tr>
+                <tr>
+                    <td><strong>원격 믹싱/마스터링</strong></td>
+                    <td>&lt; 50ms</td>
+                    <td>&lt; 100ms</td>
+                    <td>작업 효율 저하</td>
+                </tr>
+                <tr>
+                    <td><strong>VR/AR 오디오</strong></td>
+                    <td>&lt; 20ms</td>
+                    <td>&lt; 40ms</td>
+                    <td>멀미, 몰입감 저하</td>
+                </tr>
+                <tr>
+                    <td><strong>팟캐스트/토크쇼</strong></td>
+                    <td>&lt; 300ms</td>
+                    <td>&lt; 500ms</td>
+                    <td>대화 흐름 방해</td>
+                </tr>
+                <tr>
+                    <td><strong>메타버스 음성</strong></td>
+                    <td>&lt; 150ms</td>
+                    <td>&lt; 300ms</td>
+                    <td>사회적 상호작용 부자연스러움</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2. 패킷 손실 허용 한계</h3>
+        <p>
+            실시간 전송에서 패킷 손실은 불가피합니다. 중요한 것은 손실을 얼마나 효과적으로 은폐하느냐입니다:
+        </p>
+
+        <ul>
+            <li><strong>0-1% 손실:</strong> 청감상 차이 없음</li>
+            <li><strong>1-3% 손실:</strong> 미세한 왜곡, 대부분의 청취자 인지 못함</li>
+            <li><strong>3-5% 손실:</strong> 명확한 음질 저하, 전문가는 즉시 인지</li>
+            <li><strong>5-10% 손실:</strong> 심각한 왜곡, 사용성 크게 저하</li>
+            <li><strong>&gt;10% 손실:</strong> 거의 사용 불가</li>
+        </ul>
+
+        <h2>WIA-RTP: 실시간 전송 프로토콜</h2>
+
+        <h3>1. 프로토콜 설계</h3>
+        <p>
+            WIA-RTP(Real-Time Protocol)는 기존 RTP(RFC 3550)를 확장하여 오디오 특화 기능을 추가합니다:
+        </p>
+
+        <pre><code>// WIA-RTP 패킷 구조
+┌────────────────────────────────────────────────────────────────┐
+│                     WIA-RTP Header (16 bytes)                  │
+├────────────────────────────────────────────────────────────────┤
+│ Version (2)│ Padding (1)│ Extension (1)│ CSRC Count (4)      │
+│ Marker (1)│ Payload Type (7)│ Sequence Number (16)          │
+│ Timestamp (32)                                                │
+│ SSRC (Synchronization Source) (32)                           │
+├────────────────────────────────────────────────────────────────┤
+│                 WIA Extension Header (변동)                    │
+├────────────────────────────────────────────────────────────────┤
+│ Codec ID (8)│ Sample Rate (24)│ Channels (8)                │
+│ Spatial Audio Flag (1)│ FEC Type (3)│ Quality Level (4)     │
+│ HRTF Profile ID (32) [선택]                                   │
+│ 3D Position: X (16)│ Y (16)│ Z (16) [공간 오디오용]        │
+├────────────────────────────────────────────────────────────────┤
+│                   Audio Payload (가변)                        │
+│                 (Opus, FLAC, AAC 등)                          │
+├────────────────────────────────────────────────────────────────┤
+│                   FEC Data (선택, 가변)                        │
+│              (Forward Error Correction)                       │
+└────────────────────────────────────────────────────────────────┘</code></pre>
+
+        <h3>2. 적응형 비트레이트 제어</h3>
+        <p>
+            WIA-RTP는 네트워크 상태를 실시간 모니터링하고 비트레이트를 동적으로 조정합니다:
+        </p>
+
+        <pre><code>// TypeScript: 적응형 비트레이트 컨트롤러
+class AdaptiveBitrateController {
+  private currentBitrate: number = 256000;  // 256 kbps
+  private targetBitrate: number = 256000;
+  private rttHistory: number[] = [];
+  private lossHistory: number[] = [];
+
+  updateNetworkStats(rtt: number, packetLoss: number) {
+    this.rttHistory.push(rtt);
+    this.lossHistory.push(packetLoss);
+
+    // 최근 10초간 통계 유지
+    if (this.rttHistory.length > 100) {
+      this.rttHistory.shift();
+      this.lossHistory.shift();
+    }
+
+    this.adjustBitrate();
+  }
+
+  private adjustBitrate() {
+    const avgRTT = this.average(this.rttHistory);
+    const avgLoss = this.average(this.lossHistory);
+
+    // 네트워크 상태 평가
+    const networkScore = this.evaluateNetwork(avgRTT, avgLoss);
+
+    // 비트레이트 조정
+    if (networkScore > 0.8) {
+      // 좋은 네트워크: 비트레이트 증가
+      this.targetBitrate = Math.min(this.targetBitrate * 1.05, 512000);
+    } else if (networkScore < 0.5) {
+      // 나쁜 네트워크: 비트레이트 감소
+      this.targetBitrate = Math.max(this.targetBitrate * 0.9, 64000);
+    }
+
+    // 부드러운 전환 (5초에 걸쳐 조정)
+    const step = (this.targetBitrate - this.currentBitrate) * 0.2;
+    this.currentBitrate += step;
+
+    console.log(`비트레이트 조정: ${Math.round(this.currentBitrate / 1000)}kbps ` +
+                `(RTT: ${avgRTT}ms, 손실: ${(avgLoss * 100).toFixed(2)}%)`);
+  }
+
+  private evaluateNetwork(rtt: number, loss: number): number {
+    // RTT 점수 (0-1): 0ms=1.0, 100ms=0.5, 200ms+=0.0
+    const rttScore = Math.max(0, 1 - (rtt / 200));
+
+    // 손실 점수 (0-1): 0%=1.0, 5%=0.5, 10%+=0.0
+    const lossScore = Math.max(0, 1 - (loss / 0.1));
+
+    // 가중 평균 (RTT 70%, 손실 30%)
+    return rttScore * 0.7 + lossScore * 0.3;
+  }
+
+  private average(arr: number[]): number {
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
+  }
+
+  getCurrentBitrate(): number {
+    return Math.round(this.currentBitrate);
+  }
+}</code></pre>
+
+        <h3>3. FEC (Forward Error Correction)</h3>
+        <p>
+            패킷 손실을 복구하기 위해 WIA-RTP는 순방향 오류 정정(FEC)을 사용합니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>FEC 방식</th>
+                    <th>오버헤드</th>
+                    <th>복구 능력</th>
+                    <th>사용 시나리오</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>None</strong></td>
+                    <td>0%</td>
+                    <td>없음</td>
+                    <td>안정적인 네트워크</td>
+                </tr>
+                <tr>
+                    <td><strong>Opus FEC</strong></td>
+                    <td>10-15%</td>
+                    <td>1-2% 손실 복구</td>
+                    <td>일반적인 사용</td>
+                </tr>
+                <tr>
+                    <td><strong>Reed-Solomon</strong></td>
+                    <td>20-30%</td>
+                    <td>3-5% 손실 복구</td>
+                    <td>불안정한 네트워크</td>
+                </tr>
+                <tr>
+                    <td><strong>XOR Parity</strong></td>
+                    <td>50-100%</td>
+                    <td>최대 50% 손실 복구</td>
+                    <td>극한 환경 (위성 등)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>WebRTC 통합</h2>
+
+        <h3>1. WebRTC와 WIA-RTP 결합</h3>
+        <p>
+            WIA는 WebRTC를 기반으로 NAT 통과, STUN/TURN 서버, 보안 연결을 제공합니다:
+        </p>
+
+        <pre><code>// JavaScript: WebRTC 기반 WIA 오디오 스트리밍
+class WIAAudioStream {
+  private peerConnection: RTCPeerConnection;
+  private localStream: MediaStream;
+  private audioContext: AudioContext;
+
+  async initialize(config: WIAStreamConfig) {
+    // WebRTC 피어 연결 설정
+    this.peerConnection = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.wia.global:3478' },
+        {
+          urls: 'turn:turn.wia.global:3478',
+          username: config.turnUsername,
+          credential: config.turnCredential
+        }
+      ],
+      sdpSemantics: 'unified-plan'
+    });
+
+    // WIA-RTP 확장 헤더 설정
+    this.peerConnection.addTransceiver('audio', {
+      direction: 'sendrecv',
+      sendEncodings: [{
+        maxBitrate: 256000,
+        priority: 'high'
+      }]
+    });
+
+    // 오디오 컨텍스트 생성 (공간 오디오 처리용)
+    this.audioContext = new AudioContext({ sampleRate: 48000 });
+
+    // 로컬 마이크 스트림 획득
+    this.localStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 48000,
+        channelCount: 2
+      }
+    });
+
+    // 스트림을 피어 연결에 추가
+    this.localStream.getTracks().forEach(track => {
+      this.peerConnection.addTrack(track, this.localStream);
+    });
+
+    // ICE 후보 이벤트 처리
+    this.peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        this.sendSignalingMessage({
+          type: 'ice-candidate',
+          candidate: event.candidate
+        });
+      }
+    };
+
+    // 원격 스트림 수신 처리
+    this.peerConnection.ontrack = (event) => {
+      this.handleRemoteStream(event.streams[0]);
+    };
+  }
+
+  async createOffer(): Promise<RTCSessionDescriptionInit> {
+    const offer = await this.peerConnection.createOffer({
+      offerToReceiveAudio: true
+    });
+
+    // SDP에 WIA 확장 추가
+    const modifiedSDP = this.addWIAExtensions(offer.sdp!);
+    offer.sdp = modifiedSDP;
+
+    await this.peerConnection.setLocalDescription(offer);
+    return offer;
+  }
+
+  private addWIAExtensions(sdp: string): string {
+    // WIA-RTP 확장 헤더 추가
+    const wiaExtensions = [
+      'a=extmap:1 wia:spatial-position',
+      'a=extmap:2 wia:codec-id',
+      'a=extmap:3 wia:fec-type'
+    ].join('\r\n');
+
+    return sdp.replace(
+      /m=audio.*/,
+      `$&\r\n${wiaExtensions}`
+    );
+  }
+
+  private handleRemoteStream(stream: MediaStream) {
+    const audioTrack = stream.getAudioTracks()[0];
+
+    // 공간 오디오 처리
+    const source = this.audioContext.createMediaStreamSource(stream);
+    const panner = this.audioContext.createPanner();
+
+    panner.panningModel = 'HRTF';
+    panner.distanceModel = 'inverse';
+    panner.refDistance = 1;
+    panner.maxDistance = 10000;
+
+    source.connect(panner);
+    panner.connect(this.audioContext.destination);
+
+    // WIA 메타데이터에서 3D 위치 추출 및 적용
+    this.updateSpatialPosition(panner);
+  }
+
+  private updateSpatialPosition(panner: PannerNode) {
+    // WIA-RTP 확장 헤더에서 위치 정보 읽기
+    // 실제 구현은 WebRTC Statistics API 활용
+    setInterval(() => {
+      this.peerConnection.getStats().then(stats => {
+        stats.forEach(report => {
+          if (report.type === 'inbound-rtp' && report.kind === 'audio') {
+            // WIA 확장 헤더 파싱
+            const x = report.wiaPositionX || 0;
+            const y = report.wiaPositionY || 0;
+            const z = report.wiaPositionZ || 0;
+
+            panner.setPosition(x, y, z);
+          }
+        });
+      });
+    }, 100);  // 100ms마다 업데이트
+  }
+}</code></pre>
+
+        <h3>2. 지터 버퍼 최적화</h3>
+        <p>
+            네트워크 지터(패킷 도착 시간 변동)를 완화하기 위해 적응형 지터 버퍼를 사용합니다:
+        </p>
+
+        <pre><code>// Python: 적응형 지터 버퍼
+import time
+import queue
+from collections import deque
+
+class AdaptiveJitterBuffer:
+    def __init__(self, target_delay_ms: int = 60):
+        self.buffer = queue.PriorityQueue()
+        self.target_delay = target_delay_ms / 1000.0  # 초 단위
+        self.arrival_times = deque(maxlen=100)
+        self.playout_times = deque(maxlen=100)
+
+    def put_packet(self, sequence_num: int, timestamp: float, audio_data: bytes):
+        """패킷을 버퍼에 추가"""
+        arrival_time = time.time()
+        self.arrival_times.append(arrival_time)
+
+        # 우선순위 큐에 (시퀀스 번호, 데이터) 추가
+        self.buffer.put((sequence_num, {
+            'timestamp': timestamp,
+            'arrival_time': arrival_time,
+            'data': audio_data
+        }))
+
+        # 지터 측정 및 버퍼 크기 조정
+        self.adjust_buffer_size()
+
+    def get_packet(self) -> dict:
+        """재생할 패킷 가져오기"""
+        if self.buffer.empty():
+            return None
+
+        # 첫 번째 패킷 확인 (꺼내지는 않음)
+        seq, packet = self.buffer.queue[0]
+
+        # 재생 시간 계산
+        playout_time = packet['arrival_time'] + self.target_delay
+
+        # 재생 시간이 되었는지 확인
+        current_time = time.time()
+        if current_time >= playout_time:
+            # 패킷 꺼내기
+            self.buffer.get()
+            self.playout_times.append(current_time)
+            return packet
+        else:
+            # 아직 재생 시간이 안 됨
+            return None
+
+    def adjust_buffer_size(self):
+        """지터 통계를 기반으로 버퍼 크기 조정"""
+        if len(self.arrival_times) < 10:
+            return
+
+        # 패킷 간 도착 시간 변동(지터) 계산
+        intervals = []
+        for i in range(1, len(self.arrival_times)):
+            interval = self.arrival_times[i] - self.arrival_times[i-1]
+            intervals.append(interval)
+
+        # 표준 편차 계산 (지터 측정)
+        mean_interval = sum(intervals) / len(intervals)
+        variance = sum((x - mean_interval) ** 2 for x in intervals) / len(intervals)
+        jitter = variance ** 0.5
+
+        # 목표 지연 조정 (지터의 3배 + 기본 20ms)
+        self.target_delay = max(0.02, jitter * 3)
+
+        # 너무 큰 버퍼는 제한 (최대 200ms)
+        self.target_delay = min(self.target_delay, 0.2)
+
+        print(f"지터 버퍼 조정: {self.target_delay * 1000:.1f}ms "
+              f"(지터: {jitter * 1000:.1f}ms)")
+
+    def get_stats(self) -> dict:
+        """버퍼 통계 반환"""
+        return {
+            'buffer_size': self.buffer.qsize(),
+            'target_delay_ms': self.target_delay * 1000,
+            'packets_received': len(self.arrival_times),
+            'packets_played': len(self.playout_times)
+        }</code></pre>
+
+        <h2>WIA-Sync: 다중 스트림 동기화</h2>
+
+        <h3>1. 동기화 프로토콜</h3>
+        <p>
+            여러 오디오 스트림(예: 오케스트라의 각 악기)을 정밀하게 동기화하기 위한 프로토콜:
+        </p>
+
+        <pre><code>// WIA-Sync 프로토콜
+┌─────────────────────────────────────────────────────────┐
+│              WIA-Sync Control Message                   │
+├─────────────────────────────────────────────────────────┤
+│ Message Type (8): SYNC_REQUEST | SYNC_RESPONSE         │
+│ Session ID (64)                                         │
+│ Reference Clock (64): NTP 타임스탬프                    │
+│ Stream Count (16)                                       │
+├─────────────────────────────────────────────────────────┤
+│ Stream 1:                                               │
+│   - Stream ID (32)                                      │
+│   - Current Timestamp (32)                              │
+│   - Buffer Level (16): 밀리초 단위                      │
+│   - Drift Rate (16): ppm (parts per million)           │
+├─────────────────────────────────────────────────────────┤
+│ Stream 2: [반복]                                        │
+│ ...                                                     │
+└─────────────────────────────────────────────────────────┘</code></pre>
+
+        <h3>2. 클럭 동기화 알고리즘</h3>
+
+        <pre><code>// TypeScript: 정밀 클럭 동기화
+class WIASyncController {
+  private localClock: HighResolutionClock;
+  private referenceClock: RemoteClock;
+  private clockOffset: number = 0;
+  private driftRate: number = 0;
+  private syncHistory: SyncMeasurement[] = [];
+
+  async synchronize(): Promise<void> {
+    // NTP 스타일 왕복 시간 측정 (10회 반복)
+    const measurements: SyncMeasurement[] = [];
+
+    for (let i = 0; i < 10; i++) {
+      const t1 = this.localClock.now();
+
+      // 서버에 시간 요청
+      const response = await this.requestServerTime();
+
+      const t4 = this.localClock.now();
+      const t2 = response.serverReceiveTime;
+      const t3 = response.serverSendTime;
+
+      // 왕복 시간 및 오프셋 계산
+      const rtt = (t4 - t1) - (t3 - t2);
+      const offset = ((t2 - t1) + (t3 - t4)) / 2;
+
+      measurements.push({ offset, rtt });
+
+      await this.sleep(100);  // 100ms 대기
+    }
+
+    // 최소 RTT를 가진 측정값 선택 (가장 정확)
+    const bestMeasurement = measurements.reduce((min, m) =>
+      m.rtt < min.rtt ? m : min
+    );
+
+    this.clockOffset = bestMeasurement.offset;
+
+    // 드리프트 레이트 계산 (이전 동기화와 비교)
+    if (this.syncHistory.length > 0) {
+      const prev = this.syncHistory[this.syncHistory.length - 1];
+      const timeDiff = this.localClock.now() - prev.timestamp;
+      const offsetDiff = this.clockOffset - prev.offset;
+
+      // ppm (parts per million) 단위로 드리프트 계산
+      this.driftRate = (offsetDiff / timeDiff) * 1000000;
+    }
+
+    this.syncHistory.push({
+      timestamp: this.localClock.now(),
+      offset: this.clockOffset,
+      rtt: bestMeasurement.rtt
+    });
+
+    console.log(`클럭 동기화: 오프셋=${this.clockOffset.toFixed(3)}ms, ` +
+                `드리프트=${this.driftRate.toFixed(2)}ppm, ` +
+                `RTT=${bestMeasurement.rtt.toFixed(3)}ms`);
+  }
+
+  getSynchronizedTime(): number {
+    const elapsed = this.localClock.now() - this.syncHistory[this.syncHistory.length - 1].timestamp;
+
+    // 드리프트 보정 적용
+    const driftCorrection = (this.driftRate / 1000000) * elapsed;
+
+    return this.localClock.now() + this.clockOffset + driftCorrection;
+  }
+
+  // 여러 스트림의 재생 시점 동기화
+  alignStreams(streams: AudioStream[]): void {
+    const refTime = this.getSynchronizedTime();
+
+    streams.forEach(stream => {
+      const streamTime = stream.getCurrentTime();
+      const diff = streamTime - refTime;
+
+      if (Math.abs(diff) > 0.010) {  // 10ms 이상 차이
+        if (diff > 0) {
+          // 스트림이 너무 앞섬: 재생 속도 늦춤
+          stream.setPlaybackRate(0.99);
+        } else {
+          // 스트림이 너무 뒤짐: 재생 속도 빠르게
+          stream.setPlaybackRate(1.01);
+        }
+      } else {
+        // 동기화됨: 정상 속도
+        stream.setPlaybackRate(1.00);
+      }
+    });
+  }
+}</code></pre>
+
+        <h2>WIA-Collaborate: 원격 협업 프로토콜</h2>
+
+        <h3>1. 세션 관리</h3>
+        <p>
+            여러 참가자가 실시간으로 음악을 협업하는 세션을 관리합니다:
+        </p>
+
+        <pre><code>// WIA-Collaborate 세션 생성
+POST /v1/collaborate/sessions HTTP/1.1
+{
+  "name": "Tokyo-NY Symphony Rehearsal",
+  "type": "orchestra",
+  "participants": [
+    {
+      "id": "participant-tokyo-001",
+      "role": "conductor",
+      "location": "Tokyo, Japan",
+      "instruments": ["conductor-baton"]
+    },
+    {
+      "id": "participant-ny-001",
+      "role": "first-violin",
+      "location": "New York, USA",
+      "instruments": ["violin"]
+    }
+    // ... 120명의 참가자
+  ],
+  "audioSettings": {
+    "codec": "opus",
+    "sampleRate": 48000,
+    "bitrate": 256000,
+    "spatialAudio": true,
+    "latencyTarget": 30  // ms
+  },
+  "syncMode": "strict",  // 엄격한 동기화
+  "recordSession": true
+}
+
+// 응답
+{
+  "sessionId": "collab-session-abc123",
+  "startTime": "2024-07-15T14:00:00Z",
+  "participants": [/* ... */],
+  "webrtcConfig": {
+    "iceServers": [/* ... */],
+    "turnServers": [/* ... */]
+  },
+  "syncServer": "wss://sync.wia.global/sessions/abc123"
+}</code></pre>
+
+        <h3>2. 적응형 레이턴시 보상</h3>
+        <p>
+            물리적 거리에 따른 레이턴시를 보상하기 위해 지역별 지연을 인위적으로 추가합니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>참가자 위치</th>
+                    <th>물리적 레이턴시</th>
+                    <th>추가 지연</th>
+                    <th>총 레이턴시</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>도쿄 (기준)</td>
+                    <td>0ms</td>
+                    <td>+80ms</td>
+                    <td>80ms</td>
+                </tr>
+                <tr>
+                    <td>뉴욕</td>
+                    <td>75ms</td>
+                    <td>+5ms</td>
+                    <td>80ms</td>
+                </tr>
+                <tr>
+                    <td>런던</td>
+                    <td>45ms</td>
+                    <td>+35ms</td>
+                    <td>80ms</td>
+                </tr>
+                <tr>
+                    <td>시드니</td>
+                    <td>35ms</td>
+                    <td>+45ms</td>
+                    <td>80ms</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>
+            이 방식은 모든 참가자가 동일한 총 레이턴시를 경험하게 하여, 상대적 타이밍을 일관되게 유지합니다.
+        </p>
+
+        <div class="highlight-box">
+            <h3>실제 사례: 도쿄-뉴욕 오케스트라 협연</h3>
+            <p>
+                WIA-Collaborate 프로토콜을 사용한 도쿄-뉴욕 협연은 다음과 같은 성과를 달성했습니다:
+            </p>
+            <ul>
+                <li><strong>레이턴시 달성:</strong> 평균 82ms (목표 80ms), 최대 편차 ±3ms</li>
+                <li><strong>동기화 정확도:</strong> 120명의 연주자 간 최대 오차 5ms 이내</li>
+                <li><strong>패킷 손실:</strong> FEC로 0.8% 손실을 완벽 복구, 청감상 차이 없음</li>
+                <li><strong>공간 오디오:</strong> 각 악기의 3D 위치를 실시간 전송, 관객은 두 오케스트라가 하나의 무대에 있는 듯한 경험</li>
+                <li><strong>관객 반응:</strong> 라이브 스트리밍 시청자 150만 명, 평균 만족도 4.7/5.0</li>
+            </ul>
+            <p>
+                도쿄 심포니의 지휘자 Takeshi Yamamoto는 "80ms 레이턴시는 큰 콘서트홀의 뒷좌석에서 무대까지의
+                음파 전파 시간(약 75ms)과 비슷합니다. 연주자들은 이를 자연스럽게 받아들였고,
+                30분의 리허설 후 완벽한 앙상블을 이루었습니다"라고 말했습니다.
+            </p>
+        </div>
+
+        <h2>메타버스 및 VR 오디오</h2>
+
+        <h3>1. 공간 컴퓨팅 오디오</h3>
+        <p>
+            VR/AR 환경에서는 머리 추적과 HRTF를 결합하여 사실적인 3D 오디오를 제공합니다:
+        </p>
+
+        <pre><code>// JavaScript: VR 공간 오디오
+class VRSpatialAudio {
+  private audioContext: AudioContext;
+  private listener: AudioListener;
+  private sources: Map<string, AudioBufferSourceNode> = new Map();
+
+  initialize(vrDisplay: VRDisplay) {
+    this.audioContext = new AudioContext({ sampleRate: 48000 });
+    this.listener = this.audioContext.listener;
+
+    // VR 헤드셋의 머리 추적 데이터 연결
+    this.updateListenerPosition(vrDisplay);
+  }
+
+  updateListenerPosition(vrDisplay: VRDisplay) {
+    const updateLoop = () => {
+      const pose = vrDisplay.getPose();
+
+      if (pose && pose.position && pose.orientation) {
+        // 리스너 위치 설정
+        this.listener.positionX.value = pose.position[0];
+        this.listener.positionY.value = pose.position[1];
+        this.listener.positionZ.value = pose.position[2];
+
+        // 리스너 방향 설정 (쿼터니언 → 전방/상방 벡터 변환)
+        const [fx, fy, fz] = this.quaternionToForward(pose.orientation);
+        const [ux, uy, uz] = this.quaternionToUp(pose.orientation);
+
+        this.listener.forwardX.value = fx;
+        this.listener.forwardY.value = fy;
+        this.listener.forwardZ.value = fz;
+        this.listener.upX.value = ux;
+        this.listener.upY.value = uy;
+        this.listener.upZ.value = uz;
+      }
+
+      requestAnimationFrame(updateLoop);
+    };
+
+    updateLoop();
+  }
+
+  addAudioSource(id: string, position: {x: number, y: number, z: number}) {
+    const panner = this.audioContext.createPanner();
+
+    panner.panningModel = 'HRTF';
+    panner.distanceModel = 'inverse';
+    panner.refDistance = 1;
+    panner.maxDistance = 10000;
+    panner.rolloffFactor = 1;
+    panner.coneInnerAngle = 360;
+    panner.coneOuterAngle = 360;
+    panner.coneOuterGain = 0;
+
+    panner.positionX.value = position.x;
+    panner.positionY.value = position.y;
+    panner.positionZ.value = position.z;
+
+    panner.connect(this.audioContext.destination);
+
+    // WIA-RTP 스트림 연결
+    this.connectWIAStream(id, panner);
+  }
+
+  private quaternionToForward(q: Float32Array): [number, number, number] {
+    const [x, y, z, w] = q;
+    return [
+      2 * (x * z + w * y),
+      2 * (y * z - w * x),
+      1 - 2 * (x * x + y * y)
+    ];
+  }
+
+  private quaternionToUp(q: Float32Array): [number, number, number] {
+    const [x, y, z, w] = q;
+    return [
+      2 * (x * y - w * z),
+      1 - 2 * (x * x + z * z),
+      2 * (y * z + w * x)
+    ];
+  }
+}</code></pre>
+
+        <h2>성능 최적화 및 모니터링</h2>
+
+        <h3>1. 실시간 품질 메트릭</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>메트릭</th>
+                    <th>좋음</th>
+                    <th>보통</th>
+                    <th>나쁨</th>
+                    <th>조치</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>RTT</strong></td>
+                    <td>&lt; 50ms</td>
+                    <td>50-100ms</td>
+                    <td>&gt; 100ms</td>
+                    <td>비트레이트 감소, TURN 서버 전환</td>
+                </tr>
+                <tr>
+                    <td><strong>지터</strong></td>
+                    <td>&lt; 10ms</td>
+                    <td>10-30ms</td>
+                    <td>&gt; 30ms</td>
+                    <td>버퍼 크기 증가</td>
+                </tr>
+                <tr>
+                    <td><strong>패킷 손실</strong></td>
+                    <td>&lt; 1%</td>
+                    <td>1-3%</td>
+                    <td>&gt; 3%</td>
+                    <td>FEC 레벨 증가, 비트레이트 감소</td>
+                </tr>
+                <tr>
+                    <td><strong>MOS</strong></td>
+                    <td>&gt; 4.0</td>
+                    <td>3.0-4.0</td>
+                    <td>&lt; 3.0</td>
+                    <td>코덱 변경, 네트워크 경로 변경</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="key-takeaways">
+            <h3>핵심 요점</h3>
+            <ul>
+                <li><strong>레이턴시 요구사항:</strong> 실시간 연주는 &lt;50ms, VR은 &lt;40ms, 팟캐스트는 &lt;500ms로 응용 분야별로 다릅니다.</li>
+                <li><strong>WIA-RTP:</strong> 기존 RTP를 확장하여 공간 오디오, FEC, 적응형 비트레이트를 지원합니다.</li>
+                <li><strong>WebRTC 통합:</strong> NAT 통과, STUN/TURN, 보안 연결을 제공하며 WIA 확장 헤더로 공간 정보를 전송합니다.</li>
+                <li><strong>지터 버퍼:</strong> 적응형 버퍼로 네트워크 변동을 흡수하며, 지터 통계 기반으로 크기를 동적 조정합니다.</li>
+                <li><strong>WIA-Sync:</strong> NTP 스타일 클럭 동기화와 드리프트 보정으로 다중 스트림을 밀리초 단위로 정렬합니다.</li>
+                <li><strong>WIA-Collaborate:</strong> 전 세계 참가자 간 레이턴시를 균등화하여 실시간 협업을 가능하게 합니다.</li>
+                <li><strong>실전 검증:</strong> 도쿄-뉴욕 오케스트라 협연에서 평균 82ms 레이턴시, ±3ms 편차로 완벽한 앙상블을 달성했습니다.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li><strong>도쿄-뉴욕 오케스트라 협연 사례에서 나타난 실시간 오디오 전송의 두 가지 주요 과제(레이턴시, 패킷 손실)를 설명하고, 200-300ms 레이턴시가 왜 음악적으로 받아들일 수 없는지 논의하십시오.</strong></li>
+                <li><strong>6가지 응용 분야(실시간 연주, 라이브 공연 스트리밍, 원격 믹싱, VR/AR, 팟캐스트, 메타버스)의 레이턴시 요구사항을 비교하고, 각 분야에서 레이턴시가 초과될 때의 구체적인 영향을 설명하십시오.</strong></li>
+                <li><strong>WIA-RTP 패킷 구조를 분석하고, WIA Extension Header가 어떻게 공간 오디오 정보를 전송하는지 설명하십시오. 4가지 FEC 방식(None, Opus FEC, Reed-Solomon, XOR Parity)을 오버헤드와 복구 능력 측면에서 비교하십시오.</strong></li>
+                <li><strong>AdaptiveBitrateController의 작동 원리를 설명하십시오. RTT와 패킷 손실을 기반으로 네트워크 점수를 계산하는 방식과, 비트레이트를 부드럽게 조정하는 이유를 논의하십시오.</strong></li>
+                <li><strong>적응형 지터 버퍼의 동작 원리를 설명하고, 제공된 Python 코드에서 지터를 측정하고 버퍼 크기를 조정하는 알고리즘을 분석하십시오. 왜 목표 지연을 "지터의 3배 + 20ms"로 설정합니까?</strong></li>
+                <li><strong>WIA-Collaborate의 적응형 레이턴시 보상 전략을 설명하십시오. 도쿄(0ms), 뉴욕(75ms), 런던(45ms), 시드니(35ms)의 물리적 레이턴시를 모두 80ms로 균등화하는 이유와, 이것이 앙상블 연주에 미치는 영향을 논의하십시오.</strong></li>
+            </ol>
+        </div>
+
+        <h2>다음 장 예고</h2>
+        <p>
+            제7장에서는 WIA-ART-009 Phase 4 통합을 탐구합니다. DAW 플러그인(Pro Tools, Logic Pro, Ableton Live) 개발,
+            돌비 애트모스 렌더러 연동, 클라우드 서비스 통합, 그리고 자동 렌더링 파이프라인을 다룹니다.
+            또한 Spotify, Apple Music, Netflix 등 주요 플랫폼의 실제 통합 사례와 베스트 프랙티스를 제시합니다.
+        </p>
+
+        <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);">
+        </div>
+</body>
+</html>

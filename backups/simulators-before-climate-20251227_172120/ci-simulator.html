@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA CI Octave - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #8B5CF6;
+            --primary-dark: #7C3AED;
+            --secondary: #F59E0B;
+            --danger: #ef4444;
+            --success: #10b981;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #A78BFA); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); border-radius: 8px; font-size: 1rem; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .electrode-grid { display: grid; grid-template-columns: repeat(11, 1fr); gap: 5px; margin: 20px 0; }
+        .electrode { background: var(--bg); border: 2px solid var(--border); border-radius: 8px; padding: 10px 5px; text-align: center; font-size: 0.75rem; transition: all 0.2s; cursor: pointer; }
+        .electrode:hover { border-color: var(--primary); }
+        .electrode.active { background: var(--primary); border-color: var(--primary); }
+        .electrode-num { font-weight: bold; }
+        .electrode-freq { color: var(--text-muted); font-size: 0.65rem; }
+
+        .freq-viz { background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899); border-radius: 12px; padding: 30px; margin: 20px 0; text-align: center; }
+        .freq-display { font-size: 3rem; font-weight: bold; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .freq-note { font-size: 1.5rem; margin-top: 10px; }
+
+        .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .metric-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .metric-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .metric-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+        .mode-card { background: var(--bg); border: 2px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .mode-card:hover { border-color: var(--primary); }
+        .mode-card.selected { border-color: var(--primary); background: rgba(139, 92, 246, 0.1); }
+        .mode-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .mode-name { font-weight: 600; }
+        .mode-desc { font-size: 0.85rem; color: var(--text-muted); margin-top: 5px; }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .form-grid { grid-template-columns: 1fr; }
+            .electrode-grid { grid-template-columns: repeat(6, 1fr); }
+            .metric-grid { grid-template-columns: repeat(2, 1fr); }
+            .mode-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">CI Octave</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🎵 WIA CI Octave</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Cochlear Implant Enhancement" data-ko="인공와우 향상 표준">Cochlear Implant Enhancement</h1>
+            <p data-en="Octave detection for music and tonal languages" data-ko="음악 및 성조 언어를 위한 옥타브 감지">Octave detection for music</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🎹 Electrodes" data-ko="🎹 전극">🎹 Electrodes</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🎵 Octave" data-ko="🎵 옥타브">🎵 Octave</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🎼 Music" data-ko="🎼 음악">🎼 Music</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🗣️ Speech" data-ko="🗣️ 음성">🗣️ Speech</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🔌 API" data-ko="🔌 API">🔌 API</div>
+        </div>
+
+        <!-- Panel 0: Electrodes -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🎹 22 Electrode Array" data-ko="🎹 22 전극 배열">🎹 22 Electrode Array</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Standard cochlear implant frequency allocation" data-ko="표준 인공와우 주파수 할당">Frequency allocation table</p>
+
+            <div class="electrode-grid" id="electrodeGrid"></div>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value">22</div>
+                    <div class="metric-label" data-en="Electrodes" data-ko="전극 수">Electrodes</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">250-7938</div>
+                    <div class="metric-label" data-en="Hz Range" data-ko="주파수 범위">Hz Range</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="selectedElectrode">E12</div>
+                    <div class="metric-label" data-en="Selected" data-ko="선택됨">Selected</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="selectedFreq">1688</div>
+                    <div class="metric-label" data-en="Center Hz" data-ko="중심 Hz">Center Hz</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="showElectrodeInfo()" data-en="🎹 Show Details" data-ko="🎹 상세 보기">🎹 Show Details</button>
+            </div>
+            <div class="output" id="electrodeOutput"></div>
+        </div>
+
+        <!-- Panel 1: Octave Detection -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🎵 Octave Detection" data-ko="🎵 옥타브 감지">🎵 Octave Detection</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Extract pitch information from audio" data-ko="오디오에서 피치 정보 추출">Extract pitch information</p>
+
+            <div class="freq-viz">
+                <div class="freq-display" id="freqDisplay">440 Hz</div>
+                <div class="freq-note" id="noteDisplay">A4</div>
+            </div>
+
+            <div class="form-group">
+                <label data-en="Input Frequency (Hz)" data-ko="입력 주파수 (Hz)">Input Frequency (Hz)</label>
+                <input type="number" id="freqInput" value="440" min="100" max="8000">
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="detectOctave()" data-en="🎵 Detect Octave" data-ko="🎵 옥타브 감지">🎵 Detect Octave</button>
+                <button class="btn btn-secondary" onclick="playFreq()" data-en="🔊 Play" data-ko="🔊 재생">🔊 Play</button>
+            </div>
+            <div class="output" id="octaveOutput"></div>
+        </div>
+
+        <!-- Panel 2: Music Demo -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🎼 Music Enhancement" data-ko="🎼 음악 향상">🎼 Music Enhancement</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Compare standard vs enhanced CI perception" data-ko="표준 vs 향상된 CI 인식 비교">Standard vs enhanced</p>
+
+            <div class="mode-grid">
+                <div class="mode-card selected" onclick="selectMode('speech')">
+                    <div class="mode-icon">💬</div>
+                    <div class="mode-name" data-en="Speech Mode" data-ko="음성 모드">Speech Mode</div>
+                    <div class="mode-desc" data-en="8ms latency" data-ko="8ms 지연">8ms latency</div>
+                </div>
+                <div class="mode-card" onclick="selectMode('music')">
+                    <div class="mode-icon">🎵</div>
+                    <div class="mode-name" data-en="Music Mode" data-ko="음악 모드">Music Mode</div>
+                    <div class="mode-desc" data-en="Full octave encoding" data-ko="전체 옥타브 인코딩">Full octave</div>
+                </div>
+                <div class="mode-card" onclick="selectMode('tonal')">
+                    <div class="mode-icon">🗣️</div>
+                    <div class="mode-name" data-en="Tonal Mode" data-ko="성조 모드">Tonal Mode</div>
+                    <div class="mode-desc" data-en="Mandarin, Vietnamese" data-ko="중국어, 베트남어">Tonal languages</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="playScale(false)" data-en="▶️ Standard CI" data-ko="▶️ 표준 CI">▶️ Standard CI</button>
+                <button class="btn btn-primary" onclick="playScale(true)" data-en="▶️ Enhanced CI" data-ko="▶️ 향상 CI">▶️ Enhanced CI</button>
+            </div>
+            <div class="output" id="musicOutput"></div>
+        </div>
+
+        <!-- Panel 3: Speech/Tonal -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🗣️ Tonal Language Support" data-ko="🗣️ 성조 언어 지원">🗣️ Tonal Languages</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Mandarin tone perception demo" data-ko="중국어 성조 인식 데모">Mandarin tone demo</p>
+
+            <div class="metric-grid">
+                <div class="metric-item" onclick="playTone(1)" style="cursor:pointer;">
+                    <div class="metric-value">mā</div>
+                    <div class="metric-label" data-en="Tone 1 (high)" data-ko="1성 (고)">Tone 1</div>
+                </div>
+                <div class="metric-item" onclick="playTone(2)" style="cursor:pointer;">
+                    <div class="metric-value">má</div>
+                    <div class="metric-label" data-en="Tone 2 (rising)" data-ko="2성 (상승)">Tone 2</div>
+                </div>
+                <div class="metric-item" onclick="playTone(3)" style="cursor:pointer;">
+                    <div class="metric-value">mǎ</div>
+                    <div class="metric-label" data-en="Tone 3 (dipping)" data-ko="3성 (저)">Tone 3</div>
+                </div>
+                <div class="metric-item" onclick="playTone(4)" style="cursor:pointer;">
+                    <div class="metric-value">mà</div>
+                    <div class="metric-label" data-en="Tone 4 (falling)" data-ko="4성 (하강)">Tone 4</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="analyzeTones()" data-en="🗣️ Analyze Tones" data-ko="🗣️ 성조 분석">🗣️ Analyze Tones</button>
+            </div>
+            <div class="output" id="speechOutput"></div>
+        </div>
+
+        <!-- Panel 4: API -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="🔌 API Reference" data-ko="🔌 API 레퍼런스">🔌 API Reference</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="CI enhancement integration endpoints" data-ko="CI 향상 연동 API">Integration endpoints</p>
+
+            <div class="form-group">
+                <label data-en="Endpoint" data-ko="엔드포인트">Endpoint</label>
+                <select id="apiEndpoint" onchange="showApiExample()">
+                    <option value="analyze">POST /api/v1/analyze - Pitch Analysis</option>
+                    <option value="enhance">POST /api/v1/enhance - Apply Enhancement</option>
+                    <option value="electrode">GET /api/v1/electrode-map - Electrode Map</option>
+                    <option value="realtime">WS /api/v1/realtime - Real-time</option>
+                </select>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="testApi()" data-en="🔌 Test API" data-ko="🔌 API 테스트">🔌 Test API</button>
+            </div>
+            <div class="output" id="apiOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="From robotic voices to hearing music" data-ko="로봇 음성에서 음악을 듣는 것으로">From robotic voices to music</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let selectedElectrodeNum = 12;
+        let audioCtx = null;
+        const electrodeFreqs = [7438, 6500, 5688, 5000, 4375, 3813, 3313, 2875, 2500, 2188, 1938, 1688, 1438, 1250, 1125, 1000, 875, 750, 625, 500, 375, 250];
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.toLowerCase() === lang));
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const text = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = text;
+                else el.textContent = text;
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function getAudioCtx() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            return audioCtx;
+        }
+
+        function initElectrodes() {
+            const grid = document.getElementById('electrodeGrid');
+            grid.innerHTML = '';
+            for (let i = 1; i <= 22; i++) {
+                const el = document.createElement('div');
+                el.className = 'electrode' + (i === 12 ? ' active' : '');
+                el.innerHTML = `<div class="electrode-num">E${i}</div><div class="electrode-freq">${electrodeFreqs[i-1]}</div>`;
+                el.onclick = () => selectElectrode(i);
+                grid.appendChild(el);
+            }
+        }
+
+        function selectElectrode(num) {
+            selectedElectrodeNum = num;
+            document.querySelectorAll('.electrode').forEach((e, i) => e.classList.toggle('active', i + 1 === num));
+            document.getElementById('selectedElectrode').textContent = 'E' + num;
+            document.getElementById('selectedFreq').textContent = electrodeFreqs[num - 1];
+        }
+
+        function showElectrodeInfo() {
+            const num = selectedElectrodeNum;
+            const freq = electrodeFreqs[num - 1];
+            document.getElementById('electrodeOutput').textContent = JSON.stringify({
+                electrode: 'E' + num,
+                centerFrequency: freq + ' Hz',
+                region: num <= 7 ? 'Basal (High)' : num <= 15 ? 'Middle' : 'Apical (Low)',
+                range: { low: Math.round(freq * 0.93), high: Math.round(freq * 1.07) },
+                message: currentLang === 'ko' ? `전극 E${num} 정보` : `Electrode E${num} information`
+            }, null, 2);
+        }
+
+        function detectOctave() {
+            const freq = parseFloat(document.getElementById('freqInput').value);
+            document.getElementById('freqDisplay').textContent = freq + ' Hz';
+            const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const noteNum = Math.round(12 * Math.log2(freq / 440) + 49);
+            const octave = Math.floor(noteNum / 12);
+            const note = noteNames[noteNum % 12];
+            document.getElementById('noteDisplay').textContent = note + octave;
+
+            let electrode = 22;
+            for (let i = 0; i < electrodeFreqs.length; i++) {
+                if (freq >= electrodeFreqs[i] * 0.93) { electrode = i + 1; break; }
+            }
+
+            document.getElementById('octaveOutput').textContent = JSON.stringify({
+                frequency: freq + ' Hz',
+                note: note + octave,
+                octave: octave,
+                electrode: 'E' + electrode,
+                octaveBits: octave.toString(2).padStart(4, '0'),
+                confidence: '95%',
+                message: currentLang === 'ko' ? '옥타브 감지 완료' : 'Octave detection complete'
+            }, null, 2);
+        }
+
+        function playFreq() {
+            const ctx = getAudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = parseFloat(document.getElementById('freqInput').value);
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.5);
+        }
+
+        function selectMode(mode) {
+            document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.mode-card').classList.add('selected');
+        }
+
+        function playScale(enhanced) {
+            const ctx = getAudioCtx();
+            const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+            notes.forEach((freq, i) => {
+                setTimeout(() => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = enhanced ? freq : electrodeFreqs[20 - Math.floor(i / 2)];
+                    osc.type = enhanced ? 'sine' : 'square';
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.25);
+                }, i * 300);
+            });
+            document.getElementById('musicOutput').textContent = JSON.stringify({
+                mode: enhanced ? 'Enhanced CI' : 'Standard CI',
+                scale: 'C Major',
+                notes: ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'],
+                enhancement: enhanced ? 'Octave preserved' : 'Octave ambiguous'
+            }, null, 2);
+        }
+
+        function playTone(tone) {
+            const ctx = getAudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            const baseFreq = 200, duration = 0.4, now = ctx.currentTime;
+            if (tone === 1) osc.frequency.setValueAtTime(baseFreq * 2, now);
+            else if (tone === 2) { osc.frequency.setValueAtTime(baseFreq * 1.2, now); osc.frequency.linearRampToValueAtTime(baseFreq * 2, now + duration); }
+            else if (tone === 3) { osc.frequency.setValueAtTime(baseFreq * 1.5, now); osc.frequency.linearRampToValueAtTime(baseFreq, now + duration * 0.5); osc.frequency.linearRampToValueAtTime(baseFreq * 1.8, now + duration); }
+            else if (tone === 4) { osc.frequency.setValueAtTime(baseFreq * 2, now); osc.frequency.linearRampToValueAtTime(baseFreq, now + duration); }
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+            osc.start(now);
+            osc.stop(now + duration);
+        }
+
+        function analyzeTones() {
+            document.getElementById('speechOutput').textContent = JSON.stringify({
+                language: 'Mandarin Chinese',
+                tones: [
+                    { tone: 1, pattern: 'High level', pinyin: 'mā', meaning: 'mother' },
+                    { tone: 2, pattern: 'Rising', pinyin: 'má', meaning: 'hemp' },
+                    { tone: 3, pattern: 'Dipping', pinyin: 'mǎ', meaning: 'horse' },
+                    { tone: 4, pattern: 'Falling', pinyin: 'mà', meaning: 'scold' }
+                ],
+                enhancement: 'F0 contour preserved for tone discrimination',
+                message: currentLang === 'ko' ? '성조 분석 완료' : 'Tone analysis complete'
+            }, null, 2);
+        }
+
+        function showApiExample() { testApi(); }
+
+        function testApi() {
+            const endpoint = document.getElementById('apiEndpoint').value;
+            const examples = {
+                analyze: { method: 'POST', path: '/api/v1/analyze', request: { audio: 'base64...', sampleRate: 16000 }, response: { f0: 440, octave: 4, confidence: 0.95 } },
+                enhance: { method: 'POST', path: '/api/v1/enhance', request: { mode: 'music', data: 'base64...' }, response: { enhanced: 'base64...', latency: '23ms' } },
+                electrode: { method: 'GET', path: '/api/v1/electrode-map', response: { electrodes: 22, frequencies: electrodeFreqs } },
+                realtime: { protocol: 'WebSocket', path: '/api/v1/realtime', latency: '<20ms', streaming: true }
+            };
+            document.getElementById('apiOutput').textContent = JSON.stringify(examples[endpoint], null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedLang = localStorage.getItem('wiaLang') || 'en';
+            setLang(savedLang);
+            initElectrodes();
+            testApi();
+        });
+    </script>
+</body>
+</html>

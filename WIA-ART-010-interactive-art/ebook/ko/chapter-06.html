@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: Phase 3 - 통신 프로토콜 - WIA-ART-010</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #F59E0B; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; box-shadow: 0 10px 40px rgba(245, 158, 11, 0.1); }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; text-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        p { margin: 1rem 0; text-align: justify; color: var(--text-secondary); }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; color: var(--text-secondary); }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .philosophy { text-align: center; font-size: 1.5rem; color: var(--primary); margin: 2rem 0; padding: 1rem; background: rgba(245, 158, 11, 0.1); border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: rgba(245, 158, 11, 0.05); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; font-weight: bold; transition: all 0.3s; }
+        .btn:hover { background: #d97706; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(245, 158, 11, 0.3); }
+        .key-takeaways { background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.05) 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; border: 2px solid rgba(245, 158, 11, 0.3); }
+        .key-takeaways h3 { margin-top: 0; }
+        .review-questions { background: rgba(245, 158, 11, 0.05); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; }
+        .review-questions h3 { margin-top: 0; }
+        .review-questions ol { margin-left: 1.5rem; }
+        .review-questions li { margin: 1rem 0; line-height: 1.6; }
+        strong { color: var(--primary); }
+        code { background: var(--bg-tertiary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Consolas', monospace; color: #f1f5f9; }
+        pre { background: var(--bg-tertiary); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border); }
+        pre code { background: none; padding: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제6장: Phase 3 - 통신 프로토콜</h1>
+
+        <div class="philosophy">
+            弘益人間 · 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>개요</h2>
+        <p>
+            2021년, 도쿄의 teamLab Borderless 미술관에서 기술적 문제가 발생했습니다. 50개의 인터랙티브 작품이
+            네트워크로 연결되어 있었는데, 센서 데이터를 전송하던 중 일부 작품에서 200ms 이상의 지연이 발생했습니다.
+            관람객이 움직여도 작품이 늦게 반응하면서 몰입감이 깨졌고, 일부 작품은 아예 동기화가 깨져서
+            서로 다른 시간대의 데이터를 표시했습니다. 문제는 각 작품이 서로 다른 통신 프로토콜(UDP, TCP, WebSocket)을
+            사용하고 있었고, 시간 동기화 메커니즘도 통일되지 않았다는 것이었습니다.
+        </p>
+
+        <p>
+            WIA-ART-010의 Phase 3는 바로 이러한 통신과 동기화 문제를 해결합니다. OSC(Open Sound Control),
+            WebSocket, MQTT 등 검증된 프로토콜을 기반으로 실시간 센서 데이터 전송 표준을 정의하고,
+            NTP 기반 시간 동기화, 네트워크 토폴로지, 에러 처리 전략을 제시합니다. 이 장에서는 대규모 분산
+            인터랙티브 아트 시스템의 통신 아키텍처를 실제 구현 예제와 함께 상세히 살펴봅니다.
+        </p>
+
+        <h2>1. WIA-ART-010 통신 프로토콜 개요</h2>
+
+        <h3>1.1 프로토콜 선택 기준</h3>
+        <p>
+            WIA-ART-010은 세 가지 주요 통신 프로토콜을 지원하며, 각각 특정 사용 사례에 최적화되어 있습니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>프로토콜</th>
+                    <th>전송 계층</th>
+                    <th>지연시간</th>
+                    <th>신뢰성</th>
+                    <th>주요 용도</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>OSC</strong></td>
+                    <td>UDP</td>
+                    <td>&lt; 5ms</td>
+                    <td>낮음</td>
+                    <td>실시간 센서/오디오</td>
+                </tr>
+                <tr>
+                    <td><strong>WebSocket</strong></td>
+                    <td>TCP</td>
+                    <td>&lt; 20ms</td>
+                    <td>높음</td>
+                    <td>브라우저 통합, 양방향 통신</td>
+                </tr>
+                <tr>
+                    <td><strong>MQTT</strong></td>
+                    <td>TCP</td>
+                    <td>&lt; 50ms</td>
+                    <td>매우 높음</td>
+                    <td>IoT 센서, 원격 모니터링</td>
+                </tr>
+                <tr>
+                    <td><strong>HTTP/REST</strong></td>
+                    <td>TCP</td>
+                    <td>&lt; 100ms</td>
+                    <td>높음</td>
+                    <td>설정 변경, 상태 조회</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>1.2 프로토콜 선택 가이드</h3>
+        <p>
+            작품의 요구사항에 따라 적절한 프로토콜을 선택합니다:
+        </p>
+
+        <ul>
+            <li><strong>OSC:</strong> 깊이 카메라, 모션 센서 등 초저지연이 필요한 실시간 센서 데이터</li>
+            <li><strong>WebSocket:</strong> 웹 기반 인터랙티브 작품, 실시간 대시보드, 모바일 앱 연동</li>
+            <li><strong>MQTT:</strong> 대규모 센서 네트워크, 신뢰성이 중요한 환경, IoT 디바이스</li>
+            <li><strong>HTTP/REST:</strong> 작품 설정 변경, 메타데이터 조회, 비실시간 제어</li>
+        </ul>
+
+        <h2>2. OSC (Open Sound Control) 프로토콜</h2>
+
+        <h3>2.1 OSC 기본 구조</h3>
+        <p>
+            OSC는 음악 공연과 멀티미디어 아트를 위해 설계된 경량 통신 프로토콜입니다. UDP 기반으로 초저지연을 제공하며,
+            주소 기반 메시지 라우팅을 지원합니다.
+        </p>
+
+        <div class="highlight-box">
+            <h3>WIA-ART-010 OSC 메시지 형식</h3>
+            <pre><code>// 센서 데이터 전송
+Address: /wia/art-010/sensor/sensor-001/skeleton
+Arguments:
+  - person_id (string): "person-1"
+  - joint_name (string): "head"
+  - x (float): 0.5
+  - y (float): 1.7
+  - z (float): 3.2
+  - confidence (float): 0.95
+
+// OSC Bundle (다중 메시지)
+Bundle timestamp: 1705478400523
+Messages:
+  /wia/art-010/sensor/sensor-001/skeleton "person-1" "head" 0.5 1.7 3.2 0.95
+  /wia/art-010/sensor/sensor-001/skeleton "person-1" "left_hand" 0.3 1.2 3.1 0.92
+  /wia/art-010/sensor/sensor-001/skeleton "person-1" "right_hand" 0.7 1.2 3.1 0.93
+
+// 출력 장치 제어
+Address: /wia/art-010/output/led-strip-001/color
+Arguments:
+  - hue (int): 120
+  - saturation (int): 100
+  - value (int): 80</code></pre>
+        </div>
+
+        <h3>2.2 OSC 주소 체계</h3>
+        <p>
+            WIA-ART-010은 계층적 OSC 주소 구조를 정의합니다:
+        </p>
+
+        <pre><code>/wia/art-010/{category}/{device-id}/{data-type}/{parameter}
+
+예시:
+/wia/art-010/sensor/sensor-001/skeleton/head/x
+/wia/art-010/sensor/sensor-001/gesture/type
+/wia/art-010/sensor/sensor-001/crowd/count
+/wia/art-010/output/led-strip-001/brightness
+/wia/art-010/output/led-strip-001/color/hue
+/wia/art-010/interaction/mode-001/active</code></pre>
+
+        <h3>2.3 Node.js OSC 구현 예제</h3>
+        <pre><code>import { Client, Server } from 'node-osc';
+
+// OSC 서버 (센서 데이터 수신)
+const oscServer = new Server(7400, '0.0.0.0');
+
+oscServer.on('message', (msg) => {
+  const [address, ...args] = msg;
+
+  // WIA-ART-010 센서 메시지 파싱
+  if (address.startsWith('/wia/art-010/sensor/')) {
+    const parts = address.split('/');
+    const sensorId = parts[4];
+    const dataType = parts[5];
+
+    if (dataType === 'skeleton') {
+      const [personId, jointName, x, y, z, confidence] = args;
+      console.log(`Sensor ${sensorId}: ${jointName} at (${x}, ${y}, ${z})`);
+
+      // 손 높이로 LED 색상 제어
+      if (jointName === 'left_hand') {
+        const hue = mapRange(y, 0.5, 2.5, 0, 360);
+        sendOSC('/wia/art-010/output/led-strip-001/color', [hue, 100, 100]);
+      }
+    }
+  }
+});
+
+// OSC 클라이언트 (출력 장치 제어)
+const oscClient = new Client('192.168.1.100', 7500);
+
+function sendOSC(address, args) {
+  oscClient.send(address, ...args, (err) => {
+    if (err) console.error('OSC send error:', err);
+  });
+}
+
+function mapRange(value, inMin, inMax, outMin, outMax) {
+  return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+}
+
+console.log('WIA-ART-010 OSC Server listening on port 7400');</code></pre>
+
+        <h3>2.4 TouchDesigner OSC 통합</h3>
+        <p>
+            TouchDesigner의 OSC In/Out CHOP을 사용한 WIA-ART-010 통합:
+        </p>
+
+        <pre><code># TouchDesigner Python Script
+
+import socket
+
+# OSC In CHOP 설정
+oscin = op('oscin1')
+oscin.par.port = 7400
+oscin.par.active = True
+
+# WIA-ART-010 센서 데이터 파싱
+def onValueChange(channel, sampleIndex, val, prev):
+    # /wia/art-010/sensor/sensor-001/skeleton/head/y
+    address = channel.name
+
+    if 'skeleton' in address and 'head' in address:
+        if 'y' in address:
+            # 머리 높이로 시각 효과 제어
+            op('constant_height').par.value0 = val
+
+            # 파티클 시스템 방출 속도 제어
+            emissionRate = val * 100
+            op('particlesGPU1').par.birthrate = emissionRate
+
+# OSC Out CHOP 설정 (LED 제어)
+oscout = op('oscout1')
+oscout.par.address = '192.168.1.100'
+oscout.par.port = 7500
+
+def sendLEDColor(hue, sat, val):
+    oscout.sendOSC('/wia/art-010/output/led-strip-001/color',
+                   [hue, sat, val])</code></pre>
+
+        <h2>3. WebSocket 프로토콜</h2>
+
+        <h3>3.1 WebSocket 메시지 형식</h3>
+        <p>
+            WebSocket은 웹 브라우저와의 양방향 실시간 통신에 최적화되어 있습니다. JSON 형식으로 구조화된 데이터를 전송합니다.
+        </p>
+
+        <pre><code>// 센서 데이터 스트림
+{
+  "protocol": "wia-art-010-websocket",
+  "version": "1.0",
+  "type": "sensor_data",
+  "sensor_id": "sensor-001",
+  "timestamp": 1705478400.523,
+  "data": {
+    "detected_objects": [
+      {
+        "id": "person-1",
+        "type": "human",
+        "skeleton": {
+          "head": {"x": 0.5, "y": 1.7, "z": 3.2},
+          "left_hand": {"x": 0.3, "y": 1.2, "z": 3.1},
+          "right_hand": {"x": 0.7, "y": 1.2, "z": 3.1}
+        },
+        "gesture": "waving",
+        "gesture_confidence": 0.87
+      }
+    ]
+  }
+}
+
+// 출력 제어 명령
+{
+  "protocol": "wia-art-010-websocket",
+  "version": "1.0",
+  "type": "output_command",
+  "output_id": "led-strip-001",
+  "command": "setColor",
+  "params": {
+    "h": 120,
+    "s": 100,
+    "v": 80
+  },
+  "timestamp": 1705478400.525
+}</code></pre>
+
+        <h3>3.2 Node.js WebSocket 서버 구현</h3>
+        <pre><code>import { WebSocketServer } from 'ws';
+
+const wss = new WebSocketServer({ port: 8080 });
+
+// 연결된 모든 클라이언트 추적
+const clients = new Set();
+
+wss.on('connection', (ws, req) => {
+  const clientId = req.headers['sec-websocket-key'].substring(0, 8);
+  console.log(`Client ${clientId} connected`);
+
+  clients.add(ws);
+
+  // 클라이언트로부터 메시지 수신
+  ws.on('message', (data) => {
+    try {
+      const message = JSON.parse(data);
+
+      // WIA-ART-010 프로토콜 검증
+      if (message.protocol !== 'wia-art-010-websocket') {
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Invalid protocol'
+        }));
+        return;
+      }
+
+      // 메시지 타입별 처리
+      switch (message.type) {
+        case 'output_command':
+          handleOutputCommand(message);
+          break;
+
+        case 'subscribe_sensor':
+          // 센서 구독 등록
+          ws.sensorSubscriptions = ws.sensorSubscriptions || [];
+          ws.sensorSubscriptions.push(message.sensor_id);
+          break;
+      }
+    } catch (err) {
+      console.error('Message parsing error:', err);
+    }
+  });
+
+  // 연결 종료
+  ws.on('close', () => {
+    clients.delete(ws);
+    console.log(`Client ${clientId} disconnected`);
+  });
+});
+
+// 센서 데이터를 구독 중인 클라이언트에게 브로드캐스트
+function broadcastSensorData(sensorId, data) {
+  const message = {
+    protocol: 'wia-art-010-websocket',
+    version: '1.0',
+    type: 'sensor_data',
+    sensor_id: sensorId,
+    timestamp: Date.now() / 1000,
+    data: data
+  };
+
+  const messageStr = JSON.stringify(message);
+
+  clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      if (!client.sensorSubscriptions ||
+          client.sensorSubscriptions.includes(sensorId)) {
+        client.send(messageStr);
+      }
+    }
+  });
+}
+
+// 출력 장치 제어 처리
+function handleOutputCommand(message) {
+  const { output_id, command, params } = message;
+
+  // 실제 하드웨어 제어 로직
+  console.log(`Controlling ${output_id}: ${command}`, params);
+
+  // 확인 응답 전송
+  broadcastToAll({
+    type: 'output_status',
+    output_id: output_id,
+    status: 'success'
+  });
+}
+
+function broadcastToAll(message) {
+  const messageStr = JSON.stringify(message);
+  clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(messageStr);
+    }
+  });
+}
+
+console.log('WIA-ART-010 WebSocket server running on ws://localhost:8080');</code></pre>
+
+        <h3>3.3 웹 브라우저 클라이언트</h3>
+        <p>
+            HTML5 웹 브라우저에서 WIA-ART-010 작품과 상호작용하는 예제:
+        </p>
+
+        <pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;title&gt;WIA-ART-010 Interactive Control&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;Interactive Art Control Panel&lt;/h1&gt;
+  &lt;div id="sensor-data"&gt;&lt;/div&gt;
+  &lt;div&gt;
+    &lt;label&gt;LED Hue: &lt;input type="range" id="hue-slider" min="0" max="360"&gt;&lt;/label&gt;
+    &lt;button onclick="sendLEDColor()"&gt;Set Color&lt;/button&gt;
+  &lt;/div&gt;
+
+  &lt;script&gt;
+    const ws = new WebSocket('ws://localhost:8080');
+
+    ws.onopen = () => {
+      console.log('Connected to WIA-ART-010 server');
+
+      // 센서 구독 요청
+      ws.send(JSON.stringify({
+        protocol: 'wia-art-010-websocket',
+        version: '1.0',
+        type: 'subscribe_sensor',
+        sensor_id: 'sensor-001'
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+
+      if (message.type === 'sensor_data') {
+        const data = message.data;
+        const display = document.getElementById('sensor-data');
+
+        if (data.detected_objects &amp;&amp; data.detected_objects.length &gt; 0) {
+          const person = data.detected_objects[0];
+          display.innerHTML = `
+            &lt;h3&gt;Detected Person&lt;/h3&gt;
+            &lt;p&gt;Head: (${person.skeleton.head.x.toFixed(2)},
+                     ${person.skeleton.head.y.toFixed(2)},
+                     ${person.skeleton.head.z.toFixed(2)})&lt;/p&gt;
+            &lt;p&gt;Gesture: ${person.gesture || 'none'}&lt;/p&gt;
+          `;
+        }
+      }
+    };
+
+    function sendLEDColor() {
+      const hue = document.getElementById('hue-slider').value;
+
+      ws.send(JSON.stringify({
+        protocol: 'wia-art-010-websocket',
+        version: '1.0',
+        type: 'output_command',
+        output_id: 'led-strip-001',
+        command: 'setColor',
+        params: { h: parseInt(hue), s: 100, v: 100 },
+        timestamp: Date.now() / 1000
+      }));
+    }
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+
+        <h2>4. MQTT 프로토콜</h2>
+
+        <h3>4.1 MQTT 토픽 구조</h3>
+        <p>
+            MQTT는 Publish/Subscribe 패턴으로 IoT 환경에 최적화되어 있습니다. WIA-ART-010은 계층적 토픽 구조를 사용합니다:
+        </p>
+
+        <pre><code>wia/art-010/{artwork-id}/{category}/{device-id}/{data-type}
+
+예시:
+wia/art-010/interactive-2024-001/sensor/sensor-001/skeleton
+wia/art-010/interactive-2024-001/sensor/sensor-001/gesture
+wia/art-010/interactive-2024-001/output/led-strip-001/status
+wia/art-010/interactive-2024-001/system/health
+wia/art-010/interactive-2024-001/system/errors</code></pre>
+
+        <h3>4.2 MQTT QoS 레벨</h3>
+        <p>
+            데이터 중요도에 따라 적절한 QoS(Quality of Service) 레벨을 선택합니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>QoS 레벨</th>
+                    <th>보장 수준</th>
+                    <th>오버헤드</th>
+                    <th>사용 예</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>QoS 0</strong></td>
+                    <td>최대 1회 전달 (Fire and Forget)</td>
+                    <td>최소</td>
+                    <td>실시간 센서 스트림 (일부 손실 허용)</td>
+                </tr>
+                <tr>
+                    <td><strong>QoS 1</strong></td>
+                    <td>최소 1회 전달 (중복 가능)</td>
+                    <td>중간</td>
+                    <td>제스처 이벤트, 상태 업데이트</td>
+                </tr>
+                <tr>
+                    <td><strong>QoS 2</strong></td>
+                    <td>정확히 1회 전달 (중복 없음)</td>
+                    <td>최대</td>
+                    <td>설정 변경, 중요한 제어 명령</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.3 Node.js MQTT 구현</h3>
+        <pre><code>import mqtt from 'mqtt';
+
+const ARTWORK_ID = 'interactive-2024-001';
+const BROKER_URL = 'mqtt://mqtt.artcenter.kr';
+
+// MQTT 클라이언트 연결
+const client = mqtt.connect(BROKER_URL, {
+  clientId: `wia-art-010-${Math.random().toString(16).substr(2, 8)}`,
+  clean: true,
+  reconnectPeriod: 1000
+});
+
+client.on('connect', () => {
+  console.log('Connected to MQTT broker');
+
+  // 센서 토픽 구독 (QoS 0: 실시간 스트림)
+  client.subscribe(`wia/art-010/${ARTWORK_ID}/sensor/+/skeleton`, { qos: 0 });
+
+  // 시스템 상태 구독 (QoS 1: 중요한 알림)
+  client.subscribe(`wia/art-010/${ARTWORK_ID}/system/#`, { qos: 1 });
+});
+
+client.on('message', (topic, message) => {
+  const parts = topic.split('/');
+  const category = parts[3];  // sensor, output, system
+  const deviceId = parts[4];
+  const dataType = parts[5];
+
+  if (category === 'sensor' && dataType === 'skeleton') {
+    const data = JSON.parse(message.toString());
+
+    // 손 위치로 LED 제어
+    if (data.joint === 'left_hand') {
+      const hue = mapRange(data.y, 0.5, 2.5, 0, 360);
+
+      // LED 제어 명령 발행 (QoS 1)
+      client.publish(
+        `wia/art-010/${ARTWORK_ID}/output/led-strip-001/command`,
+        JSON.stringify({
+          action: 'setColor',
+          h: hue,
+          s: 100,
+          v: 100,
+          timestamp: Date.now() / 1000
+        }),
+        { qos: 1 }
+      );
+    }
+  }
+});
+
+// 센서 데이터 발행 (예: Kinect에서 읽은 데이터)
+function publishSkeletonData(sensorId, personId, joint, position) {
+  const topic = `wia/art-010/${ARTWORK_ID}/sensor/${sensorId}/skeleton`;
+  const payload = {
+    person_id: personId,
+    joint: joint,
+    x: position.x,
+    y: position.y,
+    z: position.z,
+    confidence: position.confidence,
+    timestamp: Date.now() / 1000
+  };
+
+  // QoS 0: 고속 스트리밍, 일부 패킷 손실 허용
+  client.publish(topic, JSON.stringify(payload), { qos: 0 });
+}
+
+function mapRange(value, inMin, inMax, outMin, outMax) {
+  return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+}</code></pre>
+
+        <h2>5. 시간 동기화</h2>
+
+        <h3>5.1 NTP 기반 동기화</h3>
+        <p>
+            분산 시스템에서 여러 작품의 시간을 동기화하는 것은 매우 중요합니다. WIA-ART-010은 NTP(Network Time Protocol)를
+            사용하여 마이크로초 단위의 정확한 시간 동기화를 제공합니다.
+        </p>
+
+        <pre><code>import { NTPClient } from '@wia/art-010';
+
+// NTP 서버와 동기화
+const ntpClient = new NTPClient({
+  server: 'ntp.artcenter.kr',
+  port: 123,
+  syncInterval: 60000  // 1분마다 재동기화
+});
+
+await ntpClient.sync();
+
+// 동기화된 타임스탬프 얻기
+function getNowTimestamp() {
+  return ntpClient.now();  // 서버 시간 기준 Unix timestamp
+}
+
+// 센서 데이터에 정확한 타임스탬프 추가
+function publishSensorData(sensorId, data) {
+  const message = {
+    sensor_id: sensorId,
+    timestamp: getNowTimestamp(),  // NTP 동기화된 시간
+    data: data
+  };
+
+  oscClient.send('/wia/art-010/sensor/' + sensorId, message);
+}
+
+// 타임스탬프 검증 (지연 감지)
+function validateTimestamp(receivedTimestamp) {
+  const now = getNowTimestamp();
+  const latency = now - receivedTimestamp;
+
+  if (latency > 0.1) {  // 100ms 초과
+    console.warn(`High latency detected: ${latency * 1000}ms`);
+  }
+
+  return latency;
+}</code></pre>
+
+        <h3>5.2 타임코드 기반 동기화</h3>
+        <p>
+            비디오나 오디오와 동기화가 필요한 경우 SMPTE 타임코드를 사용합니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>타임코드 형식</th>
+                    <th>프레임율</th>
+                    <th>정밀도</th>
+                    <th>사용 예</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>SMPTE 24</strong></td>
+                    <td>24 fps</td>
+                    <td>~42ms</td>
+                    <td>영화 프로젝션 동기화</td>
+                </tr>
+                <tr>
+                    <td><strong>SMPTE 30</strong></td>
+                    <td>30 fps</td>
+                    <td>~33ms</td>
+                    <td>비디오 아트 동기화</td>
+                </tr>
+                <tr>
+                    <td><strong>SMPTE 60</strong></td>
+                    <td>60 fps</td>
+                    <td>~17ms</td>
+                    <td>고속 비주얼 동기화</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6. 네트워크 토폴로지</h2>
+
+        <h3>6.1 Star 토폴로지 (권장)</h3>
+        <p>
+            중앙 서버가 모든 센서와 출력 장치를 제어하는 구조입니다. teamLab Borderless와 같은 대규모 전시에 적합합니다.
+        </p>
+
+        <pre><code>┌─────────────┐
+│   Central   │
+│   Server    │ ← NTP Sync
+│  (Hub)      │
+└──────┬──────┘
+       │
+   ┌───┴───┬───────┬───────┐
+   │       │       │       │
+┌──▼──┐ ┌──▼──┐ ┌──▼──┐ ┌──▼──┐
+│Sensor│ │Sensor│ │ LED │ │Proj.│
+│  001 │ │  002 │ │Strip│ │     │
+└──────┘ └──────┘ └─────┘ └─────┘</code></pre>
+
+        <div class="key-takeaways">
+            <h3>핵심 요점</h3>
+            <ul>
+                <li><strong>다중 프로토콜 지원:</strong> OSC (초저지연 &lt;5ms), WebSocket (웹 통합), MQTT (IoT 신뢰성), HTTP/REST (설정 관리)를 요구사항에 맞게 선택할 수 있습니다.</li>
+                <li><strong>표준화된 메시지 형식:</strong> OSC 주소 체계, WebSocket JSON 구조, MQTT 토픽 계층을 통일하여 플랫폼 간 상호운용성을 보장합니다.</li>
+                <li><strong>NTP 시간 동기화:</strong> 분산 시스템의 모든 노드가 마이크로초 단위로 동기화되어 여러 작품 간 정확한 타이밍을 유지합니다.</li>
+                <li><strong>QoS 레벨 선택:</strong> MQTT의 QoS 0/1/2를 데이터 중요도에 따라 선택하여 성능과 신뢰성의 균형을 맞춥니다.</li>
+                <li><strong>TouchDesigner 통합:</strong> OSC와 WebSocket을 통해 TouchDesigner, Processing, openFrameworks 등 주요 크리에이티브 플랫폼과 원활하게 연동됩니다.</li>
+                <li><strong>확장 가능한 토폴로지:</strong> Star, Mesh, Hybrid 네트워크 구조를 지원하여 소규모 설치부터 teamLab 규모의 대형 전시까지 대응합니다.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li><strong>OSC, WebSocket, MQTT 세 가지 프로토콜의 전송 계층(UDP/TCP), 지연시간, 신뢰성을 비교하고, teamLab Borderless처럼 50개 작품이 연동된 대규모 전시에서 각 프로토콜이 적합한 사용 사례를 제시하십시오. 왜 OSC는 실시간 센서에, MQTT는 원격 모니터링에 더 적합한지 기술적으로 설명하십시오.</strong></li>
+
+                <li><strong>WIA-ART-010 OSC 주소 체계 "/wia/art-010/{category}/{device-id}/{data-type}/{parameter}"의 설계 원칙을 분석하십시오. 이 계층적 구조가 OSC의 패턴 매칭 기능과 어떻게 결합되어 효율적인 메시지 라우팅을 가능하게 하는지, 그리고 "/wia/art-010/sensor/*/skeleton/head/*"와 같은 와일드카드 구독의 장점을 논의하십시오.</strong></li>
+
+                <li><strong>WebSocket 서버 구현 예제에서 broadcastSensorData() 함수가 client.sensorSubscriptions를 확인하여 선택적 브로드캐스팅을 수행합니다. 만약 100명의 클라이언트가 연결되어 있고 각각 다른 센서를 구독한다면, 전체 브로드캐스트 대비 이 최적화가 네트워크 트래픽과 CPU 사용량에 미치는 영향을 정량적으로 분석하십시오.</strong></li>
+
+                <li><strong>MQTT의 QoS 0, 1, 2 레벨의 메시지 전달 보장 수준과 네트워크 오버헤드를 비교하고, Rafael Lozano-Hemmer의 "Pulse Room"처럼 생체 신호를 측정하는 작품에서 어떤 QoS 레벨이 적합한지 판단하십시오. 심박수 데이터 손실이 관람객 경험에 미치는 영향을 고려하여 논의하십시오.</strong></li>
+
+                <li><strong>NTP 기반 시간 동기화의 필요성과 구현 방법을 설명하십시오. 제공된 코드에서 validateTimestamp() 함수가 100ms 이상의 지연을 경고하는데, 왜 이 임계값을 선택했는지, 그리고 30 FPS 센서 데이터 스트림에서 100ms 지연이 몇 프레임에 해당하며 관람객이 인지 가능한 수준인지 분석하십시오.</strong></li>
+
+                <li><strong>Star 토폴로지 네트워크 구조의 장단점을 분석하고, 중앙 서버가 Single Point of Failure가 될 위험을 어떻게 완화할 수 있는지 논의하십시오. teamLab의 대규모 전시에서 중앙 서버 장애 시 개별 작품이 독립 모드로 동작하도록 하는 Failover 전략을 제안하십시오.</strong></li>
+            </ol>
+        </div>
+
+        <h2>다음 장 예고</h2>
+        <p>
+            제7장에서는 WIA-ART-010의 Phase 4인 클라우드 통합과 원격 모니터링을 다룹니다. AWS IoT, Azure IoT Hub를 활용한
+            클라우드 동기화, 실시간 대시보드 구축, 원격 작품 관리, teamLab 스타일의 다중 장소 동시 전시 구현 방법을
+            실제 아키텍처와 함께 탐구합니다. 또한 작품 데이터의 장기 보존과 분석을 위한 데이터 파이프라인 구축 방법을
+            살펴봅니다.
+        </p>
+
+        </div>
+</body>
+</html>

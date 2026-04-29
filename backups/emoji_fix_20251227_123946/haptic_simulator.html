@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>WIA Haptic Simulator - Haptic Braille Interface</title>
+    <style>
+        :root {
+            --primary: #8B5CF6;
+            --primary-dark: #7C3AED;
+            --secondary: #10b981;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; flex-wrap: wrap; gap: 15px; }
+        .logo { display: flex; align-items: center; gap: 12px; font-size: 1.3rem; font-weight: bold; color: var(--primary); text-decoration: none; }
+        .logo-emoji { font-size: 1.8rem; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+
+        h1 { text-align: center; margin: 30px 0; color: var(--primary); }
+
+        .tabs { display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab { padding: 12px 20px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px 8px 0 0; cursor: pointer; color: var(--text-muted); transition: all 0.3s; }
+        .tab:hover { color: var(--text); }
+        .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .tab-content { display: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: 0 8px 8px 8px; padding: 30px; }
+        .tab-content.active { display: block; }
+
+        .section-title { color: var(--primary); margin-bottom: 20px; font-size: 1.3rem; }
+
+        .control-group { margin-bottom: 25px; }
+        .control-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; }
+
+        select, input[type="text"], input[type="number"] { width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 1rem; }
+        select:focus, input:focus { outline: none; border-color: var(--primary); }
+
+        input[type="range"] { width: 100%; accent-color: var(--primary); }
+        .range-value { text-align: right; color: var(--primary); font-weight: bold; margin-top: 5px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.3s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-secondary:hover { border-color: var(--primary); }
+        .btn-danger { background: var(--danger); color: white; }
+
+        .waveform-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .waveform-card { background: var(--bg); padding: 20px; border-radius: 8px; border: 2px solid var(--border); cursor: pointer; text-align: center; transition: all 0.3s; }
+        .waveform-card:hover { border-color: var(--primary); }
+        .waveform-card.selected { border-color: var(--primary); background: rgba(139, 92, 246, 0.1); }
+        .waveform-icon { font-size: 2rem; margin-bottom: 10px; }
+        .waveform-name { font-weight: 600; }
+        .waveform-desc { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .adsr-visual { display: flex; gap: 10px; margin: 20px 0; padding: 20px; background: var(--bg); border-radius: 8px; }
+        .adsr-bar { flex: 1; display: flex; flex-direction: column; align-items: center; }
+        .adsr-bar-fill { width: 100%; background: var(--primary); border-radius: 4px; transition: height 0.3s; }
+        .adsr-label { margin-top: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .adsr-value { font-size: 0.75rem; color: var(--primary); }
+
+        .envelope-presets { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+        .preset-btn { padding: 8px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 20px; color: var(--text-muted); cursor: pointer; font-size: 0.85rem; transition: all 0.3s; }
+        .preset-btn:hover { border-color: var(--primary); color: var(--primary); }
+        .preset-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .frequency-bands { display: flex; gap: 10px; margin: 20px 0; }
+        .freq-band { flex: 1; padding: 15px; background: var(--bg); border-radius: 8px; text-align: center; cursor: pointer; border: 2px solid var(--border); transition: all 0.3s; }
+        .freq-band:hover { border-color: var(--primary); }
+        .freq-band.selected { border-color: var(--primary); background: rgba(139, 92, 246, 0.1); }
+        .freq-band-name { font-weight: 600; font-size: 0.85rem; }
+        .freq-band-range { font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; }
+
+        .pattern-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .pattern-card { background: var(--bg); padding: 20px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all 0.3s; }
+        .pattern-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+        .pattern-icon { font-size: 2rem; margin-bottom: 10px; }
+        .pattern-name { font-weight: 600; margin-bottom: 5px; }
+        .pattern-desc { font-size: 0.85rem; color: var(--text-muted); }
+
+        .braille-display { display: flex; justify-content: center; gap: 30px; margin: 30px 0; }
+        .braille-cell { display: grid; grid-template-columns: repeat(2, 30px); gap: 8px; }
+        .braille-dot { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--border); background: var(--bg); cursor: pointer; transition: all 0.3s; }
+        .braille-dot.active { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 15px rgba(139, 92, 246, 0.5); }
+
+        .output-display { background: var(--bg); padding: 20px; border-radius: 8px; margin-top: 20px; font-family: 'Monaco', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+
+        .qr-section { text-align: center; padding: 30px; }
+        .qr-placeholder { width: 200px; height: 200px; margin: 20px auto; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: var(--bg); }
+
+        .haptic-play-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 15px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); border: none; border-radius: 8px; color: white; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.3s; margin-top: 20px; }
+        .haptic-play-btn:hover { transform: scale(1.02); box-shadow: 0 5px 20px rgba(139, 92, 246, 0.4); }
+        .haptic-play-btn:active { transform: scale(0.98); }
+
+        .vibration-indicator { width: 100%; height: 60px; background: var(--bg); border-radius: 8px; margin: 20px 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .vibration-wave { width: 100%; height: 40px; background: linear-gradient(90deg, transparent, var(--primary), transparent); opacity: 0; animation: none; }
+        .vibration-wave.active { animation: vibrate 0.1s infinite; }
+        @keyframes vibrate { 0%, 100% { transform: translateX(-2px); opacity: 0.8; } 50% { transform: translateX(2px); opacity: 1; } }
+
+        footer { text-align: center; padding: 30px; color: var(--text-muted); margin-top: 40px; border-top: 1px solid var(--border); }
+        footer .philosophy { color: #ffd700; margin-bottom: 10px; }
+        footer a { color: var(--primary); text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="../" class="logo">
+                <span class="logo-emoji">🤚</span>
+                <span>WIA Haptic Simulator</span>
+            </a>
+        </header>
+
+        <h1>Haptic Feedback Simulator</h1>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('waveform')">Waveforms</div>
+            <div class="tab" onclick="showTab('envelope')">ADSR Envelope</div>
+            <div class="tab" onclick="showTab('frequency')">Frequency</div>
+            <div class="tab" onclick="showTab('patterns')">Patterns</div>
+            <div class="tab" onclick="showTab('braille')">Braille</div>
+        </div>
+
+        <!-- Waveform Tab -->
+        <div id="waveform" class="tab-content active">
+            <h2 class="section-title">Waveform Types</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">Select a waveform type to define the basic shape of the haptic signal.</p>
+
+            <div class="waveform-grid">
+                <div class="waveform-card selected" onclick="selectWaveform(this, 'sine')">
+                    <div class="waveform-icon">∿</div>
+                    <div class="waveform-name">Sine</div>
+                    <div class="waveform-desc">Smooth, gentle</div>
+                </div>
+                <div class="waveform-card" onclick="selectWaveform(this, 'square')">
+                    <div class="waveform-icon">▃▃</div>
+                    <div class="waveform-name">Square</div>
+                    <div class="waveform-desc">Crisp, definitive</div>
+                </div>
+                <div class="waveform-card" onclick="selectWaveform(this, 'triangle')">
+                    <div class="waveform-icon">△</div>
+                    <div class="waveform-name">Triangle</div>
+                    <div class="waveform-desc">Moderate sharpness</div>
+                </div>
+                <div class="waveform-card" onclick="selectWaveform(this, 'sawtooth')">
+                    <div class="waveform-icon">╱│</div>
+                    <div class="waveform-name">Sawtooth</div>
+                    <div class="waveform-desc">Ratcheting feel</div>
+                </div>
+                <div class="waveform-card" onclick="selectWaveform(this, 'noise')">
+                    <div class="waveform-icon">░░</div>
+                    <div class="waveform-name">Noise</div>
+                    <div class="waveform-desc">Rough, textured</div>
+                </div>
+            </div>
+
+            <div class="control-group" style="margin-top: 30px;">
+                <label>Duration (ms)</label>
+                <input type="range" id="duration" min="10" max="1000" value="200" oninput="updateDuration()">
+                <div class="range-value" id="durationValue">200ms</div>
+            </div>
+
+            <div class="control-group">
+                <label>Intensity</label>
+                <input type="range" id="intensity" min="0" max="100" value="60" oninput="updateIntensity()">
+                <div class="range-value" id="intensityValue">0.6 (Medium)</div>
+            </div>
+
+            <div class="vibration-indicator">
+                <div class="vibration-wave" id="vibrationWave"></div>
+            </div>
+
+            <button class="haptic-play-btn" onclick="playHaptic()">
+                <span>🤚</span> Play Haptic Feedback
+            </button>
+        </div>
+
+        <!-- ADSR Envelope Tab -->
+        <div id="envelope" class="tab-content">
+            <h2 class="section-title">ADSR Envelope</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">Shape the amplitude of the haptic signal over time.</p>
+
+            <div class="envelope-presets">
+                <button class="preset-btn active" onclick="setEnvelopePreset('sharp')">Sharp</button>
+                <button class="preset-btn" onclick="setEnvelopePreset('punch')">Punch</button>
+                <button class="preset-btn" onclick="setEnvelopePreset('smooth')">Smooth</button>
+                <button class="preset-btn" onclick="setEnvelopePreset('pulse')">Pulse</button>
+                <button class="preset-btn" onclick="setEnvelopePreset('swell')">Swell</button>
+                <button class="preset-btn" onclick="setEnvelopePreset('fade')">Fade</button>
+            </div>
+
+            <div class="adsr-visual">
+                <div class="adsr-bar">
+                    <div class="adsr-bar-fill" id="attackBar" style="height: 20px;"></div>
+                    <div class="adsr-label">Attack</div>
+                    <div class="adsr-value" id="attackValue">5ms</div>
+                </div>
+                <div class="adsr-bar">
+                    <div class="adsr-bar-fill" id="decayBar" style="height: 40px;"></div>
+                    <div class="adsr-label">Decay</div>
+                    <div class="adsr-value" id="decayValue">20ms</div>
+                </div>
+                <div class="adsr-bar">
+                    <div class="adsr-bar-fill" id="sustainBar" style="height: 0px;"></div>
+                    <div class="adsr-label">Sustain</div>
+                    <div class="adsr-value" id="sustainValue">0.0</div>
+                </div>
+                <div class="adsr-bar">
+                    <div class="adsr-bar-fill" id="releaseBar" style="height: 60px;"></div>
+                    <div class="adsr-label">Release</div>
+                    <div class="adsr-value" id="releaseValue">30ms</div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Attack (0-500ms)</label>
+                <input type="range" id="attack" min="0" max="500" value="5" oninput="updateADSR()">
+            </div>
+            <div class="control-group">
+                <label>Decay (0-500ms)</label>
+                <input type="range" id="decay" min="0" max="500" value="20" oninput="updateADSR()">
+            </div>
+            <div class="control-group">
+                <label>Sustain (0.0-1.0)</label>
+                <input type="range" id="sustain" min="0" max="100" value="0" oninput="updateADSR()">
+            </div>
+            <div class="control-group">
+                <label>Release (0-500ms)</label>
+                <input type="range" id="release" min="0" max="500" value="30" oninput="updateADSR()">
+            </div>
+
+            <button class="haptic-play-btn" onclick="playHaptic()">
+                <span>🤚</span> Play Haptic Feedback
+            </button>
+        </div>
+
+        <!-- Frequency Tab -->
+        <div id="frequency" class="tab-content">
+            <h2 class="section-title">Frequency Bands</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">Select the vibration frequency band for semantic meaning.</p>
+
+            <div class="frequency-bands">
+                <div class="freq-band" onclick="selectFreqBand(this, 'very_low')">
+                    <div class="freq-band-name">Very Low</div>
+                    <div class="freq-band-range">1-30 Hz</div>
+                </div>
+                <div class="freq-band" onclick="selectFreqBand(this, 'low')">
+                    <div class="freq-band-name">Low</div>
+                    <div class="freq-band-range">30-80 Hz</div>
+                </div>
+                <div class="freq-band selected" onclick="selectFreqBand(this, 'mid')">
+                    <div class="freq-band-name">Mid</div>
+                    <div class="freq-band-range">80-150 Hz</div>
+                </div>
+                <div class="freq-band" onclick="selectFreqBand(this, 'high')">
+                    <div class="freq-band-name">High</div>
+                    <div class="freq-band-range">150-250 Hz</div>
+                </div>
+                <div class="freq-band" onclick="selectFreqBand(this, 'very_high')">
+                    <div class="freq-band-name">Very High</div>
+                    <div class="freq-band-range">250-300 Hz</div>
+                </div>
+            </div>
+
+            <div class="control-group" style="margin-top: 30px;">
+                <label>Exact Frequency (Hz)</label>
+                <input type="range" id="frequency" min="1" max="300" value="100" oninput="updateFrequency()">
+                <div class="range-value" id="frequencyValue">100 Hz</div>
+            </div>
+
+            <div style="background: var(--bg); padding: 20px; border-radius: 8px; margin-top: 20px;">
+                <h3 style="margin-bottom: 15px;">Semantic Mapping</h3>
+                <table style="width: 100%; color: var(--text-muted);">
+                    <tr><td><strong>Safety/Clear</strong></td><td>Low (30-80 Hz)</td><td>Calm, reassuring</td></tr>
+                    <tr><td><strong>Information</strong></td><td>Mid (80-150 Hz)</td><td>Neutral, clear</td></tr>
+                    <tr><td><strong>Attention</strong></td><td>High (150-250 Hz)</td><td>Alerting</td></tr>
+                    <tr><td><strong>Danger/Urgent</strong></td><td>Very High (250-300 Hz)</td><td>Alarming</td></tr>
+                </table>
+            </div>
+
+            <button class="haptic-play-btn" onclick="playHaptic()">
+                <span>🤚</span> Play Haptic Feedback
+            </button>
+        </div>
+
+        <!-- Patterns Tab -->
+        <div id="patterns" class="tab-content">
+            <h2 class="section-title">Haptic Patterns</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">Pre-defined haptic patterns for common scenarios.</p>
+
+            <div class="pattern-grid">
+                <div class="pattern-card" onclick="playPattern('tick')">
+                    <div class="pattern-icon">✓</div>
+                    <div class="pattern-name">Tick</div>
+                    <div class="pattern-desc">Quick acknowledgment</div>
+                </div>
+                <div class="pattern-card" onclick="playPattern('success')">
+                    <div class="pattern-icon">✅</div>
+                    <div class="pattern-name">Success</div>
+                    <div class="pattern-desc">Double tap confirmation</div>
+                </div>
+                <div class="pattern-card" onclick="playPattern('warning')">
+                    <div class="pattern-icon">⚠️</div>
+                    <div class="pattern-name">Warning</div>
+                    <div class="pattern-desc">Attention-getting pulse</div>
+                </div>
+                <div class="pattern-card" onclick="playPattern('error')">
+                    <div class="pattern-icon">❌</div>
+                    <div class="pattern-name">Error</div>
+                    <div class="pattern-desc">Strong rejection signal</div>
+                </div>
+                <div class="pattern-card" onclick="playPattern('obstacle')">
+                    <div class="pattern-icon">🚧</div>
+                    <div class="pattern-name">Obstacle</div>
+                    <div class="pattern-desc">Textured warning</div>
+                </div>
+                <div class="pattern-card" onclick="playPattern('navigation')">
+                    <div class="pattern-icon">🧭</div>
+                    <div class="pattern-name">Navigation</div>
+                    <div class="pattern-desc">Directional cue</div>
+                </div>
+            </div>
+
+            <div class="output-display" style="margin-top: 30px;">
+<span style="color: var(--primary);">// Pattern Definition</span>
+{
+  "id": "tick",
+  "name": "Tick",
+  "waveform": { "type": "square", "dutyCycle": 0.5 },
+  "envelope": { "attack": 5, "decay": 10, "sustain": 0, "release": 5 },
+  "frequency": 150,
+  "intensity": 0.6,
+  "duration": 20
+}
+            </div>
+        </div>
+
+        <!-- Braille Tab -->
+        <div id="braille" class="tab-content">
+            <h2 class="section-title">Braille Haptic Encoding</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">Touch the dots to create Braille patterns with haptic feedback.</p>
+
+            <div class="braille-display">
+                <div class="braille-cell" id="brailleCell1">
+                    <div class="braille-dot" onclick="toggleDot(this, 0, 0)"></div>
+                    <div class="braille-dot" onclick="toggleDot(this, 0, 1)"></div>
+                    <div class="braille-dot" onclick="toggleDot(this, 0, 2)"></div>
+                    <div class="braille-dot" onclick="toggleDot(this, 0, 3)"></div>
+                    <div class="braille-dot" onclick="toggleDot(this, 0, 4)"></div>
+                    <div class="braille-dot" onclick="toggleDot(this, 0, 5)"></div>
+                </div>
+                <div class="braille-cell" id="brailleCell2">
+                    <div class="braille-dot" onclick="toggleDot(this, 1, 0)"></div>
+                    <div class="braille-dot" onclick="toggleDot(this, 1, 1)"></div>
+                    <div class="braille-dot" onclick="toggleDot(this, 1, 2)"></div>
+                    <div class="braille-dot" onclick="toggleDot(this, 1, 3)"></div>
+                    <div class="braille-dot" onclick="toggleDot(this, 1, 4)"></div>
+                    <div class="braille-dot" onclick="toggleDot(this, 1, 5)"></div>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin: 20px 0;">
+                <span style="font-size: 3rem; color: var(--primary);" id="brailleChar">⠁</span>
+                <p style="color: var(--text-muted); margin-top: 10px;">Braille Character: <span id="brailleLetter">A</span></p>
+            </div>
+
+            <div class="control-group">
+                <label>Enter text to convert to Braille haptics</label>
+                <input type="text" id="brailleInput" placeholder="Type here..." oninput="convertToBraille()">
+            </div>
+
+            <button class="haptic-play-btn" onclick="playBrailleHaptic()">
+                <span>🤚</span> Play Braille Haptic
+            </button>
+
+            <div class="output-display" style="margin-top: 20px;">
+<span style="color: var(--primary);">// Braille Haptic Sequence</span>
+{
+  "type": "braille_sequence",
+  "cells": [
+    { "dots": [1], "pattern": "dot_1" },
+    { "dots": [1, 2], "pattern": "dots_1_2" }
+  ],
+  "timing": {
+    "dotDuration": 50,
+    "dotGap": 30,
+    "cellGap": 150
+  }
+}
+            </div>
+        </div>
+
+        <footer>
+            <p class="philosophy">弘益人間 · 널리 인간을 이롭게 하라</p>
+            <p>WIA - World Industry Association for Certification</p>
+            <p><a href="https://wiastandards.com" target="_blank">wiastandards.com</a></p>
+        </footer>
+    </div>
+
+    <script>
+        let currentWaveform = 'sine';
+        let currentFreqBand = 'mid';
+        let adsr = { attack: 5, decay: 20, sustain: 0, release: 30 };
+        let brailleDots = [[false,false,false,false,false,false], [false,false,false,false,false,false]];
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`.tab[onclick*="${tabId}"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        function selectWaveform(el, type) {
+            document.querySelectorAll('.waveform-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            currentWaveform = type;
+        }
+
+        function selectFreqBand(el, band) {
+            document.querySelectorAll('.freq-band').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            currentFreqBand = band;
+            const ranges = { very_low: 15, low: 55, mid: 115, high: 200, very_high: 275 };
+            document.getElementById('frequency').value = ranges[band];
+            updateFrequency();
+        }
+
+        function updateDuration() {
+            const val = document.getElementById('duration').value;
+            document.getElementById('durationValue').textContent = val + 'ms';
+        }
+
+        function updateIntensity() {
+            const val = document.getElementById('intensity').value / 100;
+            const labels = { 0.2: 'Subtle', 0.4: 'Light', 0.6: 'Medium', 0.8: 'Strong', 1.0: 'Maximum' };
+            const closest = Object.keys(labels).reduce((a, b) => Math.abs(b - val) < Math.abs(a - val) ? b : a);
+            document.getElementById('intensityValue').textContent = val.toFixed(1) + ' (' + labels[closest] + ')';
+        }
+
+        function updateFrequency() {
+            const val = document.getElementById('frequency').value;
+            document.getElementById('frequencyValue').textContent = val + ' Hz';
+        }
+
+        function updateADSR() {
+            adsr.attack = parseInt(document.getElementById('attack').value);
+            adsr.decay = parseInt(document.getElementById('decay').value);
+            adsr.sustain = parseInt(document.getElementById('sustain').value) / 100;
+            adsr.release = parseInt(document.getElementById('release').value);
+
+            document.getElementById('attackBar').style.height = (adsr.attack / 5) + 'px';
+            document.getElementById('decayBar').style.height = (adsr.decay / 5) + 'px';
+            document.getElementById('sustainBar').style.height = (adsr.sustain * 100) + 'px';
+            document.getElementById('releaseBar').style.height = (adsr.release / 5) + 'px';
+
+            document.getElementById('attackValue').textContent = adsr.attack + 'ms';
+            document.getElementById('decayValue').textContent = adsr.decay + 'ms';
+            document.getElementById('sustainValue').textContent = adsr.sustain.toFixed(1);
+            document.getElementById('releaseValue').textContent = adsr.release + 'ms';
+
+            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        }
+
+        function setEnvelopePreset(preset) {
+            const presets = {
+                sharp: { attack: 5, decay: 20, sustain: 0, release: 30 },
+                punch: { attack: 10, decay: 50, sustain: 30, release: 50 },
+                smooth: { attack: 100, decay: 100, sustain: 70, release: 150 },
+                pulse: { attack: 5, decay: 0, sustain: 100, release: 5 },
+                swell: { attack: 200, decay: 50, sustain: 80, release: 200 },
+                fade: { attack: 50, decay: 200, sustain: 50, release: 300 }
+            };
+
+            const p = presets[preset];
+            document.getElementById('attack').value = p.attack;
+            document.getElementById('decay').value = p.decay;
+            document.getElementById('sustain').value = p.sustain;
+            document.getElementById('release').value = p.release;
+
+            updateADSR();
+
+            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.preset-btn[onclick*="${preset}"]`).classList.add('active');
+        }
+
+        function playHaptic() {
+            const duration = parseInt(document.getElementById('duration').value);
+            const wave = document.getElementById('vibrationWave');
+
+            wave.classList.add('active');
+
+            if ('vibrate' in navigator) {
+                navigator.vibrate(duration);
+            }
+
+            setTimeout(() => {
+                wave.classList.remove('active');
+            }, duration);
+        }
+
+        function playPattern(pattern) {
+            const patterns = {
+                tick: [20],
+                success: [20, 80, 20],
+                warning: [100, 50, 100, 50, 100],
+                error: [200, 100, 200],
+                obstacle: [50, 30, 50, 30, 50],
+                navigation: [30, 50, 100]
+            };
+
+            if ('vibrate' in navigator) {
+                navigator.vibrate(patterns[pattern]);
+            }
+        }
+
+        function toggleDot(el, cell, dot) {
+            el.classList.toggle('active');
+            brailleDots[cell][dot] = !brailleDots[cell][dot];
+
+            if ('vibrate' in navigator) {
+                navigator.vibrate(30);
+            }
+        }
+
+        function playBrailleHaptic() {
+            const activeDots = brailleDots.flat().filter(d => d).length;
+            const pattern = [];
+
+            for (let i = 0; i < activeDots; i++) {
+                pattern.push(50);
+                if (i < activeDots - 1) pattern.push(30);
+            }
+
+            if ('vibrate' in navigator && pattern.length > 0) {
+                navigator.vibrate(pattern);
+            }
+        }
+
+        function convertToBraille() {
+            const text = document.getElementById('brailleInput').value.toUpperCase();
+            if (text.length > 0) {
+                document.getElementById('brailleLetter').textContent = text[0];
+            }
+        }
+    </script>
+</body>
+</html>

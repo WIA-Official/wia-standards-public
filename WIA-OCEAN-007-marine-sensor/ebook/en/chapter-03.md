@@ -418,7 +418,7 @@ function calculateOxygen_Optical(
 ): number {
   const { coefficients } = sensor.calibration;
 
-  // 선행 연구 equation for Aanderaa optodes
+  // 관련 분야 자료 equation for Aanderaa optodes
   // O2 = ((c0 + c1*T) / (c2 + c3*φ) - 1) / c4
 
   const T = temperature;
@@ -584,7 +584,7 @@ function calculateNitrate_UV(
   const A217 = tempCorrected[0];   // Absorbance at 217 nm
   const A240 = tempCorrected[23];  // Absorbance at 240 nm
 
-  // 선행 연구 method
+  // 관련 분야 자료 method
   const nitrate = (A217 - A240) / 0.012; // μmol/L, empirical coefficient
 
   return Math.max(0, nitrate);  // No negative nitrate
@@ -670,7 +670,7 @@ function calculatepCO2(
   const pCO2_eq = measuredCO2 * pressure;  // μatm
 
   // Temperature correction (equilibrator temp to in situ temp)
-  // 선행 연구: pCO2(T2) = pCO2(T1) * exp(0.0423 * (T2-T1))
+  // 관련 분야 자료: pCO2(T2) = pCO2(T1) * exp(0.0423 * (T2-T1))
   const pCO2_insitu = pCO2_eq * Math.exp(0.0423 * (seawaterTemp - equilibratorTemp));
 
   return pCO2_insitu;

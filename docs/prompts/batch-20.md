@@ -1,0 +1,15 @@
+# 배치 20 프롬프트
+## 대상 표준 (10개)
+1. WIA-PEST_DETECTION
+2. WIA-PET_CLONING
+3. WIA-PET_EMOTION
+4. WIA-PET_GENOME
+5. WIA-PET_HEALTH_PASSPORT
+6. WIA-PET_INSURANCE
+7. WIA-PET_LEGACY
+8. WIA-PET_NUTRITION
+9. WIA-PET_TRACKING
+10. WIA-PET_TRANSLATOR
+
+## 규칙: ❌ nav/footer/href 금지, ✅ h1/h2/pre/highlight 필수, 8KB~17KB
+## 완료 후: PROGRESS-TRACKER.md → ✅, git commit & push

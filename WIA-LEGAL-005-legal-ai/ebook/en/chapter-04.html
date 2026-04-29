@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: API Design for Legal Systems | WIA-LEGAL-005</title>
+    <style>
+        :root { --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-secondary: #cbd5e1; --primary: #64748B; --border: #334155; --code-bg: #0f172a; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', 'Times New Roman', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 40px 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-card); padding: 60px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
+        h1 { font-size: 2.5rem; color: var(--primary); margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid var(--primary); }
+        h2 { font-size: 1.8rem; color: var(--primary); margin: 40px 0 20px; padding-top: 20px; }
+        h3 { font-size: 1.4rem; color: var(--text-secondary); margin: 30px 0 15px; }
+        p { margin: 15px 0; text-align: justify; color: var(--text-secondary); }
+        .intro { background: var(--code-bg); padding: 25px; border-left: 4px solid var(--primary); margin: 25px 0; font-style: italic; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; background: var(--code-bg); border-radius: 8px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; font-weight: 600; }
+        tr:hover { background: var(--bg-card); }
+        .code-block { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 25px 0; overflow-x: auto; }
+        pre { margin: 0; color: #94a3b8; font-family: 'Courier New', monospace; font-size: 0.9rem; }
+        .highlight { color: #60a5fa; }
+        .summary { background: linear-gradient(135deg, var(--code-bg) 0%, var(--bg-card) 100%); padding: 30px; border-radius: 12px; margin: 40px 0; border: 2px solid var(--primary); }
+        .questions { background: var(--code-bg); padding: 25px; border-radius: 8px; margin: 30px 0; }
+        .questions ol { margin-left: 25px; color: var(--text-secondary); }
+        .questions li { margin: 12px 0; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 2px solid var(--border); }
+        .nav-btn { padding: 14px 28px; background: var(--primary); color: white; text-decoration: none; border-radius: 8px; transition: all 0.3s; font-weight: 500; }
+        .nav-btn:hover { background: #475569; transform: translateY(-2px); }
+        .hongik { text-align: center; margin-top: 50px; padding: 30px; background: linear-gradient(135deg, var(--code-bg) 0%, var(--bg-card) 100%); border-radius: 12px; border: 2px solid var(--primary); }
+        .hongik h3 { color: var(--primary); margin-bottom: 15px; }
+        ul { margin: 15px 0 15px 30px; color: var(--text-secondary); }
+        li { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: API Design for Legal Systems</h1>
+
+        <div class="intro">
+            <p>Phase 2 of WIA-LEGAL-005 defines comprehensive API interfaces for legal AI systems. This chapter explores RESTful API design principles, GraphQL implementations, authentication mechanisms, and rate limiting strategies specific to legal technology applications. We examine how well-designed APIs enable seamless integration between legal research platforms, case management systems, and AI-powered analysis tools.</p>
+        </div>
+
+        <h2>4.1 RESTful API Architecture for Legal Systems</h2>
+        <p>Legal AI systems require robust API architectures that handle complex queries, large document collections, and real-time analysis requests. The WIA-LEGAL-005 standard defines a RESTful API specification that balances performance, security, and developer experience.</p>
+
+        <p>The API architecture follows REST principles while incorporating legal domain-specific requirements such as citation resolution, jurisdiction filtering, temporal queries, and privilege-aware access control. Every endpoint is designed to support both synchronous and asynchronous operations, enabling clients to handle long-running legal research tasks efficiently.</p>
+
+        <h3>Core API Endpoints</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Endpoint</th>
+                    <th>Method</th>
+                    <th>Purpose</th>
+                    <th>Response Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>/api/v1/documents</td>
+                    <td>GET, POST</td>
+                    <td>Search and ingest legal documents</td>
+                    <td>&lt; 500ms</td>
+                </tr>
+                <tr>
+                    <td>/api/v1/analysis</td>
+                    <td>POST</td>
+                    <td>Submit documents for AI analysis</td>
+                    <td>Async (webhook)</td>
+                </tr>
+                <tr>
+                    <td>/api/v1/citations</td>
+                    <td>GET</td>
+                    <td>Resolve and validate citations</td>
+                    <td>&lt; 200ms</td>
+                </tr>
+                <tr>
+                    <td>/api/v1/precedents</td>
+                    <td>GET</td>
+                    <td>Find relevant case precedents</td>
+                    <td>&lt; 1000ms</td>
+                </tr>
+                <tr>
+                    <td>/api/v1/predictions</td>
+                    <td>POST</td>
+                    <td>Predict case outcomes</td>
+                    <td>&lt; 2000ms</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.2 API Implementation Example</h2>
+        <p>The following code demonstrates a production-ready implementation of the WIA-LEGAL-005 API specification using modern frameworks and best practices.</p>
+
+        <div class="code-block">
+            <pre>
+<span class="highlight">// WIA-LEGAL-005 API Server Implementation</span>
+
+<span class="highlight">import</span> express <span class="highlight">from</span> 'express';
+<span class="highlight">import</span> { rateLimit } <span class="highlight">from</span> 'express-rate-limit';
+<span class="highlight">import</span> { authenticate, authorize } <span class="highlight">from</span> './middleware/auth';
+<span class="highlight">import</span> { LegalDocumentService } <span class="highlight">from</span> './services/documents';
+<span class="highlight">import</span> { AnalysisService } <span class="highlight">from</span> './services/analysis';
+
+<span class="highlight">const</span> app = express();
+
+<span class="highlight">// Rate limiting configuration</span>
+<span class="highlight">const</span> limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, <span class="highlight">// 15 minutes</span>
+  max: 100, <span class="highlight">// Limit each IP to 100 requests per window</span>
+  message: 'Too many requests from this IP'
+});
+
+app.use('/api/', limiter);
+app.use(express.json({ limit: '10mb' }));
+
+<span class="highlight">// Document Search Endpoint</span>
+app.get('/api/v1/documents',
+  authenticate,
+  <span class="highlight">async</span> (req, res) => {
+    <span class="highlight">try</span> {
+      <span class="highlight">const</span> {
+        query,
+        jurisdiction,
+        dateFrom,
+        dateTo,
+        docType,
+        limit = 20,
+        offset = 0
+      } = req.query;
+
+      <span class="highlight">const</span> documentService = <span class="highlight">new</span> LegalDocumentService();
+      <span class="highlight">const</span> results = <span class="highlight">await</span> documentService.search({
+        query: query <span class="highlight">as</span> string,
+        filters: {
+          jurisdiction: jurisdiction ? (jurisdiction <span class="highlight">as</span> string).split(',') : undefined,
+          dateRange: dateFrom && dateTo ? {
+            from: <span class="highlight">new</span> Date(dateFrom <span class="highlight">as</span> string),
+            to: <span class="highlight">new</span> Date(dateTo <span class="highlight">as</span> string)
+          } : undefined,
+          documentType: docType <span class="highlight">as</span> string
+        },
+        pagination: {
+          limit: parseInt(limit <span class="highlight">as</span> string),
+          offset: parseInt(offset <span class="highlight">as</span> string)
+        }
+      });
+
+      res.json({
+        success: true,
+        data: {
+          documents: results.documents,
+          totalCount: results.total,
+          pagination: {
+            limit: results.limit,
+            offset: results.offset,
+            hasMore: results.offset + results.documents.length < results.total
+          }
+        },
+        meta: {
+          requestId: req.id,
+          timestamp: <span class="highlight">new</span> Date().toISOString()
+        }
+      });
+    } <span class="highlight">catch</span> (error) {
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'SEARCH_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+);
+
+<span class="highlight">// Document Analysis Endpoint (Async)</span>
+app.post('/api/v1/analysis',
+  authenticate,
+  authorize(['legal-ai:analyze']),
+  <span class="highlight">async</span> (req, res) => {
+    <span class="highlight">try</span> {
+      <span class="highlight">const</span> {
+        documentId,
+        analysisType,
+        webhookUrl,
+        options
+      } = req.body;
+
+      <span class="highlight">// Validate request</span>
+      <span class="highlight">if</span> (!documentId || !analysisType) {
+        <span class="highlight">return</span> res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'documentId and analysisType are required'
+          }
+        });
+      }
+
+      <span class="highlight">const</span> analysisService = <span class="highlight">new</span> AnalysisService();
+      <span class="highlight">const</span> job = <span class="highlight">await</span> analysisService.submitAnalysis({
+        documentId,
+        type: analysisType,
+        userId: req.user.id,
+        webhook: webhookUrl,
+        options
+      });
+
+      res.status(202).json({
+        success: true,
+        data: {
+          jobId: job.id,
+          status: 'pending',
+          estimatedCompletion: job.estimatedTime,
+          statusUrl: `/api/v1/analysis/${job.id}/status`
+        },
+        meta: {
+          requestId: req.id,
+          timestamp: <span class="highlight">new</span> Date().toISOString()
+        }
+      });
+    } <span class="highlight">catch</span> (error) {
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'ANALYSIS_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+);
+
+<span class="highlight">// Citation Resolution Endpoint</span>
+app.get('/api/v1/citations/:citationId',
+  authenticate,
+  <span class="highlight">async</span> (req, res) => {
+    <span class="highlight">try</span> {
+      <span class="highlight">const</span> { citationId } = req.params;
+      <span class="highlight">const</span> { format = 'bluebook' } = req.query;
+
+      <span class="highlight">const</span> citationService = <span class="highlight">new</span> CitationService();
+      <span class="highlight">const</span> citation = <span class="highlight">await</span> citationService.resolve(citationId);
+
+      <span class="highlight">if</span> (!citation) {
+        <span class="highlight">return</span> res.status(404).json({
+          success: false,
+          error: {
+            code: 'CITATION_NOT_FOUND',
+            message: `Citation ${citationId} not found`
+          }
+        });
+      }
+
+      <span class="highlight">const</span> formatted = citationService.format(citation, format <span class="highlight">as</span> string);
+
+      res.json({
+        success: true,
+        data: {
+          citation: {
+            id: citation.id,
+            canonical: formatted,
+            components: citation.components,
+            references: citation.references,
+            treatment: citation.treatment
+          }
+        }
+      });
+    } <span class="highlight">catch</span> (error) {
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'CITATION_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+);
+
+<span class="highlight">// Precedent Discovery Endpoint</span>
+app.get('/api/v1/precedents',
+  authenticate,
+  <span class="highlight">async</span> (req, res) => {
+    <span class="highlight">try</span> {
+      <span class="highlight">const</span> {
+        legalIssue,
+        jurisdiction,
+        minRelevance = 0.7,
+        limit = 10
+      } = req.query;
+
+      <span class="highlight">const</span> precedentService = <span class="highlight">new</span> PrecedentService();
+      <span class="highlight">const</span> precedents = <span class="highlight">await</span> precedentService.find({
+        issue: legalIssue <span class="highlight">as</span> string,
+        jurisdiction: jurisdiction ? (jurisdiction <span class="highlight">as</span> string).split(',') : undefined,
+        minRelevance: parseFloat(minRelevance <span class="highlight">as</span> string),
+        limit: parseInt(limit <span class="highlight">as</span> string)
+      });
+
+      res.json({
+        success: true,
+        data: {
+          precedents: precedents.map(p => ({
+            id: p.id,
+            caseName: p.caseName,
+            citation: p.citation,
+            relevanceScore: p.relevance,
+            keyHoldings: p.holdings,
+            treatment: p.treatment,
+            year: p.year
+          })),
+          analysis: {
+            totalFound: precedents.length,
+            averageRelevance: precedents.reduce((sum, p) => sum + p.relevance, 0) / precedents.length,
+            jurisdictionCoverage: [...<span class="highlight">new</span> Set(precedents.map(p => p.jurisdiction))]
+          }
+        }
+      });
+    } <span class="highlight">catch</span> (error) {
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'PRECEDENT_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+);
+
+<span class="highlight">// Start server</span>
+<span class="highlight">const</span> PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`WIA-LEGAL-005 API server running on port ${PORT}`);
+});
+            </pre>
+        </div>
+
+        <h2>4.3 Authentication and Authorization</h2>
+        <p>Legal AI APIs must implement robust security measures to protect sensitive legal information and ensure compliance with attorney-client privilege requirements. The WIA-LEGAL-005 standard mandates OAuth 2.0 with JWT tokens for authentication and role-based access control (RBAC) for authorization.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Security Feature</th>
+                    <th>Implementation</th>
+                    <th>Standard</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Authentication</td>
+                    <td>OAuth 2.0 + JWT</td>
+                    <td>RFC 6749, RFC 7519</td>
+                    <td>Verify user identity</td>
+                </tr>
+                <tr>
+                    <td>Authorization</td>
+                    <td>RBAC with scopes</td>
+                    <td>WIA-LEGAL-005</td>
+                    <td>Control access to resources</td>
+                </tr>
+                <tr>
+                    <td>Transport Security</td>
+                    <td>TLS 1.3</td>
+                    <td>RFC 8446</td>
+                    <td>Encrypt data in transit</td>
+                </tr>
+                <tr>
+                    <td>API Keys</td>
+                    <td>SHA-256 hashed keys</td>
+                    <td>WIA-LEGAL-005</td>
+                    <td>Service authentication</td>
+                </tr>
+                <tr>
+                    <td>Rate Limiting</td>
+                    <td>Token bucket algorithm</td>
+                    <td>Industry standard</td>
+                    <td>Prevent abuse</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.4 Error Handling and Status Codes</h2>
+        <p>Consistent error handling is critical for API usability. The WIA-LEGAL-005 standard defines a comprehensive error taxonomy with specific status codes and error objects that provide actionable information to API consumers.</p>
+
+        <div class="code-block">
+            <pre>
+<span class="highlight">// WIA-LEGAL-005 Error Response Format</span>
+
+<span class="highlight">interface</span> ErrorResponse {
+  success: false;
+  error: {
+    code: string;           <span class="highlight">// Machine-readable error code</span>
+    message: string;        <span class="highlight">// Human-readable description</span>
+    details?: any;          <span class="highlight">// Additional context</span>
+    requestId: string;      <span class="highlight">// For support tracking</span>
+    documentation?: string; <span class="highlight">// Link to error docs</span>
+  };
+  meta: {
+    timestamp: string;
+    version: string;
+  };
+}
+
+<span class="highlight">// Error Codes</span>
+<span class="highlight">enum</span> LegalAPIErrorCode {
+  <span class="highlight">// Client Errors (4xx)</span>
+  INVALID_REQUEST = 'INVALID_REQUEST',
+  UNAUTHORIZED = 'UNAUTHORIZED',
+  FORBIDDEN = 'FORBIDDEN',
+  NOT_FOUND = 'NOT_FOUND',
+  RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
+  INVALID_JURISDICTION = 'INVALID_JURISDICTION',
+  INVALID_CITATION = 'INVALID_CITATION',
+
+  <span class="highlight">// Server Errors (5xx)</span>
+  INTERNAL_ERROR = 'INTERNAL_ERROR',
+  SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
+  ANALYSIS_TIMEOUT = 'ANALYSIS_TIMEOUT',
+  EXTERNAL_SERVICE_ERROR = 'EXTERNAL_SERVICE_ERROR'
+}
+
+<span class="highlight">// Example error responses</span>
+<span class="highlight">const</span> examples = {
+  invalidJurisdiction: {
+    success: false,
+    error: {
+      code: 'INVALID_JURISDICTION',
+      message: 'Invalid jurisdiction code: "XX-YY"',
+      details: {
+        provided: 'XX-YY',
+        validFormats: ['US-CA', 'US-NY', 'UK-ENG'],
+        suggestion: 'Use ISO country code + region'
+      },
+      requestId: 'req_abc123',
+      documentation: 'https://docs.wia-legal.org/errors/invalid-jurisdiction'
+    },
+    meta: {
+      timestamp: '2025-12-27T10:30:00Z',
+      version: '1.0'
+    }
+  },
+
+  rateLimitExceeded: {
+    success: false,
+    error: {
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'API rate limit exceeded',
+      details: {
+        limit: 100,
+        window: '15 minutes',
+        resetAt: '2025-12-27T10:45:00Z',
+        retryAfter: 900
+      },
+      requestId: 'req_def456'
+    },
+    meta: {
+      timestamp: '2025-12-27T10:30:00Z',
+      version: '1.0'
+    }
+  }
+};
+            </pre>
+        </div>
+
+        <h2>4.5 API Versioning and Deprecation</h2>
+        <p>APIs evolve over time. The WIA-LEGAL-005 standard defines a clear versioning strategy that ensures backward compatibility while enabling innovation. Version numbers appear in the URL path (/api/v1/), and deprecation warnings are communicated through HTTP headers.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Version Strategy</th>
+                    <th>Approach</th>
+                    <th>Timeline</th>
+                    <th>Migration Support</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Major Version</td>
+                    <td>Breaking changes</td>
+                    <td>12 month deprecation period</td>
+                    <td>Full documentation + migration guide</td>
+                </tr>
+                <tr>
+                    <td>Minor Version</td>
+                    <td>New features (backward compatible)</td>
+                    <td>Immediate availability</td>
+                    <td>Release notes + examples</td>
+                </tr>
+                <tr>
+                    <td>Patch Version</td>
+                    <td>Bug fixes</td>
+                    <td>Immediate deployment</td>
+                    <td>Changelog entry</td>
+                </tr>
+                <tr>
+                    <td>Beta Features</td>
+                    <td>Experimental endpoints</td>
+                    <td>No guarantee of stability</td>
+                    <td>Beta documentation</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <p><strong>API Design for Legal Systems</strong> presents Phase 2 of the WIA-LEGAL-005 standard, covering comprehensive API interfaces for legal AI. Key takeaways:</p>
+            <ul>
+                <li><strong>RESTful Architecture:</strong> Well-designed endpoints for document search, analysis, citation resolution, and precedent discovery</li>
+                <li><strong>Production Implementation:</strong> Complete code examples demonstrating authentication, rate limiting, and error handling</li>
+                <li><strong>Security:</strong> OAuth 2.0, JWT, RBAC, and TLS 1.3 ensure protection of sensitive legal information</li>
+                <li><strong>Error Handling:</strong> Comprehensive error taxonomy with actionable information for API consumers</li>
+                <li><strong>Versioning:</strong> Clear deprecation strategy with 12-month migration periods for breaking changes</li>
+                <li><strong>Performance:</strong> Response time targets and asynchronous processing for long-running operations</li>
+            </ul>
+            <p>These API design principles ensure that legal AI systems can integrate seamlessly while maintaining security, performance, and developer experience.</p>
+        </div>
+
+        <div class="questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the core REST endpoints defined in WIA-LEGAL-005, and what is the purpose of each?</li>
+                <li>Explain how the API handles long-running analysis operations. Why is asynchronous processing important?</li>
+                <li>Describe the authentication and authorization mechanisms. How does RBAC enhance security?</li>
+                <li>What information should be included in error responses, and why is this important for API consumers?</li>
+                <li>How does the versioning strategy balance innovation with backward compatibility?</li>
+                <li>Why are rate limits necessary in legal AI APIs? What happens when limits are exceeded?</li>
+                <li>Compare synchronous and asynchronous API patterns. When should each be used in legal applications?</li>
+                <li>How would you design an API endpoint for complex legal research queries that might take several minutes to complete?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-03.html" class="nav-btn">← Previous: Data Formats</a>
+            <a href="index.html" class="nav-btn">Contents</a>
+            <a href="chapter-05.html" class="nav-btn">Next: Protocols →</a>
+        </div>
+
+        <div class="hongik">
+            <h3>弘益人間 (Hongik Ingan)</h3>
+            <p><strong>"Benefit All Humanity"</strong></p>
+            <p>Open, well-documented APIs democratize legal technology by enabling developers worldwide to build innovative solutions. By providing standardized interfaces to legal AI capabilities, we lower barriers to entry and empower small firms, solo practitioners, and public interest organizations to access the same powerful tools used by large corporations, ultimately making justice more accessible to all.</p>
+            <p style="margin-top: 20px; font-size: 0.9rem; color: var(--text-secondary);">
+                © 2025 WIA-LEGAL-005 Standard | World Certification Industry Association
+            </p>
+        </div>
+    </div>
+</body>
+</html>

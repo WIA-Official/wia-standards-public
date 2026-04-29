@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CRYO-ASSET Simulator - Asset Management Standards</title>
+</head>
+<body>
+<pre id="output">
+================================================================================
+CRYO-ASSET SIMULATOR
+Asset Management Standards for Cryopreserved Individuals
+================================================================================
+
+<a href="../../index.html">[WIA Standards Home]</a>
+
+Loading simulator...
+</pre>
+
+<script>
+const CryoAssetSimulator = (function() {
+    // Registry Status Types
+    const RegistryStatus = {
+        ACTIVE: 'ACTIVE',
+        FROZEN: 'FROZEN',
+        TRUST_MANAGED: 'TRUST_MANAGED',
+        RESTORATION_PENDING: 'RESTORATION_PENDING',
+        RESTORED: 'RESTORED',
+        ESTATE_DISTRIBUTED: 'ESTATE_DISTRIBUTED'
+    };
+
+    // Asset Types
+    const AssetType = {
+        REAL_PROPERTY: 'REAL_PROPERTY',
+        FINANCIAL_ACCOUNT: 'FINANCIAL_ACCOUNT',
+        INVESTMENT_PORTFOLIO: 'INVESTMENT_PORTFOLIO',
+        CRYPTOCURRENCY: 'CRYPTOCURRENCY',
+        INTELLECTUAL_PROPERTY: 'INTELLECTUAL_PROPERTY',
+        BUSINESS_INTEREST: 'BUSINESS_INTEREST',
+        PERSONAL_PROPERTY: 'PERSONAL_PROPERTY'
+    };
+
+    // Asset Status
+    const AssetStatus = {
+        ACTIVE: 'ACTIVE',
+        FROZEN: 'FROZEN',
+        UNDER_MANAGEMENT: 'UNDER_MANAGEMENT',
+        LIQUIDATING: 'LIQUIDATING',
+        TRANSFERRED: 'TRANSFERRED',
+        DISPOSED: 'DISPOSED'
+    };
+
+    // Trust Status
+    const TrustStatus = {
+        ACTIVE: 'ACTIVE',
+        SUSPENDED: 'SUSPENDED',
+        TERMINATED: 'TERMINATED',
+        DISSOLVED: 'DISSOLVED'
+    };
+
+    // Valid Transitions
+    const validTransitions = {
+        [RegistryStatus.ACTIVE]: [RegistryStatus.FROZEN],
+        [RegistryStatus.FROZEN]: [RegistryStatus.TRUST_MANAGED],
+        [RegistryStatus.TRUST_MANAGED]: [RegistryStatus.RESTORATION_PENDING, RegistryStatus.ESTATE_DISTRIBUTED],
+        [RegistryStatus.RESTORATION_PENDING]: [RegistryStatus.RESTORED, RegistryStatus.TRUST_MANAGED],
+        [RegistryStatus.RESTORED]: [],
+        [RegistryStatus.ESTATE_DISTRIBUTED]: []
+    };
+
+    // State
+    let state = {
+        registries: [],
+        assets: [],
+        trusts: [],
+        valuations: [],
+        distributions: [],
+        currentSection: 'main'
+    };
+
+    // Utility Functions
+    function generateId(prefix) {
+        return prefix + '-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    }
+
+    function formatDate(date) {
+        return date.toISOString().split('T')[0];
+    }
+
+    function formatCurrency(amount, currency = 'USD') {
+        return currency + ' ' + amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    // Asset Registry Class
+    class AssetRegistry {
+        constructor(subjectName, subjectId, legalRecordId) {
+            this.registryId = generateId('REG');
+            this.subjectName = subjectName;
+            this.subjectId = subjectId;
+            this.legalRecordId = legalRecordId;
+            this.status = RegistryStatus.ACTIVE;
+            this.statusHistory = [{
+                fromStatus: null,
+                toStatus: RegistryStatus.ACTIVE,
+                timestamp: new Date(),
+                triggeredBy: 'SYSTEM',
+                reason: 'Registry created'
+            }];
+            this.assets = [];
+            this.trusts = [];
+            this.guardian = null;
+            this.createdAt = new Date();
+            this.updatedAt = new Date();
+        }
+
+        canTransitionTo(newStatus) {
+            return validTransitions[this.status].includes(newStatus);
+        }
+
+        transition(newStatus, triggeredBy, reason) {
+            if (!this.canTransitionTo(newStatus)) {
+                throw new Error(`Invalid transition from ${this.status} to ${newStatus}`);
+            }
+
+            this.statusHistory.push({
+                fromStatus: this.status,
+                toStatus: newStatus,
+                timestamp: new Date(),
+                triggeredBy: triggeredBy,
+                reason: reason
+            });
+
+            this.status = newStatus;
+            this.updatedAt = new Date();
+
+            // Execute status-specific actions
+            this._executeTransitionActions(newStatus);
+        }
+
+        _executeTransitionActions(newStatus) {
+            const registryAssets = state.assets.filter(a => a.registryId === this.registryId);
+
+            switch(newStatus) {
+                case RegistryStatus.FROZEN:
+                    registryAssets.forEach(a => a.freeze());
+                    break;
+                case RegistryStatus.TRUST_MANAGED:
+                    registryAssets.forEach(a => a.setStatus(AssetStatus.UNDER_MANAGEMENT));
+                    break;
+                case RegistryStatus.RESTORED:
+                    registryAssets.forEach(a => a.setStatus(AssetStatus.TRANSFERRED));
+                    break;
+                case RegistryStatus.ESTATE_DISTRIBUTED:
+                    registryAssets.forEach(a => {
+                        if (a.status !== AssetStatus.DISPOSED) {
+                            a.setStatus(AssetStatus.LIQUIDATING);
+                        }
+                    });
+                    break;
+            }
+        }
+
+        getTotalValue(currency = 'USD') {
+            const registryAssets = state.assets.filter(a => a.registryId === this.registryId);
+            return registryAssets.reduce((sum, a) => sum + a.value.amount, 0);
+        }
+    }
+
+    // Asset Class
+    class Asset {
+        constructor(registryId, type, name, value, jurisdiction) {
+            this.assetId = generateId('AST');
+            this.registryId = registryId;
+            this.type = type;
+            this.name = name;
+            this.value = { amount: value, currency: 'USD', asOf: new Date() };
+            this.jurisdiction = jurisdiction;
+            this.status = AssetStatus.ACTIVE;
+            this.history = [];
+            this.createdAt = new Date();
+            this.updatedAt = new Date();
+        }
+
+        freeze() {
+            this.setStatus(AssetStatus.FROZEN);
+        }
+
+        setStatus(newStatus) {
+            this.history.push({
+                eventType: 'STATUS_CHANGE',
+                previousValue: this.status,
+                newValue: newStatus,
+                timestamp: new Date()
+            });
+            this.status = newStatus;
+            this.updatedAt = new Date();
+        }
+
+        updateValue(newValue) {
+            this.history.push({
+                eventType: 'VALUATION',
+                previousValue: this.value.amount,
+                newValue: newValue,
+                timestamp: new Date()
+            });
+            this.value = { amount: newValue, currency: 'USD', asOf: new Date() };
+            this.updatedAt = new Date();
+        }
+    }
+
+    // Trust Class
+    class Trust {
+        constructor(registryId, trustName, trustType) {
+            this.trustId = generateId('TRT');
+            this.registryId = registryId;
+            this.trustName = trustName;
+            this.trustType = trustType;
+            this.status = TrustStatus.ACTIVE;
+            this.trustees = [];
+            this.beneficiaries = [];
+            this.distributions = [];
+            this.preservationReserve = 0;
+            this.createdAt = new Date();
+            this.updatedAt = new Date();
+        }
+
+        addTrustee(name, role, type) {
+            this.trustees.push({
+                trusteeId: generateId('TRE'),
+                name: name,
+                role: role,
+                type: type,
+                appointmentDate: new Date()
+            });
+            this.updatedAt = new Date();
+        }
+
+        addBeneficiary(name, relationship, share, benefitType) {
+            const totalShare = this.beneficiaries.reduce((sum, b) => sum + b.share, 0);
+            if (totalShare + share > 1) {
+                throw new Error('Total beneficiary shares exceed 100%');
+            }
+
+            this.beneficiaries.push({
+                beneficiaryId: generateId('BEN'),
+                name: name,
+                relationship: relationship,
+                share: share,
+                benefitType: benefitType
+            });
+            this.updatedAt = new Date();
+        }
+
+        distribute(beneficiaryId, amount, type, reason) {
+            const distribution = {
+                distributionId: generateId('DST'),
+                beneficiaryId: beneficiaryId,
+                amount: amount,
+                type: type,
+                reason: reason,
+                date: new Date(),
+                status: 'COMPLETED'
+            };
+            this.distributions.push(distribution);
+            this.updatedAt = new Date();
+            return distribution;
+        }
+
+        fundPreservationReserve(amount) {
+            this.preservationReserve += amount;
+            this.updatedAt = new Date();
+        }
+
+        terminate(reason) {
+            this.status = TrustStatus.TERMINATED;
+            this.terminationReason = reason;
+            this.terminatedAt = new Date();
+            this.updatedAt = new Date();
+        }
+    }
+
+    // Render Functions
+    function render(content) {
+        document.getElementById('output').innerHTML = content;
+    }
+
+    function renderMainMenu() {
+        let totalAssets = state.assets.length;
+        let totalValue = state.assets.reduce((sum, a) => sum + a.value.amount, 0);
+
+        const output = `
+================================================================================
+CRYO-ASSET SIMULATOR
+Asset Management Standards for Cryopreserved Individuals
+================================================================================
+
+<a href="../../index.html">[WIA Standards Home]</a>
+
+--------------------------------------------------------------------------------
+MAIN MENU
+--------------------------------------------------------------------------------
+
+[1] <a href="#" onclick="CryoAssetSimulator.showSection('registries')">Asset Registries</a>        - Manage asset registries
+[2] <a href="#" onclick="CryoAssetSimulator.showSection('assets')">Assets</a>                  - Add and manage assets
+[3] <a href="#" onclick="CryoAssetSimulator.showSection('trusts')">Trust Management</a>        - Preservation trusts
+[4] <a href="#" onclick="CryoAssetSimulator.showSection('valuations')">Valuations</a>              - Asset valuation services
+[5] <a href="#" onclick="CryoAssetSimulator.showSection('restoration')">Restoration</a>             - Asset restoration workflow
+[6] <a href="#" onclick="CryoAssetSimulator.showSection('distribution')">Distribution</a>            - Estate distribution
+[7] <a href="#" onclick="CryoAssetSimulator.showSection('dashboard')">Dashboard</a>               - System overview
+[8] <a href="#" onclick="CryoAssetSimulator.showSection('investment')">Investment Strategy</a>     - Long-term planning
+
+--------------------------------------------------------------------------------
+SYSTEM STATUS
+--------------------------------------------------------------------------------
+
+    Registries:     ${state.registries.length}
+    Assets:         ${totalAssets}
+    Trusts:         ${state.trusts.length}
+    Total Value:    ${formatCurrency(totalValue)}
+
+--------------------------------------------------------------------------------
+ASSET LIFECYCLE
+--------------------------------------------------------------------------------
+
+    ACTIVE --> FROZEN --> TRUST_MANAGED --> RESTORATION_PENDING --> RESTORED
+                               |
+                               v
+                       ESTATE_DISTRIBUTED
+
+--------------------------------------------------------------------------------
+
+    "Hongik Ingan" - Asset preservation ensures financial continuity
+    for cryopreserved individuals and their beneficiaries.
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderRegistriesSection() {
+        let registriesList = '';
+        if (state.registries.length === 0) {
+            registriesList = '    No registries found. Create a new registry to begin.\n';
+        } else {
+            state.registries.forEach((reg, index) => {
+                const assetCount = state.assets.filter(a => a.registryId === reg.registryId).length;
+                const totalValue = reg.getTotalValue();
+                registriesList += `
+    [${index + 1}] ${reg.registryId}
+        Subject:      ${reg.subjectName}
+        Status:       ${reg.status}
+        Assets:       ${assetCount}
+        Total Value:  ${formatCurrency(totalValue)}
+        Created:      ${formatDate(reg.createdAt)}
+        <a href="#" onclick="CryoAssetSimulator.viewRegistry('${reg.registryId}')">[View]</a> <a href="#" onclick="CryoAssetSimulator.showTransitionForm('${reg.registryId}')">[Transition]</a>
+`;
+            });
+        }
+
+        const output = `
+================================================================================
+ASSET REGISTRIES
+================================================================================
+
+<a href="#" onclick="CryoAssetSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+CREATE NEW REGISTRY
+--------------------------------------------------------------------------------
+
+    Subject Name:   <input type="text" id="subjectName" size="30" value="Kim Preservation">
+    Subject ID:     <input type="text" id="subjectId" size="30" value="SUB-2075-001">
+    Legal Record:   <input type="text" id="legalRecordId" size="30" value="LSR-2075-001">
+
+    <a href="#" onclick="CryoAssetSimulator.createRegistry()">[Create Registry]</a>
+
+--------------------------------------------------------------------------------
+EXISTING REGISTRIES (${state.registries.length})
+--------------------------------------------------------------------------------
+${registriesList}
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderAssetsSection() {
+        let assetsList = '';
+        if (state.assets.length === 0) {
+            assetsList = '    No assets found. Add assets to a registry.\n';
+        } else {
+            state.assets.forEach((asset, index) => {
+                const registry = state.registries.find(r => r.registryId === asset.registryId);
+                assetsList += `
+    [${index + 1}] ${asset.assetId}
+        Name:         ${asset.name}
+        Type:         ${asset.type}
+        Value:        ${formatCurrency(asset.value.amount)}
+        Status:       ${asset.status}
+        Registry:     ${registry ? registry.subjectName : 'Unknown'}
+        <a href="#" onclick="CryoAssetSimulator.viewAsset('${asset.assetId}')">[View]</a> <a href="#" onclick="CryoAssetSimulator.updateAssetValue('${asset.assetId}')">[Revalue]</a>
+`;
+            });
+        }
+
+        let registryOptions = '<option value="">Select Registry</option>';
+        state.registries.forEach(reg => {
+            registryOptions += `<option value="${reg.registryId}">${reg.registryId} - ${reg.subjectName}</option>`;
+        });
+
+        const output = `
+================================================================================
+ASSETS
+================================================================================
+
+<a href="#" onclick="CryoAssetSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+ADD NEW ASSET
+--------------------------------------------------------------------------------
+
+    Registry:       <select id="assetRegistryId">${registryOptions}</select>
+    Asset Type:     <select id="assetType">
+                      <option value="REAL_PROPERTY">Real Property</option>
+                      <option value="FINANCIAL_ACCOUNT">Financial Account</option>
+                      <option value="INVESTMENT_PORTFOLIO">Investment Portfolio</option>
+                      <option value="CRYPTOCURRENCY">Cryptocurrency</option>
+                      <option value="INTELLECTUAL_PROPERTY">Intellectual Property</option>
+                      <option value="BUSINESS_INTEREST">Business Interest</option>
+                      <option value="PERSONAL_PROPERTY">Personal Property</option>
+                    </select>
+    Asset Name:     <input type="text" id="assetName" size="30" value="Primary Residence">
+    Value (USD):    <input type="number" id="assetValue" size="15" value="500000">
+    Jurisdiction:   <input type="text" id="assetJurisdiction" size="10" value="US-CA">
+
+    <a href="#" onclick="CryoAssetSimulator.createAsset()">[Add Asset]</a>
+
+--------------------------------------------------------------------------------
+EXISTING ASSETS (${state.assets.length})
+--------------------------------------------------------------------------------
+${assetsList}
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderTrustsSection() {
+        let trustsList = '';
+        if (state.trusts.length === 0) {
+            trustsList = '    No trusts found. Create a trust for asset management.\n';
+        } else {
+            state.trusts.forEach((trust, index) => {
+                trustsList += `
+    [${index + 1}] ${trust.trustId}
+        Name:         ${trust.trustName}
+        Type:         ${trust.trustType}
+        Status:       ${trust.status}
+        Trustees:     ${trust.trustees.length}
+        Beneficiaries: ${trust.beneficiaries.length}
+        Reserve:      ${formatCurrency(trust.preservationReserve)}
+        <a href="#" onclick="CryoAssetSimulator.viewTrust('${trust.trustId}')">[View]</a> <a href="#" onclick="CryoAssetSimulator.manageTrust('${trust.trustId}')">[Manage]</a>
+`;
+            });
+        }
+
+        let registryOptions = '<option value="">Select Registry</option>';
+        state.registries.forEach(reg => {
+            registryOptions += `<option value="${reg.registryId}">${reg.registryId} - ${reg.subjectName}</option>`;
+        });
+
+        const output = `
+================================================================================
+TRUST MANAGEMENT
+================================================================================
+
+<a href="#" onclick="CryoAssetSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+CREATE NEW TRUST
+--------------------------------------------------------------------------------
+
+    Registry:       <select id="trustRegistryId">${registryOptions}</select>
+    Trust Name:     <input type="text" id="trustName" size="30" value="Kim Preservation Trust">
+    Trust Type:     <select id="trustType">
+                      <option value="PRESERVATION_TRUST">Preservation Trust</option>
+                      <option value="REVOCABLE_LIVING">Revocable Living Trust</option>
+                      <option value="IRREVOCABLE">Irrevocable Trust</option>
+                      <option value="DYNASTY">Dynasty Trust</option>
+                    </select>
+
+    <a href="#" onclick="CryoAssetSimulator.createTrust()">[Create Trust]</a>
+
+--------------------------------------------------------------------------------
+TRUST RESPONSIBILITIES
+--------------------------------------------------------------------------------
+
+    Preservation Trust Duties:
+    - Fund and maintain preservation costs
+    - Manage assets prudently for long-term growth
+    - Report to court annually
+    - Prepare for restoration or distribution
+
+--------------------------------------------------------------------------------
+EXISTING TRUSTS (${state.trusts.length})
+--------------------------------------------------------------------------------
+${trustsList}
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderValuationsSection() {
+        let valuationsList = '';
+        state.valuations.forEach((val, index) => {
+            const asset = state.assets.find(a => a.assetId === val.assetId);
+            valuationsList += `
+    [${index + 1}] ${val.valuationId}
+        Asset:        ${asset ? asset.name : val.assetId}
+        Method:       ${val.method}
+        Value:        ${formatCurrency(val.value)}
+        Confidence:   ${(val.confidence * 100).toFixed(0)}%
+        Date:         ${formatDate(val.date)}
+`;
+        });
+
+        if (!valuationsList) {
+            valuationsList = '    No valuations recorded. Request a valuation for an asset.\n';
+        }
+
+        let assetOptions = '<option value="">Select Asset</option>';
+        state.assets.forEach(asset => {
+            assetOptions += `<option value="${asset.assetId}">${asset.name} (${formatCurrency(asset.value.amount)})</option>`;
+        });
+
+        const output = `
+================================================================================
+VALUATIONS
+================================================================================
+
+<a href="#" onclick="CryoAssetSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+REQUEST VALUATION
+--------------------------------------------------------------------------------
+
+    Asset:          <select id="valuationAssetId">${assetOptions}</select>
+    Method:         <select id="valuationMethod">
+                      <option value="MARKET_VALUE">Market Value</option>
+                      <option value="APPRAISAL">Appraisal</option>
+                      <option value="BOOK_VALUE">Book Value</option>
+                      <option value="DCF">Discounted Cash Flow</option>
+                      <option value="COMPARABLE">Comparable Sales</option>
+                    </select>
+
+    <a href="#" onclick="CryoAssetSimulator.requestValuation()">[Request Valuation]</a>
+
+--------------------------------------------------------------------------------
+VALUATION METHODS
+--------------------------------------------------------------------------------
+
+    MARKET_VALUE:   Current market trading price
+    APPRAISAL:      Professional assessment
+    BOOK_VALUE:     Account/stated value
+    DCF:            Future cash flows discounted
+    COMPARABLE:     Similar asset sales comparison
+
+--------------------------------------------------------------------------------
+RECENT VALUATIONS
+--------------------------------------------------------------------------------
+${valuationsList}
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderRestorationSection() {
+        let registryOptions = '<option value="">Select Registry</option>';
+        state.registries.filter(r =>
+            r.status === RegistryStatus.RESTORATION_PENDING ||
+            r.status === RegistryStatus.TRUST_MANAGED
+        ).forEach(reg => {
+            registryOptions += `<option value="${reg.registryId}">${reg.registryId} - ${reg.subjectName} (${reg.status})</option>`;
+        });
+
+        const output = `
+================================================================================
+ASSET RESTORATION
+================================================================================
+
+<a href="#" onclick="CryoAssetSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+RESTORATION PROCESS
+--------------------------------------------------------------------------------
+
+    Upon successful revival and legal restoration, assets are returned
+    to the restored individual through a structured process.
+
+    Restoration Steps:
+    1. Legal restoration order received
+    2. Registry status changes to RESTORATION_PENDING
+    3. Trust termination initiated
+    4. Assets transferred to individual
+    5. Registry status changes to RESTORED
+
+--------------------------------------------------------------------------------
+INITIATE RESTORATION
+--------------------------------------------------------------------------------
+
+    Registry:       <select id="restoreRegistryId">${registryOptions}</select>
+    Legal Order ID: <input type="text" id="legalOrderId" size="30" value="LRO-2075-001">
+
+    <a href="#" onclick="CryoAssetSimulator.initiateRestoration()">[Initiate Restoration]</a>
+
+--------------------------------------------------------------------------------
+RESTORATION TASKS
+--------------------------------------------------------------------------------
+
+    For each asset type:
+    - Verify ownership documentation
+    - Clear temporary encumbrances
+    - Update title/ownership records
+    - Execute transfer documents
+    - Update registrations
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderDistributionSection() {
+        let registryOptions = '<option value="">Select Registry</option>';
+        state.registries.filter(r => r.status === RegistryStatus.TRUST_MANAGED).forEach(reg => {
+            registryOptions += `<option value="${reg.registryId}">${reg.registryId} - ${reg.subjectName}</option>`;
+        });
+
+        const output = `
+================================================================================
+ESTATE DISTRIBUTION
+================================================================================
+
+<a href="#" onclick="CryoAssetSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+DISTRIBUTION PROCESS
+--------------------------------------------------------------------------------
+
+    Upon permanent death declaration, estate distribution is initiated
+    according to will provisions or intestacy rules.
+
+    Distribution Steps:
+    1. Permanent death declaration received
+    2. Registry status changes to ESTATE_DISTRIBUTED
+    3. Assets liquidated as needed
+    4. Debts and expenses paid
+    5. Remaining assets distributed to heirs
+
+--------------------------------------------------------------------------------
+INITIATE DISTRIBUTION
+--------------------------------------------------------------------------------
+
+    Registry:       <select id="distributeRegistryId">${registryOptions}</select>
+    Death Record:   <input type="text" id="deathRecordId" size="30" value="PDR-2075-001">
+
+    <a href="#" onclick="CryoAssetSimulator.initiateDistribution()">[Initiate Distribution]</a>
+
+--------------------------------------------------------------------------------
+DISTRIBUTION PRIORITY
+--------------------------------------------------------------------------------
+
+    1. Funeral/preservation costs
+    2. Administrative expenses
+    3. Secured creditors
+    4. Unsecured creditors
+    5. Specific bequests
+    6. Residuary beneficiaries
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderDashboard() {
+        const statusCounts = {};
+        state.registries.forEach(reg => {
+            statusCounts[reg.status] = (statusCounts[reg.status] || 0) + 1;
+        });
+
+        const assetTypeCounts = {};
+        let totalValue = 0;
+        state.assets.forEach(asset => {
+            assetTypeCounts[asset.type] = (assetTypeCounts[asset.type] || 0) + 1;
+            totalValue += asset.value.amount;
+        });
+
+        let statusDisplay = '';
+        Object.entries(statusCounts).forEach(([status, count]) => {
+            statusDisplay += `        ${status}: ${count}\n`;
+        });
+        if (!statusDisplay) statusDisplay = '        No registries\n';
+
+        let assetTypeDisplay = '';
+        Object.entries(assetTypeCounts).forEach(([type, count]) => {
+            assetTypeDisplay += `        ${type}: ${count}\n`;
+        });
+        if (!assetTypeDisplay) assetTypeDisplay = '        No assets\n';
+
+        const output = `
+================================================================================
+INTEGRATION DASHBOARD
+================================================================================
+
+<a href="#" onclick="CryoAssetSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+REGISTRY STATUS OVERVIEW
+--------------------------------------------------------------------------------
+
+${statusDisplay}
+--------------------------------------------------------------------------------
+ASSET TYPE BREAKDOWN
+--------------------------------------------------------------------------------
+
+${assetTypeDisplay}
+--------------------------------------------------------------------------------
+FINANCIAL SUMMARY
+--------------------------------------------------------------------------------
+
+    Total Registries:    ${state.registries.length}
+    Total Assets:        ${state.assets.length}
+    Total Value:         ${formatCurrency(totalValue)}
+    Active Trusts:       ${state.trusts.filter(t => t.status === TrustStatus.ACTIVE).length}
+
+--------------------------------------------------------------------------------
+SYSTEM INTEGRATION
+--------------------------------------------------------------------------------
+
+    [!] CRYO-LEGAL:    Legal status triggers asset transitions
+    [!] CRYO-CONSENT:  Consent verification for major decisions
+    [!] CRYO-IDENTITY: Identity verification for restoration
+    [!] CRYO-REVIVAL:  Revival triggers restoration workflow
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function renderInvestmentSection() {
+        const output = `
+================================================================================
+INVESTMENT STRATEGY
+================================================================================
+
+<a href="#" onclick="CryoAssetSimulator.showSection('main')">[Back to Main Menu]</a>
+
+--------------------------------------------------------------------------------
+LONG-TERM PRESERVATION STRATEGY
+--------------------------------------------------------------------------------
+
+    For cryopreservation trusts, investment strategy must balance:
+    - Capital preservation for potentially indefinite timeframes
+    - Growth to offset inflation and preservation costs
+    - Liquidity for ongoing expense payments
+    - Risk management for uncertain revival timelines
+
+--------------------------------------------------------------------------------
+RISK PROFILES
+--------------------------------------------------------------------------------
+
+    CONSERVATIVE:
+        Fixed Income:    60%
+        Equities:        20%
+        Alternatives:    10%
+        Cash:            10%
+
+    MODERATE:
+        Fixed Income:    40%
+        Equities:        40%
+        Alternatives:    15%
+        Cash:             5%
+
+    AGGRESSIVE:
+        Fixed Income:    20%
+        Equities:        55%
+        Alternatives:    20%
+        Cash:             5%
+
+--------------------------------------------------------------------------------
+SUSTAINABILITY CALCULATOR
+--------------------------------------------------------------------------------
+
+    Portfolio Value: <input type="number" id="portfolioValue" value="1000000">
+    Annual Costs:    <input type="number" id="annualCosts" value="25000">
+    Expected Return: <input type="number" id="expectedReturn" value="4" step="0.1">%
+
+    <a href="#" onclick="CryoAssetSimulator.calculateSustainability()">[Calculate]</a>
+
+    <div id="sustainabilityResult"></div>
+
+--------------------------------------------------------------------------------
+WITHDRAWAL GUIDELINES
+--------------------------------------------------------------------------------
+
+    Conservative 3% Rule:
+    - Annual withdrawal = 3% of portfolio value
+    - Designed for potentially indefinite preservation
+    - Adjusts for actual investment performance
+
+================================================================================
+`;
+        render(output);
+    }
+
+    // Action Functions
+    function createRegistry() {
+        const name = document.getElementById('subjectName').value;
+        const subjectId = document.getElementById('subjectId').value;
+        const legalRecordId = document.getElementById('legalRecordId').value;
+
+        if (!name || !subjectId || !legalRecordId) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        const registry = new AssetRegistry(name, subjectId, legalRecordId);
+        state.registries.push(registry);
+
+        alert(`Registry created: ${registry.registryId}`);
+        renderRegistriesSection();
+    }
+
+    function viewRegistry(registryId) {
+        const registry = state.registries.find(r => r.registryId === registryId);
+        if (!registry) {
+            alert('Registry not found');
+            return;
+        }
+
+        const registryAssets = state.assets.filter(a => a.registryId === registryId);
+        const registryTrusts = state.trusts.filter(t => t.registryId === registryId);
+        const totalValue = registry.getTotalValue();
+
+        let assetsDisplay = registryAssets.length > 0 ?
+            registryAssets.map(a => `        ${a.name}: ${formatCurrency(a.value.amount)} (${a.status})`).join('\n') :
+            '        No assets';
+
+        let trustsDisplay = registryTrusts.length > 0 ?
+            registryTrusts.map(t => `        ${t.trustName} (${t.status})`).join('\n') :
+            '        No trusts';
+
+        let historyDisplay = registry.statusHistory.map(h =>
+            `        ${formatDate(h.timestamp)}: ${h.fromStatus || 'N/A'} --> ${h.toStatus} (${h.triggeredBy})`
+        ).join('\n');
+
+        const output = `
+================================================================================
+REGISTRY DETAILS: ${registry.registryId}
+================================================================================
+
+<a href="#" onclick="CryoAssetSimulator.showSection('registries')">[Back to Registries]</a>
+
+--------------------------------------------------------------------------------
+BASIC INFORMATION
+--------------------------------------------------------------------------------
+
+    Registry ID:    ${registry.registryId}
+    Subject:        ${registry.subjectName}
+    Subject ID:     ${registry.subjectId}
+    Legal Record:   ${registry.legalRecordId}
+    Status:         ${registry.status}
+    Total Value:    ${formatCurrency(totalValue)}
+    Created:        ${formatDate(registry.createdAt)}
+
+--------------------------------------------------------------------------------
+ASSETS (${registryAssets.length})
+--------------------------------------------------------------------------------
+
+${assetsDisplay}
+
+--------------------------------------------------------------------------------
+TRUSTS (${registryTrusts.length})
+--------------------------------------------------------------------------------
+
+${trustsDisplay}
+
+--------------------------------------------------------------------------------
+STATUS HISTORY
+--------------------------------------------------------------------------------
+
+${historyDisplay}
+
+--------------------------------------------------------------------------------
+ACTIONS
+--------------------------------------------------------------------------------
+
+    <a href="#" onclick="CryoAssetSimulator.showTransitionForm('${registryId}')">[Transition Status]</a>
+    <a href="#" onclick="CryoAssetSimulator.showSection('registries')">[Back]</a>
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function showTransitionForm(registryId) {
+        const registry = state.registries.find(r => r.registryId === registryId);
+        if (!registry) return;
+
+        const possibleTransitions = validTransitions[registry.status];
+        let transitionOptions = '';
+        possibleTransitions.forEach(status => {
+            transitionOptions += `<option value="${status}">${status}</option>`;
+        });
+
+        if (possibleTransitions.length === 0) {
+            transitionOptions = '<option value="">No transitions available (terminal state)</option>';
+        }
+
+        const output = `
+================================================================================
+STATUS TRANSITION: ${registry.registryId}
+================================================================================
+
+<a href="#" onclick="CryoAssetSimulator.viewRegistry('${registryId}')">[Back to Registry]</a>
+
+--------------------------------------------------------------------------------
+CURRENT STATUS
+--------------------------------------------------------------------------------
+
+    Registry:     ${registry.registryId}
+    Subject:      ${registry.subjectName}
+    Status:       ${registry.status}
+
+--------------------------------------------------------------------------------
+TRANSITION FORM
+--------------------------------------------------------------------------------
+
+    New Status:   <select id="newStatus">${transitionOptions}</select>
+    Triggered By: <input type="text" id="transTriggeredBy" size="30" value="Guardian">
+    Reason:       <input type="text" id="transReason" size="50" value="Status transition">
+
+    <a href="#" onclick="CryoAssetSimulator.executeTransition('${registryId}')">[Execute Transition]</a>
+
+--------------------------------------------------------------------------------
+VALID TRANSITIONS FROM ${registry.status}
+--------------------------------------------------------------------------------
+
+${possibleTransitions.length > 0 ?
+    possibleTransitions.map(s => `    --> ${s}`).join('\n') :
+    '    (Terminal state - no further transitions possible)'}
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function executeTransition(registryId) {
+        const registry = state.registries.find(r => r.registryId === registryId);
+        if (!registry) return;
+
+        const newStatus = document.getElementById('newStatus').value;
+        const triggeredBy = document.getElementById('transTriggeredBy').value;
+        const reason = document.getElementById('transReason').value;
+
+        if (!newStatus) {
+            alert('Please select a new status');
+            return;
+        }
+
+        try {
+            registry.transition(newStatus, triggeredBy, reason);
+            alert(`Status transitioned to ${newStatus}`);
+            viewRegistry(registryId);
+        } catch (error) {
+            alert('Transition failed: ' + error.message);
+        }
+    }
+
+    function createAsset() {
+        const registryId = document.getElementById('assetRegistryId').value;
+        const type = document.getElementById('assetType').value;
+        const name = document.getElementById('assetName').value;
+        const value = parseFloat(document.getElementById('assetValue').value);
+        const jurisdiction = document.getElementById('assetJurisdiction').value;
+
+        if (!registryId || !name || isNaN(value)) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        const asset = new Asset(registryId, type, name, value, jurisdiction);
+        state.assets.push(asset);
+
+        const registry = state.registries.find(r => r.registryId === registryId);
+        if (registry) {
+            registry.assets.push(asset.assetId);
+        }
+
+        alert(`Asset created: ${asset.assetId}`);
+        renderAssetsSection();
+    }
+
+    function viewAsset(assetId) {
+        const asset = state.assets.find(a => a.assetId === assetId);
+        if (!asset) return;
+
+        const registry = state.registries.find(r => r.registryId === asset.registryId);
+
+        let historyDisplay = asset.history.length > 0 ?
+            asset.history.map(h =>
+                `        ${formatDate(h.timestamp)}: ${h.eventType} - ${h.previousValue} --> ${h.newValue}`
+            ).join('\n') :
+            '        No history';
+
+        const output = `
+================================================================================
+ASSET DETAILS: ${asset.assetId}
+================================================================================
+
+<a href="#" onclick="CryoAssetSimulator.showSection('assets')">[Back to Assets]</a>
+
+--------------------------------------------------------------------------------
+BASIC INFORMATION
+--------------------------------------------------------------------------------
+
+    Asset ID:     ${asset.assetId}
+    Name:         ${asset.name}
+    Type:         ${asset.type}
+    Value:        ${formatCurrency(asset.value.amount)}
+    Status:       ${asset.status}
+    Jurisdiction: ${asset.jurisdiction}
+    Registry:     ${registry ? registry.subjectName : asset.registryId}
+    Created:      ${formatDate(asset.createdAt)}
+    Updated:      ${formatDate(asset.updatedAt)}
+
+--------------------------------------------------------------------------------
+VALUE HISTORY
+--------------------------------------------------------------------------------
+
+${historyDisplay}
+
+--------------------------------------------------------------------------------
+ACTIONS
+--------------------------------------------------------------------------------
+
+    <a href="#" onclick="CryoAssetSimulator.updateAssetValue('${assetId}')">[Update Value]</a>
+    <a href="#" onclick="CryoAssetSimulator.showSection('assets')">[Back]</a>
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function updateAssetValue(assetId) {
+        const asset = state.assets.find(a => a.assetId === assetId);
+        if (!asset) return;
+
+        const newValue = prompt(`Enter new value for ${asset.name} (current: ${asset.value.amount}):`, asset.value.amount);
+        if (newValue !== null && !isNaN(parseFloat(newValue))) {
+            asset.updateValue(parseFloat(newValue));
+            alert('Asset value updated');
+            viewAsset(assetId);
+        }
+    }
+
+    function createTrust() {
+        const registryId = document.getElementById('trustRegistryId').value;
+        const trustName = document.getElementById('trustName').value;
+        const trustType = document.getElementById('trustType').value;
+
+        if (!registryId || !trustName) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        const trust = new Trust(registryId, trustName, trustType);
+        state.trusts.push(trust);
+
+        const registry = state.registries.find(r => r.registryId === registryId);
+        if (registry) {
+            registry.trusts.push(trust.trustId);
+        }
+
+        alert(`Trust created: ${trust.trustId}`);
+        renderTrustsSection();
+    }
+
+    function viewTrust(trustId) {
+        const trust = state.trusts.find(t => t.trustId === trustId);
+        if (!trust) return;
+
+        const registry = state.registries.find(r => r.registryId === trust.registryId);
+
+        let trusteesDisplay = trust.trustees.length > 0 ?
+            trust.trustees.map(t => `        ${t.name} (${t.role})`).join('\n') :
+            '        No trustees appointed';
+
+        let beneficiariesDisplay = trust.beneficiaries.length > 0 ?
+            trust.beneficiaries.map(b => `        ${b.name}: ${(b.share * 100).toFixed(0)}% (${b.benefitType})`).join('\n') :
+            '        No beneficiaries';
+
+        let distributionsDisplay = trust.distributions.length > 0 ?
+            trust.distributions.map(d => `        ${formatDate(d.date)}: ${formatCurrency(d.amount)} to ${d.beneficiaryId}`).join('\n') :
+            '        No distributions';
+
+        const output = `
+================================================================================
+TRUST DETAILS: ${trust.trustId}
+================================================================================
+
+<a href="#" onclick="CryoAssetSimulator.showSection('trusts')">[Back to Trusts]</a>
+
+--------------------------------------------------------------------------------
+BASIC INFORMATION
+--------------------------------------------------------------------------------
+
+    Trust ID:     ${trust.trustId}
+    Name:         ${trust.trustName}
+    Type:         ${trust.trustType}
+    Status:       ${trust.status}
+    Registry:     ${registry ? registry.subjectName : trust.registryId}
+    Reserve:      ${formatCurrency(trust.preservationReserve)}
+    Created:      ${formatDate(trust.createdAt)}
+
+--------------------------------------------------------------------------------
+TRUSTEES
+--------------------------------------------------------------------------------
+
+${trusteesDisplay}
+
+--------------------------------------------------------------------------------
+BENEFICIARIES
+--------------------------------------------------------------------------------
+
+${beneficiariesDisplay}
+
+--------------------------------------------------------------------------------
+DISTRIBUTIONS
+--------------------------------------------------------------------------------
+
+${distributionsDisplay}
+
+--------------------------------------------------------------------------------
+ACTIONS
+--------------------------------------------------------------------------------
+
+    <a href="#" onclick="CryoAssetSimulator.manageTrust('${trustId}')">[Manage Trust]</a>
+    <a href="#" onclick="CryoAssetSimulator.showSection('trusts')">[Back]</a>
+
+================================================================================
+`;
+        render(output);
+    }
+
+    function manageTrust(trustId) {
+        const trust = state.trusts.find(t => t.trustId === trustId);
+        if (!trust) return;
+
+        const action = prompt('Select action:\n1. Add Trustee\n2. Add Beneficiary\n3. Fund Reserve\n4. Make Distribution\n5. Cancel', '1');
+
+        switch(action) {
+            case '1':
+                const trusteeName = prompt('Trustee name:', 'John Trustee');
+                const trusteeRole = prompt('Role (PRIMARY/SUCCESSOR):', 'PRIMARY');
+                if (trusteeName) {
+                    trust.addTrustee(trusteeName, trusteeRole, 'INDIVIDUAL');
+                    alert('Trustee added');
+                }
+                break;
+            case '2':
+                const benName = prompt('Beneficiary name:', 'Jane Beneficiary');
+                const benRelation = prompt('Relationship:', 'Spouse');
+                const benShare = parseFloat(prompt('Share (0-1):', '0.5'));
+                if (benName && !isNaN(benShare)) {
+                    try {
+                        trust.addBeneficiary(benName, benRelation, benShare, 'BOTH');
+                        alert('Beneficiary added');
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                }
+                break;
+            case '3':
+                const amount = parseFloat(prompt('Amount to add to reserve:', '10000'));
+                if (!isNaN(amount)) {
+                    trust.fundPreservationReserve(amount);
+                    alert('Reserve funded');
+                }
+                break;
+            case '4':
+                if (trust.beneficiaries.length === 0) {
+                    alert('No beneficiaries to distribute to');
+                    break;
+                }
+                const distAmount = parseFloat(prompt('Distribution amount:', '1000'));
+                if (!isNaN(distAmount)) {
+                    trust.distribute(trust.beneficiaries[0].beneficiaryId, distAmount, 'INCOME', 'Periodic distribution');
+                    alert('Distribution recorded');
+                }
+                break;
+        }
+        viewTrust(trustId);
+    }
+
+    function requestValuation() {
+        const assetId = document.getElementById('valuationAssetId').value;
+        const method = document.getElementById('valuationMethod').value;
+
+        if (!assetId) {
+            alert('Please select an asset');
+            return;
+        }
+
+        const asset = state.assets.find(a => a.assetId === assetId);
+        if (!asset) return;
+
+        // Simulate valuation with some variance
+        const variance = (Math.random() - 0.5) * 0.2;
+        const newValue = asset.value.amount * (1 + variance);
+        const confidence = 0.7 + Math.random() * 0.25;
+
+        const valuation = {
+            valuationId: generateId('VAL'),
+            assetId: assetId,
+            method: method,
+            value: newValue,
+            confidence: confidence,
+            date: new Date()
+        };
+
+        state.valuations.push(valuation);
+        asset.updateValue(newValue);
+
+        alert(`Valuation complete: ${formatCurrency(newValue)} (${(confidence * 100).toFixed(0)}% confidence)`);
+        renderValuationsSection();
+    }
+
+    function initiateRestoration() {
+        const registryId = document.getElementById('restoreRegistryId').value;
+        const legalOrderId = document.getElementById('legalOrderId').value;
+
+        if (!registryId) {
+            alert('Please select a registry');
+            return;
+        }
+
+        const registry = state.registries.find(r => r.registryId === registryId);
+        if (!registry) return;
+
+        if (registry.status === RegistryStatus.TRUST_MANAGED) {
+            registry.transition(RegistryStatus.RESTORATION_PENDING, 'SYSTEM', `Legal order: ${legalOrderId}`);
+        }
+
+        if (registry.status === RegistryStatus.RESTORATION_PENDING) {
+            registry.transition(RegistryStatus.RESTORED, 'SYSTEM', 'Restoration completed');
+            alert('Assets restored to individual');
+        }
+
+        renderRestorationSection();
+    }
+
+    function initiateDistribution() {
+        const registryId = document.getElementById('distributeRegistryId').value;
+        const deathRecordId = document.getElementById('deathRecordId').value;
+
+        if (!registryId) {
+            alert('Please select a registry');
+            return;
+        }
+
+        const registry = state.registries.find(r => r.registryId === registryId);
+        if (!registry) return;
+
+        try {
+            registry.transition(RegistryStatus.ESTATE_DISTRIBUTED, 'SYSTEM', `Death record: ${deathRecordId}`);
+            alert('Estate distribution initiated');
+        } catch (e) {
+            alert(e.message);
+        }
+
+        renderDistributionSection();
+    }
+
+    function calculateSustainability() {
+        const portfolioValue = parseFloat(document.getElementById('portfolioValue').value);
+        const annualCosts = parseFloat(document.getElementById('annualCosts').value);
+        const expectedReturn = parseFloat(document.getElementById('expectedReturn').value) / 100;
+
+        if (isNaN(portfolioValue) || isNaN(annualCosts) || isNaN(expectedReturn)) {
+            alert('Please enter valid numbers');
+            return;
+        }
+
+        // Calculate years until exhaustion
+        let years = 0;
+        let balance = portfolioValue;
+        while (balance > 0 && years < 500) {
+            balance = balance * (1 + expectedReturn) - annualCosts;
+            years++;
+        }
+
+        const sustainableWithdrawal = portfolioValue * 0.03;
+        const isSustainable = sustainableWithdrawal >= annualCosts;
+
+        document.getElementById('sustainabilityResult').innerHTML = `
+    ---------------------------------------------------------------
+    SUSTAINABILITY ANALYSIS
+    ---------------------------------------------------------------
+
+    Portfolio Value:      ${formatCurrency(portfolioValue)}
+    Annual Costs:         ${formatCurrency(annualCosts)}
+    Expected Return:      ${(expectedReturn * 100).toFixed(1)}%
+
+    Years Until Exhaustion: ${years >= 500 ? 'Indefinite' : years + ' years'}
+    Sustainable Withdrawal: ${formatCurrency(sustainableWithdrawal)}/year
+
+    Status: ${isSustainable ? '[OK] SUSTAINABLE' : '[!] AT RISK - Costs exceed sustainable rate'}
+`;
+    }
+
+    function showSection(section) {
+        state.currentSection = section;
+        switch(section) {
+            case 'main': renderMainMenu(); break;
+            case 'registries': renderRegistriesSection(); break;
+            case 'assets': renderAssetsSection(); break;
+            case 'trusts': renderTrustsSection(); break;
+            case 'valuations': renderValuationsSection(); break;
+            case 'restoration': renderRestorationSection(); break;
+            case 'distribution': renderDistributionSection(); break;
+            case 'dashboard': renderDashboard(); break;
+            case 'investment': renderInvestmentSection(); break;
+            default: renderMainMenu();
+        }
+    }
+
+    // Initialize
+    function init() {
+        renderMainMenu();
+    }
+
+    // Public API
+    return {
+        init: init,
+        showSection: showSection,
+        createRegistry: createRegistry,
+        viewRegistry: viewRegistry,
+        showTransitionForm: showTransitionForm,
+        executeTransition: executeTransition,
+        createAsset: createAsset,
+        viewAsset: viewAsset,
+        updateAssetValue: updateAssetValue,
+        createTrust: createTrust,
+        viewTrust: viewTrust,
+        manageTrust: manageTrust,
+        requestValuation: requestValuation,
+        initiateRestoration: initiateRestoration,
+        initiateDistribution: initiateDistribution,
+        calculateSustainability: calculateSustainability
+    };
+})();
+
+// Initialize on load
+window.onload = CryoAssetSimulator.init;
+</script>
+</body>
+</html>

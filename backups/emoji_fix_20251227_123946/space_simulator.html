@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Space - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #0EA5E9;
+            --primary-dark: #0284C7;
+            --secondary: #F59E0B;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #38BDF8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .mission-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin: 20px 0; }
+        .mission-card { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .mission-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .mission-card.selected { border-color: var(--primary); background: rgba(14, 165, 233, 0.1); }
+        .mission-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .mission-name { font-weight: 600; margin-bottom: 5px; }
+        .mission-dist { font-size: 0.8rem; color: var(--text-muted); }
+
+        .space-viz { background: linear-gradient(135deg, #0c0f1a, #1a1f3a); border-radius: 12px; padding: 40px; margin: 20px 0; text-align: center; position: relative; overflow: hidden; }
+        .star { position: absolute; width: 2px; height: 2px; background: white; border-radius: 50%; animation: twinkle 2s infinite; }
+        @keyframes twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .planet { width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 20px; position: relative; z-index: 1; }
+        .planet.earth { background: linear-gradient(135deg, #3B82F6, #10B981); }
+        .planet.mars { background: linear-gradient(135deg, #EF4444, #F59E0B); }
+        .planet.dyson { background: radial-gradient(circle, #FCD34D 30%, #F59E0B 50%, transparent 60%); box-shadow: 0 0 50px #F59E0B; }
+
+        .settings-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+        .settings-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .settings-card h5 { color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+
+        .slider-row { padding: 15px 0; border-bottom: 1px solid var(--border); }
+        .slider-row:last-child { border-bottom: none; }
+        .slider-label { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .slider-value { color: var(--primary); font-weight: 600; }
+        input[type="range"] { width: 100%; height: 8px; border-radius: 4px; background: var(--border); appearance: none; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--primary); cursor: pointer; }
+
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .toggle-row:last-child { border-bottom: none; }
+        .toggle-switch { position: relative; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 26px; transition: 0.3s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(24px); }
+
+        .progress-bar { width: 100%; height: 20px; background: var(--border); border-radius: 10px; overflow: hidden; margin: 15px 0; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #38BDF8); transition: width 0.5s; }
+        .progress-label { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted); }
+
+        .resource-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .resource-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .resource-icon { font-size: 1.5rem; margin-bottom: 5px; }
+        .resource-name { font-size: 0.8rem; color: var(--text-muted); }
+        .resource-value { font-weight: 600; color: var(--primary); }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .settings-grid { grid-template-columns: 1fr; }
+            .resource-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Space</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🚀 WIA Space</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Space Technology Standard" data-ko="우주 기술 표준">Space Technology Standard</h1>
+            <p data-en="Interstellar travel, megastructures, terraforming" data-ko="항성간 여행, 메가스트럭처, 테라포밍">Interstellar, megastructure</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🪐 Mission" data-ko="🪐 미션">🪐 Mission</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🛸 Warp" data-ko="🛸 워프">🛸 Warp</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🏗️ Mega" data-ko="🏗️ 메가">🏗️ Mega</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🌍 Terraform" data-ko="🌍 테라포밍">🌍 Terraform</div>
+            <div class="tab" onclick="showPanel(4)" data-en="⛏️ Mining" data-ko="⛏️ 채굴">⛏️ Mining</div>
+        </div>
+
+        <!-- Panel 0: Mission -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🪐 Interstellar Mission Planner" data-ko="🪐 항성간 미션 플래너">🪐 Mission Planner</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Plan missions to nearby star systems" data-ko="인근 항성계 미션 계획">Plan interstellar missions</p>
+
+            <div class="mission-grid">
+                <div class="mission-card selected" onclick="selectMission('proxima')">
+                    <div class="mission-icon">⭐</div>
+                    <div class="mission-name">Proxima Centauri</div>
+                    <div class="mission-dist">4.24 ly</div>
+                </div>
+                <div class="mission-card" onclick="selectMission('alpha')">
+                    <div class="mission-icon">✨</div>
+                    <div class="mission-name">Alpha Centauri</div>
+                    <div class="mission-dist">4.37 ly</div>
+                </div>
+                <div class="mission-card" onclick="selectMission('barnard')">
+                    <div class="mission-icon">🌟</div>
+                    <div class="mission-name">Barnard's Star</div>
+                    <div class="mission-dist">5.96 ly</div>
+                </div>
+                <div class="mission-card" onclick="selectMission('sirius')">
+                    <div class="mission-icon">💫</div>
+                    <div class="mission-name">Sirius</div>
+                    <div class="mission-dist">8.6 ly</div>
+                </div>
+            </div>
+
+            <div class="settings-card" style="margin: 20px 0;">
+                <h5>⚡ <span data-en="Propulsion System" data-ko="추진 시스템">Propulsion</span></h5>
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span data-en="Cruise Velocity" data-ko="순항 속도">Velocity</span>
+                        <span class="slider-value" id="velocityValue">10% c</span>
+                    </div>
+                    <input type="range" min="1" max="50" value="10" oninput="updateVelocity(this.value)">
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="calculateMission()" data-en="🚀 Calculate Mission" data-ko="🚀 미션 계산">🚀 Calculate</button>
+            </div>
+            <div class="output" id="missionOutput"></div>
+        </div>
+
+        <!-- Panel 1: Warp -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🛸 Warp Drive Simulator" data-ko="🛸 워프 드라이브 시뮬레이터">🛸 Warp Drive</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Alcubierre metric warp bubble simulation" data-ko="알쿠비에레 메트릭 워프 버블 시뮬레이션">Alcubierre metric simulation</p>
+
+            <div class="space-viz" id="warpViz">
+                <div class="star" style="top: 10%; left: 20%;"></div>
+                <div class="star" style="top: 30%; left: 80%; animation-delay: 0.5s;"></div>
+                <div class="star" style="top: 70%; left: 15%; animation-delay: 1s;"></div>
+                <div class="star" style="top: 50%; left: 60%; animation-delay: 0.3s;"></div>
+                <div class="star" style="top: 85%; left: 45%; animation-delay: 0.7s;"></div>
+                <div style="font-size: 4rem; position: relative; z-index: 1;">🛸</div>
+                <p style="margin-top: 15px; color: var(--primary);" id="warpStatus" data-en="Warp Bubble: Standby" data-ko="워프 버블: 대기">Warp Bubble: Standby</p>
+            </div>
+
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <h5>⚡ <span data-en="Warp Factor" data-ko="워프 팩터">Warp Factor</span></h5>
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span>Warp</span>
+                            <span class="slider-value" id="warpFactor">1.0</span>
+                        </div>
+                        <input type="range" min="1" max="10" step="0.1" value="1" oninput="updateWarp(this.value)">
+                    </div>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 10px;" id="warpSpeed">= 1c (speed of light)</p>
+                </div>
+                <div class="settings-card">
+                    <h5>🔋 <span data-en="Energy Requirements" data-ko="에너지 요구량">Energy</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="Exotic Matter" data-ko="이종 물질">Exotic Matter</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Negative Energy" data-ko="음의 에너지">Negative Energy</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="engageWarp()" data-en="🛸 Engage Warp" data-ko="🛸 워프 실행">🛸 Engage</button>
+            </div>
+            <div class="output" id="warpOutput"></div>
+        </div>
+
+        <!-- Panel 2: Megastructure -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🏗️ Megastructure Designer" data-ko="🏗️ 메가스트럭처 설계">🏗️ Megastructure</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Dyson Sphere and Space Elevator" data-ko="다이슨 스피어 및 우주 엘리베이터">Dyson Sphere & Elevator</p>
+
+            <div class="mission-grid">
+                <div class="mission-card selected" onclick="selectMega('dyson')">
+                    <div class="mission-icon">☀️</div>
+                    <div class="mission-name">Dyson Sphere</div>
+                    <div class="mission-dist" data-en="Energy Capture" data-ko="에너지 수집">Energy</div>
+                </div>
+                <div class="mission-card" onclick="selectMega('swarm')">
+                    <div class="mission-icon">🔆</div>
+                    <div class="mission-name">Dyson Swarm</div>
+                    <div class="mission-dist" data-en="Modular Design" data-ko="모듈식 설계">Modular</div>
+                </div>
+                <div class="mission-card" onclick="selectMega('elevator')">
+                    <div class="mission-icon">🏗️</div>
+                    <div class="mission-name">Space Elevator</div>
+                    <div class="mission-dist" data-en="36,000 km" data-ko="36,000 km">36,000 km</div>
+                </div>
+                <div class="mission-card" onclick="selectMega('ring')">
+                    <div class="mission-icon">💍</div>
+                    <div class="mission-name">Orbital Ring</div>
+                    <div class="mission-dist" data-en="Low Orbit" data-ko="저궤도">Low Orbit</div>
+                </div>
+            </div>
+
+            <div class="space-viz">
+                <div class="planet dyson" id="megaViz"></div>
+                <p style="color: var(--primary);" id="megaLabel" data-en="Dyson Sphere: Type II Civilization" data-ko="다이슨 스피어: 유형 II 문명">Dyson Sphere</p>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="designMega()" data-en="🏗️ Calculate Requirements" data-ko="🏗️ 요구사항 계산">🏗️ Calculate</button>
+            </div>
+            <div class="output" id="megaOutput"></div>
+        </div>
+
+        <!-- Panel 3: Terraform -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🌍 Terraforming Simulator" data-ko="🌍 테라포밍 시뮬레이터">🌍 Terraforming</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Transform Mars into a habitable world" data-ko="화성을 거주 가능한 행성으로 변환">Transform Mars</p>
+
+            <div class="space-viz">
+                <div class="planet mars" id="terraViz"></div>
+                <p style="color: var(--secondary);" data-en="Mars: Current State" data-ko="화성: 현재 상태">Mars: Current State</p>
+            </div>
+
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <h5>🌡️ <span data-en="Atmosphere" data-ko="대기">Atmosphere</span></h5>
+                    <div class="progress-bar"><div class="progress-fill" id="atmoProgress" style="width: 1%;"></div></div>
+                    <div class="progress-label"><span>CO₂</span><span id="atmoValue">1%</span></div>
+                </div>
+                <div class="settings-card">
+                    <h5>💧 <span data-en="Water" data-ko="물">Water</span></h5>
+                    <div class="progress-bar"><div class="progress-fill" id="waterProgress" style="width: 0%;"></div></div>
+                    <div class="progress-label"><span data-en="Surface Water" data-ko="지표수">Surface</span><span id="waterValue">0%</span></div>
+                </div>
+                <div class="settings-card">
+                    <h5>🌱 <span data-en="Biosphere" data-ko="생물권">Biosphere</span></h5>
+                    <div class="progress-bar"><div class="progress-fill" id="bioProgress" style="width: 0%;"></div></div>
+                    <div class="progress-label"><span data-en="Oxygen" data-ko="산소">O₂</span><span id="bioValue">0%</span></div>
+                </div>
+                <div class="settings-card">
+                    <h5>⏱️ <span data-en="Timeline" data-ko="타임라인">Timeline</span></h5>
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span data-en="Years" data-ko="년">Years</span>
+                            <span class="slider-value" id="terraYears">100</span>
+                        </div>
+                        <input type="range" min="100" max="1000" step="50" value="100" oninput="updateTerra(this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulateTerra()" data-en="🌍 Start Terraforming" data-ko="🌍 테라포밍 시작">🌍 Terraform</button>
+            </div>
+            <div class="output" id="terraOutput"></div>
+        </div>
+
+        <!-- Panel 4: Mining -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="⛏️ Asteroid Mining" data-ko="⛏️ 소행성 채굴">⛏️ Asteroid Mining</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Extract resources from near-Earth asteroids" data-ko="지구 근접 소행성에서 자원 추출">Extract resources from NEAs</p>
+
+            <div class="mission-grid">
+                <div class="mission-card selected" onclick="selectAsteroid('ryugu')">
+                    <div class="mission-icon">🪨</div>
+                    <div class="mission-name">162173 Ryugu</div>
+                    <div class="mission-dist">C-type (Carbon)</div>
+                </div>
+                <div class="mission-card" onclick="selectAsteroid('bennu')">
+                    <div class="mission-icon">☄️</div>
+                    <div class="mission-name">101955 Bennu</div>
+                    <div class="mission-dist">B-type (Carbon)</div>
+                </div>
+                <div class="mission-card" onclick="selectAsteroid('psyche')">
+                    <div class="mission-icon">⚙️</div>
+                    <div class="mission-name">16 Psyche</div>
+                    <div class="mission-dist">M-type (Metal)</div>
+                </div>
+                <div class="mission-card" onclick="selectAsteroid('eros')">
+                    <div class="mission-icon">💎</div>
+                    <div class="mission-name">433 Eros</div>
+                    <div class="mission-dist">S-type (Silicate)</div>
+                </div>
+            </div>
+
+            <div class="resource-grid">
+                <div class="resource-item">
+                    <div class="resource-icon">🪙</div>
+                    <div class="resource-name" data-en="Platinum" data-ko="백금">Platinum</div>
+                    <div class="resource-value" id="platinumValue">0 kg</div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-icon">🥇</div>
+                    <div class="resource-name" data-en="Gold" data-ko="금">Gold</div>
+                    <div class="resource-value" id="goldValue">0 kg</div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-icon">💧</div>
+                    <div class="resource-name" data-en="Water" data-ko="물">Water</div>
+                    <div class="resource-value" id="waterMiningValue">0 L</div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-icon">⚫</div>
+                    <div class="resource-name" data-en="Iron" data-ko="철">Iron</div>
+                    <div class="resource-value" id="ironValue">0 t</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="mineAsteroid()" data-en="⛏️ Start Mining" data-ko="⛏️ 채굴 시작">⛏️ Mine</button>
+            </div>
+            <div class="output" id="miningOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Space: Reaching for the stars" data-ko="WIA Space: 별을 향하여">WIA Space: Reach for stars</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let selectedTarget = 'proxima';
+        let velocity = 10;
+        let selectedMega = 'dyson';
+        let selectedAst = 'ryugu';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.toLowerCase() === lang));
+            document.querySelectorAll('[data-en]').forEach(el => el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en'));
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function selectMission(target) {
+            selectedTarget = target;
+            document.querySelectorAll('#panel-0 .mission-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.mission-card').classList.add('selected');
+        }
+
+        function updateVelocity(val) {
+            velocity = val;
+            document.getElementById('velocityValue').textContent = val + '% c';
+        }
+
+        function calculateMission() {
+            const distances = { proxima: 4.24, alpha: 4.37, barnard: 5.96, sirius: 8.6 };
+            const dist = distances[selectedTarget];
+            const travelTime = (dist / (velocity / 100)).toFixed(1);
+            document.getElementById('missionOutput').textContent = JSON.stringify({
+                target: selectedTarget, distance: dist + ' light-years',
+                velocity: velocity + '% c', travelTime: travelTime + ' years',
+                deltaV: (velocity * 3000).toFixed(0) + ' km/s',
+                fuelMass: (Math.pow(2.7, velocity / 10) * 1000).toFixed(0) + ' tonnes',
+                message: currentLang === 'ko' ? '미션 계산 완료' : 'Mission calculated'
+            }, null, 2);
+        }
+
+        function updateWarp(val) {
+            document.getElementById('warpFactor').textContent = val;
+            const speed = Math.pow(val, 3.33).toFixed(1);
+            document.getElementById('warpSpeed').textContent = `= ${speed}c (${speed}x speed of light)`;
+        }
+
+        function engageWarp() {
+            const warp = document.getElementById('warpFactor').textContent;
+            document.getElementById('warpStatus').textContent = currentLang === 'ko' ? '워프 버블: 활성화' : 'Warp Bubble: ENGAGED';
+            document.getElementById('warpOutput').textContent = JSON.stringify({
+                warpFactor: warp, effectiveSpeed: Math.pow(warp, 3.33).toFixed(1) + 'c',
+                energyRequired: (Math.pow(10, 45) * warp).toExponential(2) + ' Joules',
+                exoticMatter: (Math.pow(10, 30) * warp).toExponential(2) + ' kg (negative mass)',
+                bubbleRadius: '100 meters', spacetimeDistortion: 'Active',
+                message: currentLang === 'ko' ? '워프 드라이브 실행!' : 'Warp drive engaged!'
+            }, null, 2);
+        }
+
+        function selectMega(type) {
+            selectedMega = type;
+            document.querySelectorAll('#panel-2 .mission-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.mission-card').classList.add('selected');
+        }
+
+        function designMega() {
+            const specs = {
+                dyson: { name: 'Dyson Sphere', radius: '1 AU', material: '2×10²⁶ kg', energy: '3.8×10²⁶ W', time: '100,000+ years' },
+                swarm: { name: 'Dyson Swarm', radius: '1 AU', material: '10²⁴ kg', energy: '10²⁵ W', time: '1,000 years' },
+                elevator: { name: 'Space Elevator', height: '35,786 km', material: 'Carbon Nanotubes', capacity: '100 t/day', time: '50 years' },
+                ring: { name: 'Orbital Ring', altitude: '300 km', circumference: '40,000 km', capacity: '10,000 t/day', time: '100 years' }
+            };
+            document.getElementById('megaOutput').textContent = JSON.stringify(specs[selectedMega], null, 2);
+        }
+
+        function updateTerra(val) {
+            document.getElementById('terraYears').textContent = val;
+            const atmo = Math.min(val / 10, 100);
+            const water = Math.min((val - 100) / 5, 100);
+            const bio = Math.min((val - 300) / 7, 100);
+            document.getElementById('atmoProgress').style.width = Math.max(1, atmo) + '%';
+            document.getElementById('atmoValue').textContent = Math.max(1, atmo).toFixed(0) + '%';
+            document.getElementById('waterProgress').style.width = Math.max(0, water) + '%';
+            document.getElementById('waterValue').textContent = Math.max(0, water).toFixed(0) + '%';
+            document.getElementById('bioProgress').style.width = Math.max(0, bio) + '%';
+            document.getElementById('bioValue').textContent = Math.max(0, bio).toFixed(0) + '%';
+        }
+
+        function simulateTerra() {
+            const years = document.getElementById('terraYears').textContent;
+            document.getElementById('terraOutput').textContent = JSON.stringify({
+                planet: 'Mars', duration: years + ' years',
+                phases: ['Magnetic Shield', 'Atmosphere Thickening', 'Ice Melting', 'Ocean Formation', 'Biosphere Introduction'],
+                temperature: '+60°C from current', pressure: '0.5 atm (breathable with mask)',
+                cost: '$' + (years * 100).toLocaleString() + ' trillion',
+                message: currentLang === 'ko' ? '테라포밍 시뮬레이션 완료' : 'Terraforming simulation complete'
+            }, null, 2);
+        }
+
+        function selectAsteroid(ast) {
+            selectedAst = ast;
+            document.querySelectorAll('#panel-4 .mission-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.mission-card').classList.add('selected');
+        }
+
+        function mineAsteroid() {
+            const resources = {
+                ryugu: { platinum: 30, gold: 15, water: 50000, iron: 500 },
+                bennu: { platinum: 25, gold: 10, water: 80000, iron: 300 },
+                psyche: { platinum: 500, gold: 200, water: 0, iron: 50000 },
+                eros: { platinum: 100, gold: 50, water: 10000, iron: 10000 }
+            };
+            const r = resources[selectedAst];
+            document.getElementById('platinumValue').textContent = r.platinum.toLocaleString() + ' kg';
+            document.getElementById('goldValue').textContent = r.gold.toLocaleString() + ' kg';
+            document.getElementById('waterMiningValue').textContent = r.water.toLocaleString() + ' L';
+            document.getElementById('ironValue').textContent = r.iron.toLocaleString() + ' t';
+            document.getElementById('miningOutput').textContent = JSON.stringify({
+                asteroid: selectedAst, type: selectedAst === 'psyche' ? 'M-type (Metallic)' : 'C/S-type',
+                totalValue: '$' + (r.platinum * 30000 + r.gold * 60000 + r.iron * 100).toLocaleString() + ' million',
+                miningDuration: '5 years', returnPayload: '10,000 kg',
+                message: currentLang === 'ko' ? '채굴 분석 완료' : 'Mining analysis complete'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang('en'));
+    </script>
+</body>
+</html>

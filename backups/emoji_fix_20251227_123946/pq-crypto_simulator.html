@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA PQ-Crypto - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #6366F1;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); color: #000; }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); color: #000; }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: #000; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .algo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0; }
+        .algo-card { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 25px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .algo-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .algo-card.selected { border-color: var(--primary); background: rgba(16, 185, 129, 0.1); }
+        .algo-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .algo-name { font-weight: 600; margin-bottom: 5px; }
+        .algo-type { font-size: 0.8rem; color: var(--text-muted); }
+        .algo-safe { color: var(--primary); font-size: 0.75rem; margin-top: 8px; }
+
+        .key-display { background: linear-gradient(135deg, #064e3b, #065f46); border-radius: 12px; padding: 25px; margin: 20px 0; text-align: center; }
+        .key-label { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px; }
+        .key-value { font-family: monospace; font-size: 0.8rem; word-break: break-all; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; color: var(--primary); }
+        .key-size { margin-top: 10px; color: var(--text-muted); font-size: 0.85rem; }
+
+        .settings-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+        .settings-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .settings-card h5 { color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .toggle-row:last-child { border-bottom: none; }
+        .toggle-switch { position: relative; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 26px; transition: 0.3s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(24px); }
+
+        .compare-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .compare-table th, .compare-table td { padding: 15px; text-align: left; border-bottom: 1px solid var(--border); }
+        .compare-table th { color: var(--primary); background: var(--bg); }
+        .compare-table tr:hover { background: rgba(16, 185, 129, 0.05); }
+        .status-safe { color: var(--primary); }
+        .status-broken { color: var(--danger); }
+
+        .migrate-step { display: flex; align-items: center; gap: 20px; padding: 20px; background: var(--bg); border-radius: 10px; margin: 15px 0; }
+        .step-num { width: 50px; height: 50px; border-radius: 50%; background: var(--primary); color: #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; flex-shrink: 0; }
+        .step-content { flex: 1; }
+        .step-title { font-weight: 600; margin-bottom: 5px; }
+        .step-desc { font-size: 0.9rem; color: var(--text-muted); }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .settings-grid { grid-template-columns: 1fr; }
+            .compare-table { font-size: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">PQ-Crypto</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🔐 WIA PQ-Crypto</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Post-Quantum Cryptography" data-ko="포스트양자 암호화">Post-Quantum Cryptography</h1>
+            <p data-en="Quantum-safe encryption for the real world" data-ko="현실 세계를 위한 양자 안전 암호화">Quantum-safe encryption</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🔑 KEM" data-ko="🔑 KEM">🔑 KEM</div>
+            <div class="tab" onclick="showPanel(1)" data-en="✍️ Sign" data-ko="✍️ 서명">✍️ Sign</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🔀 Hybrid" data-ko="🔀 하이브리드">🔀 Hybrid</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🛡️ Migrate" data-ko="🛡️ 마이그레이션">🛡️ Migrate</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📊 Compare" data-ko="📊 비교">📊 Compare</div>
+        </div>
+
+        <!-- Panel 0: KEM -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🔑 Key Encapsulation (KEM)" data-ko="🔑 키 캡슐화 (KEM)">🔑 Key Encapsulation</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="ML-KEM (Kyber) for quantum-safe key exchange" data-ko="양자 안전 키 교환을 위한 ML-KEM (Kyber)">ML-KEM (Kyber)</p>
+
+            <div class="algo-grid">
+                <div class="algo-card selected" onclick="selectKEM('kyber512')">
+                    <div class="algo-icon">🔑</div>
+                    <div class="algo-name">ML-KEM-512</div>
+                    <div class="algo-type">NIST Level 1</div>
+                    <div class="algo-safe">✅ Quantum Safe</div>
+                </div>
+                <div class="algo-card" onclick="selectKEM('kyber768')">
+                    <div class="algo-icon">🔐</div>
+                    <div class="algo-name">ML-KEM-768</div>
+                    <div class="algo-type">NIST Level 3 (Recommended)</div>
+                    <div class="algo-safe">✅ Quantum Safe</div>
+                </div>
+                <div class="algo-card" onclick="selectKEM('kyber1024')">
+                    <div class="algo-icon">🛡️</div>
+                    <div class="algo-name">ML-KEM-1024</div>
+                    <div class="algo-type">NIST Level 5</div>
+                    <div class="algo-safe">✅ Quantum Safe</div>
+                </div>
+            </div>
+
+            <div class="key-display">
+                <div class="key-label" data-en="Generated Public Key" data-ko="생성된 공개 키">Public Key</div>
+                <div class="key-value" id="kemPublicKey">Click "Generate" to create a key pair...</div>
+                <div class="key-size" id="kemKeySize" data-en="Key Size: --" data-ko="키 크기: --">Key Size: --</div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="generateKEM()" data-en="🔑 Generate Key Pair" data-ko="🔑 키 쌍 생성">🔑 Generate</button>
+                <button class="btn btn-secondary" onclick="encapsulateKEM()" data-en="📦 Encapsulate" data-ko="📦 캡슐화">📦 Encapsulate</button>
+            </div>
+            <div class="output" id="kemOutput"></div>
+        </div>
+
+        <!-- Panel 1: Sign -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="✍️ Digital Signatures" data-ko="✍️ 디지털 서명">✍️ Digital Signatures</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="ML-DSA (Dilithium) for quantum-safe signatures" data-ko="양자 안전 서명을 위한 ML-DSA (Dilithium)">ML-DSA (Dilithium)</p>
+
+            <div class="algo-grid">
+                <div class="algo-card selected" onclick="selectSign('dilithium2')">
+                    <div class="algo-icon">✍️</div>
+                    <div class="algo-name">ML-DSA-44</div>
+                    <div class="algo-type">NIST Level 2</div>
+                    <div class="algo-safe">✅ Quantum Safe</div>
+                </div>
+                <div class="algo-card" onclick="selectSign('dilithium3')">
+                    <div class="algo-icon">📝</div>
+                    <div class="algo-name">ML-DSA-65</div>
+                    <div class="algo-type">NIST Level 3 (Recommended)</div>
+                    <div class="algo-safe">✅ Quantum Safe</div>
+                </div>
+                <div class="algo-card" onclick="selectSign('sphincs')">
+                    <div class="algo-icon">🌲</div>
+                    <div class="algo-name">SLH-DSA</div>
+                    <div class="algo-type">SPHINCS+ (Stateless)</div>
+                    <div class="algo-safe">✅ Quantum Safe</div>
+                </div>
+                <div class="algo-card" onclick="selectSign('falcon')">
+                    <div class="algo-icon">🦅</div>
+                    <div class="algo-name">FN-DSA</div>
+                    <div class="algo-type">FALCON (Compact)</div>
+                    <div class="algo-safe">✅ Quantum Safe</div>
+                </div>
+            </div>
+
+            <div class="settings-card" style="margin: 20px 0;">
+                <h5>📝 <span data-en="Message to Sign" data-ko="서명할 메시지">Message</span></h5>
+                <textarea id="signMessage" style="width: 100%; height: 80px; padding: 12px; border-radius: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--border); resize: none;" placeholder="Enter message to sign...">Hello, Quantum World!</textarea>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="signMessage()" data-en="✍️ Sign Message" data-ko="✍️ 메시지 서명">✍️ Sign</button>
+                <button class="btn btn-secondary" onclick="verifySignature()" data-en="✅ Verify" data-ko="✅ 검증">✅ Verify</button>
+            </div>
+            <div class="output" id="signOutput"></div>
+        </div>
+
+        <!-- Panel 2: Hybrid -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🔀 Hybrid Mode" data-ko="🔀 하이브리드 모드">🔀 Hybrid Mode</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Classical + Post-Quantum for transition period" data-ko="전환 기간을 위한 클래식 + 포스트양자">Classical + PQ</p>
+
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <h5>🔑 <span data-en="Hybrid KEM" data-ko="하이브리드 KEM">Hybrid KEM</span></h5>
+                    <div class="toggle-row">
+                        <span>X25519 + ML-KEM-768</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span>P-384 + ML-KEM-1024</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="settings-card">
+                    <h5>✍️ <span data-en="Hybrid Signatures" data-ko="하이브리드 서명">Hybrid Sign</span></h5>
+                    <div class="toggle-row">
+                        <span>Ed25519 + ML-DSA-65</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span>ECDSA + SLH-DSA</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="key-display">
+                <div class="key-label" data-en="Hybrid Security" data-ko="하이브리드 보안">🛡️ Defense in Depth</div>
+                <div style="color: var(--text); padding: 10px;">
+                    <p data-en="✅ If PQ has weakness → Classical protects" data-ko="✅ PQ에 약점이 있으면 → 클래식이 보호">✅ PQ weakness → Classical protects</p>
+                    <p data-en="✅ If quantum arrives → PQ protects" data-ko="✅ 양자가 오면 → PQ가 보호">✅ Quantum arrives → PQ protects</p>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="generateHybrid()" data-en="🔀 Generate Hybrid" data-ko="🔀 하이브리드 생성">🔀 Generate</button>
+            </div>
+            <div class="output" id="hybridOutput"></div>
+        </div>
+
+        <!-- Panel 3: Migrate -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🛡️ Migration Guide" data-ko="🛡️ 마이그레이션 가이드">🛡️ Migration</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Steps to migrate to post-quantum cryptography" data-ko="포스트양자 암호화로 마이그레이션하는 단계">Migrate to PQC</p>
+
+            <div class="migrate-step">
+                <div class="step-num">1</div>
+                <div class="step-content">
+                    <div class="step-title" data-en="Inventory" data-ko="인벤토리">Inventory</div>
+                    <div class="step-desc" data-en="List all cryptographic uses: TLS, code signing, data encryption" data-ko="모든 암호화 사용 목록: TLS, 코드 서명, 데이터 암호화">List all crypto uses</div>
+                </div>
+            </div>
+            <div class="migrate-step">
+                <div class="step-num">2</div>
+                <div class="step-content">
+                    <div class="step-title" data-en="Prioritize" data-ko="우선순위">Prioritize</div>
+                    <div class="step-desc" data-en="Long-lived secrets first (signing keys, encrypted archives)" data-ko="장기 비밀 먼저 (서명 키, 암호화된 아카이브)">Long-lived secrets first</div>
+                </div>
+            </div>
+            <div class="migrate-step">
+                <div class="step-num">3</div>
+                <div class="step-content">
+                    <div class="step-title" data-en="Test Hybrid" data-ko="하이브리드 테스트">Test Hybrid</div>
+                    <div class="step-desc" data-en="Deploy hybrid mode in non-production first" data-ko="비프로덕션에서 먼저 하이브리드 모드 배포">Deploy hybrid first</div>
+                </div>
+            </div>
+            <div class="migrate-step">
+                <div class="step-num">4</div>
+                <div class="step-content">
+                    <div class="step-title" data-en="Full PQC" data-ko="전체 PQC">Full PQC</div>
+                    <div class="step-desc" data-en="Transition to pure post-quantum when ecosystem ready" data-ko="에코시스템 준비되면 순수 포스트양자로 전환">Pure PQC when ready</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runAssessment()" data-en="🔍 Run Assessment" data-ko="🔍 평가 실행">🔍 Assess</button>
+            </div>
+            <div class="output" id="migrateOutput"></div>
+        </div>
+
+        <!-- Panel 4: Compare -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="📊 Algorithm Comparison" data-ko="📊 알고리즘 비교">📊 Compare</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Classical vs Post-Quantum cryptography" data-ko="클래식 vs 포스트양자 암호화">Classical vs PQC</p>
+
+            <table class="compare-table">
+                <thead>
+                    <tr>
+                        <th data-en="Algorithm" data-ko="알고리즘">Algorithm</th>
+                        <th data-en="Type" data-ko="유형">Type</th>
+                        <th data-en="Key Size" data-ko="키 크기">Key Size</th>
+                        <th data-en="Quantum" data-ko="양자">Quantum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>RSA-2048</td>
+                        <td data-en="Key Exchange" data-ko="키 교환">Key Exchange</td>
+                        <td>256 bytes</td>
+                        <td class="status-broken">❌ BROKEN</td>
+                    </tr>
+                    <tr>
+                        <td>ECDH (X25519)</td>
+                        <td data-en="Key Exchange" data-ko="키 교환">Key Exchange</td>
+                        <td>32 bytes</td>
+                        <td class="status-broken">❌ BROKEN</td>
+                    </tr>
+                    <tr>
+                        <td>ML-KEM-768</td>
+                        <td data-en="Key Encapsulation" data-ko="키 캡슐화">KEM</td>
+                        <td>2,400 bytes</td>
+                        <td class="status-safe">✅ SAFE</td>
+                    </tr>
+                    <tr>
+                        <td>ECDSA (P-256)</td>
+                        <td data-en="Signature" data-ko="서명">Signature</td>
+                        <td>64 bytes</td>
+                        <td class="status-broken">❌ BROKEN</td>
+                    </tr>
+                    <tr>
+                        <td>ML-DSA-65</td>
+                        <td data-en="Signature" data-ko="서명">Signature</td>
+                        <td>4,032 bytes</td>
+                        <td class="status-safe">✅ SAFE</td>
+                    </tr>
+                    <tr>
+                        <td>AES-256</td>
+                        <td data-en="Symmetric" data-ko="대칭">Symmetric</td>
+                        <td>32 bytes</td>
+                        <td class="status-safe">✅ SAFE</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="exportComparison()" data-en="📥 Export Report" data-ko="📥 리포트 내보내기">📥 Export</button>
+            </div>
+            <div class="output" id="compareOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA PQ-Crypto: Securing the post-quantum future" data-ko="WIA PQ-Crypto: 포스트양자 미래 보안">PQ-Crypto: Post-quantum future</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let selectedKEMAlgo = 'kyber512';
+        let selectedSignAlgo = 'dilithium2';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function selectKEM(algo) {
+            selectedKEMAlgo = algo;
+            document.querySelectorAll('#panel-0 .algo-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.algo-card').classList.add('selected');
+        }
+
+        function selectSign(algo) {
+            selectedSignAlgo = algo;
+            document.querySelectorAll('#panel-1 .algo-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.algo-card').classList.add('selected');
+        }
+
+        function generateKEM() {
+            const sizes = { kyber512: 800, kyber768: 1184, kyber1024: 1568 };
+            const randomKey = Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+            document.getElementById('kemPublicKey').textContent = randomKey + '...';
+            document.getElementById('kemKeySize').textContent = `Key Size: ${sizes[selectedKEMAlgo]} bytes`;
+            document.getElementById('kemOutput').textContent = JSON.stringify({
+                algorithm: selectedKEMAlgo.toUpperCase().replace('KYBER', 'ML-KEM-'),
+                publicKeySize: sizes[selectedKEMAlgo] + ' bytes',
+                privateKeySize: (sizes[selectedKEMAlgo] * 2) + ' bytes',
+                nistLevel: selectedKEMAlgo === 'kyber512' ? 1 : selectedKEMAlgo === 'kyber768' ? 3 : 5,
+                quantumSafe: true,
+                message: currentLang === 'ko' ? 'KEM 키 쌍 생성 완료' : 'KEM key pair generated'
+            }, null, 2);
+        }
+
+        function encapsulateKEM() {
+            document.getElementById('kemOutput').textContent = JSON.stringify({
+                operation: 'encapsulate',
+                ciphertextSize: '1088 bytes',
+                sharedSecretSize: '32 bytes',
+                message: currentLang === 'ko' ? '키 캡슐화 완료' : 'Key encapsulated successfully'
+            }, null, 2);
+        }
+
+        function signMessage() {
+            const msg = document.getElementById('signMessage').value;
+            const sigSizes = { dilithium2: 2420, dilithium3: 3293, sphincs: 7856, falcon: 690 };
+            document.getElementById('signOutput').textContent = JSON.stringify({
+                algorithm: selectedSignAlgo.toUpperCase(),
+                message: msg,
+                signatureSize: sigSizes[selectedSignAlgo] + ' bytes',
+                signature: Array.from({length: 32}, () => Math.floor(Math.random() * 16).toString(16)).join('') + '...',
+                quantumSafe: true,
+                result: currentLang === 'ko' ? '메시지 서명 완료' : 'Message signed successfully'
+            }, null, 2);
+        }
+
+        function verifySignature() {
+            document.getElementById('signOutput').textContent = JSON.stringify({
+                verification: 'SUCCESS',
+                algorithm: selectedSignAlgo.toUpperCase(),
+                valid: true,
+                message: currentLang === 'ko' ? '✅ 서명 검증 성공' : '✅ Signature verified successfully'
+            }, null, 2);
+        }
+
+        function generateHybrid() {
+            document.getElementById('hybridOutput').textContent = JSON.stringify({
+                kemHybrid: 'X25519 + ML-KEM-768',
+                signHybrid: 'Ed25519 + ML-DSA-65',
+                combinedKeyDerivation: 'HKDF-SHA256',
+                classicalProtection: true,
+                quantumProtection: true,
+                message: currentLang === 'ko' ? '하이브리드 키 생성 완료' : 'Hybrid keys generated'
+            }, null, 2);
+        }
+
+        function runAssessment() {
+            document.getElementById('migrateOutput').textContent = JSON.stringify({
+                assessment: 'complete',
+                findings: {
+                    tlsCertificates: { count: 15, pqcReady: 0, priority: 'HIGH' },
+                    codeSigningKeys: { count: 3, pqcReady: 0, priority: 'CRITICAL' },
+                    dataEncryption: { count: 8, pqcReady: 2, priority: 'MEDIUM' }
+                },
+                recommendation: currentLang === 'ko' ? '코드 서명 키 먼저 마이그레이션 권장' : 'Recommend migrating code signing keys first',
+                estimatedEffort: '3-6 months'
+            }, null, 2);
+        }
+
+        function exportComparison() {
+            document.getElementById('compareOutput').textContent = JSON.stringify({
+                report: 'PQC Comparison Report',
+                date: new Date().toISOString(),
+                summary: {
+                    classicalBroken: ['RSA-2048', 'ECDH', 'ECDSA'],
+                    pqcSafe: ['ML-KEM-768', 'ML-DSA-65', 'SLH-DSA', 'AES-256'],
+                    recommendation: 'Migrate to hybrid mode immediately'
+                },
+                message: currentLang === 'ko' ? '비교 리포트 생성 완료' : 'Comparison report generated'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang('en'));
+    </script>
+</body>
+</html>

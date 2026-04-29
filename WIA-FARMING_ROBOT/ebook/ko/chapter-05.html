@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>제5장: API 인터페이스 및 통신 프로토콜 - WIA-FARMING_ROBOT</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.8; color: #333; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 50px; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        .chapter-header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 3px solid #667eea; }
+        .chapter-number { color: #764ba2; font-size: 1.2em; font-weight: 600; margin-bottom: 10px; }
+        h1 { color: #667eea; font-size: 2.5em; margin-bottom: 20px; }
+        h2 { color: #667eea; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
+        h3 { color: #764ba2; font-size: 1.4em; margin-top: 30px; margin-bottom: 15px; }
+        p { margin-bottom: 15px; text-align: justify; }
+        .highlight-box { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 25px; border-radius: 10px; margin: 25px 0; border-left: 5px solid #667eea; }
+        .info-box { background: #e8f4f8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196F3; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        th { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; text-align: left; font-weight: 600; }
+        td { padding: 12px 15px; border-bottom: 1px solid #eee; }
+        tr:hover { background: #f8f9fa; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #2d2d2d; color: #f8f8f2; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; }
+        pre code { background: none; color: #f8f8f2; padding: 0; }
+        ul, ol { margin: 15px 0; padding-left: 30px; }
+        li { margin: 8px 0; }
+        .key-takeaways { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .key-takeaways h2 { color: white; border-bottom: 2px solid rgba(255,255,255,0.3); margin-top: 0; }
+        .key-takeaways ul { list-style: none; }
+        .key-takeaways li:before { content: "✓ "; font-weight: bold; margin-right: 10px; }
+        .review-questions { background: #f8f9fa; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .review-questions h2 { color: #667eea; margin-top: 0; }
+        .review-questions ol { counter-reset: question-counter; list-style: none; }
+        .review-questions li { counter-increment: question-counter; margin: 20px 0; padding-left: 40px; position: relative; }
+        .review-questions li:before { content: "Q" counter(question-counter); position: absolute; left: 0; top: 0; background: #667eea; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9em; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 30px; border-top: 2px solid #eee; }
+        .nav-button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; border-radius: 25px; text-decoration: none; font-weight: 600; transition: transform 0.3s ease; display: inline-block; }
+        .nav-button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); }
+        .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #eee; color: #999; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <div class="chapter-number">제5장</div>
+            <h1>API 인터페이스 및 통신 프로토콜</h1>
+        </div>
+
+        <div class="highlight-box">
+            <h3>장 개요</h3>
+            <p>이 장에서는 농업 로봇 제어 및 모니터링을 위한 RESTful API와 실시간 통신 프로토콜을 탐구합니다. WIA-FARMING_ROBOT 표준의 API 엔드포인트, 인증, MQTT 메시징, WebSocket 연결 및 데이터 보안을 다룹니다.</p>
+        </div>
+
+        <h2>5.1 REST API 아키텍처</h2>
+
+        <p>WIA-FARMING_ROBOT 표준은 로봇 관리, 작업 제어, 센서 데이터 수집 및 분석을 위한 포괄적인 RESTful API를 정의합니다.</p>
+
+        <h3>5.1.1 기본 URL 및 버전 관리</h3>
+
+        <pre><code>기본 URL: https://api.farming-robot.wia.org/v1
+
+버전 관리 전략:
+- URL 경로 버전: /v1/, /v2/
+- 헤더 버전: Accept-Version: 1.0
+- 이전 버전과의 호환성: 2개 주요 버전
+- 폐기 통지: 최소 6개월</code></pre>
+
+        <h3>5.1.2 인증 및 권한 부여</h3>
+
+        <pre><code>// JWT 토큰 기반 인증
+POST /auth/login
+Content-Type: application/json
+
+{
+  "username": "farm-operator-1",
+  "password": "secure-password",
+  "farmId": "farm-001"
+}
+
+Response 200:
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": 3600,
+  "tokenType": "Bearer"
+}
+
+// API 요청에 토큰 사용
+GET /robots
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+X-API-Key: robot_ak_1234567890abcdef
+X-Robot-ID: 550e8400-e29b-41d4-a716-446655440000</code></pre>
+
+        <h2>5.2 로봇 관리 API</h2>
+
+        <h3>5.2.1 로봇 등록 및 관리</h3>
+
+        <pre><code>// 새 로봇 등록
+POST /robots
+Content-Type: application/json
+Authorization: Bearer {JWT_TOKEN}
+
+{
+  "manufacturer": "John Deere",
+  "model": "8R 410",
+  "serialNumber": "1M08R410XXXXXX",
+  "type": "AUTONOMOUS_TRACTOR",
+  "certifications": ["ISO18497", "FIRA-L4"]
+}
+
+Response 201:
+{
+  "robotId": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "registered",
+  "apiKey": "robot_ak_1234567890abcdef",
+  "registeredAt": "2026-01-12T10:30:00Z"
+}
+
+// 로봇 상태 조회
+GET /robots/{robotId}/status
+
+Response 200:
+{
+  "robotId": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "WORKING",
+  "position": {
+    "latitude": 42.3601,
+    "longitude": -71.0589,
+    "accuracy": 2.3,
+    "heading": 45.2
+  },
+  "battery": 87.5,
+  "currentTask": "task-2026-001",
+  "health": {
+    "overall": "HEALTHY",
+    "alerts": [],
+    "lastMaintenance": "2026-01-10T08:00:00Z"
+  }
+}
+
+// 로봇 구성 업데이트
+PATCH /robots/{robotId}/config
+
+{
+  "workingSpeed": 2.5,
+  "safetyDistance": 5.0,
+  "autoResumeEnabled": true,
+  "telemetryInterval": 10
+}
+
+Response 200:
+{
+  "success": true,
+  "updated": ["workingSpeed", "safetyDistance", "autoResumeEnabled", "telemetryInterval"],
+  "timestamp": "2026-01-12T10:35:00Z"
+}</code></pre>
+
+        <h2>5.3 작업 관리 API</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>엔드포인트</th>
+                    <th>방법</th>
+                    <th>설명</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>/tasks</td>
+                    <td>POST</td>
+                    <td>새 작업 생성</td>
+                </tr>
+                <tr>
+                    <td>/tasks/{taskId}</td>
+                    <td>GET</td>
+                    <td>작업 상태 및 진행 상황 조회</td>
+                </tr>
+                <tr>
+                    <td>/tasks/{taskId}/pause</td>
+                    <td>POST</td>
+                    <td>작업 일시 중지</td>
+                </tr>
+                <tr>
+                    <td>/tasks/{taskId}/resume</td>
+                    <td>POST</td>
+                    <td>작업 재개</td>
+                </tr>
+                <tr>
+                    <td>/tasks/{taskId}/cancel</td>
+                    <td>POST</td>
+                    <td>작업 취소</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>5.3.1 작업 생성 및 실행</h3>
+
+        <pre><code>// 파종 작업 생성
+POST /tasks
+Content-Type: application/json
+
+{
+  "robotId": "550e8400-e29b-41d4-a716-446655440000",
+  "taskType": "SEEDING",
+  "fieldId": "field-001",
+  "parameters": {
+    "seedType": "corn",
+    "seedingRate": 75000,
+    "rowSpacing": 0.76,
+    "depth": 5.0,
+    "seedVariety": "P1197AM"
+  },
+  "schedule": {
+    "startTime": "2026-01-12T14:00:00Z",
+    "priority": "HIGH"
+  },
+  "constraints": {
+    "maxWindSpeed": 25,
+    "minSoilTemp": 10,
+    "maxSoilMoisture": 80
+  }
+}
+
+Response 201:
+{
+  "taskId": "task-2026-001",
+  "status": "SCHEDULED",
+  "estimatedDuration": 4.5,
+  "estimatedCompletion": "2026-01-12T18:30:00Z",
+  "fuelRequired": 45.2,
+  "seedRequired": 320.5
+}
+
+// 작업 진행 상황 조회
+GET /tasks/task-2026-001
+
+Response 200:
+{
+  "taskId": "task-2026-001",
+  "status": "IN_PROGRESS",
+  "progress": 67.5,
+  "startedAt": "2026-01-12T14:00:00Z",
+  "currentPosition": {
+    "latitude": 42.3605,
+    "longitude": -71.0582
+  },
+  "metrics": {
+    "areaCovered": 27.5,
+    "areaRemaining": 13.2,
+    "workRate": 6.2,
+    "seedUsed": 216.3,
+    "fuelUsed": 30.5
+  },
+  "estimatedCompletion": "2026-01-12T18:15:00Z"
+}</code></pre>
+
+        <h2>5.4 MQTT 통신 프로토콜</h2>
+
+        <p>MQTT는 원격 측정, 상태 업데이트 및 센서 데이터에 사용되는 경량 게시/구독 프로토콜입니다.</p>
+
+        <h3>5.4.1 MQTT 토픽 구조</h3>
+
+        <pre><code>주제 구조:
+wia/farming/{farmId}/{robotId}/{messageType}
+
+예제:
+wia/farming/farm-001/robot-550e/telemetry
+wia/farming/farm-001/robot-550e/status
+wia/farming/farm-001/robot-550e/alerts
+wia/farming/farm-001/robot-550e/sensors/lidar
+wia/farming/farm-001/robot-550e/sensors/camera
+wia/farming/farm-001/robot-550e/commands
+
+QoS 수준:
+- QoS 0: 원격 측정 데이터 (고주파, 손실 허용)
+- QoS 1: 상태 업데이트 (최소 한 번 전달)
+- QoS 2: 제어 명령 (정확히 한 번 전달)</code></pre>
+
+        <h3>5.4.2 MQTT 메시지 형식</h3>
+
+        <pre><code>// 원격 측정 메시지 (QoS 0, 10Hz)
+Topic: wia/farming/farm-001/robot-550e/telemetry
+Payload:
+{
+  "timestamp": "2026-01-12T10:30:00.123Z",
+  "robotId": "550e8400-e29b-41d4-a716-446655440000",
+  "messageType": "TELEMETRY",
+  "payload": {
+    "position": {
+      "latitude": 42.3601,
+      "longitude": -71.0589,
+      "heading": 45.2,
+      "speed": 2.5
+    },
+    "status": "WORKING",
+    "battery": 87.5,
+    "temperature": 78.3
+  },
+  "signature": "sha256_hash_here"
+}
+
+// 경고 메시지 (QoS 1)
+Topic: wia/farming/farm-001/robot-550e/alerts
+Payload:
+{
+  "timestamp": "2026-01-12T10:30:15.456Z",
+  "robotId": "550e8400-e29b-41d4-a716-446655440000",
+  "messageType": "ALERT",
+  "payload": {
+    "alertType": "OBSTACLE_DETECTED",
+    "severity": "WARNING",
+    "obstacleType": "HUMAN",
+    "distance": 8.5,
+    "action": "SLOW_DOWN"
+  }
+}
+
+// 제어 명령 (QoS 2)
+Topic: wia/farming/farm-001/robot-550e/commands
+Payload:
+{
+  "timestamp": "2026-01-12T10:30:20.789Z",
+  "commandId": "cmd-2026-001",
+  "messageType": "CONTROL",
+  "payload": {
+    "command": "PAUSE_TASK",
+    "taskId": "task-2026-001",
+    "reason": "OPERATOR_REQUESTED"
+  }
+}</code></pre>
+
+        <h2>5.5 WebSocket 실시간 통신</h2>
+
+        <p>WebSocket은 양방향 실시간 제어 및 모니터링을 위한 지속적인 연결을 제공합니다.</p>
+
+        <h3>5.5.1 WebSocket 연결 설정</h3>
+
+        <pre><code>// JavaScript WebSocket 클라이언트
+const ws = new WebSocket('wss://api.farming-robot.wia.org/v1/realtime');
+
+ws.onopen = () => {
+  // 인증
+  ws.send(JSON.stringify({
+    type: 'AUTH',
+    token: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    robotId: '550e8400-e29b-41d4-a716-446655440000'
+  }));
+};
+
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  
+  switch(message.type) {
+    case 'AUTH_SUCCESS':
+      console.log('인증 성공');
+      break;
+      
+    case 'TELEMETRY':
+      updateRobotPosition(message.data);
+      break;
+      
+    case 'ALERT':
+      handleAlert(message.data);
+      break;
+      
+    case 'TASK_UPDATE':
+      updateTaskProgress(message.data);
+      break;
+      
+    case 'SENSOR_DATA':
+      processSensorData(message.data);
+      break;
+  }
+};
+
+// 하트비트 (5초마다)
+setInterval(() => {
+  ws.send(JSON.stringify({ type: 'PING' }));
+}, 5000);
+
+// 제어 명령 전송
+function sendEmergencyStop() {
+  ws.send(JSON.stringify({
+    type: 'CONTROL',
+    command: 'EMERGENCY_STOP',
+    robotId: '550e8400-e29b-41d4-a716-446655440000',
+    timestamp: new Date().toISOString()
+  }));
+}
+
+// 응답 처리
+{
+  type: 'CONTROL_ACK',
+  command: 'EMERGENCY_STOP',
+  status: 'EXECUTED',
+  timestamp: '2026-01-12T10:30:01.234Z',
+  executionTime: 87  // 밀리초
+}</code></pre>
+
+        <h2>5.6 데이터 보안 및 암호화</h2>
+
+        <h3>5.6.1 전송 계층 보안</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>프로토콜</th>
+                    <th>암호화</th>
+                    <th>사용 사례</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>HTTP/2</td>
+                    <td>TLS 1.3</td>
+                    <td>REST API 통신</td>
+                </tr>
+                <tr>
+                    <td>WebSocket</td>
+                    <td>WSS (TLS 1.3)</td>
+                    <td>실시간 제어</td>
+                </tr>
+                <tr>
+                    <td>MQTT</td>
+                    <td>TLS 1.3</td>
+                    <td>원격 측정 및 메시징</td>
+                </tr>
+                <tr>
+                    <td>UDP (센서 스트림)</td>
+                    <td>DTLS 1.3</td>
+                    <td>고주파 센서 데이터</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>5.6.2 메시지 서명 및 검증</h3>
+
+        <pre><code>// 메시지 서명 생성
+function signMessage(payload, secretKey) {
+  const timestamp = Date.now();
+  const nonce = generateNonce();
+  const message = JSON.stringify(payload) + timestamp + nonce;
+  
+  const signature = crypto
+    .createHmac('sha256', secretKey)
+    .update(message)
+    .digest('hex');
+  
+  return {
+    payload: payload,
+    timestamp: timestamp,
+    nonce: nonce,
+    signature: signature
+  };
+}
+
+// 메시지 검증
+function verifyMessage(signedMessage, secretKey) {
+  const { payload, timestamp, nonce, signature } = signedMessage;
+  
+  // 타임스탬프 확인 (최대 5초 오래됨)
+  if (Date.now() - timestamp > 5000) {
+    throw new Error('Message expired');
+  }
+  
+  // 서명 재계산 및 확인
+  const message = JSON.stringify(payload) + timestamp + nonce;
+  const expectedSignature = crypto
+    .createHmac('sha256', secretKey)
+    .update(message)
+    .digest('hex');
+  
+  if (signature !== expectedSignature) {
+    throw new Error('Invalid signature');
+  }
+  
+  return payload;
+}</code></pre>
+
+        <h2>5.7 오류 처리 및 재시도 로직</h2>
+
+        <h3>5.7.1 표준 오류 응답</h3>
+
+        <pre><code>// 오류 응답 형식
+{
+  "error": {
+    "code": "ROBOT_NOT_FOUND",
+    "message": "Robot with ID 550e8400 not found",
+    "details": {
+      "robotId": "550e8400-e29b-41d4-a716-446655440000",
+      "requestId": "req-2026-001"
+    },
+    "timestamp": "2026-01-12T10:30:00Z"
+  }
+}
+
+// 일반적인 오류 코드
+Error Codes:
+- 4001: ROBOT_NOT_FOUND
+- 4002: INVALID_TASK_PARAMETERS
+- 4003: ROBOT_OFFLINE
+- 4004: TASK_CONFLICT
+- 4005: INSUFFICIENT_BATTERY
+- 4006: WEATHER_CONDITION_UNSAFE
+- 5001: PATH_PLANNING_FAILED
+- 5002: SENSOR_DATA_CORRUPT
+- 5003: COMMUNICATION_TIMEOUT
+- 5004: INTERNAL_SERVER_ERROR</code></pre>
+
+        <h3>5.7.2 재시도 전략</h3>
+
+        <pre><code>class APIClient {
+  async requestWithRetry(endpoint, options, maxRetries = 3) {
+    let lastError;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const response = await fetch(endpoint, options);
+        
+        // 성공
+        if (response.ok) {
+          return await response.json();
+        }
+        
+        // 재시도 불가능한 오류 (4xx 클라이언트 오류)
+        if (response.status >= 400 && response.status < 500) {
+          throw new Error(`Client error: ${response.status}`);
+        }
+        
+        // 재시도 가능한 오류 (5xx 서버 오류)
+        lastError = new Error(`Server error: ${response.status}`);
+        
+      } catch (error) {
+        lastError = error;
+      }
+      
+      // 지수 백오프 (exponential backoff)
+      const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    
+    throw lastError;
+  }
+}</code></pre>
+
+        <h2>5.8 속도 제한 및 할당량</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>엔드포인트 유형</th>
+                    <th>제한</th>
+                    <th>할당량 재설정</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>REST API</td>
+                    <td>로봇당 시간당 1000개 요청</td>
+                    <td>매시간 정각</td>
+                </tr>
+                <tr>
+                    <td>WebSocket</td>
+                    <td>연결당 초당 100개 메시지</td>
+                    <td>롤링 윈도우</td>
+                </tr>
+                <tr>
+                    <td>센서 업로드</td>
+                    <td>최대 10 Hz</td>
+                    <td>즉시</td>
+                </tr>
+                <tr>
+                    <td>경로 계획</td>
+                    <td>작업당 5개 계획</td>
+                    <td>작업 완료 시</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="info-box">
+            <h3>속도 제한 헤더</h3>
+            <p>모든 API 응답에는 속도 제한 정보가 포함됩니다:</p>
+            <pre><code>X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 847
+X-RateLimit-Reset: 1705068000</code></pre>
+        </div>
+
+        <div class="key-takeaways">
+            <h2>핵심 요약</h2>
+            <ul>
+                <li>WIA REST API는 로봇 관리, 작업 제어 및 데이터 수집을 위한 포괄적인 엔드포인트를 제공합니다</li>
+                <li>JWT 기반 인증은 API 키 및 로봇 ID와 함께 안전한 액세스를 보장합니다</li>
+                <li>MQTT는 다양한 QoS 수준으로 경량 게시/구독 메시징을 제공합니다: QoS 0(원격 측정), QoS 1(상태), QoS 2(명령)</li>
+                <li>WebSocket은 양방향 실시간 제어 및 모니터링을 위한 지속적인 연결을 제공합니다</li>
+                <li>TLS 1.3 암호화는 전송 중인 모든 데이터를 보호하며, HMAC-SHA256 서명은 메시지 무결성을 보장합니다</li>
+                <li>오류 처리는 표준 오류 코드 및 지수 백오프를 사용한 재시도 로직을 포함합니다</li>
+                <li>속도 제한은 시스템 안정성을 보장하며, 엔드포인트 유형에 따라 다른 제한이 적용됩니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>REST API의 버전 관리 전략을 설명하세요. URL 경로 버전과 헤더 버전의 장단점은 무엇입니까?</li>
+                <li>JWT 기반 인증이 어떻게 작동하는지 설명하고, accessToken 및 refreshToken의 역할을 논의하세요.</li>
+                <li>MQTT QoS 수준(0, 1, 2)을 비교하고, 각각이 농업 로봇 통신의 어떤 사용 사례에 적합한지 설명하세요.</li>
+                <li>WebSocket이 REST API에 비해 실시간 제어에 더 적합한 이유를 분석하세요. 하트비트의 목적은 무엇입니까?</li>
+                <li>메시지 서명 및 검증 프로세스를 설명하세요. HMAC-SHA256이 메시지 무결성을 어떻게 보장합니까?</li>
+                <li>지수 백오프를 사용한 재시도 전략을 논의하세요. 어떤 오류 유형이 재시도 가능하고, 어떤 오류 유형은 즉시 실패해야 합니까?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-04.html" class="nav-button">← 이전 장</a>
+            <a href="chapter-06.html" class="nav-button">다음 장: 안전 시스템 →</a>
+        </div>
+
+        </div>
+</body>
+</html>

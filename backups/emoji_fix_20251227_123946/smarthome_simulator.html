@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Smart Home - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #EAB308;
+            --primary-dark: #CA8A04;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); color: #000; }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #FDE047); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); color: #000; }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: #000; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .device-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0; }
+        .device-card { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 25px; text-align: center; cursor: pointer; transition: all 0.3s; }
+        .device-card:hover { border-color: var(--primary); }
+        .device-card.on { border-color: var(--primary); background: rgba(234, 179, 8, 0.1); }
+        .device-icon { font-size: 3rem; margin-bottom: 10px; transition: all 0.3s; }
+        .device-card.on .device-icon { filter: drop-shadow(0 0 15px var(--primary)); }
+        .device-name { font-weight: 600; margin-bottom: 5px; }
+        .device-status { font-size: 0.85rem; color: var(--text-muted); }
+        .device-slider { width: 100%; margin-top: 15px; }
+
+        .climate-display { background: linear-gradient(135deg, #1e3a5f, #0f172a); border-radius: 16px; padding: 40px; text-align: center; margin: 20px 0; }
+        .temp-value { font-size: 5rem; font-weight: bold; color: var(--primary); }
+        .temp-unit { font-size: 2rem; color: var(--text-muted); }
+        .climate-controls { display: flex; justify-content: center; gap: 20px; margin-top: 20px; }
+        .climate-btn { width: 60px; height: 60px; border-radius: 50%; border: 2px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 1.5rem; cursor: pointer; }
+        .climate-btn:hover { border-color: var(--primary); }
+
+        .security-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+        .security-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .security-card h5 { color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .security-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .security-item:last-child { border-bottom: none; }
+        .security-status { padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; }
+        .security-status.locked { background: rgba(16, 185, 129, 0.2); color: var(--secondary); }
+        .security-status.unlocked { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .security-status.alert { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+        .automation-list { display: flex; flex-direction: column; gap: 15px; margin: 20px 0; }
+        .automation-item { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .automation-info { flex: 1; }
+        .automation-name { font-weight: 600; margin-bottom: 5px; display: flex; align-items: center; gap: 8px; }
+        .automation-desc { font-size: 0.85rem; color: var(--text-muted); }
+        .toggle-switch { position: relative; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 26px; transition: 0.3s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(24px); }
+
+        .access-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+        .access-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .access-card h5 { color: var(--primary); margin-bottom: 15px; }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .toggle-row:last-child { border-bottom: none; }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .security-grid, .access-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Smart Home</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🏠 WIA Smart Home</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Accessible Smart Home" data-ko="접근 가능한 스마트홈">Accessible Smart Home</h1>
+            <p data-en="Voice, touch, switch — control your home your way" data-ko="음성, 터치, 스위치 — 내 방식대로 홈 제어">Voice, touch, switch control</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="💡 Lights" data-ko="💡 조명">💡 Lights</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🌡️ Climate" data-ko="🌡️ 온도">🌡️ Climate</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🔐 Security" data-ko="🔐 보안">🔐 Security</div>
+            <div class="tab" onclick="showPanel(3)" data-en="⚙️ Automation" data-ko="⚙️ 자동화">⚙️ Automation</div>
+            <div class="tab" onclick="showPanel(4)" data-en="♿ Accessibility" data-ko="♿ 접근성">♿ Accessibility</div>
+        </div>
+
+        <!-- Panel 0: Lights -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="💡 Lighting Control" data-ko="💡 조명 제어">💡 Lighting Control</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Control lights with voice, touch, or switch" data-ko="음성, 터치, 스위치로 조명 제어">Control with voice, touch, switch</p>
+
+            <div class="device-grid">
+                <div class="device-card on" onclick="toggleLight('living')">
+                    <div class="device-icon">💡</div>
+                    <div class="device-name" data-en="Living Room" data-ko="거실">Living Room</div>
+                    <div class="device-status" data-en="On · 80%" data-ko="켜짐 · 80%">On · 80%</div>
+                    <input type="range" class="device-slider" min="0" max="100" value="80" onclick="event.stopPropagation()">
+                </div>
+                <div class="device-card" onclick="toggleLight('bedroom')">
+                    <div class="device-icon">🛏️</div>
+                    <div class="device-name" data-en="Bedroom" data-ko="침실">Bedroom</div>
+                    <div class="device-status" data-en="Off" data-ko="꺼짐">Off</div>
+                    <input type="range" class="device-slider" min="0" max="100" value="0" onclick="event.stopPropagation()">
+                </div>
+                <div class="device-card on" onclick="toggleLight('kitchen')">
+                    <div class="device-icon">🍳</div>
+                    <div class="device-name" data-en="Kitchen" data-ko="주방">Kitchen</div>
+                    <div class="device-status" data-en="On · 100%" data-ko="켜짐 · 100%">On · 100%</div>
+                    <input type="range" class="device-slider" min="0" max="100" value="100" onclick="event.stopPropagation()">
+                </div>
+                <div class="device-card" onclick="toggleLight('bathroom')">
+                    <div class="device-icon">🚿</div>
+                    <div class="device-name" data-en="Bathroom" data-ko="욕실">Bathroom</div>
+                    <div class="device-status" data-en="Off" data-ko="꺼짐">Off</div>
+                    <input type="range" class="device-slider" min="0" max="100" value="0" onclick="event.stopPropagation()">
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="allLightsOn()" data-en="☀️ All On" data-ko="☀️ 모두 켜기">☀️ All On</button>
+                <button class="btn btn-secondary" onclick="allLightsOff()" data-en="🌙 All Off" data-ko="🌙 모두 끄기">🌙 All Off</button>
+            </div>
+            <div class="output" id="lightsOutput"></div>
+        </div>
+
+        <!-- Panel 1: Climate -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🌡️ Climate Control" data-ko="🌡️ 온도 제어">🌡️ Climate Control</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Temperature and ventilation control" data-ko="온도 및 환기 제어">Temperature & ventilation</p>
+
+            <div class="climate-display">
+                <div>
+                    <span class="temp-value" id="tempValue">22</span>
+                    <span class="temp-unit">°C</span>
+                </div>
+                <p style="color: var(--text-muted); margin-top: 10px;" data-en="Target Temperature" data-ko="목표 온도">Target Temperature</p>
+                <div class="climate-controls">
+                    <button class="climate-btn" onclick="adjustTemp(-1)">−</button>
+                    <button class="climate-btn" onclick="adjustTemp(1)">+</button>
+                </div>
+            </div>
+
+            <div class="device-grid" style="margin-top: 30px;">
+                <div class="device-card on" onclick="toggleDevice('ac')">
+                    <div class="device-icon">❄️</div>
+                    <div class="device-name" data-en="Air Conditioner" data-ko="에어컨">Air Conditioner</div>
+                    <div class="device-status" data-en="Cooling · 22°C" data-ko="냉방 · 22°C">Cooling · 22°C</div>
+                </div>
+                <div class="device-card" onclick="toggleDevice('heater')">
+                    <div class="device-icon">🔥</div>
+                    <div class="device-name" data-en="Heater" data-ko="히터">Heater</div>
+                    <div class="device-status" data-en="Off" data-ko="꺼짐">Off</div>
+                </div>
+                <div class="device-card on" onclick="toggleDevice('fan')">
+                    <div class="device-icon">🌀</div>
+                    <div class="device-name" data-en="Fan" data-ko="선풍기">Fan</div>
+                    <div class="device-status" data-en="Speed 2" data-ko="속도 2">Speed 2</div>
+                </div>
+                <div class="device-card" onclick="toggleDevice('humidifier')">
+                    <div class="device-icon">💧</div>
+                    <div class="device-name" data-en="Humidifier" data-ko="가습기">Humidifier</div>
+                    <div class="device-status" data-en="Off" data-ko="꺼짐">Off</div>
+                </div>
+            </div>
+            <div class="output" id="climateOutput"></div>
+        </div>
+
+        <!-- Panel 2: Security -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🔐 Security System" data-ko="🔐 보안 시스템">🔐 Security System</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Door locks, cameras, and sensors" data-ko="도어락, 카메라, 센서">Door locks, cameras, sensors</p>
+
+            <div class="security-grid">
+                <div class="security-card">
+                    <h5>🚪 <span data-en="Door Locks" data-ko="도어락">Door Locks</span></h5>
+                    <div class="security-item">
+                        <span data-en="Front Door" data-ko="현관문">Front Door</span>
+                        <span class="security-status locked" data-en="Locked" data-ko="잠김">Locked</span>
+                    </div>
+                    <div class="security-item">
+                        <span data-en="Back Door" data-ko="뒷문">Back Door</span>
+                        <span class="security-status locked" data-en="Locked" data-ko="잠김">Locked</span>
+                    </div>
+                    <div class="security-item">
+                        <span data-en="Garage" data-ko="차고">Garage</span>
+                        <span class="security-status unlocked" data-en="Unlocked" data-ko="열림">Unlocked</span>
+                    </div>
+                </div>
+                <div class="security-card">
+                    <h5>📹 <span data-en="Cameras" data-ko="카메라">Cameras</span></h5>
+                    <div class="security-item">
+                        <span data-en="Front Yard" data-ko="앞마당">Front Yard</span>
+                        <span class="security-status locked" data-en="Recording" data-ko="녹화중">Recording</span>
+                    </div>
+                    <div class="security-item">
+                        <span data-en="Back Yard" data-ko="뒷마당">Back Yard</span>
+                        <span class="security-status locked" data-en="Recording" data-ko="녹화중">Recording</span>
+                    </div>
+                    <div class="security-item">
+                        <span data-en="Indoor" data-ko="실내">Indoor</span>
+                        <span class="security-status unlocked" data-en="Off" data-ko="꺼짐">Off</span>
+                    </div>
+                </div>
+                <div class="security-card">
+                    <h5>🚨 <span data-en="Sensors" data-ko="센서">Sensors</span></h5>
+                    <div class="security-item">
+                        <span data-en="Motion" data-ko="동작">Motion</span>
+                        <span class="security-status locked" data-en="Clear" data-ko="정상">Clear</span>
+                    </div>
+                    <div class="security-item">
+                        <span data-en="Smoke" data-ko="연기">Smoke</span>
+                        <span class="security-status locked" data-en="Clear" data-ko="정상">Clear</span>
+                    </div>
+                    <div class="security-item">
+                        <span data-en="CO" data-ko="일산화탄소">CO</span>
+                        <span class="security-status locked" data-en="Clear" data-ko="정상">Clear</span>
+                    </div>
+                </div>
+                <div class="security-card">
+                    <h5>🛡️ <span data-en="Alarm" data-ko="알람">Alarm</span></h5>
+                    <div class="security-item">
+                        <span data-en="System Status" data-ko="시스템 상태">Status</span>
+                        <span class="security-status locked" data-en="Armed" data-ko="경계중">Armed</span>
+                    </div>
+                    <div class="security-item">
+                        <span data-en="Mode" data-ko="모드">Mode</span>
+                        <span class="security-status locked" data-en="Away" data-ko="외출">Away</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="armSystem()" data-en="🛡️ Arm All" data-ko="🛡️ 전체 경계">🛡️ Arm All</button>
+                <button class="btn btn-secondary" onclick="disarmSystem()" data-en="🔓 Disarm" data-ko="🔓 해제">🔓 Disarm</button>
+            </div>
+            <div class="output" id="securityOutput"></div>
+        </div>
+
+        <!-- Panel 3: Automation -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="⚙️ Automation" data-ko="⚙️ 자동화">⚙️ Automation</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Smart scenes and routines" data-ko="스마트 씬 및 루틴">Smart scenes and routines</p>
+
+            <div class="automation-list">
+                <div class="automation-item">
+                    <div class="automation-info">
+                        <div class="automation-name">🌅 <span data-en="Good Morning" data-ko="좋은 아침">Good Morning</span></div>
+                        <div class="automation-desc" data-en="Lights on, blinds open, coffee maker start" data-ko="조명 켜기, 블라인드 열기, 커피머신 시작">Lights, blinds, coffee</div>
+                    </div>
+                    <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="automation-item">
+                    <div class="automation-info">
+                        <div class="automation-name">🌙 <span data-en="Good Night" data-ko="좋은 밤">Good Night</span></div>
+                        <div class="automation-desc" data-en="All lights off, doors locked, alarm armed" data-ko="모든 조명 끄기, 문 잠금, 경보 설정">Lights, locks, alarm</div>
+                    </div>
+                    <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="automation-item">
+                    <div class="automation-info">
+                        <div class="automation-name">🚪 <span data-en="Welcome Home" data-ko="귀가">Welcome Home</span></div>
+                        <div class="automation-desc" data-en="Unlock door, lights on, AC start" data-ko="문 열기, 조명 켜기, 에어컨 시작">Unlock, lights, AC</div>
+                    </div>
+                    <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="automation-item">
+                    <div class="automation-info">
+                        <div class="automation-name">🏃 <span data-en="Away Mode" data-ko="외출 모드">Away Mode</span></div>
+                        <div class="automation-desc" data-en="Random lights, security cameras on" data-ko="랜덤 조명, 보안 카메라 켜기">Lights simulation, cameras</div>
+                    </div>
+                    <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                </div>
+                <div class="automation-item">
+                    <div class="automation-info">
+                        <div class="automation-name">🎬 <span data-en="Movie Mode" data-ko="영화 모드">Movie Mode</span></div>
+                        <div class="automation-desc" data-en="Dim lights, close blinds, TV on" data-ko="조명 어둡게, 블라인드 닫기, TV 켜기">Dim, blinds, TV</div>
+                    </div>
+                    <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="createScene()" data-en="➕ Create Scene" data-ko="➕ 씬 만들기">➕ Create Scene</button>
+            </div>
+            <div class="output" id="automationOutput"></div>
+        </div>
+
+        <!-- Panel 4: Accessibility -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="♿ Accessibility Settings" data-ko="♿ 접근성 설정">♿ Accessibility</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Configure accessible interaction methods" data-ko="접근 가능한 상호작용 방식 구성">Accessible interaction</p>
+
+            <div class="access-grid">
+                <div class="access-card">
+                    <h5>🎤 <span data-en="Voice Control" data-ko="음성 제어">Voice Control</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="Enable Voice" data-ko="음성 활성화">Enable Voice</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Wake Word" data-ko="호출어">Wake Word</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Voice Feedback" data-ko="음성 피드백">Voice Feedback</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="access-card">
+                    <h5>🔘 <span data-en="Switch Control" data-ko="스위치 제어">Switch Control</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="Enable Switch" data-ko="스위치 활성화">Enable Switch</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Scanning Mode" data-ko="스캔 모드">Scanning Mode</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Dwell Click" data-ko="응시 클릭">Dwell Click</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="access-card">
+                    <h5>📳 <span data-en="Notifications" data-ko="알림">Notifications</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="Audio Alerts" data-ko="음성 알림">Audio Alerts</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Visual Alerts" data-ko="시각 알림">Visual Alerts</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Haptic Alerts" data-ko="햅틱 알림">Haptic Alerts</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="access-card">
+                    <h5>👁️ <span data-en="Display" data-ko="디스플레이">Display</span></h5>
+                    <div class="toggle-row">
+                        <span data-en="High Contrast" data-ko="고대비">High Contrast</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Large Icons" data-ko="큰 아이콘">Large Icons</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span data-en="Screen Reader" data-ko="화면 읽기">Screen Reader</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="saveAccessibility()" data-en="💾 Save Settings" data-ko="💾 설정 저장">💾 Save</button>
+            </div>
+            <div class="output" id="accessOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Smart Home: Your home, your way" data-ko="WIA Smart Home: 내 집, 내 방식대로">WIA Smart Home: Your home, your way</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let temp = 22;
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function toggleLight(room) {
+            const card = event.target.closest('.device-card');
+            card.classList.toggle('on');
+            const isOn = card.classList.contains('on');
+            card.querySelector('.device-status').textContent = isOn ? (currentLang === 'ko' ? '켜짐' : 'On') : (currentLang === 'ko' ? '꺼짐' : 'Off');
+            document.getElementById('lightsOutput').textContent = JSON.stringify({
+                room: room, state: isOn ? 'on' : 'off', timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function allLightsOn() {
+            document.querySelectorAll('#panel-0 .device-card').forEach(c => c.classList.add('on'));
+            document.getElementById('lightsOutput').textContent = currentLang === 'ko' ? '모든 조명 켜짐' : 'All lights on';
+        }
+
+        function allLightsOff() {
+            document.querySelectorAll('#panel-0 .device-card').forEach(c => c.classList.remove('on'));
+            document.getElementById('lightsOutput').textContent = currentLang === 'ko' ? '모든 조명 꺼짐' : 'All lights off';
+        }
+
+        function adjustTemp(delta) {
+            temp = Math.max(16, Math.min(30, temp + delta));
+            document.getElementById('tempValue').textContent = temp;
+            document.getElementById('climateOutput').textContent = JSON.stringify({
+                temperature: temp + '°C', mode: 'cooling', timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function toggleDevice(device) {
+            const card = event.target.closest('.device-card');
+            card.classList.toggle('on');
+        }
+
+        function armSystem() {
+            document.getElementById('securityOutput').textContent = JSON.stringify({
+                action: 'arm', mode: 'away', status: 'armed',
+                message: currentLang === 'ko' ? '보안 시스템 경계 설정됨' : 'Security system armed'
+            }, null, 2);
+        }
+
+        function disarmSystem() {
+            document.getElementById('securityOutput').textContent = JSON.stringify({
+                action: 'disarm', status: 'disarmed',
+                message: currentLang === 'ko' ? '보안 시스템 해제됨' : 'Security system disarmed'
+            }, null, 2);
+        }
+
+        function createScene() {
+            document.getElementById('automationOutput').textContent = JSON.stringify({
+                action: 'create_scene',
+                message: currentLang === 'ko' ? '새 씬 만들기 시작...' : 'Creating new scene...'
+            }, null, 2);
+        }
+
+        function saveAccessibility() {
+            document.getElementById('accessOutput').textContent = JSON.stringify({
+                voice: { enabled: true, wakework: true, feedback: true },
+                switch: { enabled: false, scanning: false },
+                notifications: { audio: true, visual: true, haptic: false },
+                display: { highContrast: false, largeIcons: false },
+                matterCompatible: true,
+                message: currentLang === 'ko' ? '접근성 설정 저장됨' : 'Accessibility settings saved'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang('en'));
+    </script>
+</body>
+</html>

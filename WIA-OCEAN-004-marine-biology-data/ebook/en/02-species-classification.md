@@ -247,8 +247,7 @@ const dolphinTaxonomy: TaxonomicHistory = {
       date: new Date("2011-01-01"),
       previousName: "Tursiops truncatus aduncus",
       newName: "Tursiops aduncus",
-      reason: "Genetic and morphological evidence supports species status",
-      reference: "선행 연구 PLoS ONE 6(9): e24047"
+      reason: "Genetic and morphological evidence supports species status"
     }
   ]
 };

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-ORGAN-SHORTAGE Simulator | 弘益人間</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #14B8A6;
+            --primary-dark: #0D9488;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border: #334155;
+            --gold: #ffd700;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { background: var(--bg-card); padding: 20px; border-bottom: 2px solid var(--primary); margin-bottom: 20px; }
+        .header-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .logo { display: flex; align-items: center; gap: 10px; font-size: 24px; color: var(--primary); font-weight: bold; }
+        .nav-links { display: flex; gap: 20px; align-items: center; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; }
+        .nav-links a:hover { color: var(--primary); }
+        .lang-btn { background: var(--bg); border: 1px solid var(--primary); color: var(--text); padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        .lang-btn:hover { background: var(--primary); }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { background: var(--bg-card); border: 1px solid var(--border); padding: 12px 20px; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+        .tab:hover { border-color: var(--primary); }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { color: var(--primary); margin-bottom: 20px; text-align: center; }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+
+        .btn-center { text-align: center; margin: 20px 0; }
+        .btn { padding: 12px 30px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; transition: all 0.3s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+
+        .output { background: var(--bg); border-radius: 8px; padding: 20px; margin-top: 20px; border: 1px solid var(--border); }
+        .output pre { white-space: pre-wrap; font-family: 'Consolas', monospace; font-size: 13px; color: var(--text); overflow-x: auto; }
+
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .status-eligible { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .status-ineligible { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .status-pending { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+
+        .result-card { background: var(--bg); border-radius: 8px; padding: 20px; margin: 10px 0; border-left: 4px solid var(--primary); }
+        .result-card h4 { color: var(--primary); margin-bottom: 10px; }
+
+        .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin: 10px 0; }
+        .progress-fill { height: 100%; background: var(--primary); transition: width 0.5s; }
+
+        .match-score { font-size: 48px; color: var(--primary); font-weight: bold; text-align: center; }
+
+        footer { text-align: center; padding: 30px; color: var(--text-muted); margin-top: 40px; border-top: 1px solid var(--border); }
+        .philosophy { color: var(--gold); font-size: 18px; letter-spacing: 4px; margin-bottom: 10px; }
+
+        @media (max-width: 768px) {
+            .tabs { flex-direction: column; align-items: center; }
+            .tab { width: 100%; text-align: center; }
+            .header-content { flex-direction: column; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container header-content">
+            <div class="logo">🫀 <span data-en="WIA-ORGAN-SHORTAGE Simulator" data-ko="WIA-장기부족 시뮬레이터">WIA-ORGAN-SHORTAGE Simulator</span></div>
+            <div class="nav-links">
+                <a href="../" data-en="← Back to Standard" data-ko="← 표준으로 돌아가기">← Back to Standard</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                <button class="lang-btn" onclick="toggleLang()">EN / 한국어</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📊 Data Format" data-ko="📊 데이터 형식">📊 Data Format</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🔢 Algorithms" data-ko="🔢 알고리즘">🔢 Algorithms</div>
+            <div class="tab" onclick="showPanel(2)" data-en="📡 Protocol" data-ko="📡 프로토콜">📡 Protocol</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🔗 Integration" data-ko="🔗 통합">🔗 Integration</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📱 QR & VC" data-ko="📱 QR & VC">📱 QR & VC</div>
+        </div>
+
+        <!-- Panel 0: Data Format -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="📊 Organ Profile Data Format" data-ko="📊 장기 프로필 데이터 형식">📊 Organ Profile Data Format</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Organ Needed" data-ko="필요 장기">Organ Needed</label>
+                    <select id="organNeeded">
+                        <option value="kidney">Kidney (신장)</option>
+                        <option value="liver">Liver (간)</option>
+                        <option value="heart">Heart (심장)</option>
+                        <option value="lung">Lung (폐)</option>
+                        <option value="pancreas">Pancreas (췌장)</option>
+                        <option value="intestine">Intestine (장)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Blood Type" data-ko="혈액형">Blood Type</label>
+                    <select id="bloodType">
+                        <option value="O">O</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="AB">AB</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Urgency" data-ko="긴급도">Urgency</label>
+                    <select id="urgency">
+                        <option value="urgent">Urgent (긴급)</option>
+                        <option value="high">High (높음)</option>
+                        <option value="medium">Medium (중간)</option>
+                        <option value="stable">Stable (안정)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="PRA Percent (%)" data-ko="PRA 백분율 (%)">PRA Percent (%)</label>
+                    <input type="number" id="praPercent" value="25" min="0" max="100">
+                </div>
+                <div class="form-group">
+                    <label data-en="Waiting Days" data-ko="대기 일수">Waiting Days</label>
+                    <input type="number" id="waitingDays" value="365" min="0">
+                </div>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="generateProfile()">
+                    <span data-en="Generate Profile JSON" data-ko="프로필 JSON 생성">Generate Profile JSON</span>
+                </button>
+            </div>
+            <div class="output" id="output-0"><pre data-en="Click 'Generate' to see the organ profile data format..." data-ko="'생성'을 클릭하여 장기 프로필 데이터 형식을 확인하세요...">Click 'Generate' to see the organ profile data format...</pre></div>
+        </div>
+
+        <!-- Panel 1: Algorithms -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🔢 Matching Algorithm" data-ko="🔢 매칭 알고리즘">🔢 Matching Algorithm</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Patient Blood Type" data-ko="환자 혈액형">Patient Blood Type</label>
+                    <select id="patientBlood">
+                        <option value="O">O</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="AB">AB</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Donor Blood Type" data-ko="공여자 혈액형">Donor Blood Type</label>
+                    <select id="donorBlood">
+                        <option value="O">O</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="AB">AB</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="HLA Match Count (0-6)" data-ko="HLA 일치 수 (0-6)">HLA Match Count (0-6)</label>
+                    <input type="number" id="hlaMatch" value="4" min="0" max="6">
+                </div>
+                <div class="form-group">
+                    <label data-en="Geographic Distance (km)" data-ko="지리적 거리 (km)">Geographic Distance (km)</label>
+                    <input type="number" id="geoDistance" value="150" min="0">
+                </div>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runMatching()">
+                    <span data-en="Calculate Match Score" data-ko="매칭 점수 계산">Calculate Match Score</span>
+                </button>
+            </div>
+            <div class="output" id="output-1">
+                <div class="match-score" id="matchScore">--</div>
+                <p style="text-align:center;color:var(--text-muted)" data-en="Match Score (0-100)" data-ko="매칭 점수 (0-100)">Match Score (0-100)</p>
+                <div id="matchDetails"></div>
+            </div>
+        </div>
+
+        <!-- Panel 2: Protocol -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="📡 Real-time Protocol Simulation" data-ko="📡 실시간 프로토콜 시뮬레이션">📡 Real-time Protocol Simulation</h2>
+            <div class="form-group">
+                <label data-en="Message Type" data-ko="메시지 유형">Message Type</label>
+                <select id="msgType">
+                    <option value="organ.available">Organ Available (장기 이용 가능)</option>
+                    <option value="match.request">Match Request (매칭 요청)</option>
+                    <option value="eligibility.check">Eligibility Check (적격성 확인)</option>
+                    <option value="alert.urgent">Urgent Alert (긴급 알림)</option>
+                </select>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulateProtocol()">
+                    <span data-en="Send Protocol Message" data-ko="프로토콜 메시지 전송">Send Protocol Message</span>
+                </button>
+            </div>
+            <div class="output" id="output-2"><pre data-en="Protocol messages will appear here..." data-ko="프로토콜 메시지가 여기에 표시됩니다...">Protocol messages will appear here...</pre></div>
+        </div>
+
+        <!-- Panel 3: Integration -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🔗 Alternative Options Evaluation" data-ko="🔗 대안 옵션 평가">🔗 Alternative Options Evaluation</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Patient Age" data-ko="환자 나이">Patient Age</label>
+                    <input type="number" id="patientAge" value="45" min="0" max="120">
+                </div>
+                <div class="form-group">
+                    <label data-en="PRA Level (%)" data-ko="PRA 수준 (%)">PRA Level (%)</label>
+                    <input type="number" id="praLevel" value="60" min="0" max="100">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Years on Waitlist" data-ko="대기 연수">Years on Waitlist</label>
+                    <input type="number" id="yearsWaiting" value="3" min="0" max="20">
+                </div>
+                <div class="form-group">
+                    <label data-en="Living Donor Available" data-ko="생체 기증자 유무">Living Donor Available</label>
+                    <select id="livingDonor">
+                        <option value="no">No (없음)</option>
+                        <option value="yes">Yes (있음)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="evaluateOptions()">
+                    <span data-en="Evaluate All Options" data-ko="모든 옵션 평가">Evaluate All Options</span>
+                </button>
+            </div>
+            <div class="output" id="output-3"><pre data-en="Evaluation results will appear here..." data-ko="평가 결과가 여기에 표시됩니다...">Evaluation results will appear here...</pre></div>
+        </div>
+
+        <!-- Panel 4: QR & VC -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="📱 Verifiable Credential" data-ko="📱 검증 가능한 자격증명">📱 Verifiable Credential</h2>
+            <div class="form-group">
+                <label data-en="Patient Name" data-ko="환자 이름">Patient Name</label>
+                <input type="text" id="patientName" value="John Doe">
+            </div>
+            <div class="form-group">
+                <label data-en="Credential Type" data-ko="자격증명 유형">Credential Type</label>
+                <select id="credType">
+                    <option value="waitlist">Waitlist Registration (대기자 등록)</option>
+                    <option value="eligibility">Eligibility Certificate (적격성 증명서)</option>
+                    <option value="transplant">Transplant Record (이식 기록)</option>
+                </select>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="generateVC()">
+                    <span data-en="Generate Verifiable Credential" data-ko="검증 가능한 자격증명 생성">Generate Verifiable Credential</span>
+                </button>
+            </div>
+            <div class="output" id="output-4"><pre data-en="Verifiable Credential will appear here..." data-ko="검증 가능한 자격증명이 여기에 표시됩니다...">Verifiable Credential will appear here...</pre></div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</div>
+        <p>WIA - World Certification Industry Association</p>
+        <p>© 2025 MIT License</p>
+    </footer>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang);
+            });
+        }
+
+        function toggleLang() {
+            setLang(currentLang === 'en' ? 'ko' : 'en');
+        }
+
+        function showPanel(idx) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === idx));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+        }
+
+        function generateProfile() {
+            const profile = {
+                "$schema": "https://wia.live/schemas/organ-shortage/v1.0.0",
+                "organ_profile": {
+                    "patient_id": "urn:uuid:" + crypto.randomUUID(),
+                    "organ_needed": document.getElementById('organNeeded').value,
+                    "urgency": document.getElementById('urgency').value,
+                    "waitlist_status": {
+                        "registered_date": new Date(Date.now() - parseInt(document.getElementById('waitingDays').value) * 86400000).toISOString(),
+                        "unos_status": document.getElementById('urgency').value === 'urgent' ? '1A' : '2',
+                        "waiting_time_days": parseInt(document.getElementById('waitingDays').value),
+                        "geographic_region": "Region 5"
+                    },
+                    "immunological": {
+                        "blood_type": document.getElementById('bloodType').value,
+                        "hla_typing": {
+                            "classI": { "A": ["02:01", "03:01"], "B": ["07:02", "44:02"], "C": ["07:02", "05:01"] },
+                            "classII": { "DR": ["15:01", "04:01"], "DQ": ["06:02", "03:01"] }
+                        },
+                        "pra_percent": parseInt(document.getElementById('praPercent').value),
+                        "crossmatch_history": []
+                    },
+                    "alternative_options": {
+                        "xenotransplant_eligible": parseInt(document.getElementById('praPercent').value) > 50,
+                        "bioprinted_organ_eligible": true,
+                        "living_donor_available": false,
+                        "domino_transplant_option": false
+                    }
+                },
+                "metadata": {
+                    "standard": "WIA-ORGAN-SHORTAGE",
+                    "version": "1.0.0",
+                    "philosophy": "弘益人間",
+                    "generated_at": new Date().toISOString()
+                }
+            };
+            document.querySelector('#output-0 pre').textContent = JSON.stringify(profile, null, 2);
+        }
+
+        function runMatching() {
+            const patientBlood = document.getElementById('patientBlood').value;
+            const donorBlood = document.getElementById('donorBlood').value;
+            const hlaMatch = parseInt(document.getElementById('hlaMatch').value);
+            const distance = parseInt(document.getElementById('geoDistance').value);
+
+            const compatibility = {
+                'O': ['O'],
+                'A': ['A', 'O'],
+                'B': ['B', 'O'],
+                'AB': ['A', 'B', 'AB', 'O']
+            };
+
+            const bloodCompatible = compatibility[patientBlood].includes(donorBlood);
+            const bloodScore = bloodCompatible ? 30 : 0;
+            const hlaScore = (hlaMatch / 6) * 40;
+            const distanceScore = Math.max(0, 30 - (distance / 50));
+            const totalScore = Math.round(bloodScore + hlaScore + distanceScore);
+
+            document.getElementById('matchScore').textContent = totalScore;
+            document.getElementById('matchScore').style.color = totalScore >= 70 ? 'var(--success)' : totalScore >= 40 ? 'var(--warning)' : 'var(--danger)';
+
+            document.getElementById('matchDetails').innerHTML = `
+                <div class="result-card">
+                    <h4>Match Breakdown</h4>
+                    <p>Blood Compatibility: ${bloodCompatible ? '✅ Compatible' : '❌ Incompatible'} (${bloodScore}/30)</p>
+                    <div class="progress-bar"><div class="progress-fill" style="width:${(bloodScore/30)*100}%"></div></div>
+                    <p>HLA Match: ${hlaMatch}/6 antigens (${Math.round(hlaScore)}/40)</p>
+                    <div class="progress-bar"><div class="progress-fill" style="width:${(hlaScore/40)*100}%"></div></div>
+                    <p>Geographic: ${distance}km (${Math.round(distanceScore)}/30)</p>
+                    <div class="progress-bar"><div class="progress-fill" style="width:${(distanceScore/30)*100}%"></div></div>
+                </div>
+            `;
+        }
+
+        function simulateProtocol() {
+            const msgType = document.getElementById('msgType').value;
+            const message = {
+                header: {
+                    version: "WIA-ORGAN-SHORTAGE/1.0",
+                    messageId: "msg_" + Date.now(),
+                    type: msgType,
+                    timestamp: new Date().toISOString(),
+                    priority: msgType === 'alert.urgent' ? 'critical' : 'normal'
+                },
+                payload: {
+                    organType: "kidney",
+                    region: "Region 5",
+                    status: "available",
+                    expiresAt: new Date(Date.now() + 4 * 3600000).toISOString()
+                },
+                security: {
+                    encryption: "AES-256-GCM",
+                    signature: "sig_" + btoa(Math.random().toString()).slice(0, 32)
+                }
+            };
+            document.querySelector('#output-2 pre').textContent = JSON.stringify(message, null, 2);
+        }
+
+        function evaluateOptions() {
+            const age = parseInt(document.getElementById('patientAge').value);
+            const pra = parseInt(document.getElementById('praLevel').value);
+            const years = parseInt(document.getElementById('yearsWaiting').value);
+            const livingDonor = document.getElementById('livingDonor').value === 'yes';
+
+            const xenoEligible = pra > 50 || years > 2;
+            const bioprintEligible = age < 65;
+
+            const html = `
+                <div class="result-card">
+                    <h4>🏥 Traditional Transplant</h4>
+                    <p>Living Donor: ${livingDonor ? '<span class="status-badge status-eligible">Available</span>' : '<span class="status-badge status-ineligible">Not Available</span>'}</p>
+                    <p>Deceased Donor: <span class="status-badge status-pending">On Waitlist (${years} years)</span></p>
+                </div>
+                <div class="result-card">
+                    <h4>🧬 Xenotransplantation</h4>
+                    <p>Eligibility: ${xenoEligible ? '<span class="status-badge status-eligible">Eligible</span>' : '<span class="status-badge status-ineligible">Not Eligible</span>'}</p>
+                    <p>Reason: ${pra > 50 ? 'High PRA - difficult to match' : years > 2 ? 'Extended waitlist time' : 'Standard pathway preferred'}</p>
+                    <p>Trial Status: eGenesis Phase 1 (2024-2025)</p>
+                </div>
+                <div class="result-card">
+                    <h4>🖨️ 3D Bioprinted Organ</h4>
+                    <p>Eligibility: ${bioprintEligible ? '<span class="status-badge status-eligible">Eligible</span>' : '<span class="status-badge status-pending">Limited</span>'}</p>
+                    <p>Technology Status: Research Phase</p>
+                    <p>Estimated Availability: 2028-2030</p>
+                </div>
+            `;
+            document.getElementById('output-3').innerHTML = html;
+        }
+
+        function generateVC() {
+            const name = document.getElementById('patientName').value;
+            const credType = document.getElementById('credType').value;
+            const vc = {
+                "@context": [
+                    "https://www.w3.org/2018/credentials/v1",
+                    "https://wia.live/contexts/organ-shortage/v1"
+                ],
+                "type": ["VerifiableCredential", "OrganShortageCredential"],
+                "issuer": "did:wia:issuer:organ-registry",
+                "issuanceDate": new Date().toISOString(),
+                "credentialSubject": {
+                    "id": "did:wia:patient:" + btoa(name).slice(0, 16),
+                    "name": name,
+                    "credentialType": credType,
+                    "organNeeded": "kidney",
+                    "status": credType === 'waitlist' ? 'active' : 'verified',
+                    "registeredAt": new Date().toISOString()
+                },
+                "proof": {
+                    "type": "Ed25519Signature2020",
+                    "created": new Date().toISOString(),
+                    "verificationMethod": "did:wia:issuer:organ-registry#key-1",
+                    "proofPurpose": "assertionMethod",
+                    "proofValue": "z" + btoa(Math.random().toString() + Date.now()).slice(0, 64)
+                }
+            };
+            document.querySelector('#output-4 pre').textContent = JSON.stringify(vc, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang(currentLang));
+    </script>
+</body>
+</html>

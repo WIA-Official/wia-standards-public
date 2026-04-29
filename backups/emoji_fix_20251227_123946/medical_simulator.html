@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Medical - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #0EA5E9;
+            --primary-dark: #0284C7;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #38BDF8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .device-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0; }
+        .device-card { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 25px; cursor: pointer; transition: all 0.2s; }
+        .device-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .device-card.selected { border-color: var(--primary); background: rgba(14, 165, 233, 0.1); }
+        .device-icon { font-size: 3rem; margin-bottom: 15px; }
+        .device-name { font-size: 1.1rem; font-weight: 600; margin-bottom: 5px; }
+        .device-type { font-size: 0.85rem; color: var(--text-muted); }
+        .device-fda { display: inline-block; background: rgba(14, 165, 233, 0.2); color: var(--primary); padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; margin-top: 10px; }
+
+        .access-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+        .access-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .access-card h5 { color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .toggle-row:last-child { border-bottom: none; }
+        .toggle-label { font-size: 0.9rem; }
+        .toggle-switch { position: relative; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 26px; transition: 0.3s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(24px); }
+
+        .alert-demo { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 30px; margin: 20px 0; text-align: center; }
+        .alert-icon { font-size: 4rem; margin-bottom: 15px; }
+        .alert-message { font-size: 1.3rem; font-weight: 600; margin-bottom: 10px; }
+        .alert-modes { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+        .alert-mode { background: var(--bg-card); padding: 15px 20px; border-radius: 8px; display: flex; align-items: center; gap: 8px; }
+        .alert-mode.active { background: rgba(14, 165, 233, 0.2); border: 1px solid var(--primary); }
+
+        .compliance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 20px 0; }
+        .compliance-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 25px; text-align: center; }
+        .compliance-logo { font-size: 2.5rem; margin-bottom: 10px; }
+        .compliance-name { font-weight: 600; margin-bottom: 5px; }
+        .compliance-status { font-size: 0.85rem; padding: 5px 12px; border-radius: 15px; display: inline-block; margin-top: 10px; }
+        .compliance-status.passed { background: rgba(16, 185, 129, 0.2); color: var(--secondary); }
+        .compliance-status.pending { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+
+        .profile-section { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin: 15px 0; }
+        .profile-section h5 { color: var(--primary); margin-bottom: 15px; }
+        .profile-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .profile-item:last-child { border-bottom: none; }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .access-grid, .compliance-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Medical</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">⚕️ WIA Medical</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Medical Device Accessibility" data-ko="의료기기 접근성">Medical Device Accessibility</h1>
+            <p data-en="Accessible healthcare devices for everyone" data-ko="모든 이를 위한 접근 가능한 의료기기">Accessible healthcare devices</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🏥 Devices" data-ko="🏥 기기">🏥 Devices</div>
+            <div class="tab" onclick="showPanel(1)" data-en="♿ Accessibility" data-ko="♿ 접근성">♿ Accessibility</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🔔 Alerts" data-ko="🔔 알람">🔔 Alerts</div>
+            <div class="tab" onclick="showPanel(3)" data-en="📋 Compliance" data-ko="📋 인증">📋 Compliance</div>
+            <div class="tab" onclick="showPanel(4)" data-en="👤 Profile" data-ko="👤 프로필">👤 Profile</div>
+        </div>
+
+        <!-- Panel 0: Devices -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🏥 Medical Devices" data-ko="🏥 의료기기">🏥 Medical Devices</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Select a device to configure accessibility" data-ko="접근성을 구성할 기기를 선택하세요">Select device to configure</p>
+
+            <div class="device-grid">
+                <div class="device-card selected" onclick="selectDevice('glucose')">
+                    <div class="device-icon">🩸</div>
+                    <div class="device-name" data-en="Glucose Monitor" data-ko="혈당 측정기">Glucose Monitor</div>
+                    <div class="device-type" data-en="Continuous Glucose Monitor (CGM)" data-ko="연속 혈당 측정기 (CGM)">CGM</div>
+                    <span class="device-fda">FDA Class II</span>
+                </div>
+                <div class="device-card" onclick="selectDevice('bp')">
+                    <div class="device-icon">💉</div>
+                    <div class="device-name" data-en="Blood Pressure" data-ko="혈압계">Blood Pressure</div>
+                    <div class="device-type" data-en="Home Blood Pressure Monitor" data-ko="가정용 혈압 측정기">Home Monitor</div>
+                    <span class="device-fda">FDA Class II</span>
+                </div>
+                <div class="device-card" onclick="selectDevice('insulin')">
+                    <div class="device-icon">💊</div>
+                    <div class="device-name" data-en="Insulin Pump" data-ko="인슐린 펌프">Insulin Pump</div>
+                    <div class="device-type" data-en="Automated Insulin Delivery" data-ko="자동 인슐린 전달">AID System</div>
+                    <span class="device-fda">FDA Class III</span>
+                </div>
+                <div class="device-card" onclick="selectDevice('pulse')">
+                    <div class="device-icon">❤️</div>
+                    <div class="device-name" data-en="Pulse Oximeter" data-ko="맥박 산소측정기">Pulse Oximeter</div>
+                    <div class="device-type" data-en="SpO2 & Heart Rate Monitor" data-ko="SpO2 & 심박수 측정">SpO2 Monitor</div>
+                    <span class="device-fda">FDA Class II</span>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="configureDevice()" data-en="⚙️ Configure Device" data-ko="⚙️ 기기 설정">⚙️ Configure</button>
+            </div>
+            <div class="output" id="deviceOutput"></div>
+        </div>
+
+        <!-- Panel 1: Accessibility -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="♿ Accessibility Features" data-ko="♿ 접근성 기능">♿ Accessibility Features</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Configure device accessibility settings" data-ko="기기 접근성 설정 구성">Configure accessibility</p>
+
+            <div class="access-grid">
+                <div class="access-card">
+                    <h5>👁️ <span data-en="Visual" data-ko="시각">Visual</span></h5>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Screen Reader" data-ko="화면 읽기">Screen Reader</span>
+                        <label class="toggle-switch"><input type="checkbox" id="screenReader" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Large Display" data-ko="큰 화면">Large Display</span>
+                        <label class="toggle-switch"><input type="checkbox" id="largeDisplay" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="High Contrast" data-ko="고대비">High Contrast</span>
+                        <label class="toggle-switch"><input type="checkbox" id="highContrast"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="access-card">
+                    <h5>🔊 <span data-en="Audio" data-ko="청각">Audio</span></h5>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Voice Feedback" data-ko="음성 피드백">Voice Feedback</span>
+                        <label class="toggle-switch"><input type="checkbox" id="voiceFeedback" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Audio Alerts" data-ko="음성 알람">Audio Alerts</span>
+                        <label class="toggle-switch"><input type="checkbox" id="audioAlerts" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Headphone Jack" data-ko="헤드폰 잭">Headphone Jack</span>
+                        <label class="toggle-switch"><input type="checkbox" id="headphone"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="access-card">
+                    <h5>🖐️ <span data-en="Motor" data-ko="운동">Motor</span></h5>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="One-Hand Operation" data-ko="한 손 조작">One-Hand Op</span>
+                        <label class="toggle-switch"><input type="checkbox" id="oneHand" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Large Buttons" data-ko="큰 버튼">Large Buttons</span>
+                        <label class="toggle-switch"><input type="checkbox" id="largeButtons" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Voice Control" data-ko="음성 제어">Voice Control</span>
+                        <label class="toggle-switch"><input type="checkbox" id="voiceControl"><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="access-card">
+                    <h5>🧠 <span data-en="Cognitive" data-ko="인지">Cognitive</span></h5>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Simple Mode" data-ko="간단 모드">Simple Mode</span>
+                        <label class="toggle-switch"><input type="checkbox" id="simpleMode"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Step-by-Step" data-ko="단계별 안내">Step-by-Step</span>
+                        <label class="toggle-switch"><input type="checkbox" id="stepByStep" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Reminders" data-ko="알림">Reminders</span>
+                        <label class="toggle-switch"><input type="checkbox" id="reminders" checked><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="saveAccessibility()" data-en="💾 Save Settings" data-ko="💾 설정 저장">💾 Save</button>
+            </div>
+            <div class="output" id="accessOutput"></div>
+        </div>
+
+        <!-- Panel 2: Alerts -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🔔 Multi-Modal Alerts" data-ko="🔔 다중 모달 알람">🔔 Multi-Modal Alerts</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Configure alert methods for accessibility" data-ko="접근성을 위한 알람 방식 구성">Configure alert methods</p>
+
+            <div class="alert-demo" id="alertDemo">
+                <div class="alert-icon">⚠️</div>
+                <div class="alert-message" data-en="LOW GLUCOSE: 65 mg/dL" data-ko="저혈당: 65 mg/dL">LOW GLUCOSE: 65 mg/dL</div>
+                <p style="color: var(--text-muted);" data-en="Urgent: Take glucose tablets" data-ko="긴급: 포도당 정제 섭취">Urgent action needed</p>
+                <div class="alert-modes">
+                    <div class="alert-mode active"><span>🔊</span><span data-en="Audio" data-ko="음성">Audio</span></div>
+                    <div class="alert-mode active"><span>📳</span><span data-en="Vibration" data-ko="진동">Vibration</span></div>
+                    <div class="alert-mode active"><span>💡</span><span data-en="Visual" data-ko="시각">Visual</span></div>
+                    <div class="alert-mode"><span>⠿</span><span data-en="Braille" data-ko="점자">Braille</span></div>
+                </div>
+            </div>
+
+            <div class="access-grid">
+                <div class="access-card">
+                    <h5>🚨 <span data-en="Alert Types" data-ko="알람 유형">Alert Types</span></h5>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Critical Alerts" data-ko="위급 알람">Critical</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Warning Alerts" data-ko="경고 알람">Warning</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Info Alerts" data-ko="정보 알람">Info</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+                <div class="access-card">
+                    <h5>📲 <span data-en="Delivery Methods" data-ko="전달 방식">Delivery</span></h5>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Push Notification" data-ko="푸시 알림">Push</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="SMS/Text" data-ko="문자">SMS</span>
+                        <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label" data-en="Caregiver Alert" data-ko="보호자 알림">Caregiver</span>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="testAlert()" data-en="🔔 Test Alert" data-ko="🔔 알람 테스트">🔔 Test Alert</button>
+            </div>
+            <div class="output" id="alertOutput"></div>
+        </div>
+
+        <!-- Panel 3: Compliance -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="📋 Regulatory Compliance" data-ko="📋 규제 준수">📋 Regulatory Compliance</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Device certifications and compliance status" data-ko="기기 인증 및 준수 현황">Certifications & compliance</p>
+
+            <div class="compliance-grid">
+                <div class="compliance-card">
+                    <div class="compliance-logo">🇺🇸</div>
+                    <div class="compliance-name">FDA</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">510(k) Clearance</div>
+                    <span class="compliance-status passed">✅ Cleared</span>
+                </div>
+                <div class="compliance-card">
+                    <div class="compliance-logo">🇪🇺</div>
+                    <div class="compliance-name">CE Mark</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">MDR 2017/745</div>
+                    <span class="compliance-status passed">✅ Certified</span>
+                </div>
+                <div class="compliance-card">
+                    <div class="compliance-logo">🤟</div>
+                    <div class="compliance-name">WIA</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">Accessibility Cert</div>
+                    <span class="compliance-status passed">✅ Level AAA</span>
+                </div>
+            </div>
+
+            <div class="profile-section">
+                <h5 data-en="📊 Compliance Details" data-ko="📊 준수 세부 사항">Compliance Details</h5>
+                <div class="profile-item"><span>IEC 62366-1</span><span style="color: var(--secondary);">✅ Usability</span></div>
+                <div class="profile-item"><span>ISO 14971</span><span style="color: var(--secondary);">✅ Risk Mgmt</span></div>
+                <div class="profile-item"><span>WCAG 2.1 AAA</span><span style="color: var(--secondary);">✅ Accessibility</span></div>
+                <div class="profile-item"><span>IEC 60601-1</span><span style="color: var(--secondary);">✅ Safety</span></div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="viewCertificate()" data-en="📄 View Certificate" data-ko="📄 인증서 보기">📄 View Certificate</button>
+            </div>
+            <div class="output" id="complianceOutput"></div>
+        </div>
+
+        <!-- Panel 4: Profile -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="👤 User Accessibility Profile" data-ko="👤 사용자 접근성 프로필">👤 User Profile</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Your medical accessibility preferences" data-ko="의료 접근성 기본 설정">Medical accessibility preferences</p>
+
+            <div class="profile-section">
+                <h5 data-en="📋 Accessibility Needs" data-ko="📋 접근성 요구 사항">Accessibility Needs</h5>
+                <div class="profile-item"><span data-en="Primary Need" data-ko="주요 요구">Primary</span><span data-en="Visual Impairment" data-ko="시각 장애">Visual Impairment</span></div>
+                <div class="profile-item"><span data-en="Assistive Tech" data-ko="보조 기술">Assistive Tech</span><span data-en="Screen Reader" data-ko="화면 읽기">Screen Reader</span></div>
+                <div class="profile-item"><span data-en="Preferred Input" data-ko="선호 입력">Input</span><span data-en="Voice Control" data-ko="음성 제어">Voice Control</span></div>
+            </div>
+
+            <div class="profile-section">
+                <h5 data-en="🏥 Medical Context" data-ko="🏥 의료 맥락">Medical Context</h5>
+                <div class="profile-item"><span data-en="Condition" data-ko="질환">Condition</span><span data-en="Type 1 Diabetes" data-ko="제1형 당뇨병">Type 1 Diabetes</span></div>
+                <div class="profile-item"><span data-en="Devices" data-ko="기기">Devices</span><span>CGM, Insulin Pump</span></div>
+                <div class="profile-item"><span data-en="Caregiver" data-ko="보호자">Caregiver</span><span data-en="Enabled" data-ko="활성화">Enabled</span></div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="exportProfile()" data-en="📤 Export Profile" data-ko="📤 프로필 내보내기">📤 Export</button>
+                <button class="btn btn-secondary" onclick="syncDevices()" data-en="🔄 Sync Devices" data-ko="🔄 기기 동기화">🔄 Sync</button>
+            </div>
+            <div class="output" id="profileOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Medical: Healthcare without barriers" data-ko="WIA Medical: 장벽 없는 의료">WIA Medical: Healthcare without barriers</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let selectedDevice = 'glucose';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function selectDevice(device) {
+            selectedDevice = device;
+            document.querySelectorAll('.device-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.device-card').classList.add('selected');
+        }
+
+        function configureDevice() {
+            const devices = {
+                glucose: { name: 'CGM', class: 'II', type: 'Continuous Glucose Monitor' },
+                bp: { name: 'Blood Pressure Monitor', class: 'II', type: 'Home Monitor' },
+                insulin: { name: 'Insulin Pump', class: 'III', type: 'AID System' },
+                pulse: { name: 'Pulse Oximeter', class: 'II', type: 'SpO2 Monitor' }
+            };
+            document.getElementById('deviceOutput').textContent = JSON.stringify({
+                device: devices[selectedDevice],
+                fdaClass: devices[selectedDevice].class,
+                accessibilityReady: true,
+                wiaCompliant: true,
+                message: currentLang === 'ko' ? '기기 설정 로드됨' : 'Device config loaded'
+            }, null, 2);
+        }
+
+        function saveAccessibility() {
+            document.getElementById('accessOutput').textContent = JSON.stringify({
+                visual: { screenReader: true, largeDisplay: true, highContrast: false },
+                audio: { voiceFeedback: true, audioAlerts: true },
+                motor: { oneHand: true, largeButtons: true, voiceControl: false },
+                cognitive: { simpleMode: false, stepByStep: true, reminders: true },
+                message: currentLang === 'ko' ? '접근성 설정 저장됨' : 'Accessibility settings saved'
+            }, null, 2);
+        }
+
+        function testAlert() {
+            const demo = document.getElementById('alertDemo');
+            demo.style.borderColor = 'var(--danger)';
+            demo.style.animation = 'pulse 0.5s 3';
+            document.getElementById('alertOutput').textContent = JSON.stringify({
+                alertType: 'critical',
+                message: 'LOW GLUCOSE: 65 mg/dL',
+                modes: ['audio', 'vibration', 'visual'],
+                timestamp: new Date().toISOString(),
+                message: currentLang === 'ko' ? '알람 테스트 전송됨' : 'Alert test sent'
+            }, null, 2);
+            setTimeout(() => { demo.style.borderColor = 'var(--border)'; }, 1500);
+        }
+
+        function viewCertificate() {
+            document.getElementById('complianceOutput').textContent = JSON.stringify({
+                certifications: [
+                    { name: 'FDA 510(k)', number: 'K123456', status: 'cleared' },
+                    { name: 'CE Mark', notifiedBody: 'TÜV SÜD', status: 'certified' },
+                    { name: 'WIA Medical', level: 'AAA', status: 'certified' }
+                ],
+                standards: ['IEC 62366-1', 'ISO 14971', 'WCAG 2.1', 'IEC 60601-1'],
+                message: currentLang === 'ko' ? '인증서 정보 로드됨' : 'Certificate info loaded'
+            }, null, 2);
+        }
+
+        function exportProfile() {
+            document.getElementById('profileOutput').textContent = JSON.stringify({
+                format: 'WIA-MEDICAL-PROFILE-1.0',
+                accessibilityNeeds: ['visual_impairment'],
+                assistiveTech: ['screen_reader', 'voice_control'],
+                devices: ['cgm', 'insulin_pump'],
+                fhirCompatible: true,
+                message: currentLang === 'ko' ? '프로필 내보내기 준비됨' : 'Profile ready for export'
+            }, null, 2);
+        }
+
+        function syncDevices() {
+            document.getElementById('profileOutput').textContent = JSON.stringify({
+                synced: true,
+                devices: [
+                    { name: 'CGM', status: 'connected', lastSync: new Date().toISOString() },
+                    { name: 'Insulin Pump', status: 'connected', lastSync: new Date().toISOString() }
+                ],
+                message: currentLang === 'ko' ? '기기 동기화 완료' : 'Devices synced successfully'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang('en'));
+    </script>
+</body>
+</html>

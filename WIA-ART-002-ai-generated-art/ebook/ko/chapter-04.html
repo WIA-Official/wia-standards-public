@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: API와 SDK 구현 - WIA-ART-002</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #E11D48; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; box-shadow: 0 10px 40px rgba(225, 29, 72, 0.1); }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; text-shadow: 0 0 20px rgba(225, 29, 72, 0.3); }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        p { margin: 1rem 0; text-align: justify; color: var(--text-secondary); }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; color: var(--text-secondary); }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .philosophy { text-align: center; font-size: 1.5rem; color: var(--primary); margin: 2rem 0; padding: 1rem; background: rgba(225, 29, 72, 0.1); border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: rgba(225, 29, 72, 0.05); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; font-weight: bold; transition: all 0.3s; }
+        .btn:hover { background: #be123c; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(225, 29, 72, 0.3); }
+        .key-takeaways { background: linear-gradient(135deg, rgba(225, 29, 72, 0.1) 0%, rgba(190, 18, 60, 0.05) 100%); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; border: 2px solid rgba(225, 29, 72, 0.3); }
+        .key-takeaways h3 { margin-top: 0; }
+        .review-questions { background: rgba(225, 29, 72, 0.05); padding: 1.5rem; border-radius: 10px; margin: 2rem 0; }
+        .review-questions h3 { margin-top: 0; }
+        .review-questions ol { margin-left: 1.5rem; }
+        .review-questions li { margin: 1rem 0; line-height: 1.6; }
+        strong { color: var(--primary); }
+        code { background: var(--bg-tertiary); padding: 0.2rem 0.4rem; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 0.9em; }
+        pre { background: var(--bg-tertiary); padding: 1.5rem; border-radius: 5px; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; padding: 0; }
+        .diagram { background: var(--bg-tertiary); padding: 2rem; border-radius: 10px; margin: 2rem 0; font-family: monospace; line-height: 1.4; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제4장: API와 SDK 구현</h1>
+
+        <div class="philosophy">
+            弘益人間 · 널리 인간을 이롭게 하라
+        </div>
+
+        <h2>개요</h2>
+        <p>
+            WIA-ART-002 표준의 진정한 가치는 실제 구현에 있습니다. 표준을 정의하는 것만으로는 충분하지 않으며, 개발자들이 쉽게 통합할 수 있는
+            RESTful API, 직관적인 SDK, 그리고 실시간 통신을 위한 WebSocket 인터페이스가 필요합니다. 이 장에서는 WIA-ART-002의 실무 구현을
+            상세히 다룹니다.
+        </p>
+
+        <p>
+            현대 AI 이미지 생성 서비스는 단순한 동기식 요청-응답을 넘어섭니다. 고품질 이미지 생성은 수십 초에서 수 분이 걸릴 수 있으며,
+            배치 처리, 큐 관리, 실시간 진행 상황 스트리밍이 필요합니다. 또한 API 속도 제한(Rate Limiting), 사용량 할당(Quota),
+            비용 추적, 그리고 OAuth 2.0 기반 인증 시스템을 갖춰야 합니다.
+        </p>
+
+        <h2>RESTful API 설계 원칙</h2>
+
+        <h3>1. API 엔드포인트 구조</h3>
+        <p>
+            WIA-ART-002 API는 REST 아키텍처 원칙을 따르며, 명확한 리소스 기반 URL 구조를 사용합니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>엔드포인트</th>
+                    <th>메서드</th>
+                    <th>기능</th>
+                    <th>인증 필요</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>/api/v1/generate</code></td>
+                    <td>POST</td>
+                    <td>새 이미지 생성 요청</td>
+                    <td>필수</td>
+                </tr>
+                <tr>
+                    <td><code>/api/v1/jobs/{jobId}</code></td>
+                    <td>GET</td>
+                    <td>생성 작업 상태 조회</td>
+                    <td>필수</td>
+                </tr>
+                <tr>
+                    <td><code>/api/v1/jobs/{jobId}/cancel</code></td>
+                    <td>POST</td>
+                    <td>작업 취소</td>
+                    <td>필수</td>
+                </tr>
+                <tr>
+                    <td><code>/api/v1/artworks</code></td>
+                    <td>GET</td>
+                    <td>작품 목록 조회</td>
+                    <td>필수</td>
+                </tr>
+                <tr>
+                    <td><code>/api/v1/artworks/{id}</code></td>
+                    <td>GET</td>
+                    <td>특정 작품 상세 정보</td>
+                    <td>선택</td>
+                </tr>
+                <tr>
+                    <td><code>/api/v1/artworks/{id}/metadata</code></td>
+                    <td>GET</td>
+                    <td>WIA-ART-002 메타데이터</td>
+                    <td>선택</td>
+                </tr>
+                <tr>
+                    <td><code>/api/v1/artworks/{id}/verify</code></td>
+                    <td>POST</td>
+                    <td>작품 진위 검증</td>
+                    <td>선택</td>
+                </tr>
+                <tr>
+                    <td><code>/api/v1/models</code></td>
+                    <td>GET</td>
+                    <td>사용 가능 모델 목록</td>
+                    <td>선택</td>
+                </tr>
+                <tr>
+                    <td><code>/api/v1/quota</code></td>
+                    <td>GET</td>
+                    <td>사용량 할당 확인</td>
+                    <td>필수</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2. 이미지 생성 API</h3>
+        <p>
+            핵심 엔드포인트인 <code>/api/v1/generate</code>는 비동기 작업을 시작하고 즉시 Job ID를 반환합니다:
+        </p>
+
+        <pre><code>// POST /api/v1/generate
+// Content-Type: application/json
+// Authorization: Bearer {ACCESS_TOKEN}
+
+{
+  "prompt": "A serene Japanese garden in autumn, maple leaves falling,
+             koi pond with stone bridge, Mount Fuji in background,
+             golden hour lighting, cinematic composition, 8k resolution",
+  "negativePrompt": "low quality, blurry, distorted, modern buildings",
+  "model": "stable-diffusion-xl-1.0",
+  "parameters": {
+    "width": 1024,
+    "height": 1024,
+    "steps": 50,
+    "cfgScale": 7.5,
+    "sampler": "DPM++ 2M Karras",
+    "seed": 42,  // 생략 시 랜덤 시드
+    "batchSize": 4  // 한 번에 4개 변형 생성
+  },
+  "metadata": {
+    "title": "Autumn in Kyoto Garden",
+    "description": "A peaceful autumn scene...",
+    "tags": ["nature", "japan", "autumn", "garden"],
+    "license": "CC-BY-SA-4.0"
+  },
+  "options": {
+    "webhook": "https://myapp.com/webhooks/generation-complete",
+    "priority": "normal",  // "low", "normal", "high"
+    "saveToGallery": true
+  }
+}
+
+// 응답 (202 Accepted)
+{
+  "jobId": "job_2024_abc123xyz",
+  "status": "queued",
+  "queuePosition": 3,
+  "estimatedTime": 45,  // 초 단위
+  "credits": {
+    "cost": 10,
+    "remaining": 490
+  },
+  "statusUrl": "/api/v1/jobs/job_2024_abc123xyz",
+  "websocketUrl": "wss://api.wia-art.org/jobs/job_2024_abc123xyz/stream"
+}</code></pre>
+
+        <h3>3. 작업 상태 조회</h3>
+        <p>
+            클라이언트는 Job ID로 작업 진행 상황을 폴링하거나 WebSocket으로 실시간 업데이트를 받을 수 있습니다:
+        </p>
+
+        <pre><code>// GET /api/v1/jobs/{jobId}
+// Authorization: Bearer {ACCESS_TOKEN}
+
+// 응답 - 진행 중
+{
+  "jobId": "job_2024_abc123xyz",
+  "status": "processing",  // queued, processing, completed, failed, cancelled
+  "progress": 0.68,  // 0.0 ~ 1.0
+  "currentStep": 34,
+  "totalSteps": 50,
+  "message": "Generating image 2 of 4...",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "startedAt": "2024-01-15T10:30:45Z",
+  "estimatedCompletion": "2024-01-15T10:31:30Z"
+}
+
+// 응답 - 완료
+{
+  "jobId": "job_2024_abc123xyz",
+  "status": "completed",
+  "progress": 1.0,
+  "results": [
+    {
+      "artworkId": "art_001",
+      "imageUrl": "https://cdn.wia-art.org/images/art_001.png",
+      "thumbnailUrl": "https://cdn.wia-art.org/thumbs/art_001.jpg",
+      "metadata": {
+        "standard": "WIA-ART-002",
+        "version": "1.0",
+        // 전체 WIA-ART-002 메타데이터
+      },
+      "generation": {
+        "seed": 42,
+        "actualSteps": 50,
+        "generationTime": 38.5  // 초
+      }
+    },
+    // ... 3개의 추가 변형
+  ],
+  "createdAt": "2024-01-15T10:30:00Z",
+  "completedAt": "2024-01-15T10:31:32Z",
+  "totalTime": 92.3
+}</code></pre>
+
+        <h2>TypeScript SDK 구현</h2>
+
+        <h3>1. SDK 아키텍처</h3>
+        <p>
+            WIA-ART-002 TypeScript SDK는 Promise 기반의 현대적인 API를 제공하며, 자동 재시도, 에러 처리, 타입 안정성을 갖춥니다:
+        </p>
+
+        <pre><code>// wia-art-002-sdk/src/client.ts
+import axios, { AxiosInstance } from 'axios';
+import { EventEmitter } from 'events';
+import WebSocket from 'ws';
+
+export interface WIAArtConfig {
+  apiKey: string;
+  baseUrl?: string;
+  timeout?: number;
+  retries?: number;
+}
+
+export interface GenerationRequest {
+  prompt: string;
+  negativePrompt?: string;
+  model?: string;
+  parameters?: GenerationParameters;
+  metadata?: ArtworkMetadata;
+  options?: GenerationOptions;
+}
+
+export interface GenerationParameters {
+  width?: number;
+  height?: number;
+  steps?: number;
+  cfgScale?: number;
+  sampler?: string;
+  seed?: number;
+  batchSize?: number;
+}
+
+export class WIAArtClient extends EventEmitter {
+  private axios: AxiosInstance;
+  private config: WIAArtConfig;
+
+  constructor(config: WIAArtConfig) {
+    super();
+    this.config = {
+      baseUrl: 'https://api.wia-art.org',
+      timeout: 60000,
+      retries: 3,
+      ...config
+    };
+
+    this.axios = axios.create({
+      baseURL: this.config.baseUrl,
+      timeout: this.config.timeout,
+      headers: {
+        'Authorization': `Bearer ${this.config.apiKey}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'WIA-ART-002-SDK/1.0'
+      }
+    });
+
+    this.setupInterceptors();
+  }
+
+  // 이미지 생성 시작
+  async generate(request: GenerationRequest): Promise<GenerationJob> {
+    try {
+      const response = await this.axios.post('/api/v1/generate', request);
+      return new GenerationJob(this, response.data);
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // 작업 상태 조회
+  async getJob(jobId: string): Promise<JobStatus> {
+    const response = await this.axios.get(`/api/v1/jobs/${jobId}`);
+    return response.data;
+  }
+
+  // 작품 조회
+  async getArtwork(artworkId: string): Promise<Artwork> {
+    const response = await this.axios.get(`/api/v1/artworks/${artworkId}`);
+    return response.data;
+  }
+
+  // 메타데이터 조회
+  async getMetadata(artworkId: string): Promise<WIAArtMetadata> {
+    const response = await this.axios.get(
+      `/api/v1/artworks/${artworkId}/metadata`
+    );
+    return response.data;
+  }
+
+  // 작품 검증
+  async verifyArtwork(artworkId: string): Promise<VerificationResult> {
+    const response = await this.axios.post(
+      `/api/v1/artworks/${artworkId}/verify`
+    );
+    return response.data;
+  }
+
+  // 사용량 할당 확인
+  async getQuota(): Promise<QuotaInfo> {
+    const response = await this.axios.get('/api/v1/quota');
+    return response.data;
+  }
+
+  // 에러 처리
+  private handleError(error: any): Error {
+    if (error.response) {
+      const { status, data } = error.response;
+      switch (status) {
+        case 401:
+          return new Error('Invalid API key or expired token');
+        case 402:
+          return new Error('Insufficient credits');
+        case 429:
+          return new Error(`Rate limit exceeded: ${data.message}`);
+        case 500:
+          return new Error('Server error, please try again later');
+        default:
+          return new Error(data.message || 'Unknown error');
+      }
+    }
+    return error;
+  }
+
+  // 자동 재시도 설정
+  private setupInterceptors() {
+    this.axios.interceptors.response.use(
+      response => response,
+      async error => {
+        const config = error.config;
+        if (!config || !config.retry) {
+          config.retry = 0;
+        }
+
+        if (config.retry >= this.config.retries!) {
+          return Promise.reject(error);
+        }
+
+        config.retry += 1;
+
+        // 지수 백오프
+        const delay = Math.pow(2, config.retry) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+
+        return this.axios(config);
+      }
+    );
+  }
+}</code></pre>
+
+        <h3>2. 생성 작업 클래스</h3>
+        <p>
+            <code>GenerationJob</code> 클래스는 진행 상황 추적, WebSocket 스트리밍, 완료 대기 등을 캡슐화합니다:
+        </p>
+
+        <pre><code>// wia-art-002-sdk/src/job.ts
+export class GenerationJob extends EventEmitter {
+  private client: WIAArtClient;
+  private jobData: any;
+  private ws?: WebSocket;
+  private pollInterval?: NodeJS.Timeout;
+
+  constructor(client: WIAArtClient, jobData: any) {
+    super();
+    this.client = client;
+    this.jobData = jobData;
+  }
+
+  get id(): string {
+    return this.jobData.jobId;
+  }
+
+  get status(): string {
+    return this.jobData.status;
+  }
+
+  // WebSocket으로 실시간 진행 상황 스트리밍
+  stream(): this {
+    if (this.ws) return this;
+
+    this.ws = new WebSocket(this.jobData.websocketUrl, {
+      headers: { 'Authorization': `Bearer ${this.client.config.apiKey}` }
+    });
+
+    this.ws.on('message', (data: string) => {
+      const update = JSON.parse(data);
+      this.emit('progress', update);
+
+      if (update.status === 'completed') {
+        this.emit('completed', update.results);
+        this.cleanup();
+      } else if (update.status === 'failed') {
+        this.emit('failed', new Error(update.error));
+        this.cleanup();
+      }
+    });
+
+    this.ws.on('error', (error) => {
+      this.emit('error', error);
+      this.cleanup();
+    });
+
+    return this;
+  }
+
+  // 폴링으로 진행 상황 확인
+  poll(intervalMs: number = 2000): this {
+    this.pollInterval = setInterval(async () => {
+      try {
+        const status = await this.client.getJob(this.id);
+        this.emit('progress', status);
+
+        if (status.status === 'completed') {
+          this.emit('completed', status.results);
+          this.cleanup();
+        } else if (status.status === 'failed') {
+          this.emit('failed', new Error(status.error));
+          this.cleanup();
+        }
+      } catch (error) {
+        this.emit('error', error);
+      }
+    }, intervalMs);
+
+    return this;
+  }
+
+  // 완료까지 대기 (Promise)
+  async wait(): Promise<GenerationResult[]> {
+    return new Promise((resolve, reject) => {
+      this.stream()
+        .on('completed', resolve)
+        .on('failed', reject)
+        .on('error', reject);
+    });
+  }
+
+  // 작업 취소
+  async cancel(): Promise<void> {
+    await this.client.axios.post(`/api/v1/jobs/${this.id}/cancel`);
+    this.cleanup();
+  }
+
+  private cleanup() {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = undefined;
+    }
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = undefined;
+    }
+  }
+}</code></pre>
+
+        <h3>3. SDK 사용 예시</h3>
+        <pre><code>// 클라이언트 애플리케이션에서 사용
+import { WIAArtClient } from 'wia-art-002-sdk';
+
+const client = new WIAArtClient({
+  apiKey: process.env.WIA_ART_API_KEY!
+});
+
+// 예시 1: Promise 기반 사용 (async/await)
+async function generateImage() {
+  try {
+    const job = await client.generate({
+      prompt: 'A majestic dragon flying over mountains at sunset',
+      parameters: {
+        width: 1024,
+        height: 1024,
+        steps: 50,
+        cfgScale: 7.5
+      }
+    });
+
+    console.log(`Job created: ${job.id}`);
+
+    // 완료까지 대기
+    const results = await job.wait();
+    console.log(`Generated ${results.length} images:`);
+    results.forEach(result => {
+      console.log(`- ${result.imageUrl}`);
+    });
+  } catch (error) {
+    console.error('Generation failed:', error);
+  }
+}
+
+// 예시 2: 이벤트 기반 사용 (진행 상황 추적)
+function generateWithProgress() {
+  client.generate({
+    prompt: 'Cyberpunk city at night, neon lights, rain',
+    parameters: { batchSize: 4 }
+  }).then(job => {
+    job.stream()
+      .on('progress', (status) => {
+        console.log(`Progress: ${(status.progress * 100).toFixed(1)}%`);
+        console.log(`Message: ${status.message}`);
+      })
+      .on('completed', (results) => {
+        console.log('Generation completed!');
+        results.forEach((result, i) => {
+          console.log(`Image ${i + 1}: ${result.imageUrl}`);
+        });
+      })
+      .on('failed', (error) => {
+        console.error('Generation failed:', error);
+      });
+  });
+}
+
+// 예시 3: 메타데이터 조회 및 검증
+async function verifyArtwork(artworkId: string) {
+  // 메타데이터 가져오기
+  const metadata = await client.getMetadata(artworkId);
+  console.log('Artwork metadata:', JSON.stringify(metadata, null, 2));
+
+  // 블록체인 검증
+  const verification = await client.verifyArtwork(artworkId);
+  if (verification.verified) {
+    console.log('✓ Artwork verified on blockchain');
+    console.log(`Transaction: ${verification.transactionHash}`);
+  } else {
+    console.log('✗ Verification failed');
+  }
+}
+
+// 예시 4: 사용량 확인
+async function checkQuota() {
+  const quota = await client.getQuota();
+  console.log(`Credits remaining: ${quota.remaining}/${quota.total}`);
+  console.log(`Resets at: ${quota.resetAt}`);
+}</code></pre>
+
+        <h2>WebSocket 실시간 스트리밍</h2>
+
+        <h3>1. WebSocket 프로토콜</h3>
+        <p>
+            WIA-ART-002 WebSocket 인터페이스는 생성 과정의 실시간 업데이트를 제공합니다. 특히 고해상도 이미지나 여러 변형을
+            생성할 때 유용합니다:
+        </p>
+
+        <div class="highlight-box">
+            <h3>WebSocket 메시지 형식</h3>
+            <pre><code>// 클라이언트 → 서버: 구독
+{
+  "type": "subscribe",
+  "jobId": "job_2024_abc123xyz"
+}
+
+// 서버 → 클라이언트: 진행 상황 업데이트
+{
+  "type": "progress",
+  "jobId": "job_2024_abc123xyz",
+  "status": "processing",
+  "progress": 0.45,
+  "currentStep": 23,
+  "totalSteps": 50,
+  "message": "Denoising latent image...",
+  "timestamp": "2024-01-15T10:31:15Z"
+}
+
+// 서버 → 클라이언트: 중간 미리보기 (선택적)
+{
+  "type": "preview",
+  "jobId": "job_2024_abc123xyz",
+  "step": 25,
+  "imageData": "data:image/jpeg;base64,/9j/4AAQ..."  // Base64 인코딩
+}
+
+// 서버 → 클라이언트: 완료
+{
+  "type": "completed",
+  "jobId": "job_2024_abc123xyz",
+  "results": [/* 생성된 이미지들 */]
+}
+
+// 서버 → 클라이언트: 에러
+{
+  "type": "error",
+  "jobId": "job_2024_abc123xyz",
+  "error": {
+    "code": "NSFW_DETECTED",
+    "message": "Generated content violated safety guidelines"
+  }
+}</code></pre>
+        </div>
+
+        <h2>배치 생성 및 큐 관리</h2>
+
+        <h3>1. 배치 처리 전략</h3>
+        <p>
+            대량의 이미지를 생성할 때는 배치 API를 사용하여 효율성을 높일 수 있습니다:
+        </p>
+
+        <pre><code>// POST /api/v1/batch/generate
+{
+  "requests": [
+    {
+      "id": "req_001",
+      "prompt": "Sunset over mountains",
+      "parameters": { "seed": 42 }
+    },
+    {
+      "id": "req_002",
+      "prompt": "Ocean waves at night",
+      "parameters": { "seed": 43 }
+    },
+    // ... 최대 100개
+  ],
+  "options": {
+    "priority": "low",
+    "webhook": "https://myapp.com/batch-webhook"
+  }
+}
+
+// 응답
+{
+  "batchId": "batch_2024_xyz789",
+  "totalJobs": 100,
+  "estimatedTime": 1800,  // 30분
+  "statusUrl": "/api/v1/batch/batch_2024_xyz789"
+}</code></pre>
+
+        <h2>인증 및 권한 관리</h2>
+
+        <h3>1. OAuth 2.0 흐름</h3>
+        <p>
+            WIA-ART-002는 OAuth 2.0 Authorization Code Flow를 지원하여 제3자 애플리케이션이 사용자를 대신하여
+            이미지를 생성할 수 있습니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>단계</th>
+                    <th>엔드포인트</th>
+                    <th>설명</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1. 인증 요청</td>
+                    <td><code>/oauth/authorize</code></td>
+                    <td>사용자를 로그인 페이지로 리디렉션</td>
+                </tr>
+                <tr>
+                    <td>2. 콜백</td>
+                    <td>클라이언트 redirect_uri</td>
+                    <td>Authorization Code 수신</td>
+                </tr>
+                <tr>
+                    <td>3. 토큰 교환</td>
+                    <td><code>/oauth/token</code></td>
+                    <td>Code를 Access Token으로 교환</td>
+                </tr>
+                <tr>
+                    <td>4. 토큰 갱신</td>
+                    <td><code>/oauth/token</code></td>
+                    <td>Refresh Token으로 새 토큰 발급</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2. Rate Limiting</h3>
+        <p>
+            API는 사용자당 요청 속도 제한을 적용하며, 응답 헤더로 현재 상태를 알려줍니다:
+        </p>
+
+        <pre><code>// 응답 헤더
+X-RateLimit-Limit: 100          // 시간당 최대 요청 수
+X-RateLimit-Remaining: 87       // 남은 요청 수
+X-RateLimit-Reset: 1705320000   // 리셋 시간 (Unix timestamp)
+
+// 제한 초과 시 (429 Too Many Requests)
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Rate limit exceeded. Try again in 342 seconds.",
+    "retryAfter": 342
+  }
+}</code></pre>
+
+        <h2>에러 처리 및 재시도 로직</h2>
+
+        <h3>1. 에러 코드 체계</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>HTTP 상태</th>
+                    <th>에러 코드</th>
+                    <th>설명</th>
+                    <th>재시도 가능</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>400</td>
+                    <td>INVALID_REQUEST</td>
+                    <td>요청 형식 오류</td>
+                    <td>불가</td>
+                </tr>
+                <tr>
+                    <td>401</td>
+                    <td>UNAUTHORIZED</td>
+                    <td>인증 실패</td>
+                    <td>불가</td>
+                </tr>
+                <tr>
+                    <td>402</td>
+                    <td>INSUFFICIENT_CREDITS</td>
+                    <td>크레딧 부족</td>
+                    <td>불가</td>
+                </tr>
+                <tr>
+                    <td>422</td>
+                    <td>NSFW_DETECTED</td>
+                    <td>안전 가이드라인 위반</td>
+                    <td>불가</td>
+                </tr>
+                <tr>
+                    <td>429</td>
+                    <td>RATE_LIMIT_EXCEEDED</td>
+                    <td>요청 제한 초과</td>
+                    <td>가능</td>
+                </tr>
+                <tr>
+                    <td>500</td>
+                    <td>INTERNAL_ERROR</td>
+                    <td>서버 내부 오류</td>
+                    <td>가능</td>
+                </tr>
+                <tr>
+                    <td>503</td>
+                    <td>SERVICE_UNAVAILABLE</td>
+                    <td>서비스 일시 중단</td>
+                    <td>가능</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2. 지수 백오프 재시도</h3>
+        <pre><code>// 재시도 로직 구현
+async function retryWithExponentialBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: Error;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+
+      // 재시도 불가능한 에러는 즉시 throw
+      const nonRetryable = [
+        'INVALID_REQUEST',
+        'UNAUTHORIZED',
+        'INSUFFICIENT_CREDITS',
+        'NSFW_DETECTED'
+      ];
+      if (nonRetryable.includes(error.code)) {
+        throw error;
+      }
+
+      // 마지막 시도였다면 throw
+      if (attempt === maxRetries) {
+        throw error;
+      }
+
+      // 지수 백오프 대기
+      const delay = baseDelay * Math.pow(2, attempt);
+      const jitter = Math.random() * 1000;  // 랜덤 지터 추가
+      await new Promise(resolve => setTimeout(resolve, delay + jitter));
+
+      console.log(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
+    }
+  }
+
+  throw lastError!;
+}</code></pre>
+
+        <div class="key-takeaways">
+            <h3>핵심 요점</h3>
+            <ul>
+                <li><strong>RESTful API 설계:</strong> 명확한 리소스 기반 엔드포인트, 비동기 Job 패턴, 표준 HTTP 메서드와 상태 코드 사용으로 직관적인 API 제공.</li>
+                <li><strong>TypeScript SDK:</strong> Promise 기반 현대적 API, 자동 재시도, 타입 안정성, 이벤트 기반 진행 상황 추적으로 개발자 경험 최적화.</li>
+                <li><strong>WebSocket 스트리밍:</strong> 실시간 진행 상황 업데이트, 중간 미리보기, 양방향 통신으로 반응형 사용자 경험 구현.</li>
+                <li><strong>배치 처리:</strong> 대량 생성 작업을 효율적으로 관리하는 배치 API와 큐 시스템으로 리소스 최적화.</li>
+                <li><strong>OAuth 2.0 인증:</strong> 표준 인증 프로토콜로 제3자 통합 지원, 세밀한 권한 관리, 토큰 갱신 메커니즘.</li>
+                <li><strong>Rate Limiting:</strong> 공정한 리소스 분배, 남용 방지, 명확한 제한 정보 제공으로 서비스 안정성 보장.</li>
+                <li><strong>에러 처리:</strong> 체계적인 에러 코드, 지수 백오프 재시도, 재시도 가능 여부 판단으로 견고한 통합 가능.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li><strong>WIA-ART-002 API가 동기식이 아닌 비동기 Job 패턴을 사용하는 이유를 설명하십시오. 이 패턴의 장단점과 구현 시 고려사항을 논의하십시오.</strong></li>
+                <li><strong>TypeScript SDK의 <code>GenerationJob</code> 클래스가 제공하는 세 가지 진행 상황 추적 방법(stream, poll, wait)을 비교하고, 각각이 적합한 사용 사례를 제시하십시오.</strong></li>
+                <li><strong>WebSocket과 HTTP 폴링의 차이점을 설명하고, 실시간 이미지 생성 진행 상황 추적에 WebSocket이 더 적합한 이유를 기술적으로 논의하십시오.</strong></li>
+                <li><strong>OAuth 2.0 Authorization Code Flow의 단계를 상세히 설명하고, API Key 방식과 비교하여 어떤 보안 이점이 있는지 논의하십시오.</strong></li>
+                <li><strong>Rate Limiting이 필요한 이유와 구현 방법을 설명하십시오. Token Bucket, Leaky Bucket, Fixed Window 등 다양한 알고리즘을 비교하십시오.</strong></li>
+                <li><strong>지수 백오프(Exponential Backoff) 재시도 전략을 설명하고, 코드 예시의 jitter(무작위 지연) 추가가 왜 중요한지 논의하십시오.</strong></li>
+                <li><strong>배치 생성 API의 장점과 구현 시 고려해야 할 기술적 도전 과제(큐 관리, 우선순위, 부분 실패 처리 등)를 상세히 논의하십시오.</strong></li>
+                <li><strong>RESTful API 설계 원칙(리소스 기반 URL, 표준 HTTP 메서드, 상태 코드 사용 등)을 설명하고, WIA-ART-002 API가 이를 어떻게 따르고 있는지 구체적인 예시를 들어 분석하십시오.</strong></li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>
