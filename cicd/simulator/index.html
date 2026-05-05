@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA CICD - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --accent: #06B6D4;
+            --warn: #F59E0B;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; flex-wrap: wrap; gap: 15px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+        .hero { text-align: center; padding: 40px 0 20px; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 22px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; font-size: 0.95rem; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-warn { background: var(--warn); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-center { display: flex; justify-content: center; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 18px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.82rem; white-space: pre-wrap; max-height: 420px; overflow-y: auto; }
+        .card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .card h3 { color: var(--primary); margin-bottom: 15px; font-size: 1.05rem; }
+        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        input, select, textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 9px 13px; border-radius: 6px; font-size: 0.95rem; width: 100%; margin-bottom: 8px; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
+        label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 0.88rem; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.88rem; }
+        th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--primary); font-weight: 600; }
+        .form-group { margin-bottom: 12px; }
+        .progress-bar { background: var(--bg); border-radius: 10px; height: 18px; overflow: hidden; margin: 8px 0; border: 1px solid var(--border); }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--success)); transition: width 0.4s ease; }
+        .progress-fill.warn { background: linear-gradient(90deg, var(--warn), var(--danger)); }
+        .pill { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 600; margin: 2px 4px 2px 0; }
+        .pill-pass { background: rgba(34,197,94,0.18); color: var(--success); border: 1px solid var(--success); }
+        .pill-fail { background: rgba(239,68,68,0.18); color: var(--danger); border: 1px solid var(--danger); }
+        .pill-warn { background: rgba(245,158,11,0.18); color: var(--warn); border: 1px solid var(--warn); }
+        .pill-info { background: rgba(59,130,246,0.18); color: var(--primary); border: 1px solid var(--primary); }
+        .dag-svg { width: 100%; height: 220px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+        .dag-node { fill: var(--bg-card); stroke: var(--border); stroke-width: 2; }
+        .dag-node.active { fill: var(--primary); stroke: var(--primary-dark); }
+        .dag-node.fail { fill: var(--danger); stroke: var(--danger); }
+        .dag-edge { stroke: var(--border); stroke-width: 2; fill: none; marker-end: url(#arr); }
+        .dag-edge.active { stroke: var(--primary); }
+        .dag-label { fill: var(--text); font-size: 11px; text-anchor: middle; pointer-events: none; }
+        .ebook-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: linear-gradient(135deg, var(--warn), var(--danger)); color: white; border-radius: 20px; text-decoration: none; font-size: 0.85rem; font-weight: 600; transition: all 0.2s; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3); }
+        .ebook-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.5); }
+        .panel-ebook-link { float: right; padding: 4px 10px; background: rgba(245, 158, 11, 0.15); color: var(--warn); border: 1px solid var(--warn); border-radius: 12px; text-decoration: none; font-size: 0.75rem; font-weight: 500; }
+        .panel-ebook-link:hover { background: var(--warn); color: white; }
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .hero h1 { font-size: 1.8rem; }
+            .tabs { flex-direction: column; }
+            .tab { width: 100%; text-align: center; }
+            .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+            .breadcrumb { display: none; }
+        }
+        /* Site-kit spacing fix */
+        .hero{margin-top:20px!important}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/cicd/" target="_blank">CICD</a>
+                    <span class="sep">›</span>
+                    <span class="current" data-en="Simulator" data-ko="시뮬레이터">Simulator</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com/?s=WIA-CICD&amp;post_type=download" target="_blank" rel="noopener" class="ebook-btn" data-en="📖 Read Companion eBook" data-ko="📖 동반 전자책 읽기">📖 Read Companion eBook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards-public/tree/main/cicd" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <section class="hero">
+            <h1 data-en="🚦 WIA CICD" data-ko="🚦 WIA CICD">🚦 WIA CICD</h1>
+            <p data-en="Continuous Integration / Continuous Delivery — interactive reference simulator" data-ko="지속적 통합·지속적 전달 — 인터랙티브 참조 시뮬레이터">Continuous Integration / Continuous Delivery — interactive reference simulator</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🔧 Pipeline DAG" data-ko="🔧 파이프라인 DAG">🔧 Pipeline DAG</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🏗️ Build Cache" data-ko="🏗️ 빌드 캐시">🏗️ Build Cache</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🧪 Test Pyramid" data-ko="🧪 테스트 피라미드">🧪 Test Pyramid</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🛡️ Security Gate" data-ko="🛡️ 보안 게이트">🛡️ Security Gate</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🚀 Deploy & Observe" data-ko="🚀 배포·관측">🚀 Deploy &amp; Observe</div>
+        </div>
+
+        <!-- Panel 0: Pipeline DAG -->
+        <div id="panel0" class="panel active">
+            <h2 data-en="🔧 Pipeline DAG" data-ko="🔧 파이프라인 DAG">🔧 Pipeline DAG
+                <a href="https://wiabook.com/?s=WIA-CICD&amp;post_type=download" target="_blank" rel="noopener" class="panel-ebook-link" data-en="📖 eBook Ch.1·2 Pipeline Topology" data-ko="📖 전자책 제1·2장 파이프라인 위상">📖 eBook Ch.1·2</a>
+                <a href="https://github.com/WIA-Official/wia-standards-public/tree/main/cicd" target="_blank" rel="noopener" class="panel-ebook-link" style="background:rgba(99,102,241,0.15);color:#6366F1;border-color:#6366F1;" data-en="📦 Source" data-ko="📦 소스">📦 Source</a>
+            </h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Five-node DAG (SOURCE → BUILD → TEST_GATE → SECURITY_GATE → CD_HANDOFF) with DORA Elite thresholds." data-ko="5 노드 DAG (SOURCE → BUILD → TEST_GATE → SECURITY_GATE → CD_HANDOFF) + DORA Elite 임계값.">Five-node DAG with DORA Elite thresholds.</p>
+
+            <div class="card">
+                <h3 data-en="DAG Visualization" data-ko="DAG 시각화">DAG Visualization</h3>
+                <svg class="dag-svg" id="dagSvg" viewBox="0 0 1100 200" preserveAspectRatio="xMidYMid meet">
+                    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3b82f6"/></marker></defs>
+                </svg>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3 data-en="Pipeline Inputs" data-ko="파이프라인 입력">Pipeline Inputs</h3>
+                    <div class="form-group">
+                        <label data-en="Trigger" data-ko="트리거">Trigger</label>
+                        <select id="pipeTrigger">
+                            <option value="PUSH">PUSH</option>
+                            <option value="PR">PR</option>
+                            <option value="TAG">TAG</option>
+                            <option value="MANUAL">MANUAL</option>
+                            <option value="SCHEDULE">SCHEDULE</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Repo Size (LOC)" data-ko="저장소 크기 (LOC)">Repo Size (LOC)</label>
+                        <input type="number" id="pipeLoc" value="120000" min="1000" step="1000">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Cache Hit Rate (0–1)" data-ko="캐시 적중률 (0–1)">Cache Hit Rate (0–1)</label>
+                        <input type="number" id="pipeHit" value="0.72" min="0" max="1" step="0.01">
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 data-en="DORA Elite Thresholds (1차 진실)" data-ko="DORA Elite 임계 (1차 진실)">DORA Elite Thresholds</h3>
+                    <table>
+                        <caption style="caption-side:top;text-align:left;color:var(--text-muted);font-size:0.82rem;padding-bottom:6px;" data-en="Constants used by simulatePipeline()" data-ko="simulatePipeline() 함수가 참조">Constants used by simulatePipeline()</caption>
+                        <thead><tr><th data-en="Metric" data-ko="지표">Metric</th><th data-en="Elite" data-ko="Elite">Elite</th></tr></thead>
+                        <tbody>
+                            <tr><td>Lead Time</td><td>≤ 1 hr</td></tr>
+                            <tr><td>Failure Rate</td><td>≤ 5%</td></tr>
+                            <tr><td>Fast Feedback p50/p95</td><td>5/10 min</td></tr>
+                            <tr><td>Full Test p95</td><td>30 min</td></tr>
+                            <tr><td>Security Scan p95</td><td>15 min</td></tr>
+                            <tr><td>Prod Deploy p95</td><td>60 min</td></tr>
+                            <tr><td>Rollback (max)</td><td>5 min</td></tr>
+                            <tr><td>Rework Rate</td><td>≤ 5%</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulatePipeline()" data-en="▶️ Simulate Pipeline" data-ko="▶️ 파이프라인 시뮬레이션">▶️ Simulate Pipeline</button>
+                <button class="btn btn-secondary" onclick="resetPipeline()" data-en="↺ Reset" data-ko="↺ 초기화">↺ Reset</button>
+            </div>
+            <div class="output" id="pipelineOutput"></div>
+        </div>
+
+        <!-- Panel 1: Build Cache -->
+        <div id="panel1" class="panel">
+            <h2 data-en="🏗️ Build Cache" data-ko="🏗️ 빌드 캐시">🏗️ Build Cache
+                <a href="https://wiabook.com/?s=WIA-CICD&amp;post_type=download" target="_blank" rel="noopener" class="panel-ebook-link" data-en="📖 eBook Ch.3 Build Cache + SBOM + SLSA" data-ko="📖 전자책 제3장 빌드 캐시·SBOM·SLSA">📖 eBook Ch.3</a>
+                <a href="https://github.com/WIA-Official/wia-standards-public/tree/main/cicd" target="_blank" rel="noopener" class="panel-ebook-link" style="background:rgba(99,102,241,0.15);color:#6366F1;border-color:#6366F1;" data-en="📦 Source" data-ko="📦 소스">📦 Source</a>
+            </h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Three-tier cache (LOCAL · REMOTE · EXECUTION) with SBOM (CycloneDX/SPDX) and SLSA L0–L3 evaluation." data-ko="3계층 캐시 (LOCAL · REMOTE · EXECUTION) + SBOM (CycloneDX/SPDX) + SLSA L0–L3 평가.">Three-tier cache + SBOM + SLSA evaluation.</p>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3 data-en="Cache Inputs" data-ko="캐시 입력">Cache Inputs</h3>
+                    <div class="form-group">
+                        <label data-en="Build System" data-ko="빌드 시스템">Build System</label>
+                        <select id="cacheBuildSys">
+                            <option value="BAZEL">BAZEL</option>
+                            <option value="GRADLE">GRADLE</option>
+                            <option value="BUILDKIT">BUILDKIT</option>
+                            <option value="MAVEN">MAVEN</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Local Hit (0–1)" data-ko="로컬 적중 (0–1)">Local Hit (0–1)</label>
+                        <input type="number" id="cacheLocal" value="0.82" min="0" max="1" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Remote Hit (0–1)" data-ko="원격 적중 (0–1)">Remote Hit (0–1)</label>
+                        <input type="number" id="cacheRemote" value="0.65" min="0" max="1" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Execution Hit (0–1)" data-ko="실행 적중 (0–1)">Execution Hit (0–1)</label>
+                        <input type="number" id="cacheExec" value="0.45" min="0" max="1" step="0.01">
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 data-en="SBOM &amp; SLSA" data-ko="SBOM·SLSA">SBOM &amp; SLSA</h3>
+                    <div class="form-group">
+                        <label data-en="SBOM Format" data-ko="SBOM 형식">SBOM Format</label>
+                        <select id="sbomFormat">
+                            <option value="CYCLONEDX">CYCLONEDX</option>
+                            <option value="SPDX">SPDX</option>
+                            <option value="SPDX_JSON">SPDX_JSON</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="SLSA Level" data-ko="SLSA 등급">SLSA Level</label>
+                        <select id="slsaLevel">
+                            <option value="L0">L0</option>
+                            <option value="L1">L1</option>
+                            <option value="L2">L2</option>
+                            <option value="L3" selected>L3</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="In-toto Provenance Signed" data-ko="in-toto 증명 서명">In-toto Provenance Signed</label>
+                        <select id="provenanceSigned">
+                            <option value="true">true</option>
+                            <option value="false">false</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="evaluateBuildCache()" data-en="🔍 Evaluate Build Cache" data-ko="🔍 빌드 캐시 평가">🔍 Evaluate</button>
+            </div>
+            <div class="output" id="cacheOutput"></div>
+        </div>
+
+        <!-- Panel 2: Test Pyramid -->
+        <div id="panel2" class="panel">
+            <h2 data-en="🧪 Test Pyramid" data-ko="🧪 테스트 피라미드">🧪 Test Pyramid
+                <a href="https://wiabook.com/?s=WIA-CICD&amp;post_type=download" target="_blank" rel="noopener" class="panel-ebook-link" data-en="📖 eBook Ch.4 Test Pyramid + ISO/IEC 25010" data-ko="📖 전자책 제4장 테스트 피라미드·ISO/IEC 25010">📖 eBook Ch.4</a>
+                <a href="https://github.com/WIA-Official/wia-standards-public/tree/main/cicd" target="_blank" rel="noopener" class="panel-ebook-link" style="background:rgba(99,102,241,0.15);color:#6366F1;border-color:#6366F1;" data-en="📦 Source" data-ko="📦 소스">📦 Source</a>
+            </h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Pyramid 70/20/10 vs Trophy 30/50/20 layouts. SLO unit/integration/E2E. Coverage + mutation + flaky thresholds." data-ko="피라미드 70/20/10 vs 트로피 30/50/20. UNIT·INTEGRATION·E2E SLO. 커버리지·뮤테이션·flaky 임계.">Pyramid vs Trophy layouts with SLO and quality thresholds.</p>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3 data-en="Layer Counts" data-ko="계층 카운트">Layer Counts</h3>
+                    <div class="form-group">
+                        <label data-en="Distribution Model" data-ko="분포 모델">Distribution Model</label>
+                        <select id="pyramidModel">
+                            <option value="PYRAMID">PYRAMID (70/20/10)</option>
+                            <option value="TROPHY">TROPHY (30/50/20)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Total Tests" data-ko="총 테스트 수">Total Tests</label>
+                        <input type="number" id="pyramidTotal" value="2400" min="10" step="10">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Coverage (0–1)" data-ko="커버리지 (0–1)">Coverage (0–1)</label>
+                        <input type="number" id="pyramidCov" value="0.82" min="0" max="1" step="0.01">
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 data-en="Quality Inputs" data-ko="품질 입력">Quality Inputs</h3>
+                    <div class="form-group">
+                        <label data-en="Mutation Score (0–1)" data-ko="뮤테이션 점수 (0–1)">Mutation Score (0–1)</label>
+                        <input type="number" id="pyramidMut" value="0.74" min="0" max="1" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Flaky Rate (0–1)" data-ko="Flaky 비율 (0–1)">Flaky Rate (0–1)</label>
+                        <input type="number" id="pyramidFlaky" value="0.008" min="0" max="0.5" step="0.001">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Unit Avg (ms)" data-ko="UNIT 평균 (ms)">Unit Avg (ms)</label>
+                        <input type="number" id="pyramidUnitMs" value="35" min="1">
+                    </div>
+                </div>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runTestPyramid()" data-en="🧪 Run Test Pyramid" data-ko="🧪 테스트 피라미드 실행">🧪 Run</button>
+            </div>
+            <div class="output" id="pyramidOutput"></div>
+        </div>
+
+        <!-- Panel 3: Security Gate -->
+        <div id="panel3" class="panel">
+            <h2 data-en="🛡️ Security Gate" data-ko="🛡️ 보안 게이트">🛡️ Security Gate
+                <a href="https://wiabook.com/?s=WIA-CICD&amp;post_type=download" target="_blank" rel="noopener" class="panel-ebook-link" data-en="📖 eBook Ch.5 Security Gate + OWASP CICD Top 10" data-ko="📖 전자책 제5장 보안 게이트·OWASP CICD Top 10">📖 eBook Ch.5</a>
+                <a href="https://github.com/WIA-Official/wia-standards-public/tree/main/cicd" target="_blank" rel="noopener" class="panel-ebook-link" style="background:rgba(99,102,241,0.15);color:#6366F1;border-color:#6366F1;" data-en="📦 Source" data-ko="📦 소스">📦 Source</a>
+            </h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Six gates (SAST · SCA · DAST · SECRETS · CONTAINER · IAC) mapped to OWASP CICD Top 10, NIST SSDF (PO/PS/PW/RV) and KISA 47 diagnostic items." data-ko="6 게이트 (SAST · SCA · DAST · SECRETS · CONTAINER · IAC) — OWASP CICD Top 10 · NIST SSDF (PO/PS/PW/RV) · KISA 47 진단 매핑.">Six security gates with policy mode + false-positive guard.</p>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3 data-en="Gate Findings (counts)" data-ko="게이트 검출 (건수)">Gate Findings</h3>
+                    <div class="grid-3">
+                        <div><label>SAST</label><input type="number" id="gSast" value="3" min="0"></div>
+                        <div><label>SCA</label><input type="number" id="gSca" value="2" min="0"></div>
+                        <div><label>DAST</label><input type="number" id="gDast" value="1" min="0"></div>
+                        <div><label>SECRETS</label><input type="number" id="gSecrets" value="0" min="0"></div>
+                        <div><label>CONTAINER</label><input type="number" id="gContainer" value="2" min="0"></div>
+                        <div><label>IAC</label><input type="number" id="gIac" value="1" min="0"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 data-en="Policy Setup" data-ko="정책 설정">Policy Setup</h3>
+                    <div class="form-group">
+                        <label data-en="Policy Mode" data-ko="정책 모드">Policy Mode</label>
+                        <select id="policyMode">
+                            <option value="AUDIT">AUDIT</option>
+                            <option value="ENFORCE">ENFORCE</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="False Positive Rate (0–1)" data-ko="오탐률 (0–1)">False Positive Rate (0–1)</label>
+                        <input type="number" id="fpRate" value="0.04" min="0" max="1" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Critical Findings Allowed" data-ko="허용 Critical 건수">Critical Findings Allowed</label>
+                        <input type="number" id="critAllowed" value="0" min="0">
+                    </div>
+                </div>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="evaluateSecurityGates()" data-en="🛡️ Evaluate Security Gates" data-ko="🛡️ 보안 게이트 평가">🛡️ Evaluate</button>
+            </div>
+            <div class="output" id="securityOutput"></div>
+        </div>
+
+        <!-- Panel 4: Deploy & Observe -->
+        <div id="panel4" class="panel">
+            <h2 data-en="🚀 Deploy &amp; Observe" data-ko="🚀 배포·관측">🚀 Deploy &amp; Observe
+                <a href="https://wiabook.com/?s=WIA-CICD&amp;post_type=download" target="_blank" rel="noopener" class="panel-ebook-link" data-en="📖 eBook Ch.6·7 Deployment + Observability" data-ko="📖 전자책 제6·7장 배포·관측">📖 eBook Ch.6·7</a>
+                <a href="https://github.com/WIA-Official/wia-standards-public/tree/main/cicd" target="_blank" rel="noopener" class="panel-ebook-link" style="background:rgba(99,102,241,0.15);color:#6366F1;border-color:#6366F1;" data-en="📦 Source" data-ko="📦 소스">📦 Source</a>
+            </h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Four strategies (ROLLING · BLUE_GREEN · CANARY · PROGRESSIVE) with traffic curve 5→25→50→100. SLO 0.999 / 0.9995 + error-budget burn." data-ko="4 전략 (ROLLING · BLUE_GREEN · CANARY · PROGRESSIVE) + 트래픽 곡선 5→25→50→100. SLO 0.999/0.9995 + 오류 예산 소모.">Strategies, traffic curves, SLO and error-budget burn.</p>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3 data-en="Deployment" data-ko="배포">Deployment</h3>
+                    <div class="form-group">
+                        <label data-en="Strategy" data-ko="전략">Strategy</label>
+                        <select id="deployStrategy">
+                            <option value="ROLLING">ROLLING</option>
+                            <option value="BLUE_GREEN">BLUE_GREEN</option>
+                            <option value="CANARY" selected>CANARY</option>
+                            <option value="PROGRESSIVE">PROGRESSIVE</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Step Duration (min)" data-ko="단계 지속 (분)">Step Duration (min)</label>
+                        <input type="number" id="stepMin" value="10" min="1" max="120">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Service Tier" data-ko="서비스 등급">Service Tier</label>
+                        <select id="svcTier">
+                            <option value="STD">STANDARD (SLO 0.999)</option>
+                            <option value="FIN">FINANCE (SLO 0.9995)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 data-en="Observability + SLO" data-ko="관측·SLO">Observability + SLO</h3>
+                    <div class="form-group">
+                        <label data-en="Window (days)" data-ko="윈도 (일)">Window (days)</label>
+                        <input type="number" id="sloWindow" value="30" min="1" max="90">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Error Rate Observed (0–1)" data-ko="관측 오류율 (0–1)">Error Rate (0–1)</label>
+                        <input type="number" id="errRate" value="0.0008" min="0" max="0.1" step="0.0001">
+                    </div>
+                    <div class="form-group">
+                        <label data-en="OTLP Signal" data-ko="OTLP 신호">OTLP Signal</label>
+                        <select id="otelSignal">
+                            <option value="TRACES">TRACES</option>
+                            <option value="METRICS">METRICS</option>
+                            <option value="LOGS">LOGS</option>
+                            <option value="PROFILES">PROFILES</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="simulateDeployment()" data-en="🚀 Simulate Deployment" data-ko="🚀 배포 시뮬레이션">🚀 Simulate Deployment</button>
+                <button class="btn btn-warn" onclick="evaluateSLO()" data-en="📊 Evaluate SLO" data-ko="📊 SLO 평가">📊 Evaluate SLO</button>
+            </div>
+            <div class="output" id="deployOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA — World Industry Association · Open standard initiative" data-ko="WIA — 세계산업협회 · 오픈 표준 이니셔티브">WIA — World Industry Association · Open standard initiative</p>
+            <p>© 2026 MIT License · WIA-CICD v1.0.0</p>
+            <div class="links">
+                <a href="https://wiabook.com/?s=WIA-CICD&amp;post_type=download" target="_blank" rel="noopener" data-en="📚 Companion eBook" data-ko="📚 동반 전자책">📚 Companion eBook</a>
+                <a href="https://github.com/WIA-Official/wia-standards-public/tree/main/cicd" target="_blank" data-en="📦 GitHub Source" data-ko="📦 GitHub 소스">📦 GitHub Source</a>
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 WIA Standards Home" data-ko="🏠 WIA Standards 홈">🏠 WIA Standards Home</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        /* =========================================================
+         * WIA-CICD Reference Simulator — vanilla JS, single file
+         * Source of truth for ENUMs and thresholds (book follows).
+         * =======================================================*/
+
+        // ---- ENUMs (shared with book + GitHub spec) ---------------
+        const PIPELINE_NODES        = ['SOURCE', 'BUILD', 'TEST_GATE', 'SECURITY_GATE', 'CD_HANDOFF'];
+        const PIPELINE_TRIGGERS     = ['PUSH', 'PR', 'TAG', 'MANUAL', 'SCHEDULE'];
+        const CACHE_TIERS           = ['LOCAL', 'REMOTE', 'EXECUTION'];
+        const SBOM_FORMATS          = ['CYCLONEDX', 'SPDX', 'SPDX_JSON'];
+        const SLSA_LEVELS           = ['L0', 'L1', 'L2', 'L3'];
+        const BUILD_SYSTEMS         = ['BAZEL', 'GRADLE', 'BUILDKIT', 'MAVEN'];
+        const TEST_LAYERS           = ['UNIT', 'INTEGRATION', 'E2E'];
+        const SECURITY_GATES        = ['SAST', 'SCA', 'DAST', 'SECRETS', 'CONTAINER', 'IAC'];
+        const OWASP_CICD_TOP10      = ['CICD_SEC_1','CICD_SEC_2','CICD_SEC_3','CICD_SEC_4','CICD_SEC_5','CICD_SEC_6','CICD_SEC_7','CICD_SEC_8','CICD_SEC_9','CICD_SEC_10'];
+        const SSDF_GROUPS           = ['PO', 'PS', 'PW', 'RV'];
+        const POLICY_MODES          = ['AUDIT', 'ENFORCE'];
+        const DEPLOY_STRATEGIES     = ['ROLLING', 'BLUE_GREEN', 'CANARY', 'PROGRESSIVE'];
+        const TRAFFIC_CURVE         = [5, 25, 50, 100];
+        const OTEL_SIGNALS          = ['TRACES', 'METRICS', 'LOGS', 'PROFILES'];
+        const METRIC_INSTRUMENTS    = ['COUNTER', 'GAUGE', 'HISTOGRAM'];
+        const INCIDENT_PRIORITIES   = ['P0', 'P1', 'P2', 'P3'];
+        const ISO_25010_CHARACTERISTICS = ['FUNCTIONAL_SUITABILITY','PERFORMANCE_EFFICIENCY','COMPATIBILITY','USABILITY','RELIABILITY','SECURITY','MAINTAINABILITY','FLEXIBILITY','SAFETY'];
+
+        // ---- Thresholds (book quotes these verbatim) --------------
+        const FAST_FEEDBACK_P50_MIN          = 5;
+        const FAST_FEEDBACK_P95_MIN          = 10;
+        const FULL_TEST_P95_MIN              = 30;
+        const SECURITY_SCAN_P95_MIN          = 15;
+        const PROD_DEPLOY_P95_MIN            = 60;
+        const ROLLBACK_MAX_MIN               = 5;
+        const DORA_ELITE_LEAD_TIME_HR        = 1;
+        const DORA_ELITE_FAILURE_RATE        = 0.05;
+        const REWORK_RATE_THRESHOLD          = 0.05;
+
+        const LOCAL_CACHE_HITRATE_TARGET     = 0.80;
+        const REMOTE_CACHE_HITRATE_TARGET    = 0.60;
+        const OVERALL_CACHE_HITRATE_TARGET   = 0.70;
+
+        const PYRAMID_RATIO                  = [70, 20, 10];
+        const ALT_TROPHY_RATIO               = [30, 50, 20];
+        const UNIT_SLO_MS                    = 100;
+        const INTEGRATION_SLO_S              = 5;
+        const E2E_SLO_S                      = 60;
+        const COVERAGE_TARGET                = 0.80;
+        const MUTATION_SCORE_TARGET          = 0.70;
+        const FLAKY_RATE_THRESHOLD           = 0.01;
+
+        const POLICY_FALSE_POSITIVE_GATE     = 0.05;
+        const KISA_DIAGNOSTIC_ITEMS          = 47;
+
+        const SLO_DEFAULT                    = 0.999;
+        const SLO_FINANCE                    = 0.9995;
+        const ERROR_BUDGET_POSTMORTEM_TRIGGER = 0.20;
+
+        // ---- i18n ---------------------------------------------------
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const t = el.getAttribute('data-' + lang);
+                if (t !== null) el.textContent = t;
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.toLowerCase() === lang));
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            setLang(currentLang);
+            renderDag(['idle','idle','idle','idle','idle']);
+            const hash = (location.hash || '').replace('#panel','');
+            const idx = parseInt(hash, 10);
+            if (!isNaN(idx) && idx >= 0 && idx <= 4) showPanel(idx);
+        });
+
+        // ---- panel switch ------------------------------------------
+        function showPanel(idx) {
+            for (let i = 0; i < 5; i++) {
+                document.getElementById('panel' + i).classList.toggle('active', i === idx);
+            }
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+            history.replaceState(null, '', '#panel' + idx);
+        }
+
+        // ---- helpers ------------------------------------------------
+        function fmt(n, d) { return Number(n).toFixed(d == null ? 2 : d); }
+        function pillPass(label) { return '<span class="pill pill-pass">' + label + '</span>'; }
+        function pillFail(label) { return '<span class="pill pill-fail">' + label + '</span>'; }
+        function pillWarn(label) { return '<span class="pill pill-warn">' + label + '</span>'; }
+        function pillInfo(label) { return '<span class="pill pill-info">' + label + '</span>'; }
+
+        // ---- DAG rendering -----------------------------------------
+        function renderDag(states) {
+            const svg = document.getElementById('dagSvg');
+            // Keep defs only
+            const defs = svg.querySelector('defs').outerHTML;
+            const w = 1100, h = 200, pad = 60;
+            const stepX = (w - 2 * pad) / (PIPELINE_NODES.length - 1);
+            let body = defs;
+            // edges
+            for (let i = 0; i < PIPELINE_NODES.length - 1; i++) {
+                const x1 = pad + i * stepX + 50;
+                const x2 = pad + (i + 1) * stepX - 50;
+                const cls = (states[i] === 'pass' || states[i] === 'active') ? 'dag-edge active' : 'dag-edge';
+                body += '<line class="' + cls + '" x1="' + x1 + '" y1="100" x2="' + x2 + '" y2="100" />';
+            }
+            // nodes
+            PIPELINE_NODES.forEach((name, i) => {
+                const cx = pad + i * stepX;
+                const st = states[i] || 'idle';
+                let cls = 'dag-node';
+                if (st === 'pass' || st === 'active') cls += ' active';
+                else if (st === 'fail') cls += ' fail';
+                body += '<rect class="' + cls + '" x="' + (cx - 50) + '" y="76" width="100" height="48" rx="10" ry="10" />';
+                body += '<text class="dag-label" x="' + cx + '" y="103">' + name + '</text>';
+                body += '<text class="dag-label" x="' + cx + '" y="118" style="fill:#94a3b8;font-size:9px">' + (st === 'idle' ? '·' : st.toUpperCase()) + '</text>';
+            });
+            svg.innerHTML = body;
+        }
+
+        // ---- Panel 0 — simulatePipeline() ---------------------------
+        function simulatePipeline() {
+            const trigger = document.getElementById('pipeTrigger').value;
+            const loc     = parseInt(document.getElementById('pipeLoc').value, 10) || 100000;
+            const hit     = parseFloat(document.getElementById('pipeHit').value) || 0;
+
+            // synthetic times (linear in LOC, scaled by cache miss)
+            const missFactor   = 1 + (1 - hit) * 1.5;
+            const buildMin     = (loc / 30000) * missFactor;
+            const fastMin      = Math.max(2, buildMin * 0.7);
+            const fullMin      = Math.max(8, buildMin * 2.2);
+            const secMin       = Math.max(4, buildMin * 1.0);
+            const deployMin    = Math.max(10, buildMin * 1.6);
+            const leadHr       = (buildMin + fullMin + secMin + deployMin) / 60;
+            const failureRate  = trigger === 'MANUAL' ? 0.07 : 0.03;
+            const reworkRate   = trigger === 'PR' ? 0.04 : 0.06;
+
+            const checks = [
+                { k: 'Fast feedback p95',  v: fastMin,    t: FAST_FEEDBACK_P95_MIN, u: 'min' },
+                { k: 'Full test p95',      v: fullMin,    t: FULL_TEST_P95_MIN,     u: 'min' },
+                { k: 'Security scan p95',  v: secMin,     t: SECURITY_SCAN_P95_MIN, u: 'min' },
+                { k: 'Prod deploy p95',    v: deployMin,  t: PROD_DEPLOY_P95_MIN,   u: 'min' },
+                { k: 'Lead time',          v: leadHr,     t: DORA_ELITE_LEAD_TIME_HR, u: 'hr' },
+                { k: 'Failure rate',       v: failureRate, t: DORA_ELITE_FAILURE_RATE, u: '' },
+                { k: 'Rework rate',        v: reworkRate, t: REWORK_RATE_THRESHOLD,   u: '' }
+            ];
+
+            const states = PIPELINE_NODES.map(() => 'pass');
+            // simple failure injection: if failure_rate exceeds threshold, fail TEST_GATE
+            if (failureRate > DORA_ELITE_FAILURE_RATE) states[2] = 'fail';
+            renderDag(states);
+
+            let out = '── simulatePipeline() ──\n';
+            out += 'Trigger        : ' + trigger + '\n';
+            out += 'Repo size LOC  : ' + loc + '\n';
+            out += 'Cache hit      : ' + fmt(hit) + '\n';
+            out += 'DAG nodes      : ' + PIPELINE_NODES.join(' → ') + '\n\n';
+            out += 'Synthetic timings vs DORA Elite thresholds:\n';
+            checks.forEach(c => {
+                const ok = c.v <= c.t;
+                out += '  ' + (ok ? '✅' : '❌') + ' ' + c.k.padEnd(20) + ' ' + fmt(c.v) + ' ' + c.u + ' (≤ ' + c.t + ' ' + c.u + ')\n';
+            });
+            out += '\nVerdict: ' + (checks.every(c => c.v <= c.t) ? 'DORA Elite candidate ✅' : 'Not Elite — investigate failing axes ⚠️') + '\n';
+            document.getElementById('pipelineOutput').innerHTML =
+                checks.map(c => (c.v <= c.t ? pillPass(c.k) : pillFail(c.k))).join('') +
+                '\n\n' + out;
+        }
+        function resetPipeline() {
+            renderDag(['idle','idle','idle','idle','idle']);
+            document.getElementById('pipelineOutput').textContent = '';
+        }
+
+        // ---- Panel 1 — evaluateBuildCache() -------------------------
+        function evaluateBuildCache() {
+            const sys      = document.getElementById('cacheBuildSys').value;
+            const local    = parseFloat(document.getElementById('cacheLocal').value);
+            const remote   = parseFloat(document.getElementById('cacheRemote').value);
+            const exec     = parseFloat(document.getElementById('cacheExec').value);
+            const sbom     = document.getElementById('sbomFormat').value;
+            const slsa     = document.getElementById('slsaLevel').value;
+            const signed   = document.getElementById('provenanceSigned').value === 'true';
+
+            // overall = 1 - (1-local)(1-remote)(1-exec)
+            const overall = 1 - (1 - local) * (1 - remote) * (1 - exec);
+
+            const tierResults = [
+                { k: 'LOCAL hit',     v: local,   t: LOCAL_CACHE_HITRATE_TARGET },
+                { k: 'REMOTE hit',    v: remote,  t: REMOTE_CACHE_HITRATE_TARGET },
+                { k: 'OVERALL hit',   v: overall, t: OVERALL_CACHE_HITRATE_TARGET }
+            ];
+
+            const slsaOk = slsa === 'L3' && signed;
+            let out = '── evaluateBuildCache() ──\n';
+            out += 'Build system   : ' + sys + ' (∈ ' + BUILD_SYSTEMS.join('|') + ')\n';
+            out += 'Cache tiers    : ' + CACHE_TIERS.join(' · ') + '\n';
+            out += 'SBOM format    : ' + sbom + ' (∈ ' + SBOM_FORMATS.join('|') + ')\n';
+            out += 'SLSA level     : ' + slsa + ' (target L3, signed=' + signed + ')\n\n';
+            tierResults.forEach(t => {
+                out += '  ' + (t.v >= t.t ? '✅' : '❌') + ' ' + t.k.padEnd(15) + ' ' + fmt(t.v) + ' (≥ ' + t.t + ')\n';
+            });
+            out += '\nProvenance attestation: ' + (slsaOk ? 'in-toto signed at SLSA L3 ✅' : 'below L3 or unsigned ⚠️') + '\n';
+            document.getElementById('cacheOutput').innerHTML =
+                tierResults.map(t => (t.v >= t.t ? pillPass(t.k) : pillFail(t.k))).join('') +
+                (slsaOk ? pillPass('SLSA L3 signed') : pillWarn('SLSA below L3')) +
+                '\n\n' + out;
+        }
+
+        // ---- Panel 2 — runTestPyramid() -----------------------------
+        function runTestPyramid() {
+            const model   = document.getElementById('pyramidModel').value;
+            const total   = parseInt(document.getElementById('pyramidTotal').value, 10);
+            const cov     = parseFloat(document.getElementById('pyramidCov').value);
+            const mut     = parseFloat(document.getElementById('pyramidMut').value);
+            const flaky   = parseFloat(document.getElementById('pyramidFlaky').value);
+            const unitMs  = parseInt(document.getElementById('pyramidUnitMs').value, 10);
+
+            const ratio   = (model === 'TROPHY') ? ALT_TROPHY_RATIO : PYRAMID_RATIO;
+            const counts  = ratio.map(p => Math.round(total * p / 100));
+
+            // synthetic execution time per layer
+            const integS  = unitMs / 1000 * 40;        // integration ~40x unit
+            const e2eS    = unitMs / 1000 * 600;       // E2E ~600x unit
+
+            const checks = [
+                { k: 'Coverage',       v: cov,   t: COVERAGE_TARGET,        higher: true },
+                { k: 'Mutation',       v: mut,   t: MUTATION_SCORE_TARGET,  higher: true },
+                { k: 'Flaky rate',     v: flaky, t: FLAKY_RATE_THRESHOLD,   higher: false },
+                { k: 'Unit avg ms',    v: unitMs, t: UNIT_SLO_MS,           higher: false },
+                { k: 'Integ avg s',    v: integS, t: INTEGRATION_SLO_S,     higher: false },
+                { k: 'E2E avg s',      v: e2eS,  t: E2E_SLO_S,              higher: false }
+            ];
+
+            let out = '── runTestPyramid() ──\n';
+            out += 'Model          : ' + model + ' (ratio ' + ratio.join('/') + ')\n';
+            out += 'Layers         : ' + TEST_LAYERS.join(' · ') + '\n';
+            out += 'Total tests    : ' + total + '\n';
+            TEST_LAYERS.forEach((l, i) => { out += '  · ' + l.padEnd(12) + ' ' + counts[i] + ' tests (' + ratio[i] + '%)\n'; });
+            out += '\nQuality + SLO:\n';
+            checks.forEach(c => {
+                const ok = c.higher ? c.v >= c.t : c.v <= c.t;
+                out += '  ' + (ok ? '✅' : '❌') + ' ' + c.k.padEnd(15) + ' ' + fmt(c.v, c.k === 'Flaky rate' ? 4 : 2) + (c.higher ? ' (≥ ' : ' (≤ ') + c.t + ')\n';
+            });
+            out += '\nISO/IEC 25010 axes covered: ' + ISO_25010_CHARACTERISTICS.length + '\n';
+            document.getElementById('pyramidOutput').innerHTML =
+                checks.map(c => {
+                    const ok = c.higher ? c.v >= c.t : c.v <= c.t;
+                    return ok ? pillPass(c.k) : pillFail(c.k);
+                }).join('') + '\n\n' + out;
+        }
+
+        // ---- Panel 3 — evaluateSecurityGates() ----------------------
+        function evaluateSecurityGates() {
+            const findings = {
+                SAST:      parseInt(document.getElementById('gSast').value, 10),
+                SCA:       parseInt(document.getElementById('gSca').value, 10),
+                DAST:      parseInt(document.getElementById('gDast').value, 10),
+                SECRETS:   parseInt(document.getElementById('gSecrets').value, 10),
+                CONTAINER: parseInt(document.getElementById('gContainer').value, 10),
+                IAC:       parseInt(document.getElementById('gIac').value, 10)
+            };
+            const mode    = document.getElementById('policyMode').value;
+            const fp      = parseFloat(document.getElementById('fpRate').value);
+            const allowed = parseInt(document.getElementById('critAllowed').value, 10);
+
+            const totalCritical = findings.SECRETS + Math.max(0, findings.SAST - allowed);
+            const fpOk          = fp <= POLICY_FALSE_POSITIVE_GATE;
+            const policyPass    = (mode === 'AUDIT') || (totalCritical === 0 && fpOk);
+
+            let out = '── evaluateSecurityGates() ──\n';
+            out += 'Gates          : ' + SECURITY_GATES.join(' · ') + '\n';
+            out += 'Findings:\n';
+            SECURITY_GATES.forEach(g => { out += '  · ' + g.padEnd(11) + ' ' + findings[g] + '\n'; });
+            out += '\nPolicy mode    : ' + mode + ' (∈ ' + POLICY_MODES.join('|') + ')\n';
+            out += 'False-positive : ' + fmt(fp) + ' (≤ ' + POLICY_FALSE_POSITIVE_GATE + ')\n';
+            out += 'Critical found : ' + totalCritical + ' (allowed ' + allowed + ')\n\n';
+            out += 'OWASP CICD-SEC  : ' + OWASP_CICD_TOP10.join(', ') + '\n';
+            out += 'NIST SSDF       : ' + SSDF_GROUPS.join(' / ') + '\n';
+            out += 'KISA diagnostic items: ' + KISA_DIAGNOSTIC_ITEMS + '\n\n';
+            out += 'Policy verdict : ' + (policyPass ? 'PASS ✅' : 'BLOCK ❌') + '\n';
+
+            document.getElementById('securityOutput').innerHTML =
+                SECURITY_GATES.map(g => findings[g] === 0 ? pillPass(g) : (findings[g] > 2 ? pillFail(g) : pillWarn(g))).join('') +
+                (fpOk ? pillPass('FP ≤ 5%') : pillFail('FP > 5%')) +
+                (policyPass ? pillPass('Policy ' + mode) : pillFail('Policy ' + mode)) +
+                '\n\n' + out;
+        }
+
+        // ---- Panel 4 — simulateDeployment() / evaluateSLO() --------
+        function simulateDeployment() {
+            const strategy = document.getElementById('deployStrategy').value;
+            const stepMin  = parseInt(document.getElementById('stepMin').value, 10);
+            const tier     = document.getElementById('svcTier').value;
+
+            const curve = (strategy === 'CANARY' || strategy === 'PROGRESSIVE') ? TRAFFIC_CURVE
+                        : (strategy === 'BLUE_GREEN') ? [0, 100]
+                        : [25, 50, 75, 100];
+
+            const totalMin = stepMin * curve.length;
+            const sloTarget = (tier === 'FIN') ? SLO_FINANCE : SLO_DEFAULT;
+
+            let out = '── simulateDeployment() ──\n';
+            out += 'Strategy       : ' + strategy + ' (∈ ' + DEPLOY_STRATEGIES.join('|') + ')\n';
+            out += 'Traffic curve  : ' + curve.map(p => p + '%').join(' → ') + '\n';
+            out += 'Step duration  : ' + stepMin + ' min · total ≈ ' + totalMin + ' min\n';
+            out += 'Service tier   : ' + tier + ' (SLO ' + sloTarget + ')\n';
+            out += 'Rollback budget: ≤ ' + ROLLBACK_MAX_MIN + ' min (auto)\n';
+            out += '\nOTLP signals   : ' + OTEL_SIGNALS.join(' · ') + '\n';
+            out += 'Metric instr.  : ' + METRIC_INSTRUMENTS.join(' / ') + '\n';
+            out += 'Incident pri.  : ' + INCIDENT_PRIORITIES.join(' · ') + '\n';
+
+            const within = totalMin <= PROD_DEPLOY_P95_MIN;
+            document.getElementById('deployOutput').innerHTML =
+                pillInfo(strategy) +
+                (within ? pillPass('Deploy ≤ 60 min') : pillWarn('Deploy > 60 min')) +
+                pillInfo('SLO ' + sloTarget) +
+                '\n\n' + out;
+        }
+        function evaluateSLO() {
+            const window = parseInt(document.getElementById('sloWindow').value, 10);
+            const errRate = parseFloat(document.getElementById('errRate').value);
+            const tier   = document.getElementById('svcTier').value;
+            const sloTarget = (tier === 'FIN') ? SLO_FINANCE : SLO_DEFAULT;
+            const budget  = 1 - sloTarget;             // e.g. 0.001
+            const burned  = errRate / budget;          // fraction of budget consumed
+            const trigger = burned >= ERROR_BUDGET_POSTMORTEM_TRIGGER;
+
+            let out = '── evaluateSLO() ──\n';
+            out += 'Tier           : ' + tier + ' (SLO ' + sloTarget + ')\n';
+            out += 'Window         : ' + window + ' days\n';
+            out += 'Error rate     : ' + fmt(errRate, 5) + '\n';
+            out += 'Error budget   : ' + fmt(budget, 5) + '\n';
+            out += 'Budget burned  : ' + fmt(burned * 100, 1) + '% of budget\n';
+            out += 'Postmortem trigger ≥ ' + (ERROR_BUDGET_POSTMORTEM_TRIGGER * 100) + '%: ' + (trigger ? 'YES — postmortem required ❗' : 'no — within budget ✅') + '\n';
+            document.getElementById('deployOutput').innerHTML +=
+                '\n\n' + (trigger ? pillFail('Postmortem trigger') : pillPass('Within budget')) +
+                '\n\n' + out;
+        }
+    </script>
+    <script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

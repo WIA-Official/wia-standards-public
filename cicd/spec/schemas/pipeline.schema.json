@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wia.standards/cicd/schemas/pipeline.schema.json",
+  "title": "WIA-CICD Pipeline Definition",
+  "description": "DAG of jobs grouped into the five canonical nodes SOURCE, BUILD, TEST_GATE, SECURITY_GATE, CD_HANDOFF.",
+  "type": "object",
+  "required": ["pipeline"],
+  "properties": {
+    "pipeline": {
+      "type": "object",
+      "required": ["name", "trigger", "nodes"],
+      "properties": {
+        "name":    { "type": "string", "minLength": 1 },
+        "trigger": { "type": "string", "enum": ["PUSH", "PR", "TAG", "MANUAL", "SCHEDULE"] },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/node" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id":    { "type": "string", "enum": ["SOURCE", "BUILD", "TEST_GATE", "SECURITY_GATE", "CD_HANDOFF"] },
+        "type":  { "type": "string", "enum": ["source", "build", "test", "security", "deliver"] },
+        "needs": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["SOURCE", "BUILD", "TEST_GATE", "SECURITY_GATE", "CD_HANDOFF"] },
+          "uniqueItems": true
+        },
+        "cache": {
+          "type": "object",
+          "properties": {
+            "local":     { "type": "string" },
+            "remote":    { "type": "string" },
+            "execution": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "slo": {
+          "type": "object",
+          "properties": {
+            "unit_ms":       { "type": "number", "minimum": 0 },
+            "integration_s": { "type": "number", "minimum": 0 },
+            "e2e_s":         { "type": "number", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "gates": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["SAST", "SCA", "DAST", "SECRETS", "CONTAINER", "IAC"] },
+          "uniqueItems": true
+        },
+        "policy":   { "type": "string", "enum": ["AUDIT", "ENFORCE"] },
+        "strategy": { "type": "string", "enum": ["ROLLING", "BLUE_GREEN", "CANARY", "PROGRESSIVE"] },
+        "traffic_curve": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
