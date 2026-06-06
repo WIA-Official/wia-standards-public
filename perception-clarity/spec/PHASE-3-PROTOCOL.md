@@ -238,7 +238,7 @@ agent                                   fleet/관제
   │  clarity_report (주기 1s, all CLEAR)   │
   ├───────────────────────────────────────▶  (모니터링)
   │                                        │
-  │  [rain_film 누적 → PCI 72 degraded]    │
+  │  [rain_film 누적 → PCI 73 degraded]    │
   │  state_change: clear→degraded (즉시)   │
   ├───────────────────────────────────────▶
   │                                        │  Safety Manager 평가
@@ -349,8 +349,8 @@ PCI 산출과 상태 판정이 **재현 가능**함을 검증하는, 인가된 �
       "steps": [
         {
           "contaminant": "rain_film | mud_dust | salt_spray | insect_strike | frost_ice | condensation | sun_glare | scratch_abrasion | other",
-          "appliedAxis": { "occlusion": 0.25, "distanceDegradation": 0.0, "mtfReduction": 0.0 },
-          "reportedAxis": { "occlusion": 0.27, "distanceDegradation": 0.0, "mtfReduction": 0.0 },
+          "appliedAxis": { "occlusion": 0.40, "distanceDegradation": 0.0, "mtfReduction": 0.0 },
+          "reportedAxis": { "occlusion": 0.42, "distanceDegradation": 0.0, "mtfReduction": 0.0 },
           "expectedPci": 84,
           "reportedPci": 83,
           "reportedState": "degraded",

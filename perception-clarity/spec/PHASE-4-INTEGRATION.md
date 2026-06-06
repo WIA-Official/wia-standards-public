@@ -280,7 +280,7 @@ LiDAR 자기진단(return-rate, 윈도우 오염) ─► PCI(lidar_window)
     "messageId": "a9...lidar", "timestamp": "2025-06-05T11:03:08Z" },
   "sensors": [
     { "sensorId": "nav-lidar-front", "sensorClass": "lidar_window",
-      "pci": 14, "state": "blind",
+      "pci": 21, "state": "blind",
       "contaminants": [{ "type": "mud_dust", "coverage": 0.81 }],
       "axes": { "occlusion": 0.81, "distanceDegradation": 0.88, "mtfReduction": 0.30 },
       "lastCleanedAt": null, "dwellSeconds": 312, "confidence": 0.86 }
@@ -333,14 +333,14 @@ function gateInference(rawConfidence: number, pci: number, state: ClarityState):
     "messageId": "d7...vai", "timestamp": "2025-06-05T17:40:00Z" },
   "sensors": [
     { "sensorId": "front-cam", "sensorClass": "rgb_camera",
-      "pci": 64, "state": "degraded",
+      "pci": 75, "state": "degraded",
       "contaminants": [{ "type": "sun_glare", "coverage": 0.4 }],
       "axes": { "occlusion": 0.10, "distanceDegradation": 0.20, "mtfReduction": 0.45 },
       "dwellSeconds": 12, "confidence": 0.83 }
   ]
 }
-// vision-ai: 보행자 검출 raw confidence 0.88 → gate(0.88, 64, degraded) = 0.56.
-// 다운스트림 의사결정은 감쇠된 0.56과 sun_glare 메타로 보수적 판단.
+// vision-ai: 보행자 검출 raw confidence 0.88 → gate(0.88, 75, degraded) = 0.66.
+// 다운스트림 의사결정은 감쇠된 0.66과 sun_glare 메타로 보수적 판단.
 ```
 
 ---

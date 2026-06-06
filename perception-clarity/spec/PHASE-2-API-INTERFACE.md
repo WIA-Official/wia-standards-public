@@ -412,11 +412,11 @@ pub fn compute_pci(axes: &PciAxes, weights: &PciWeights) -> PciIndex {
 
 ```rust
 #[test]
-fn rain_camera_yields_degraded_72() {
+fn rain_camera_yields_degraded_73() {
     let axes = PciAxes { occlusion: 0.18, distance_degradation: 0.22, mtf_reduction: 0.40 };
     let weights = PciWeights::default_for(SensorClass::RgbCamera);
     let pci = compute_pci(&axes, &weights);
-    assert_eq!(pci.value(), 72);              // 100 - (0.072+0.055+0.140)*100 = 73.3 → 반올림 검증
+    assert_eq!(pci.value(), 73);              // 100 - (0.072+0.055+0.140)*100 = 73.3 → 반올림 검증
     assert_eq!(pci.state(), ClarityState::Degraded);
 }
 ```
