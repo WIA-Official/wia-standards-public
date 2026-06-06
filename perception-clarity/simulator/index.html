@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Perception Clarity - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #0EA5E9;
+            --primary-dark: #0284C7;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 20px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 1rem; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 10px; margin: 15px 0; }
+        .checkbox-item { display: flex; align-items: center; gap: 8px; padding: 10px 15px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+        .checkbox-item:hover { border-color: var(--primary); }
+        .checkbox-item.checked { border-color: var(--primary); background: rgba(14, 165, 233, 0.1); }
+        .checkbox-item input { display: none; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-secondary:hover { border-color: var(--primary); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .sub-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .sub-section h4 { color: var(--primary); margin-bottom: 15px; font-size: 1rem; }
+
+        .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin: 20px 0; }
+        .feature-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .feature-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .feature-card.active { border-color: var(--secondary); background: rgba(16, 185, 129, 0.1); }
+        .feature-card .icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .feature-card .name { font-weight: 600; margin-bottom: 5px; }
+        .feature-card .status { font-size: 0.8rem; color: var(--text-muted); }
+
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .status-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .status-item .value { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+        .status-item .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .route-step { display: flex; align-items: center; gap: 15px; padding: 15px; background: var(--bg); border-radius: 8px; margin: 10px 0; border-left: 4px solid var(--primary); }
+        .route-step .step-num { width: 30px; height: 30px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .route-step .step-info { flex: 1; }
+        .route-step .step-title { font-weight: 600; }
+        .route-step .step-desc { font-size: 0.85rem; color: var(--text-muted); }
+
+        .alert-box { padding: 15px 20px; border-radius: 8px; margin: 15px 0; }
+        .alert-box.danger { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: #fca5a5; }
+        .alert-box.warning { background: rgba(245, 158, 11, 0.1); border: 1px solid var(--warning); color: #fcd34d; }
+        .alert-box.success { background: rgba(16, 185, 129, 0.1); border: 1px solid var(--secondary); color: #6ee7b7; }
+
+        .slider-group { margin: 15px 0; }
+        .slider-group label { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .slider-group input[type="range"] { width: 100%; }
+
+        .gauge { text-align: center; margin: 20px 0; }
+        .gauge .pci-num { font-size: 4rem; font-weight: bold; line-height: 1; }
+        .gauge .pci-state { font-size: 1.3rem; font-weight: 600; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        .gauge .pci-bar { height: 16px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); overflow: hidden; margin: 18px auto 0; max-width: 480px; }
+        .gauge .pci-fill { height: 100%; transition: width 0.25s, background 0.25s; }
+        .st-clear { color: var(--secondary); }
+        .st-degraded { color: var(--warning); }
+        .st-obstructed { color: #fb923c; }
+        .st-blind { color: var(--danger); }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+        }
+            .emoji-icon { background: none !important; -webkit-background-clip: initial !important; -webkit-text-fill-color: initial !important; background-clip: initial !important; display: inline-block; margin-right: 8px; }
+
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+        .ebook-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: linear-gradient(135deg, #F59E0B, #ef4444); color: white; border-radius: 20px; text-decoration: none; font-size: 0.85rem; font-weight: 600; transition: all 0.2s; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3); }
+        .ebook-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.5); }
+        .panel-ebook-link { float: right; padding: 4px 10px; background: rgba(245, 158, 11, 0.15); color: #F59E0B; border: 1px solid #F59E0B; border-radius: 12px; text-decoration: none; font-size: 0.75rem; font-weight: 500; }
+        .panel-ebook-link:hover { background: #F59E0B; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Perception Clarity</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://wiabook.com/?s=Perception+Clarity&post_type=download" target="_blank" rel="noopener" style="display:inline-block;padding:6px 14px;background:linear-gradient(135deg,#F59E0B,#ef4444);color:white;border-radius:20px;text-decoration:none;font-size:0.85rem;font-weight:600;margin:0 8px;">📖 eBook</a><a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com/reader/simulators/" target="_blank" data-en="🎮 109+ Simulators" data-ko="🎮 109+ 시뮬레이터">🎮 109+ Simulators</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards-public/tree/main/perception-clarity" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">👁️ WIA Perception Clarity</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Sensor Clarity for Physical AI" data-ko="피지컬 AI 센서 명료도">Sensor Clarity for Physical AI</h1>
+            <p data-en="Measure, state, and report how clearly sensors currently see" data-ko="센서가 지금 얼마나 잘 보이는가를 측정·상태화·보고">Measure, state, and report how clearly sensors currently see</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📷 Sensors" data-ko="📷 센서">📷 Sensors</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🌧️ Contamination" data-ko="🌧️ 오염">🌧️ Contamination</div>
+            <div class="tab" onclick="showPanel(2)" data-en="📊 PCI" data-ko="📊 PCI">📊 PCI</div>
+            <div class="tab" onclick="showPanel(3)" data-en="📡 Report" data-ko="📡 보고">📡 Report</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🚦 Safe Action" data-ko="🚦 안전 동작">🚦 Safe Action</div>
+        </div>
+
+        <!-- Panel 0: Sensors -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="📷 Sensor Class" data-ko="📷 센서 클래스">📷 Sensor Class</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Pick a sensor class and see its live PCI gauge" data-ko="센서 클래스를 선택해 실시간 PCI 게이지를 확인하세요">Pick a sensor class and see its live PCI gauge</p>
+
+            <div class="feature-grid" id="sensorGrid">
+                <div class="feature-card active" data-class="rgb_camera" onclick="selectSensor(this)">
+                    <div class="icon">📷</div>
+                    <div class="name" data-en="RGB Camera" data-ko="RGB 카메라">RGB Camera</div>
+                    <div class="status">w 0.40 / 0.25 / 0.35</div>
+                </div>
+                <div class="feature-card" data-class="ir_thermal" onclick="selectSensor(this)">
+                    <div class="icon">🌡️</div>
+                    <div class="name" data-en="IR / Thermal" data-ko="적외선 / 열화상">IR / Thermal</div>
+                    <div class="status">w 0.40 / 0.35 / 0.25</div>
+                </div>
+                <div class="feature-card" data-class="lidar_window" onclick="selectSensor(this)">
+                    <div class="icon">📡</div>
+                    <div class="name" data-en="LiDAR Window" data-ko="LiDAR 윈도우">LiDAR Window</div>
+                    <div class="status">w 0.45 / 0.45 / 0.10</div>
+                </div>
+                <div class="feature-card" data-class="radar_radome" onclick="selectSensor(this)">
+                    <div class="icon">📶</div>
+                    <div class="name" data-en="Radar Radome" data-ko="레이더 레이돔">Radar Radome</div>
+                    <div class="status">w 0.30 / 0.65 / 0.05</div>
+                </div>
+                <div class="feature-card" data-class="ultrasonic" onclick="selectSensor(this)">
+                    <div class="icon">🔊</div>
+                    <div class="name" data-en="Ultrasonic" data-ko="초음파">Ultrasonic</div>
+                    <div class="status">w 0.50 / 0.50 / 0.00</div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Live PCI" data-ko="실시간 PCI">Live PCI</h4>
+                <div class="gauge">
+                    <div class="pci-num" id="s0_pci">100</div>
+                    <div class="pci-state" id="s0_state">clear</div>
+                    <div class="pci-bar"><div class="pci-fill" id="s0_fill" style="width:100%;background:#10b981;"></div></div>
+                </div>
+                <p style="color: var(--text-muted); font-size: 0.85rem; text-align:center;" data-en="Add contaminants or adjust axes in the next tabs to change PCI." data-ko="다음 탭에서 오염을 더하거나 축을 조정하면 PCI가 바뀝니다.">Add contaminants or adjust axes in the next tabs to change PCI.</p>
+            </div>
+            <div class="output" id="sensorOutput"></div>
+        </div>
+
+        <!-- Panel 1: Contamination -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🌧️ Contamination" data-ko="🌧️ 오염">🌧️ Contamination</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Toggle contaminants and set coverage to recompute PCI" data-ko="오염을 켜고 점유율을 설정해 PCI를 다시 계산하세요">Toggle contaminants and set coverage to recompute PCI</p>
+
+            <div class="sub-section" id="contamList">
+                <h4 data-en="Contaminants & Coverage" data-ko="오염 종류 및 점유율">Contaminants &amp; Coverage</h4>
+                <!-- contaminant sliders injected by JS -->
+            </div>
+
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="value" id="c_pci">100</div>
+                    <div class="label" data-en="PCI" data-ko="PCI">PCI</div>
+                </div>
+                <div class="status-item">
+                    <div class="value" id="c_state">clear</div>
+                    <div class="label" data-en="State" data-ko="상태">State</div>
+                </div>
+                <div class="status-item">
+                    <div class="value" id="c_total">0%</div>
+                    <div class="label" data-en="Total Coverage" data-ko="총 점유율">Total Coverage</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-secondary" onclick="resetContaminants()" data-en="♻️ Reset" data-ko="♻️ 초기화">♻️ Reset</button>
+            </div>
+            <div class="output" id="contamOutput"></div>
+        </div>
+
+        <!-- Panel 2: PCI -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="📊 PCI Calculator" data-ko="📊 PCI 계산기">📊 PCI Calculator</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Adjust the three damage axes; weights follow the selected sensor class" data-ko="세 손상 축을 조정하세요. 가중치는 선택한 센서 클래스를 따릅니다">Adjust the three damage axes; weights follow the selected sensor class</p>
+
+            <div class="sub-section">
+                <h4 data-en="Damage Axes (0.0 - 1.0)" data-ko="손상 축 (0.0 - 1.0)">Damage Axes (0.0 - 1.0)</h4>
+                <div class="slider-group">
+                    <label><span data-en="Occlusion ratio" data-ko="가림 비율">Occlusion ratio</span><span id="occVal">0.00</span></label>
+                    <input type="range" id="occ" min="0" max="100" value="0" oninput="recompute()">
+                </div>
+                <div class="slider-group">
+                    <label><span data-en="Distance degradation" data-ko="거리 저하">Distance degradation</span><span id="distVal">0.00</span></label>
+                    <input type="range" id="dist" min="0" max="100" value="0" oninput="recompute()">
+                </div>
+                <div class="slider-group">
+                    <label><span data-en="MTF reduction" data-ko="MTF 저하">MTF reduction</span><span id="mtfVal">0.00</span></label>
+                    <input type="range" id="mtf" min="0" max="100" value="0" oninput="recompute()">
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Class Weights (applied)" data-ko="적용 가중치">Class Weights (applied)</h4>
+                <div class="form-group">
+                    <label data-en="Sensor Class" data-ko="센서 클래스">Sensor Class</label>
+                    <select id="pciClass" onchange="recompute()">
+                        <option value="rgb_camera">📷 RGB Camera (0.40 / 0.25 / 0.35)</option>
+                        <option value="ir_thermal">🌡️ IR / Thermal (0.40 / 0.35 / 0.25)</option>
+                        <option value="lidar_window">📡 LiDAR Window (0.45 / 0.45 / 0.10)</option>
+                        <option value="radar_radome">📶 Radar Radome (0.30 / 0.65 / 0.05)</option>
+                        <option value="ultrasonic">🔊 Ultrasonic (0.50 / 0.50 / 0.00)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="gauge">
+                <div class="pci-num" id="p_pci">100</div>
+                <div class="pci-state" id="p_state">clear</div>
+                <div class="pci-bar"><div class="pci-fill" id="p_fill" style="width:100%;background:#10b981;"></div></div>
+            </div>
+            <div class="output" id="pciOutput"></div>
+        </div>
+
+        <!-- Panel 3: Report -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="📡 Sensor Clarity Report" data-ko="📡 센서 명료도 보고">📡 Sensor Clarity Report</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Generate a SensorClarityReport JSON matching the Phase 1 schema" data-ko="Phase 1 스키마에 맞는 SensorClarityReport JSON을 생성하세요">Generate a SensorClarityReport JSON matching the Phase 1 schema</p>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-en="Agent ID" data-ko="에이전트 ID">Agent ID</label>
+                    <input type="text" id="agentId" value="veh-seoul-0421">
+                </div>
+                <div class="form-group">
+                    <label data-en="Agent Type" data-ko="에이전트 유형">Agent Type</label>
+                    <select id="agentType">
+                        <option value="vehicle">vehicle</option>
+                        <option value="robot">robot</option>
+                        <option value="drone">drone</option>
+                        <option value="amr">amr</option>
+                        <option value="other">other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Sensor ID" data-ko="센서 ID">Sensor ID</label>
+                    <input type="text" id="sensorId" value="front-cam-main">
+                </div>
+                <div class="form-group">
+                    <label data-en="Conformance Level" data-ko="적합성 레벨">Conformance Level</label>
+                    <select id="conformanceLevel">
+                        <option value="L-A">L-A</option>
+                        <option value="L-B">L-B</option>
+                        <option value="L-C" selected>L-C</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="generateReport()" data-en="📡 Generate Report" data-ko="📡 보고 생성">📡 Generate Report</button>
+            </div>
+            <div class="output" id="reportOutput"></div>
+        </div>
+
+        <!-- Panel 4: Safe Action -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="🚦 Safe Action" data-ko="🚦 안전 동작">🚦 Safe Action</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Given a clarity state, see the required safe action" data-ko="명료도 상태에 따른 필요한 안전 동작을 확인하세요">Given a clarity state, see the required safe action</p>
+
+            <div class="feature-grid">
+                <div class="feature-card" onclick="safeAction('clear')">
+                    <div class="icon">✅</div>
+                    <div class="name st-clear" data-en="CLEAR" data-ko="CLEAR">CLEAR</div>
+                    <div class="status">PCI 90-100</div>
+                </div>
+                <div class="feature-card" onclick="safeAction('degraded')">
+                    <div class="icon">🟡</div>
+                    <div class="name st-degraded" data-en="DEGRADED" data-ko="DEGRADED">DEGRADED</div>
+                    <div class="status">PCI 60-89</div>
+                </div>
+                <div class="feature-card" onclick="safeAction('obstructed')">
+                    <div class="icon">🟠</div>
+                    <div class="name st-obstructed" data-en="OBSTRUCTED" data-ko="OBSTRUCTED">OBSTRUCTED</div>
+                    <div class="status">PCI 30-59</div>
+                </div>
+                <div class="feature-card" onclick="safeAction('blind')">
+                    <div class="icon">🔴</div>
+                    <div class="name st-blind" data-en="BLIND" data-ko="BLIND">BLIND</div>
+                    <div class="status">PCI 0-29</div>
+                </div>
+            </div>
+
+            <div id="actionBox"></div>
+            <div class="output" id="actionOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Perception Clarity: how clearly physical AI sees" data-ko="WIA Perception Clarity: 피지컬 AI가 얼마나 잘 보는가">WIA Perception Clarity: how clearly physical AI sees</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com/?s=Perception+Clarity&post_type=download" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards-public/tree/main/perception-clarity" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+
+        // ---- Domain model (Phase 1) ----
+        const WEIGHTS = {
+            rgb_camera:   { occ: 0.40, dist: 0.25, mtf: 0.35 },
+            ir_thermal:   { occ: 0.40, dist: 0.35, mtf: 0.25 },
+            lidar_window: { occ: 0.45, dist: 0.45, mtf: 0.10 },
+            radar_radome: { occ: 0.30, dist: 0.65, mtf: 0.05 },
+            ultrasonic:   { occ: 0.50, dist: 0.50, mtf: 0.00 }
+        };
+
+        // contaminant -> per-unit-coverage impact on each axis (0..1 scale per full coverage)
+        const CONTAMINANTS = {
+            rain_film:        { occ: 0.30, dist: 0.40, mtf: 0.70, en: 'Rain film', ko: '빗물막' },
+            mud_dust:         { occ: 0.95, dist: 0.90, mtf: 0.60, en: 'Mud / dust', ko: '진흙·먼지' },
+            salt_spray:       { occ: 0.50, dist: 0.45, mtf: 0.65, en: 'Salt spray', ko: '염무' },
+            insect_strike:    { occ: 0.70, dist: 0.40, mtf: 0.55, en: 'Insect strike', ko: '벌레 충돌' },
+            frost_ice:        { occ: 0.85, dist: 0.80, mtf: 0.60, en: 'Frost / ice', ko: '서리·결빙' },
+            condensation:     { occ: 0.40, dist: 0.50, mtf: 0.75, en: 'Condensation', ko: '응결(김서림)' },
+            sun_glare:        { occ: 0.20, dist: 0.35, mtf: 0.85, en: 'Sun glare', ko: '역광·포화' },
+            scratch_abrasion: { occ: 0.30, dist: 0.30, mtf: 0.60, en: 'Scratch / abrasion', ko: '스크래치·마모' }
+        };
+
+        const SAFE_ACTIONS = {
+            clear:      { actions: ['normal'], icon: '✅', cls: 'success',
+                          en: 'Normal operation. No intervention required.',
+                          ko: '정상 운용. 개입 불필요.' },
+            degraded:   { actions: ['monitor', 'trigger_cleaning'], icon: '🟡', cls: 'warning',
+                          en: 'Monitor closely and trigger cleaning. Keep operating with caution.',
+                          ko: '면밀히 모니터링하고 세척을 트리거. 주의하며 운용 유지.' },
+            obstructed: { actions: ['slow_down', 'reroute', 'trigger_cleaning'], icon: '🟠', cls: 'warning',
+                          en: 'Slow down, reroute if needed, and trigger cleaning.',
+                          ko: '감속, 필요 시 우회, 세척 트리거.' },
+            blind:      { actions: ['disable_sensor', 'safe_state'], icon: '🔴', cls: 'danger',
+                          en: 'Disable the sensor and enter a safe state immediately.',
+                          ko: '센서 사용을 중단하고 즉시 안전 상태로 진입.' }
+        };
+
+        function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+
+        // Core PCI computation (Phase 1 section 3.1)
+        function computePci(occ, dist, mtf, weights) {
+            occ = clamp01(occ); dist = clamp01(dist); mtf = clamp01(mtf);
+            const damage = weights.occ * occ + weights.dist * dist + weights.mtf * mtf; // 0..1
+            let pci = Math.round(100 - damage * 100);
+            pci = Math.max(0, Math.min(100, pci));
+            return pci;
+        }
+
+        function pciToState(pci) {
+            if (pci >= 90) return 'clear';
+            if (pci >= 60) return 'degraded';
+            if (pci >= 30) return 'obstructed';
+            return 'blind';
+        }
+
+        function stateColor(state) {
+            return { clear: '#10b981', degraded: '#f59e0b', obstructed: '#fb923c', blind: '#ef4444' }[state];
+        }
+
+        // ---- Panel 0: Sensors ----
+        let selectedClass = 'rgb_camera';
+
+        function selectSensor(card) {
+            document.querySelectorAll('#sensorGrid .feature-card').forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+            selectedClass = card.getAttribute('data-class');
+            document.getElementById('pciClass').value = selectedClass;
+            refreshSensorGauge();
+            recompute();
+        }
+
+        // axes derived from contaminant state (shared across panels)
+        function axesFromContaminants() {
+            let occ = 0, dist = 0, mtf = 0;
+            Object.keys(CONTAMINANTS).forEach(key => {
+                const item = document.getElementById('cov_' + key);
+                if (!item) return;
+                const wrap = item.closest('.checkbox-item, .slider-group');
+                const on = document.getElementById('on_' + key);
+                if (on && on.checked) {
+                    const cov = parseInt(item.value, 10) / 100;
+                    const c = CONTAMINANTS[key];
+                    occ = Math.max(occ, c.occ * cov);
+                    dist = Math.max(dist, c.dist * cov);
+                    mtf = Math.max(mtf, c.mtf * cov);
+                }
+            });
+            return { occ: clamp01(occ), dist: clamp01(dist), mtf: clamp01(mtf) };
+        }
+
+        function refreshSensorGauge() {
+            const ax = axesFromContaminants();
+            const pci = computePci(ax.occ, ax.dist, ax.mtf, WEIGHTS[selectedClass]);
+            const state = pciToState(pci);
+            document.getElementById('s0_pci').textContent = pci;
+            const stEl = document.getElementById('s0_state');
+            stEl.textContent = state;
+            stEl.className = 'pci-state st-' + state;
+            const fill = document.getElementById('s0_fill');
+            fill.style.width = pci + '%';
+            fill.style.background = stateColor(state);
+            document.getElementById('sensorOutput').textContent = JSON.stringify({
+                sensorClass: selectedClass,
+                weights: WEIGHTS[selectedClass],
+                axes: { occlusion: +ax.occ.toFixed(2), distanceDegradation: +ax.dist.toFixed(2), mtfReduction: +ax.mtf.toFixed(2) },
+                pci: pci,
+                state: state
+            }, null, 2);
+        }
+
+        // ---- Panel 1: Contamination ----
+        function buildContaminants() {
+            const host = document.getElementById('contamList');
+            Object.keys(CONTAMINANTS).forEach(key => {
+                const c = CONTAMINANTS[key];
+                const row = document.createElement('div');
+                row.className = 'slider-group';
+                row.innerHTML =
+                    '<label>' +
+                    '<span><input type="checkbox" id="on_' + key + '" style="margin-right:8px;" onchange="onContaminantChange()">' +
+                    '<span data-en="' + c.en + '" data-ko="' + c.ko + '">' + c.en + '</span></span>' +
+                    '<span id="lbl_' + key + '">0%</span></label>' +
+                    '<input type="range" id="cov_' + key + '" min="0" max="100" value="0" oninput="onContaminantChange()">';
+                host.appendChild(row);
+            });
+        }
+
+        function onContaminantChange() {
+            Object.keys(CONTAMINANTS).forEach(key => {
+                const cov = document.getElementById('cov_' + key);
+                const lbl = document.getElementById('lbl_' + key);
+                if (cov && lbl) lbl.textContent = cov.value + '%';
+            });
+            const ax = axesFromContaminants();
+            const pci = computePci(ax.occ, ax.dist, ax.mtf, WEIGHTS[selectedClass]);
+            const state = pciToState(pci);
+            let totalCov = 0;
+            const active = [];
+            Object.keys(CONTAMINANTS).forEach(key => {
+                const on = document.getElementById('on_' + key);
+                const cov = document.getElementById('cov_' + key);
+                if (on && on.checked) {
+                    const v = parseInt(cov.value, 10);
+                    totalCov += v;
+                    active.push({ type: key, coverage: +(v / 100).toFixed(2) });
+                }
+            });
+            document.getElementById('c_pci').textContent = pci;
+            const stEl = document.getElementById('c_state');
+            stEl.textContent = state;
+            stEl.className = 'value st-' + state;
+            document.getElementById('c_total').textContent = totalCov + '%';
+            document.getElementById('contamOutput').textContent = JSON.stringify({
+                sensorClass: selectedClass,
+                contaminants: active,
+                axes: { occlusion: +ax.occ.toFixed(2), distanceDegradation: +ax.dist.toFixed(2), mtfReduction: +ax.mtf.toFixed(2) },
+                pci: pci,
+                state: state
+            }, null, 2);
+            refreshSensorGauge();
+            syncPciSlidersFromAxes(ax);
+        }
+
+        function resetContaminants() {
+            Object.keys(CONTAMINANTS).forEach(key => {
+                document.getElementById('on_' + key).checked = false;
+                document.getElementById('cov_' + key).value = 0;
+            });
+            onContaminantChange();
+        }
+
+        // ---- Panel 2: PCI calculator ----
+        function syncPciSlidersFromAxes(ax) {
+            document.getElementById('occ').value = Math.round(ax.occ * 100);
+            document.getElementById('dist').value = Math.round(ax.dist * 100);
+            document.getElementById('mtf').value = Math.round(ax.mtf * 100);
+            document.getElementById('pciClass').value = selectedClass;
+            recompute(true);
+        }
+
+        function recompute(skipSync) {
+            const occ = parseInt(document.getElementById('occ').value, 10) / 100;
+            const dist = parseInt(document.getElementById('dist').value, 10) / 100;
+            const mtf = parseInt(document.getElementById('mtf').value, 10) / 100;
+            document.getElementById('occVal').textContent = occ.toFixed(2);
+            document.getElementById('distVal').textContent = dist.toFixed(2);
+            document.getElementById('mtfVal').textContent = mtf.toFixed(2);
+            const cls = document.getElementById('pciClass').value;
+            const w = WEIGHTS[cls];
+            const pci = computePci(occ, dist, mtf, w);
+            const state = pciToState(pci);
+            document.getElementById('p_pci').textContent = pci;
+            const stEl = document.getElementById('p_state');
+            stEl.textContent = state;
+            stEl.className = 'pci-state st-' + state;
+            const fill = document.getElementById('p_fill');
+            fill.style.width = pci + '%';
+            fill.style.background = stateColor(state);
+            document.getElementById('pciOutput').textContent = JSON.stringify({
+                sensorClass: cls,
+                pciWeights: { occlusion: w.occ, distance: w.dist, mtf: w.mtf },
+                axes: { occlusion: +occ.toFixed(2), distanceDegradation: +dist.toFixed(2), mtfReduction: +mtf.toFixed(2) },
+                formula: 'round(100 - (w_occ*occ + w_dist*dist + w_mtf*mtf)*100)',
+                pci: pci,
+                state: state
+            }, null, 2);
+        }
+
+        // ---- Panel 3: Report ----
+        function generateId() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function generateReport() {
+            const occ = parseInt(document.getElementById('occ').value, 10) / 100;
+            const dist = parseInt(document.getElementById('dist').value, 10) / 100;
+            const mtf = parseInt(document.getElementById('mtf').value, 10) / 100;
+            const cls = selectedClass;
+            const w = WEIGHTS[cls];
+            const pci = computePci(occ, dist, mtf, w);
+            const state = pciToState(pci);
+
+            const contaminants = [];
+            Object.keys(CONTAMINANTS).forEach(key => {
+                const on = document.getElementById('on_' + key);
+                const cov = document.getElementById('cov_' + key);
+                if (on && on.checked) {
+                    contaminants.push({ type: key, coverage: +(parseInt(cov.value, 10) / 100).toFixed(2) });
+                }
+            });
+
+            const report = {
+                header: {
+                    version: '1.0.0',
+                    messageId: generateId(),
+                    timestamp: new Date().toISOString(),
+                    agentId: document.getElementById('agentId').value,
+                    agentType: document.getElementById('agentType').value,
+                    conformanceLevel: document.getElementById('conformanceLevel').value
+                },
+                sensors: [
+                    {
+                        sensorId: document.getElementById('sensorId').value,
+                        sensorClass: cls,
+                        pci: pci,
+                        state: state,
+                        contaminants: contaminants,
+                        axes: {
+                            occlusion: +occ.toFixed(2),
+                            distanceDegradation: +dist.toFixed(2),
+                            mtfReduction: +mtf.toFixed(2)
+                        },
+                        pciWeights: { occlusion: w.occ, distance: w.dist, mtf: w.mtf },
+                        lastCleanedAt: state === 'clear' ? new Date().toISOString() : null,
+                        dwellSeconds: state === 'clear' ? 0 : 47,
+                        confidence: 0.92
+                    }
+                ]
+            };
+            document.getElementById('reportOutput').textContent = JSON.stringify(report, null, 2);
+        }
+
+        // ---- Panel 4: Safe Action ----
+        function safeAction(state) {
+            const a = SAFE_ACTIONS[state];
+            const box = document.getElementById('actionBox');
+            box.innerHTML = '<div class="alert-box ' + a.cls + '"><strong>' + a.icon + ' ' +
+                state.toUpperCase() + '</strong><p>' + (currentLang === 'ko' ? a.ko : a.en) + '</p></div>';
+            document.getElementById('actionOutput').textContent = JSON.stringify({
+                state: state,
+                requiredActions: a.actions,
+                message: currentLang === 'ko' ? a.ko : a.en
+            }, null, 2);
+        }
+
+        // ---- Shared UI ----
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            buildContaminants();
+            setLang('en');
+            refreshSensorGauge();
+            onContaminantChange();
+            recompute();
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+<footer style="font-family:sans-serif;background:#0f172a;color:#94a3b8;padding:20px;text-align:center;margin-top:40px;">
+<p>📖 <a href="https://wiabook.com/?s=Perception+Clarity&post_type=download" target="_blank" rel="noopener" style="color:#06B6D4;">Companion eBook</a> &middot; 📦 <a href="https://github.com/WIA-Official/wia-standards-public/tree/main/perception-clarity" target="_blank" rel="noopener" style="color:#06B6D4;">GitHub Source (perception-clarity)</a> &middot; 🌐 <a href="https://wiastandards.com" target="_blank" rel="noopener" style="color:#06B6D4;">WIA Standards</a></p>
+</footer>
+
+</body>
+</html>

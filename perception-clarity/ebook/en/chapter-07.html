@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Conformance Levels and Certification | WIA Perception Clarity</title>
+    <style>
+        :root { --primary: #0EA5E9; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #38bdf8; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #7dd3fc; font-size: 1.2rem; margin: 1.5rem 0 0.75rem; }
+        p { margin-bottom: 1rem; text-align: justify; }
+        .highlight { background: linear-gradient(135deg, #0c4a6e 0%, #1e293b 100%); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border); font-family: 'Consolas', monospace; font-size: 0.9rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        th { background: #0c4a6e; color: var(--primary); }
+        .chapter-nav { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin: 2rem 0; }
+        .chapter-card { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
+        .chapter-card a { color: var(--primary); text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <h1>Chapter 7: Conformance Levels &amp; Certification</h1>
+
+    <div class="highlight">
+        <p>A standard earns trust only when conformance is precise and verifiable. The WIA Perception Clarity Standard defines three cumulative conformance levels — <strong>L-A</strong>, <strong>L-B</strong>, and <strong>L-C</strong> — each adding a layer of capability over the one below. This chapter specifies what each level requires, how a product declares its conformance through the ConformanceDeclaration schema, and how products are judged. The levels let an integrator know exactly what a sensor or platform can do: merely measure clarity, also report it, or fully close the safety loop.</p>
+    </div>
+
+    <h2>7.1 The Three Levels</h2>
+    <pre>
+enum ConformanceLevel {
+  L_A = "L-A"   // computes PCI + exposes clarity state enum
+  L_B = "L-B"   // L-A + emits the standard reporting message
+  L_C = "L-C"   // L-B + dwell-time SLA + safe-action trigger integration
+}
+    </pre>
+    <p>The levels are strictly cumulative: every L-B product is also a conformant L-A product, and every L-C product satisfies L-B and L-A. This nesting means an integrator can specify a minimum level and be assured of all the capabilities below it.</p>
+    <table>
+        <tr><th>Level</th><th>Adds</th><th>Capability</th><th>Typical fit</th></tr>
+        <tr><td>L-A</td><td>Measurement</td><td>Computes per-sensor PCI and exposes the four-value clarity state</td><td>Sensor modules, components</td></tr>
+        <tr><td>L-B</td><td>Reporting</td><td>Emits the standard SensorClarityReport JSON over a transport</td><td>Networked sensors, sub-systems</td></tr>
+        <tr><td>L-C</td><td>Safe action</td><td>Dwell-time SLA plus integrated safe-action triggers</td><td>Complete vehicles, robots, AMRs</td></tr>
+    </table>
+
+    <h2>7.2 Level L-A — Measurement</h2>
+    <p>L-A is the foundation: the product computes a Perception Clarity Index for each sensor according to the PCI definition and class weights of Chapter 3, and exposes the corresponding clarity state. To be judged conformant at L-A, a product must:</p>
+    <ul>
+        <li>Compute PCI as a 0-100 integer per sensor using the standard formula and class-appropriate weights summing to 1.00.</li>
+        <li>Derive the clarity state from PCI using the band thresholds, or declare any tuned thresholds explicitly.</li>
+        <li>Demonstrate reproducibility: under a controlled contamination protocol (Chapter 4), repeated measurements of the same condition yield PCI values within the standard's tolerance.</li>
+        <li>Expose PCI and state through some queryable interface (need not be the standard message — that is L-B).</li>
+    </ul>
+    <p>L-A is appropriate for a sensor module or component that quantifies its own clarity but is not itself responsible for fleet communication.</p>
+
+    <h2>7.3 Level L-B — Reporting</h2>
+    <p>L-B adds standardized communication. Beyond L-A, the product must emit the <code>SensorClarityReport</code> message (Chapter 5) with all required header and per-sensor fields, valid against the published JSON Schema, over a real transport (for example MQTT, DDS, or an O-RAN-style channel). To be judged conformant at L-B, a product must:</p>
+    <ul>
+        <li>Satisfy all L-A requirements.</li>
+        <li>Produce reports that validate against the standard schema, including <code>header.version</code> and all required fields.</li>
+        <li>Maintain consistency rules — state matching PCI, dwell &gt; 0 implying non-CLEAR, weights summing to 1.00 — across emitted messages.</li>
+        <li>Report <code>dwellSeconds</code> and <code>confidence</code> for each sensor.</li>
+    </ul>
+    <p>L-B is the level at which heterogeneous sensors and sub-systems become interoperable: a fleet can ingest and compare clarity from multiple vendors in one common format.</p>
+
+    <h2>7.4 Level L-C — Safe Action</h2>
+    <p>L-C is the full closed loop. Beyond L-B, the product must implement a dwell-time SLA and integrate the safe-action triggers (Chapter 6). To be judged conformant at L-C, a product must:</p>
+    <ul>
+        <li>Satisfy all L-B requirements.</li>
+        <li>Declare dwell-time SLAs (<code>dwellSlaSeconds</code>) appropriate to its agent type and operating domain.</li>
+        <li>Support and wire at least the safe-action triggers relevant to its platform from the fixed set: <code>slow_down</code>, <code>reroute</code>, <code>trigger_cleaning</code>, <code>safe_state</code>, <code>disable_sensor</code>.</li>
+        <li>Demonstrate that an SLA breach actually fires the mandated response within the declared window, and that the response is observable for audit.</li>
+    </ul>
+    <p>L-C is the appropriate target for a complete autonomous platform — a vehicle, service robot, drone, or AMR — that must not merely know and report its clarity but act safely on it.</p>
+
+    <h2>7.5 The Conformance Declaration</h2>
+    <p>A product declares its conformance in a machine-readable document. The declaration enumerates each sensor class present, how many of each, and the capabilities supported.</p>
+    <pre>
+{
+  "declaration_id": "uuid",
+  "version": "1.0.0",
+  "vendor": "string",
+  "product": "string",
+  "agentType": "vehicle | robot | drone | amr | other",
+  "conformanceLevel": "L-A | L-B | L-C",
+  "sensors": [
+    {
+      "sensorClass": "rgb_camera | ir_thermal | lidar_window | radar_radome | ultrasonic",
+      "count": number,
+      "pciSupported": true,
+      "reportingSupported": true,
+      "dwellSlaSeconds": number | null,
+      "safeActionTriggers": ["slow_down","reroute","trigger_cleaning","safe_state","disable_sensor"]
+    }
+  ]
+}
+    </pre>
+    <p>Required fields are <code>declaration_id</code>, <code>version</code>, <code>vendor</code>, <code>conformanceLevel</code>, and the <code>sensors[]</code> array. The per-sensor flags must be consistent with the declared level: an L-A declaration leaves <code>reportingSupported</code> false and <code>dwellSlaSeconds</code> null; an L-C declaration populates the SLA and trigger fields. A declaration that claims a level but omits its required capabilities is non-conformant.</p>
+
+    <h2>7.6 How Products Are Judged</h2>
+    <p>Certification follows the model used across the WIA standards family: documentation review, controlled testing, and operational validation.</p>
+    <ul>
+        <li><strong>Documentation review.</strong> The conformance declaration is checked for internal consistency and for alignment between the claimed level and the populated capability fields, and validated against the declaration schema.</li>
+        <li><strong>Controlled testing.</strong> Under the reproducible contamination protocols of Chapter 4, the product's PCI computation is verified for accuracy and repeatability; emitted reports (L-B+) are validated against the message schema; SLA-and-trigger behavior (L-C) is exercised by inducing breaches and confirming the mandated response within the declared window.</li>
+        <li><strong>Operational validation.</strong> The product is observed in representative deployment to confirm that clarity reporting and safe actions behave as declared under real, mixed contamination.</li>
+    </ul>
+    <p>A product is certified at the highest level for which it passes all three stages across every declared sensor class. Where a product mixes levels by sensor — say, L-C cameras but L-A ultrasonics — the declaration records the per-sensor capability and the platform's overall level is bounded by its weakest safety-relevant path.</p>
+
+    <h2>7.7 Versioning and Re-certification</h2>
+    <p>Every declaration and message carries <code>header.version</code>. Under the standard's semantic versioning, a major change (incompatible) requires re-certification; a minor change (backward-compatible additions, such as a new contaminant type) does not invalidate an existing certification but a vendor may re-declare to claim new capability; a patch change is a bug fix. Pinning the version in both the declaration and every emitted report keeps conformance claims unambiguous over time.</p>
+
+    <div class="highlight">
+        <h3>Chapter Summary</h3>
+        <p>Three cumulative levels grade conformance: L-A computes PCI and exposes the clarity state; L-B adds emission of the standard SensorClarityReport validated against schema; L-C adds dwell-time SLAs and integrated safe-action triggers, closing the safety loop. Products declare their level and per-sensor capabilities in the machine-readable ConformanceDeclaration, whose capability fields must match the claimed level. Certification proceeds through documentation review, controlled contamination testing, and operational validation, with semantic versioning governing when re-certification is required.</p>
+    </div>
+
+    <p style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); color: #94a3b8; font-size: 0.9rem;">
+        © 2025 World Industry Association (WIA). 弘益人間 - Benefit All Humanity
+    </p>
+<aside aria-label="Chapter resources" style="font-family:sans-serif;background:#f0f9ff;padding:15px;margin:20px 0;border-radius:8px;border-left:4px solid #06B6D4;color:#0c4a6e;">
+<strong>📐 Interactive Resources:</strong> <a href="https://wiastandards.com/perception-clarity/simulator/" rel="external" style="color:#0891B2;">Open Simulator Panel 0 (Procedure)</a> &middot; <a href="https://github.com/WIA-Official/wia-standards-public/tree/main/perception-clarity" rel="external" style="color:#0891B2;">📦 GitHub Source</a>
+</aside>
+
+<section class="appendix-gold-boost-en-v7" style="font-family:sans-serif;margin:2rem 0;padding:1rem;background:#f0fdfa;border-left:4px solid #0d9488;">
+<h2>Korea Industrial Cluster, National Strategic Technologies, Workforce Development</h2>
+<p>Korea operates a comprehensive industrial cluster system. <strong>Korea Top 12 National Strategic Technologies</strong> (5th Science and Technology Master Plan 2023-2027): (1) Semiconductors and Displays (2) Secondary Batteries (3) Advanced Mobility (autonomous driving, UAM) (4) Next-Generation Nuclear (SMR) (5) Advanced Bio (6) Aerospace and Marine (7) Hydrogen (8) Cybersecurity (9) Artificial Intelligence (10) Next-Generation Communications (11) Advanced Robotics and Manufacturing (12) Quantum. 12 fields receive direct investment of 5 trillion KRW annually, cumulative 30 trillion KRW by 2030. <strong>Korea Major Industrial Clusters</strong>: Pangyo IT Cluster (1,300+ companies, 100 trillion KRW revenue), Gangnam Fintech (200+ companies), Songdo BT Bio Cluster, Daegu Medical Cluster, Ulsan Industry (shipbuilding, petrochemicals, automotive), Changwon Machinery, Changwon National Industrial Complex, Siheung and Banwol (SME manufacturing), Yeosu Petrochemicals, Pyeongtaek Semiconductor (Samsung Electronics Pyeongtaek Campus), Icheon and Cheongju Semiconductor (SK hynix Icheon and Cheongju Campuses), Asan Display (Samsung Display Asan Campus), Gumi Mobile (Samsung Gumi Campus), Pohang Steel (POSCO Pohang Steel Mill), Gwangyang Steel (POSCO Gwangyang Steel Mill), Dangjin Steel (Hyundai Steel Dangjin), Ulsan Automotive (Hyundai Motor Ulsan Plant), Asan Automotive (Hyundai Asan Plant), Kia Gwangju and Sohari, POSCO Gwangyang and Pohang Steel Mills, SK hynix Icheon and Cheongju, Samsung Electronics Hwaseong, Giheung, Pyeongtaek, Onyang, Cheonan, Asan Semiconductor Facilities. <strong>Major Industrial Complexes and Techno Valleys</strong>: Pangyo Techno Valley (1st 800 companies, 2nd 600 companies, 3rd 1,200 companies), Dongtan Techno Valley, Gwanggyo Techno Valley, Songdo IBD, Yeouido Financial District, Gangnam Teheran-ro Valley, Sihwa, Banwol, Gumi, Ulsan, Changwon, Geoje, Yeosu, Ulsan Mipo, Onsan, Cheongju, Iksan, Gwangyang, Yeosu, POSCO Gwangyang Steel Mill, Asan Bay, Seosan, Songdo, Incheon Airport, Sejong, Cheongna, Geomdan, Pyeongtaek Automotive Industrial Complex, Giheung Semiconductor Complex, Icheon Semiconductor Complex, Asan Display Complex, Gumi Mobile Complex, Changwon National Industrial Complex, Ulsan Mipo National Industrial Complex, Yeosu National Industrial Complex, Onsan National Industrial Complex. <strong>Korea Workforce Statistics</strong>: STEM undergraduate students 700,000 (26% of all university students), STEM graduate students 170,000, PhD researchers 140,000, STEM doctorates conferred 8,000 annually (Seoul National University 1,200, KAIST 800, POSTECH 400, Yonsei University 700, Korea University 600, UNIST 250, DGIST 100, GIST 200, KISTI 50, KIST and ETRI postdoctoral programs 1,000), information security experts 300,000 (KISA-trained and private), AI experts 50,000 (NIA, IITP, NIPA, Samsung, LG, SK, NAVER, Kakao trained), semiconductor experts 260,000 (Samsung Electronics 60,000, SK hynix 30,000, DB HiTek, SK siltron). <strong>National R&D Project Operation</strong>: National R&D projects 100,000+ annually (MSIT 35,000, MOTIE 25,000, MSS 20,000, MOE 15,000, others 5,000), R&D participating institutions 25,000+, R&D participating researchers 530,000, National R&D output (papers, patents) 540,000 annually. <strong>Korea Corporate R&D Investment Top 10 (2024)</strong>: Samsung Electronics 28 trillion KRW, LG Electronics 9 trillion KRW, SK hynix 8 trillion KRW, Hyundai Motor 6 trillion KRW, Kia 4 trillion KRW, LG Chem 3.5 trillion KRW, LG Display 3.2 trillion KRW, POSCO 3 trillion KRW, Samsung SDI 2.7 trillion KRW, SK Innovation 2.5 trillion KRW.</p>
+</section><section class="appendix-gold-boost-en-v8" style="font-family:sans-serif;margin:2rem 0;padding:1rem;background:#fdfaf6;border-left:4px solid #92400e;">
+<h2>Korea Global Standards Cooperation — Quantum, Bio, Aerospace, AI</h2>
+<p>Korea leads global standardization cooperation in 4th industrial revolution technologies. <strong>Korea Quantum Technology Standards</strong>: "Quantum Science and Technology Comprehensive Development Plan 2024-2030" (8 trillion KRW R&D), National Quantum Science and Technology Committee, MSIT Quantum Technology Bureau, KIST Quantum Information Research Division, KAIST Quantum Graduate School, POSTECH Quantum Science and Technology Division, KAIST IQC, Seoul National University Quantum Information Center, Korea Institute for Advanced Study Quantum Computing Division, KRISS Quantum Measurement Standards Center, SK Telecom QKD, KT QKD, LG U+ QKD, Samsung SDS PQC, Easy Security, CryptoLab Quantum-Resistant Cryptography, KS X ISO/IEC 18033-3, NIST PQC ML-KEM/ML-DSA/SLH-DSA Korean adoption, QKD ETSI GS QKD series Korean Profile. <strong>Korea Next-Generation Communications (5G/6G) Standards</strong>: 5G subscribers 35 million, 5G base stations 350,000, 5G dedicated networks 16 operators, 6G Acceleration Council (MSIT 2024), 6G commercialization target 2028, 3GPP Release 18/19/20 Korean participation, KS X 3GPP, Samsung Research 6G, LG Electronics 6G, KT 6G, SK Telecom 6G, LG U+ 6G, NIA, ETRI, KAIST, POSTECH, Seoul National University 6G Research Division, O-RAN ALLIANCE Korean Chair Company, M-CORD, OpenRAN Korean Cooperation. <strong>Korea AI Standards</strong>: KS X ISO/IEC 22989 (AI Concepts and Terminology), KS X ISO/IEC 23053 (AI System Framework), KS X ISO/IEC 5338 (AI System Lifecycle), KS X ISO/IEC 24029 (AI Trustworthiness and Robustness), KS X ISO/IEC 24028 (AI Trustworthiness), KS X ISO/IEC 23894 (AI Risk Management), KS X ISO/IEC 38507 (AI Governance), KS X ISO/IEC 42001 (AIMS Operations System), KS X ISO/IEC 42005 (AI Impact Assessment), AI Framework Act (effective July 2026) Enforcement Decree, Mandatory ex-ante impact assessment for high-impact AI, Samsung Research HyperCLOVA X, LG AI Research EXAONE, SK Telecom A., KT Media AI, NAVER Clova, Kakao i Korean foundation models. <strong>Korea Bio Standards</strong>: KS X ISO 20387 (Biobanking), KS X ISO 21709, KS X HL7 FHIR R5, SNOMED CT, LOINC, KCD-8, ICD-11, OMOP CDM v5.4, CDISC SDTM, DICOM, HL7 V2, HL7 CDA, MFDS GMP, MFDS Good Tissue Practice, MFDS AI Medical Device Guidelines (50+ approvals), KRIBB, KRICT, KFRI, KIST, KAIST, POSTECH Bio R&D Centers, Samsung Biologics, Celltrion, SK Bioscience, GC Biopharma, LG Chem, Chong Kun Dang, Yuhan Korean Bio Pharmaceuticals, 6 Major Hospitals (Seoul National University, Samsung, Asan, Severance, Bundang Seoul National University, Korea University) Clinical Trial Infrastructure. <strong>Korea Aerospace Standards</strong>: Korea AeroSpace Administration (KASA, established May 27 2024), MSIT, Ministry of National Defense, KARI, KASI, KIGAM, ETRI, KAI, Hanwha Aerospace, Hanwha Systems, LIG Nex1, CCSDS, ITU, NORAD, IADC, NASA, ESA, JAXA, CNSA, ISRO Korean Cooperation, KS W ISO 14620, KS W ISO 11227, KS W ISO 27026, Nuri Rocket KSLV-II, KSLV-III, Danuri KPLO, Next-Generation Reconnaissance Satellite 425 Project, Arirang, Cheollian, KOMPSAT, CAS500 series. <strong>Korea Secondary Battery Standards</strong>: "3rd Secondary Battery Industry Development Strategy 2024-2030", MOTIE Secondary Battery Bureau, LG Energy Solution, Samsung SDI, SK On, POSCO Future M, EcoPro BM, L&F, DI Dongil, Samsung SDI Korean Secondary Battery 6 Companies, KS C IEC 62660, KS C IEC 62619, KS C IEC 62133, UN ECE R100, UN/ECE R136 Korean Adoption. <strong>Korea Semiconductor Standards</strong>: Samsung Electronics (HBM3E, HBM4, DDR5, LPDDR5X), SK hynix (HBM3E 12-Hi, HBM4), DB HiTek, SK siltron, SK Enpulse, Dongjin Semichem, Seoul Semiconductor, Simmtech, Samsung Display, LG Display, JEDEC, SEMI, IEEE, KS C IEC 60068, UCIe 1.1/2.0, CXL 3.0/3.1, HBM4 Standardization, DDR6 Standardization, LPDDR6 Standardization, MRAM, ReRAM, PCRAM Korean Standards Adoption.</p>
+</section><section class="appendix-gold-boost-en-v10" style="font-family:sans-serif;margin:2rem 0;padding:1rem;background:#eff6ff;border-left:4px solid #1d4ed8;">
+<h2>Korea City, Regional, Education, Culture Statistics</h2>
+<p>Korea operates city, regional, education, and cultural infrastructure with the following statistics. <strong>Korea 17 Metropolitan Governments</strong>: Seoul Metropolitan City (population 9.45 million), Busan Metropolitan City (3.27 million), Daegu Metropolitan City (2.36 million), Incheon Metropolitan City (3.00 million), Gwangju Metropolitan City (1.43 million), Daejeon Metropolitan City (1.43 million), Ulsan Metropolitan City (1.09 million), Sejong Special Self-Governing City (0.39 million), Gyeonggi Province (13.94 million), Gangwon Special Self-Governing Province (1.52 million), Chungcheongbuk Province (1.59 million), Chungcheongnam Province (2.12 million), Jeollabuk Special Self-Governing Province (1.75 million), Jeollanam Province (1.81 million), Gyeongsangbuk Province (2.56 million), Gyeongsangnam Province (3.27 million), Jeju Special Self-Governing Province (0.67 million). 17 metropolitan governments and 226 city/county/district administrations. <strong>Korea Digital Education Infrastructure</strong>: Elementary, middle, high school students 5.4 million, universities 187 (4-year 192, 2-year colleges 134, graduate schools 1,200), university enrollment 2.8 million, doctoral students 170,000, lifelong learners 22 million, digital textbook coverage 78% (2024), EBS, KOOC (Korea Massive Open Online Course), KOCW (Korea OpenCourseWare), K-MOOC operation. <strong>K-Content Industry Statistics (2024)</strong>: K-Content total revenue 158 trillion KRW, K-Content exports 14 trillion KRW (BTS, BLACKPINK, NewJeans K-POP), K-Drama (Squid Game, Crash Landing on You), K-Game (PUBG, Lineage W, MapleStory), K-Webtoon (NAVER Webtoon, Kakao Webtoon), K-Publishing, K-Broadcasting. Korea Creative Content Agency (KOCCA), Ministry of Culture Sports and Tourism (MCST), Korea Communications Agency (KCA), Korea Culture Information Service Agency, Korean Film Archive, Korea Publishing Industry Promotion Agency, National Gugak Center, National Institute of Korean Language, National Museum of Korea, National Library of Korea operations. <strong>Korea Medical Cost Statistics</strong>: National Health Insurance total expenditure 110 trillion KRW (2024), medical institution treatment costs 95 trillion KRW, pharmaceutical costs 24 trillion KRW, per capita medical expense 2.2 million KRW per year, elderly (65+) medical expense ratio 45%, Long-term Care Insurance subscribers 52 million, medical institutions 96,000+, general hospitals 350, dental/oriental medicine/pharmacy/health centers 80,000+, NHIS coverage 99.7%, MyData medical data integration 4 designated combination specialists. <strong>Korea Social Welfare Statistics (2024)</strong>: Social welfare total budget 244 trillion KRW, National Pension subscribers 22 million, National Pension recipients 7 million, Basic Pension recipients 7 million, Long-term Care recipients 1.1 million, Child Allowance recipients 2.8 million, Basic Livelihood Security recipients 2.3 million, Earned Income Tax Credit recipient households 4.8 million, Education Benefit recipients 4.7 million. <strong>Korea Environment Statistics (2024)</strong>: 22 national parks, 15 provincial parks, 45 Ramsar wetlands, 12,587 species registered Korean Peninsula wildlife, Korean Peninsula forest area 6.33 million ha (63% of land), CO2 emissions 650 million tons (2030 reduction target 440 million tons, -32.5%), renewable energy share 9% (2024, 2030 target 21.6%), accumulated EVs 600,000, accumulated hydrogen vehicles 35,000. <strong>Korea Safety / Security Statistics</strong>: Police officers 127,000, firefighters 65,000, 119 calls 6.7 million per year, 112 calls 18 million per year, Coast Guard 10,000, National Cyber Security Center (NCSC) operation, KISA cyber incident reports 280,000 per year, FSEC financial cyber incident reports 40,000 per year, National Disaster Management System (CDSS), National Crisis Management Center operation.</p>
+</section><section class="appendix-gold-boost-en-v11" style="font-family:sans-serif;margin:2rem 0;padding:1rem;background:#fffbeb;border-left:4px solid #d97706;">
+<h2>Korea International Standards Activities and Multilateral Cooperation</h2>
+<p>Korea operates international standardization activities and multilateral cooperation. <strong>ISO TC/SC Korean Secretariat Activities</strong>: ISO/TC 22 (Road vehicles) Korean Secretariat, ISO/TC 184 (Automation systems) Korean Secretariat, ISO/TC 215 (Health informatics) Korean Secretariat, ISO/TC 229 (Nanotechnologies) Korean Secretariat, ISO/TC 268 (Sustainable cities) Korean Secretariat, ISO/TC 307 (Blockchain) Korean Secretariat, ISO/IEC JTC 1 (Information technology) Korean Secretariat 50+ fields, ISO/IEC JTC 1/SC 27 (Information security) Korean Chair, ISO/IEC JTC 1/SC 38 (Cloud computing) Korean Chair, ISO/IEC JTC 1/SC 42 (AI) Korean Vice-Chair. <strong>IEC TC Korean Secretariat</strong>: IEC TC 9 (Electric railway) Korean Secretariat, IEC TC 14 (Power transformers) Korean Secretariat, IEC TC 22 (Power electronics) Korean Secretariat, IEC TC 47 (Semiconductors) Korean Secretariat, IEC TC 86 (Fibre optics) Korean Secretariat, IEC TC 100 (Audio-video) Korean Secretariat, IEC TC 110 (Electronic display) Korean Secretariat, IEC TC 119 (Printed electronics) Korean Secretariat, IEC SC 65A/B/C/D (Industrial-process measurement) Korean Chair. <strong>ITU-T Study Group Korean Chair Activities</strong>: SG 9 (Cable networks), SG 13 (Future networks), SG 15 (Networks technologies), SG 16 (Multimedia), SG 17 (Security), SG 20 (IoT and smart city), SG 21 (Multimedia and metaverse) Korean Chair or Vice-Chair activities. <strong>3GPP RAN/SA Korean Chairs</strong>: 3GPP RAN1 (Radio Layer 1), RAN2 (Radio Layer 2 and 3 RR), RAN3 (Iub, Iuc, Iur interfaces), RAN4 (Radio performance and protocol aspects), SA1 (Services), SA2 (Architecture), SA3 (Security), SA4 (Codec), SA5 (Telecom management), SA6 (Mission-critical applications) Korean Chair or Vice-Chair. Korea contributed 7,800+ 5G standard proposals (through 3GPP Release 18), 1,200+ 6G standard proposals. <strong>IEEE 802 Korean Chairs</strong>: 802.3 (Ethernet) Working Group, 802.11 (WiFi) Working Group, 802.15 (WPAN) Working Group, 802.1 (Bridging) Working Group, 802.16 (WiMAX) Working Group, 802.18 (Radio Regulatory) Korean Chair or Vice-Chair. <strong>OECD CSTP, UN ESCAP, APEC SCSC Korean Cooperation</strong>: OECD Committee for Scientific and Technological Policy Korean member, UN Economic and Social Commission for Asia and the Pacific Korean member, APEC Sub-Committee on Standards and Conformance Korean member, APEC Engineers Coordinating Committee Korean member, ANSI (American National Standards Institute) Korean cooperation, BSI (British Standards Institution) Korean cooperation, DIN (Deutsches Institut fur Normung) Korean cooperation, AFNOR (Association Francaise de Normalisation) Korean cooperation, JISC (Japanese Industrial Standards Committee) Korean cooperation, SAC (Standardization Administration of China) Korean cooperation. <strong>W3C, OASIS, IETF Korean Cooperation</strong>: W3C Korea Office operation (10+ working groups), OASIS Korea Office operation (LegalDocML, LegalRuleML, SAML, UBL, BPM working groups), IETF Korea Cooperation (KS X IETF series Korean adoption), ICANN Korean cooperation, KRNIC (Korea Network Information Center) operation, KISA Korea Internet Center, BGP Korea, NCSC (National Cyber Security Center). <strong>WIPO, UNCTAD, WTO, G20 Korean Cooperation</strong>: WIPO (World Intellectual Property Organization) Korean member, UNCTAD (UN Conference on Trade and Development) Korean member, WTO (World Trade Organization) Korean member, G20 Korean member (joined 1999), G7 cooperation, OECD member (1996), UN member (1991), KEDO (Korean Peninsula Energy Development Organization), Six-Party Talks (South/North Korea, US, China, Russia, Japan), Korea-US, Korea-Japan, Korea-China bilateral standards cooperation agreements.</p>
+</section><aside class="endnotes" aria-label="Chapter references" style="font-family:sans-serif;background:#fafafa;border-top:1px solid #ddd;padding:1rem;margin-top:2rem;"><h3 style="font-size:1rem;margin:0 0 .5rem 0;">References</h3><ol style="font-size:.9rem;line-height:1.6;padding-left:1.2rem;"><li id="fn-1-99">Reference implementations of the standards discussed in this chapter, along with simulator code and test data, are available at: <a href="https://github.com/WIA-Official/wia-standards-public/tree/main/perception-clarity" rel="external" style="color:#14b8a6;">WIA Standards Public Repository · perception-clarity</a>. The repository includes Korean Profile conformance checkers for perception-clarity standards.</li></ol></aside>
+
+</body>
+</html>

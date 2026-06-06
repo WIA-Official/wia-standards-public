@@ -1,0 +1,169 @@
+openapi: 3.0.3
+info:
+  title: WIA Perception Clarity API
+  version: 1.0.0
+  description: >
+    Reporting and query API for the WIA Perception Clarity Standard.
+    Physical AI agents (vehicles, robots, drones, AMRs) report per-sensor
+    perception clarity (PCI), and fleet/control systems query current clarity
+    state. This API standardizes the reporting contract only — not cleaning
+    hardware or vendor algorithms.
+  license:
+    name: MIT
+    url: https://github.com/WIA-Official/wia-standards-public/blob/main/perception-clarity/LICENSE
+  contact:
+    name: WIA - World Certification Industry Association
+    url: https://wiastandards.com
+servers:
+  - url: https://perception-clarity.wiastandards.com/api/v1
+    description: Reference endpoint
+tags:
+  - name: reporting
+    description: Agents push perception clarity reports.
+  - name: query
+    description: Fleet/control systems read current clarity.
+paths:
+  /reports:
+    post:
+      tags: [reporting]
+      summary: Submit a sensor clarity report
+      operationId: submitClarityReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SensorClarityReport'
+      responses:
+        '202':
+          description: Report accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messageId: { type: string }
+                  receivedAt: { type: string, format: date-time }
+        '400':
+          description: Malformed report
+        '401':
+          description: Unauthorized
+  /agents/{agentId}/clarity:
+    get:
+      tags: [query]
+      summary: Get the most recent clarity report for an agent
+      operationId: getAgentClarity
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Current clarity report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SensorClarityReport'
+        '404':
+          description: Agent not found or no report available
+  /agents/{agentId}/sensors/{sensorId}:
+    get:
+      tags: [query]
+      summary: Get the current clarity of a single sensor
+      operationId: getSensorClarity
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: sensorId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Current sensor clarity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sensor'
+        '404':
+          description: Sensor not found
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    ClarityState:
+      type: string
+      enum: [clear, degraded, obstructed, blind]
+    SensorClass:
+      type: string
+      enum: [rgb_camera, ir_thermal, lidar_window, radar_radome, ultrasonic]
+    AgentType:
+      type: string
+      enum: [vehicle, robot, drone, amr, other]
+    ConformanceLevel:
+      type: string
+      enum: [L-A, L-B, L-C]
+    ContaminantType:
+      type: string
+      enum: [rain_film, mud_dust, salt_spray, insect_strike, frost_ice, condensation, sun_glare, scratch_abrasion, other]
+    Contaminant:
+      type: object
+      required: [type, coverage]
+      properties:
+        type: { $ref: '#/components/schemas/ContaminantType' }
+        coverage: { type: number, minimum: 0, maximum: 1 }
+        note: { type: string }
+    Sensor:
+      type: object
+      required: [sensorId, sensorClass, pci, state, dwellSeconds, confidence]
+      properties:
+        sensorId: { type: string }
+        sensorClass: { $ref: '#/components/schemas/SensorClass' }
+        pci: { type: integer, minimum: 0, maximum: 100 }
+        state: { $ref: '#/components/schemas/ClarityState' }
+        contaminants:
+          type: array
+          items: { $ref: '#/components/schemas/Contaminant' }
+        axes:
+          type: object
+          properties:
+            occlusion: { type: number, minimum: 0, maximum: 1 }
+            distanceDegradation: { type: number, minimum: 0, maximum: 1 }
+            mtfReduction: { type: number, minimum: 0, maximum: 1 }
+        pciWeights:
+          type: object
+          properties:
+            occlusion: { type: number }
+            distance: { type: number }
+            mtf: { type: number }
+        lastCleanedAt:
+          type: string
+          format: date-time
+          nullable: true
+        dwellSeconds: { type: number, minimum: 0 }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+    SensorClarityReport:
+      type: object
+      required: [header, sensors]
+      properties:
+        header:
+          type: object
+          required: [version, messageId, timestamp, agentId, agentType]
+          properties:
+            version: { type: string }
+            messageId: { type: string }
+            timestamp: { type: string, format: date-time }
+            agentId: { type: string }
+            agentType: { $ref: '#/components/schemas/AgentType' }
+            conformanceLevel: { $ref: '#/components/schemas/ConformanceLevel' }
+        sensors:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/Sensor' }
+security:
+  - bearerAuth: []
