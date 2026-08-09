@@ -12,8 +12,7 @@
  *  이후 RS(ECC) + 인터리브 → 데이터셀 비트(MSB-first) → geometry.render(opts.bits)
  * ============================================================================
  */
-const V1 = require('./wiacode-v1-codec.js');
-const I = V1._internal;
+const I = require('./rs.js');            // 순수 표준 RS/CRC (v1 엔진 의존 제거)
 const GEO = require('./geometry.js');
 const { applyH } = require('./degrade.js');
 

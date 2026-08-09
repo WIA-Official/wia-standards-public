@@ -28,7 +28,7 @@ perspective recovery from a single bullseye, and integral (noise-averaging) dete
   Radial Symmetry Transform, refined to a sub-pixel homography, with **conic-pencil perspective
   recovery** from the core alone when satellites are compressed by steep viewing angles.
 - **Data layer** — payload → frame(header+CRC16) → Reed–Solomon error correction → data cells.
-  The RS/CRC/interleave codec is byte-level and reused unchanged.
+  A standalone Reed–Solomon/CRC codec (`rs.js`) — no external engine.
 - **Multi-level capacity** — data cells carry 1, 2, or 3 bits each (2/4/8 grayscale levels),
   multiplying capacity. QR is frozen to 1 bit (black/white); this is WIA-CODE's structural
   capacity lead. Multi-level is only readable because localization is sub-pixel accurate.
@@ -126,8 +126,8 @@ Pure JavaScript, runs in Node and browsers, no external dependencies.
 | `conic.js` | concentric-circle conic-pencil perspective recovery |
 | `locate.js` | anchor localization → module→image homography (`locateRobust`) |
 | `codec.js` | data layer: frame + RS + multi-level cells + calibrated classification |
+| `rs.js` | standalone Reed–Solomon (GF256) + CRC-16 + block plan (no external engine) |
 | `degrade.js` | instrumented degradations (used only by the benchmark/tests) |
-| `wiacode-v1-codec.js` | prior engine; its byte-level Reed–Solomon/CRC is reused |
 | `jsQR.js` | third-party QR decoder, used only for the head-to-head benchmark |
 
 ## Honest prior-art & IP note

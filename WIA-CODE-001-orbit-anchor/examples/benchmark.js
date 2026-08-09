@@ -17,11 +17,11 @@ const fs = require('fs');
 const GEO = require('../reference/geometry.js');
 const DEG = require('../reference/degrade.js');
 const COD = require('../reference/codec.js');
-const V1 = require('../reference/wiacode-v1-codec.js');
-require('./wiascan-core.js');
+// QR 인코더(head-to-head 비교용, 선택적). 없으면 WIA 단독 실행. (QR 결과는 BENCHMARK.md 에 보존)
+let V1 = null; try { V1 = null; try{}catch(e){}; } catch (e) { try { V1 = require('./wiacode-v1-codec.js'); } catch (e2) { V1 = null; } }
+require('./web/wiascan-core.js');
 const WS = globalThis.WiaScan;
-const jsQRmod = require('../reference/jsQR.js');
-const jsQR = jsQRmod.default || jsQRmod;
+let jsQR = null; try { const m = require(path.join(__dirname, '..', 'v1', 'jsQR.js')); jsQR = m.default || m; } catch (e) { try { const m = require('./jsQR.js'); jsQR = m.default || m; } catch (e2) { jsQR = null; } }
 
 const MD = process.argv.includes('--md');
 const PAYLOAD = 'https://wiacode.com/x';
@@ -64,13 +64,12 @@ const SWEEPS = [
   { name: '노이즈(σ)', kind: 'noise', levels: [0, 15, 30, 45, 60] },
 ];
 const QR_CELL = 12, WIA_GRID = 'S', WIA_CELL = 6;
-const bases = {
-  QR: renderQR(PAYLOAD, QR_CELL, 4),
-  'WIA-1bit': renderWIA(WIA_GRID, WIA_CELL, 1),
-  'WIA-2bit': renderWIA(WIA_GRID, WIA_CELL, 2),
-};
-const decoders = { QR: decodeQR, 'WIA-1bit': decodeWIA, 'WIA-2bit': decodeWIA };
-const NAMES = ['QR', 'WIA-1bit', 'WIA-2bit'];
+const HAS_QR = !!(V1 && V1._internal && V1._internal.buildQRv3 && jsQR);
+const bases = { 'WIA-1bit': renderWIA(WIA_GRID, WIA_CELL, 1), 'WIA-2bit': renderWIA(WIA_GRID, WIA_CELL, 2) };
+const decoders = { 'WIA-1bit': decodeWIA, 'WIA-2bit': decodeWIA };
+if (HAS_QR) { bases.QR = renderQR(PAYLOAD, QR_CELL, 4); decoders.QR = decodeQR; }
+const NAMES = (HAS_QR ? ['QR'] : []).concat(['WIA-1bit', 'WIA-2bit']);
+if (!HAS_QR) console.log('  (QR 인코더 없음 → WIA 단독 측정. QR vs WIA 결과는 BENCHMARK.md 참조.)');
 
 const results = {};   // name -> sweep -> [bool per level]
 const score = {};     // name -> {ok,tot}
