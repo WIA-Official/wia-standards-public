@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WIA Code 생성기</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#0b0f14; color:#e8eef5; font-family:-apple-system,system-ui,"Apple SD Gothic Neo",sans-serif; }
+  .kit { background:#0d141c; border-bottom:1px solid #1c2733; display:flex; gap:14px; align-items:center; padding:9px 14px; font-size:13px; overflow-x:auto; white-space:nowrap; }
+  .kit a { color:#9fb3c6; text-decoration:none; font-weight:600; }
+  .kit a.here { color:#10b981; }
+  .kit .brand { color:#e8eef5; font-weight:800; }
+  header { background:#0f1620; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #1c2733; }
+  header h1 { font-size:17px; margin:0; font-weight:800; }
+  header .sub { color:#8aa0b4; font-weight:500; font-size:13px; }
+  .badge { background:#10b981; color:#04140d; font-weight:700; font-size:12px; padding:4px 10px; border-radius:999px; }
+  main { max-width:560px; margin:0 auto; padding:16px 16px 60px; }
+  label { display:block; font-size:13px; color:#9fb3c6; margin:14px 0 6px; font-weight:600; }
+  textarea, input[type=text] { width:100%; background:#111a24; border:1px solid #24313f; color:#e8eef5; border-radius:10px; padding:11px 12px; font-size:15px; font-family:inherit; }
+  textarea { min-height:60px; resize:vertical; }
+  .seg { display:flex; gap:6px; flex-wrap:wrap; }
+  .seg button { flex:1 1 auto; background:#111a24; border:1px solid #24313f; color:#cdd9e5; border-radius:10px; padding:9px 10px; font-size:14px; font-weight:700; white-space:nowrap; }
+  .seg button.on { background:#e8eef5; color:#0b0f14; border-color:#e8eef5; }
+  .types button.on { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .fields { display:none; } .fields.on { display:block; }
+  .toggle { display:flex; align-items:center; gap:10px; margin-top:14px; }
+  .toggle input { width:44px; height:26px; }
+  #hueWrap { display:none; } #hueWrap.on { display:block; }
+  .gen { width:100%; margin-top:20px; background:#10b981; color:#04140d; border:none; border-radius:12px; padding:15px; font-size:16px; font-weight:800; }
+  .out { margin-top:20px; text-align:center; }
+  .out img { max-width:100%; width:320px; background:#fff; border-radius:12px; padding:8px; }
+  .meta { color:#8aa0b4; font-size:13px; margin-top:10px; line-height:1.6; }
+  .dl { display:inline-block; margin-top:12px; background:#111a24; border:1px solid #24313f; color:#e8eef5; border-radius:10px; padding:11px 18px; font-weight:700; text-decoration:none; }
+  .err { color:#f87171; font-size:14px; margin-top:12px; }
+  a.scan { color:#7dd3fc; }
+  .hint { color:#6b8199; font-size:12px; margin-top:4px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+</style>
+</head>
+<body>
+<nav class="kit" id="kit"></nav>
+<header>
+  <div><h1>WIA Code 생성기 <span class="sub">(prototype)</span></h1></div>
+  <span class="badge" id="badge">ENGINE: …</span>
+</header>
+<main>
+  <p class="hint">QR을 대신하는 차세대 코드를 만듭니다. 설정·키·매니페스트를 <b>오프라인 코드 하나</b>에. <a class="scan" href="scan.html">스캐너</a>로 설치 없이 읽어요.</p>
+
+  <label>콘텐츠 타입</label>
+  <div class="seg types" id="ctype">
+    <button data-v="text" class="on">📝 텍스트</button>
+    <button data-v="url">🔗 URL</button>
+    <button data-v="ssh">🔑 SSH</button>
+    <button data-v="api">🔌 API</button>
+    <button data-v="mcp">🧩 MCP</button>
+  </div>
+
+  <div class="fields on" data-t="text">
+    <label>내용</label>
+    <textarea id="f_text">홍익인간 · WIA CODE — 널리 이롭게</textarea>
+  </div>
+  <div class="fields" data-t="url">
+    <label>웹사이트 URL</label>
+    <input type="text" id="f_url" placeholder="https://…" value="https://wiacode.com">
+  </div>
+  <div class="fields" data-t="ssh">
+    <label>SSH 접속 — 서버 하나를 코드로</label>
+    <div class="grid2">
+      <div><label style="margin-top:6px">호스트</label><input type="text" id="ssh_host" placeholder="1.2.3.4"></div>
+      <div><label style="margin-top:6px">포트</label><input type="text" id="ssh_port" value="22"></div>
+    </div>
+    <label>사용자</label><input type="text" id="ssh_user" placeholder="ubuntu">
+    <label>개인키 / 식별 (붙여넣기, 선택)</label><textarea id="ssh_key" placeholder="-----BEGIN OPENSSH PRIVATE KEY----- …"></textarea>
+    <div class="hint">키까지 담으면 코드가 커져 — WIA의 고용량이 빛나는 지점. 스캔 → 그 서버에 바로 접속 정보.</div>
+  </div>
+  <div class="fields" data-t="api">
+    <label>API 설정 — 엔드포인트+키를 코드로</label>
+    <label style="margin-top:6px">이름</label><input type="text" id="api_name" placeholder="My API">
+    <label>Base URL</label><input type="text" id="api_url" placeholder="https://api.example.com">
+    <label>API Key</label><input type="text" id="api_key" placeholder="sk-…">
+    <label>헤더 (JSON, 선택)</label><input type="text" id="api_headers" placeholder='{"X-Env":"prod"}'>
+  </div>
+  <div class="fields" data-t="mcp">
+    <label>MCP 부트스트랩 — "스캔 → 검증된 에이전트 연결"</label>
+    <label style="margin-top:6px">서버 이름</label><input type="text" id="mcp_name" placeholder="local-tools">
+    <div class="grid2">
+      <div><label>전송</label>
+        <div class="seg" id="mcp_transport"><button data-v="stdio" class="on">stdio</button><button data-v="http">http</button></div></div>
+      <div><label>토큰 (선택)</label><input type="text" id="mcp_token" placeholder="prov-…"></div>
+    </div>
+    <label>엔드포인트 / 커맨드</label><input type="text" id="mcp_ep" placeholder="npx server / https://host:port">
+    <label>서버카드 sha256 (신뢰앵커, 선택)</label><input type="text" id="mcp_hash" placeholder="sha256:…">
+    <div class="hint">통째 config 아님 — <b>좌표+신뢰앵커</b>. 스캔하면 에이전트가 검증된 연결을 맺음.</div>
+  </div>
+
+  <label>모양 (QR은 못 하는 것!)</label>
+  <div class="seg" id="shape">
+    <button data-v="square" class="on">⬜ 사각</button><button data-v="round">🔵 원형</button><button data-v="heart">💗 하트</button>
+  </div>
+  <label>격자 크기</label>
+  <div class="seg" id="grid">
+    <button data-v="S">S</button><button data-v="M" class="on">M</button><button data-v="L">L</button>
+  </div>
+  <div class="hint">클수록 더 많은 데이터 (SSH 키·긴 설정은 L 권장). 스캔은 더 가까이/크게.</div>
+  <label>밝기 단계</label>
+  <div class="seg" id="bpc">
+    <button data-v="1">흑백</button><button data-v="2" class="on">4단계</button><button data-v="3">8단계</button>
+  </div>
+  <div class="toggle">
+    <input type="checkbox" id="colorOn">
+    <label for="colorOn" style="margin:0;">🎨 색(hue) 레이어 — 용량↑ (근접 스캔)</label>
+  </div>
+  <div id="hueWrap"><label>색에 담을 추가 내용</label><input type="text" id="hueText" value="🎨 색에 담긴 추가 데이터"></div>
+
+  <button class="gen" id="gen">코드 생성</button>
+  <div class="out" id="out"></div>
+</main>
+<script src="wiascan-core.js"></script>
+<script src="sitekit.js"></script>
+<script src="generate.js"></script>
+</body>
+</html>
