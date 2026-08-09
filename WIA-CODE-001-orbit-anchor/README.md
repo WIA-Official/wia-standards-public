@@ -1,5 +1,7 @@
 # WIA-CODE-001 — Orbit Anchor 2D Code
 
+**[English](README.md) · [日本語](README.ja.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md)**
+
 > An open, perspective-robust, high-capacity 2D machine-readable code — a QR alternative
 > designed for the AI-camera / AR-glasses era and for **offline** use where it matters most:
 > books for children without internet, and disaster-relief information readable in bad conditions.
