@@ -23,10 +23,21 @@
     closeTestBtn: document.getElementById('closeTestBtn'),
     gridBtns: Array.prototype.slice.call(document.querySelectorAll('.grid-btn')),
     errorMsg: document.getElementById('errorMsg'),
-    retryBtn: document.getElementById('retryBtn')
+    retryBtn: document.getElementById('retryBtn'),
+    installBanner: document.getElementById('installBanner'),
+    installBannerText: document.getElementById('installBannerText'),
+    installBtn: document.getElementById('installBtn'),
+    installDismissBtn: document.getElementById('installDismissBtn'),
+    openUrlBtn: document.getElementById('openUrlBtn')
   };
 
-  var PROC_MAX_W = 480;          // processed frame width cap (px)
+  // 480 was too aggressive a downscale: locate still succeeds well below this, but per-cell
+  // decode needs materially more effective resolution than locate does. Real-world capture
+  // (heart/round shapes at a normal scanning distance)
+  // was landing right below the decode floor — lock found, payload never read. Verified with
+  // degrade.js resample sweeps: effective cellPx~2.2px locks but never decodes; ~2.8px decodes
+  // reliably. 720 buys back that margin for a typical "doesn't quite fill the frame" photo.
+  var PROC_MAX_W = 720;          // processed frame width cap (px)
   var DETECT_INTERVAL_MS = 1000 / 8; // throttle detection to ~8fps
 
   var stream = null;
@@ -37,6 +48,9 @@
   var testMode = false;
   var currentGrid = 'S';
   var engineIsReal = false;
+  var firstDecodeDone = false;
+  var deferredInstallPrompt = null;
+  var pendingOpenUrl = null;
 
   // ---------------------------------------------------------------------
   // Screen helpers
@@ -158,6 +172,8 @@
 
   function stopCamera() {
     stopLoop();
+    pendingOpenUrl = null;
+    els.openUrlBtn.classList.add('hidden');
     if (stream) {
       stream.getTracks().forEach(function (t) { t.stop(); });
       stream = null;
@@ -237,6 +253,8 @@
     var lastDetectTime = 0;
     var frames = 0;
     var fpsWindowStart = performance.now();
+    var noDecodeStreak = 0;         // 코드는 보이는데 해독 안 되는 연속 프레임(블러 의심)
+    var noLockStreak = 0;           // 아예 못 잡는 연속 프레임(극단블러/배율추정 실패 의심)
 
     function tick(now) {
       rafId = requestAnimationFrame(tick);
@@ -257,7 +275,26 @@
       var t0 = performance.now();
       var result;
       try {
-        result = window.WiaScan.detectAuto(imageData);
+        // 매 프레임은 빠른 표준 판독(PSF·deep 폴백 둘 다 끔) — 프리뷰 안 얼림.
+        result = window.WiaScan.detectAuto(imageData, { psf: false, deep: false });
+        // 코드는 보이는데(locate O) 해독 안 됨 = 블러 의심 → 4프레임에 1번만 무거운 PSF-ISI 1회.
+        if (result && result.ok && !result.decoded) {
+          noDecodeStreak++; noLockStreak = 0;
+          if (noDecodeStreak % 4 === 0) {
+            var pr = window.WiaScan.detectAuto(imageData, { psf: true, deep: false });
+            if (pr && pr.decoded) result = pr;
+          }
+        } else if (!result || !result.ok) {
+          // 아예 못 잡음 = 극단 디포커스로 코어 링에지가 죽어 배율추정 실패 가능 →
+          //   4프레임에 1번만 deep(각도평균 프로파일 배율추정) 재시도. 실패프레임 비용 ≤4배라 스로틀.
+          noDecodeStreak = 0; noLockStreak++;
+          if (noLockStreak % 4 === 0) {
+            var dr = window.WiaScan.detectAuto(imageData, { psf: false, deep: true });
+            if (dr && dr.ok) result = dr;
+          }
+        } else {
+          noDecodeStreak = 0; noLockStreak = 0;
+        }
       } catch (e) {
         console.error('detectAuto 오류', e);
         result = { ok: false, reason: 'engine-error', ms: 0 };
@@ -266,6 +303,8 @@
 
       renderOverlay(result);
       updateHud(result, wallMs);
+      updateUrlButton(result);
+      updateProximityHint(result, noDecodeStreak);
 
       frames++;
       if (now - fpsWindowStart >= 1000) {
@@ -286,6 +325,43 @@
     var ms = (result && typeof result.ms === 'number') ? result.ms : wallMs;
     els.hudMs.textContent = ms.toFixed(1) + ' ms';
   }
+
+  // 잡히긴 했는데(locate ok) 계속 해독이 안 되는 경우 — 대개 원인은 "화면을 덜 채워서" 실효
+  // 해상도가 낮은 것. 원인 모른 채 계속 안 되는 채로 두지 않고 바로 알려준다.
+  var DEFAULT_HINT_TEXT = els.hint.textContent;
+  var CLOSER_HINT_TEXT = '해독이 안 돼요 — 코드에 더 가까이, 화면을 꽉 채워보세요';
+  var CLOSER_STREAK_THRESHOLD = 10; // ~1.2s @ 8fps 목표 — 너무 빨리 뜨면 정상 프레임에도 깜빡임
+
+  function updateProximityHint(result, streak) {
+    if (result && result.ok && !result.decoded && streak >= CLOSER_STREAK_THRESHOLD) {
+      els.hint.textContent = CLOSER_HINT_TEXT;
+      els.hint.classList.remove('hidden');
+    } else if (result && result.ok) {
+      els.hint.textContent = DEFAULT_HINT_TEXT; // 해독 성공 — renderOverlay가 이미 숨김
+    } else {
+      els.hint.textContent = DEFAULT_HINT_TEXT; // 락 자체가 없음 — renderOverlay 기본 문구로 복귀
+    }
+  }
+
+  // 해독된 payload가 http(s) URL이면 자동으로 그 페이지로 이동한다. 새 탭이 아니라 "현재 탭
+  // 자체를 이동"시키는 게 핵심 — 이동이 시작되는 순간 이 페이지의 카메라 루프도 같이 죽으므로,
+  // 매 프레임 반복 판정에도 실제 네비게이션은 정확히 한 번만 실행된다(navigatedAway 가드는
+  // 이동 시작~언로드 사이의 짧은 틈에 대비한 이중 안전장치). 새 탭 방식(window.open)은 이
+  // 탭이 안 죽어 스캔이 계속 돌아 여러 탭이 반복해서 열릴 위험이 있어 폐기.
+  var navigatedAway = false;
+  function updateUrlButton(result) {
+    var isUrl = !!(result && result.decoded && result.text && /^https?:\/\//i.test(result.text));
+    if (!isUrl || navigatedAway) return;
+    pendingOpenUrl = result.text;
+    els.openUrlBtn.textContent = '🔗 이동 중… ' + pendingOpenUrl;
+    els.openUrlBtn.classList.remove('hidden'); // 이동 직전 짧은 순간 목적지를 보여줌(깜빡 이동 방지)
+    navigatedAway = true;
+    setTimeout(function () { location.href = pendingOpenUrl; }, 400);
+  }
+
+  els.openUrlBtn.addEventListener('click', function () {
+    if (pendingOpenUrl) location.href = pendingOpenUrl; // 지연 400ms 기다리지 않고 바로 이동
+  });
 
   function renderOverlay(result) {
     var dpr = window.devicePixelRatio || 1;
@@ -362,6 +438,10 @@
 
     // 해독된 내용(payload) — 잡기 너머 "읽기". CRC 검증 통과분만 큰 초록 배너로.
     if (result.decoded && result.text) {
+      if (!firstDecodeDone) {
+        firstDecodeDone = true;
+        maybeShowInstallBanner();
+      }
       var txt = '📖 ' + result.text;
       overlayCtx.font = 'bold 16px -apple-system, system-ui, sans-serif';
       var maxW = w - 24;
@@ -398,6 +478,62 @@
     ctx.arcTo(x + ww, y + hh, x, y + hh, r); ctx.arcTo(x, y + hh, x, y, r);
     ctx.arcTo(x, y, x + ww, y, r); ctx.closePath();
   }
+
+  // ---------------------------------------------------------------------
+  // PWA install (scan-only — never touches wiacode.com root PWA)
+  // ---------------------------------------------------------------------
+  var INSTALL_DISMISS_KEY = 'wiaScanInstallDismissed';
+
+  function registerServiceWorker() {
+    if (!window.isSecureContext || !('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('scan-sw.js', { scope: './' }).catch(function () {
+      /* offline install unavailable — camera scanning still works fully online */
+    });
+  }
+
+  function isStandaloneDisplay() {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true;
+  }
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+  });
+
+  window.addEventListener('appinstalled', function () {
+    deferredInstallPrompt = null;
+    els.installBanner.classList.add('hidden');
+  });
+
+  // 첫 성공적 해독 이후에만 뜬다 — 처음 온 사람에게 다짜고짜 설치부터 들이밀지 않는다.
+  function maybeShowInstallBanner() {
+    if (isStandaloneDisplay()) return;
+    if (localStorage.getItem(INSTALL_DISMISS_KEY) === '1') return;
+    var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+    if (deferredInstallPrompt) {
+      els.installBannerText.textContent = '홈 화면에 추가하면 브라우저 없이 바로 카메라로 열려요.';
+      els.installBtn.classList.remove('hidden');
+    } else if (isIOS) {
+      els.installBannerText.textContent = 'Safari 공유 버튼 → "홈 화면에 추가"를 누르면 설치돼요.';
+      els.installBtn.classList.add('hidden');
+    } else {
+      return; // Android/기타 브라우저가 아직 설치 가능 신호를 안 줬으면 조용히 넘어간다
+    }
+    els.installBanner.classList.remove('hidden');
+  }
+
+  els.installBtn.addEventListener('click', function () {
+    els.installBanner.classList.add('hidden');
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    deferredInstallPrompt.userChoice.finally(function () { deferredInstallPrompt = null; });
+  });
+
+  els.installDismissBtn.addEventListener('click', function () {
+    els.installBanner.classList.add('hidden');
+    localStorage.setItem(INSTALL_DISMISS_KEY, '1');
+  });
 
   // ---------------------------------------------------------------------
   // Test-code mode
@@ -448,10 +584,23 @@
   els.retryBtn.addEventListener('click', startCamera);
   els.stopBtn.addEventListener('click', stopCamera);
 
+  // 재방문 자동 시작: 카메라 권한이 이미 'granted'면(= 전에 스캔해본 사람) "카메라 시작"
+  // 탭을 건너뛰고 곧바로 카메라를 켠다. 처음 온 사람은 'prompt'라 버튼이 그대로 뜬다.
+  // (iOS Safari는 Permissions API 카메라 미지원 → 안전하게 버튼 유지)
+  function maybeAutoStart() {
+    if (!window.isSecureContext) return;
+    if (!(navigator.permissions && navigator.permissions.query)) return;
+    navigator.permissions.query({ name: 'camera' }).then(function (st) {
+      if (st.state === 'granted') startCamera();
+    }).catch(function () { /* 미지원 → 버튼 유지 */ });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     els.startBtn.disabled = true;
+    registerServiceWorker();
     ensureEngine().then(function () {
       els.startBtn.disabled = false;
+      maybeAutoStart();
     });
   });
 })();

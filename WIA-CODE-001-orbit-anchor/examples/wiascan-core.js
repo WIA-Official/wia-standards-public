@@ -494,9 +494,10 @@ function sub3(A, B) { return A.map((r, i) => r.map((v, j) => v - B[i][j])); }
 // 중심(cx,cy) 주위로 방사 스캔. 각 각도에서 바깥으로 나가며 그레이가
 //   disk(검)→흰링→검링→흰 세퍼레이터. 두 개의 dark→light 상승에지(r≈1.5, ≈5.5
 //   모듈)를 서브픽셀로 잡는다. 스케일 무지 상태에서 "첫 두 상승에지"라는 순서로 견고.
-function extractCoreRings(grayObj, cx, cy, rMaxPx, nAng) {
+function extractCoreRings(grayObj, cx, cy, rMaxPx, nAng, gradFrac) {
   const { g, w, h } = grayObj;
   nAng = nAng || 180;
+  gradFrac = gradFrac != null ? gradFrac : 0.10;   // 대비-상대 에지임계(과거 절대 40 대체)
   const sampAt = (x, y) => {
     if (x < 0 || y < 0 || x >= w - 1 || y >= h - 1) return null;
     const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, i = y0 * w + x0;
@@ -510,6 +511,11 @@ function extractCoreRings(grayObj, cx, cy, rMaxPx, nAng) {
     const rs = [], vs = [];
     for (let r = 1; r <= rMaxPx; r += step) { const v = sampAt(cx + r * ct, cy + r * st); if (v == null) break; rs.push(r); vs.push(v); }
     if (vs.length < 8) continue;
+    // 대비-상대 임계: 블러로 절대 그래디언트가 낮아져도 이 프로파일 자신의 대비 대비로 판정.
+    //   (과거 절대 40 은 블러 2px에서 코어 링을 20개 못 찾아 weak-core 로 컷 → 배율추정 실패)
+    let vmin = Infinity, vmax = -Infinity;
+    for (let i = 0; i < vs.length; i++) { if (vs[i] < vmin) vmin = vs[i]; if (vs[i] > vmax) vmax = vs[i]; }
+    const gThr = Math.max(6, gradFrac * (vmax - vmin));
     // 상승에지 후보: dGray/dr 국소최대(+). 중심이 어두운지 확인(disk).
     const rises = [];                       // {r, mag}
     for (let k = 2; k < vs.length - 2; k++) {
@@ -517,7 +523,7 @@ function extractCoreRings(grayObj, cx, cy, rMaxPx, nAng) {
       if (gm1 <= 0) continue;
       // 국소최대
       const gprev = vs[k] - vs[k - 2], gnext = vs[k + 2] - vs[k];
-      if (gm1 >= gprev && gm1 >= gnext && gm1 > 40) {
+      if (gm1 >= gprev && gm1 >= gnext && gm1 > gThr) {
         // 서브픽셀: 그레이디언트 3점 포물선 정점
         const gm = vs[k] - vs[k - 2], gp = vs[k + 2] - vs[k], gc = gm1;
         const den = (gm - 2 * gc + gp);
@@ -532,6 +538,71 @@ function extractCoreRings(grayObj, cx, cy, rMaxPx, nAng) {
     outer.push([cx + rises[1].r * ct, cy + rises[1].r * st]);
   }
   return { inner, outer };
+}
+
+// ── 각도평균 방사 프로파일 (극단블러용 배율추정 기반) ──────────────────────
+// extractCoreRings 는 "각 각도마다 상승에지 2개"를 요구한다. 블러 σ가 링 폭(2모듈)에
+// 근접하면 안쪽 흰 링이 먼저 소멸(MTF≈0) → 각도별로 에지가 1개만 남아 링 수집이
+// 0개로 붕괴한다(실측: box r6·3pass 에서 180각 중 0~1개). 그러나 코어 전체(반경 5.5모듈
+// 암부 블롭)의 바깥 경계는 훨씬 저주파라 훨씬 오래 산다. 각도평균(180각)은 SNR을 √180배
+// 올려 그 경계를 블러 r10 까지 안정적으로 남긴다 — 각도별 국소 그래디언트 판정이 죽는
+// 지점에서도. 그래서 "에지 개수 세기" 대신 "평균 프로파일의 마지막 상승 반값교차".
+function meanRadialProfile(grayObj, cx, cy, rMaxPx, step) {
+  const { g, w, h } = grayObj;
+  step = step || 0.5;
+  const sampAt = (x, y) => {
+    if (x < 0 || y < 0 || x >= w - 1 || y >= h - 1) return null;
+    const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, i = y0 * w + x0;
+    return (g[i] * (1 - fx) + g[i + 1] * fx) * (1 - fy) + (g[i + w] * (1 - fx) + g[i + w + 1] * fx) * fy;
+  };
+  const nR = Math.max(2, Math.floor(rMaxPx / step) + 1);
+  const P = new Float64Array(nR);
+  let used = 0;
+  for (let k = 0; k < nR; k++) {
+    const r = k * step;
+    const nA = Math.max(16, Math.min(240, Math.round(2 * Math.PI * r)));
+    let s = 0, n = 0;
+    for (let a = 0; a < nA; a++) {
+      const th = 2 * Math.PI * a / nA;
+      const v = sampAt(cx + r * Math.cos(th), cy + r * Math.sin(th));
+      if (v != null) { s += v; n++; }
+    }
+    if (n < nA * 0.6) break;                 // 화면 밖으로 절반 이상 나가면 절단
+    P[k] = s / n; used = k + 1;
+  }
+  return { P: P.subarray(0, used), step, n: used };
+}
+
+/*
+ * estimateCoreScale — 사전지식 없이 코어 불스아이 바깥경계(5.5모듈)를 각도평균
+ *   프로파일에서 찾아 cellPx 를 역산. extractCoreRings(각도별 에지수집)가 극단블러에서
+ *   붕괴한 뒤의 폴백 겸, 코어/위성 판별자(위성 블롭반경 2.5모듈 vs 코어 5.5모듈).
+ *   반환 { ok, cellPx, rOuter, contrast, centerDark }.
+ */
+function estimateCoreScale(grayObj, cx, cy, rMaxPx, opts) {
+  opts = opts || {};
+  const prof = meanRadialProfile(grayObj, cx, cy, rMaxPx, opts.step || 0.5);
+  const P = prof.P, n = prof.n, step = prof.step;
+  if (n < 8) return { ok: false, reason: 'short-profile' };
+  const srt = Array.from(P).sort((a, b) => a - b);
+  const vmin = srt[0], vhi = srt[Math.floor(0.9 * (srt.length - 1))];
+  const contrast = vhi - vmin;
+  if (contrast < (opts.minContrast != null ? opts.minContrast : 12)) return { ok: false, reason: 'flat', contrast };
+  const thr = vmin + 0.5 * contrast;
+  // 마지막(가장 바깥) 상승 반값교차 = 코어 암부 블롭의 바깥 경계.
+  //   블러가 안쪽 흰 링을 지워도 이 교차는 남는다. 서브샘플 선형보간.
+  let rOuter = NaN;
+  for (let k = 1; k < n; k++) {
+    if (P[k - 1] < thr && P[k] >= thr) {
+      const t = (thr - P[k - 1]) / ((P[k] - P[k - 1]) || 1);
+      rOuter = (k - 1 + t) * step;
+    }
+  }
+  if (!isFinite(rOuter) || rOuter < step * 2) return { ok: false, reason: 'no-crossing', contrast };
+  const cellPx = rOuter / 5.5;                    // 코어 바깥 링 = 5.5 모듈
+  // 중심이 실제로 어두운가(밝은 blob 오검출 배제)
+  const centerDark = (P[0] < thr);
+  return { ok: centerDark && cellPx > 1.2 && cellPx < 60, cellPx, rOuter, contrast, centerDark, profile: P };
 }
 
 // ── 대수적 타원(원뿔) 적합 (Hartley 정규화 + 최소SV) ───────────────────────
@@ -707,7 +778,7 @@ function rectifyHomography(l, C, O, targetR, targetC) {
 
 module.exports = {
   jacobiEig, inv3, adj3, mul3, matVec3, transpose3, frob, scale3, sub3, det3, solveCubic,
-  extractCoreRings, fitConic, recoverFromConcentric, rectifyHomography,
+  extractCoreRings, meanRadialProfile, estimateCoreScale, fitConic, recoverFromConcentric, rectifyHomography,
 };
 
 });
@@ -811,18 +882,39 @@ function layout(grid, spec, shape) {
   return L;
 }
 
+// ── 하트 실루엣: 고전 매끈한 파라메트릭 곡선(원+쐐기 이어붙이기 아님) ─────────
+//   x=sin³t, y=13cos t−5cos2t−2cos3t−cos4t (전 구간 C∞ 매끈, 이음매 없음).
+//   이전 원(로브)+선형쐐기 결합은 두 곡선이 만나는 지점에서 값은 같아도 기울기가
+//   달라(원 쪽 기울기 -1.4대 쐐기 쪽 -0.5) 옆구리에 살짝 꺾인 자국(홀쭉한 자국)이 남았음 —
+//   단일 매끈 곡선으로 바꿔 그 이음매 자체를 없앰. 720점 샘플 폴리곤 + point-in-polygon.
+//   앵커 위치엔 무관(검출 원리와 분리, insideShape는 데이터 셀 마스크에만 관여).
+var HEART_POLY = (function () {
+  var N = 720, pts = [];
+  for (var i = 0; i < N; i++) {
+    var t = (i / N) * 2 * Math.PI;
+    var x = Math.pow(Math.sin(t), 3);
+    var yRaw = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+    var y = -0.205 - 0.07088 * yRaw; // yRaw∈[-17,11.92] → ny∈[1.0,-1.05] (뾰족점 아래, 로브 위)
+    pts.push([x, y]);
+  }
+  return pts;
+})();
+function pointInHeart(nx, ny) {
+  var inside = false;
+  for (var i = 0, j = HEART_POLY.length - 1; i < HEART_POLY.length; j = i++) {
+    var xi = HEART_POLY[i][0], yi = HEART_POLY[i][1], xj = HEART_POLY[j][0], yj = HEART_POLY[j][1];
+    if (((yi > ny) !== (yj > ny)) && (nx < (xj - xi) * (ny - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
 // ── 모양 마스크: 데이터 판의 실루엣 (검출 원리와 무관 — 앵커는 그대로) ────────
 //   'round'=원판, 'heart'=하트, 그 외=전부(사각). 정규화 좌표(중심0, 반경 Rdata=1).
 function insideShape(mx, my, L) {
   const c = L.coreCenter.mx, R = L.Rdata || (L.N / 2 - 0.8);
   const nx = (mx - c) / R, ny = (my - c) / R;
   if (L.shape === 'round') return nx * nx + ny * ny <= 1;
-  if (L.shape === 'heart') {
-    // 고전 하트 곡선 (x²+y²-1)³ - x²y³ ≤ 0. 이미지 y는 아래로 증가 → 뒤집고 스케일.
-    const x = nx / 0.95, y = -ny / 0.95 + 0.35;
-    const t = x * x + y * y - 1;
-    return t * t * t - x * x * y * y * y <= 0;
-  }
+  if (L.shape === 'heart') return pointInHeart(nx, ny);
   return true;
 }
 
@@ -1145,10 +1237,45 @@ function locate(grayObj, peaksList, layout) {
   for (let i = 0; i < A2.length; i++) { const [px, py] = applyH(H, A2[i][0], A2[i][1]); resid += Math.hypot(px - B2[i][0], py - B2[i][1]); }
   resid /= A2.length;
 
+  const vf = verifyLayout(grayObj, H, layout);   // residPx 는 grid 판별불가 → 독립 검증신호 동봉
   return { ok: true, core: coreF,
            corners: { TL: cornF.TL, TR: cornF.TR, BR: cornF.BR, BL: cornF.BL },
            northStar: 'TL', donutGray: +brightest.toFixed(0),
-           Hmod2img: H, residPx: +resid.toFixed(2), dCen: +bestDCen.toFixed(3) };
+           Hmod2img: H, residPx: +resid.toFixed(2), dCen: +bestDCen.toFixed(3),
+           modPx: vf.modPx, orbitMatch: vf.orbitMatch, orbitContrast: vf.orbitContrast };
+}
+
+/*
+ * verifyLayout — 잠금(H)의 grid/cellPx 검증 신호 2종 (2026-08-10).
+ *   residPx(5점 자기잔차)는 grid 판별력이 0 이다: S/M/L(및 사각↔링) 앵커 배치가
+ *   전부 "중심+대칭4점" 닮음꼴이라, 8자유도 호모그래피가 스케일·회전을 통째로
+ *   흡수해 어떤 layout 가정에도 같은 물리 4점에 거의 정확히 들어맞는다(실측:
+ *   클린 합성서도 오답 grid residPx 0.00~0.25). → 앵커 밖의 독립 증거로 판별:
+ *   · modPx      : H가 함의하는 코어 국소 모듈크기(px). 코어 링 실측 cellPx와
+ *                  대조하면 스케일 흡수를 잡는다(오답 grid는 ≥36% 어긋남).
+ *   · orbitMatch : 포맷 궤도 24도트 on/off 패턴의 재투영 일치율(0~1). 스케일이
+ *                  거의 같은 근사합동 쌍(M-square↔L-round, 45° 회전 차)까지 판별.
+ *                  실측: 정답 1.000, 오답 0.33~0.63 (실사진·노이즈σ45·블러r2·
+ *                  0.5축소·yaw30 전부). 대비<30 이면 정보없음 → 0.5 반환.
+ */
+function verifyLayout(grayObj, H, layout) {
+  const mx = layout.coreCenter.mx, my = layout.coreCenter.my;
+  const a = applyH(H, mx, my), b = applyH(H, mx + 1, my), c = applyH(H, mx, my + 1);
+  const modPx = (Math.hypot(b[0] - a[0], b[1] - a[1]) + Math.hypot(c[0] - a[0], c[1] - a[1])) / 2;
+  let orbitMatch = 0.5, orbitContrast = 0;
+  if (layout.orbit && layout.orbit.length) {
+    const vals = layout.orbit.map(d => { const p = applyH(H, d.mx, d.my); return grayAt(grayObj, p[0], p[1]); });
+    let mn = Infinity, mxv = -Infinity;
+    for (const v of vals) { if (v < mn) mn = v; if (v > mxv) mxv = v; }
+    orbitContrast = mxv - mn;
+    if (orbitContrast >= 30) {
+      const t = (mn + mxv) / 2;
+      let m = 0;
+      for (let i = 0; i < vals.length; i++) if ((vals[i] < t) === layout.orbit[i].on) m++;
+      orbitMatch = m / vals.length;
+    }
+  }
+  return { modPx: +modPx.toFixed(2), orbitMatch: +orbitMatch.toFixed(3), orbitContrast: Math.round(orbitContrast) };
 }
 
 // 최소자승 호모그래피 (n≥4 대응, DLT 정규방정식). A[i]→B[i].
@@ -1269,12 +1396,14 @@ function locateRobust(img, grayObj, peaksList, layout, opts) {
   const Hfin = homographyLS(A, B);
   let resid = 0; if (Hfin) { for (let i = 0; i < A.length; i++) { const [px, py] = applyH(Hfin, A[i][0], A[i][1]); resid += Math.hypot(px - B[i][0], py - B[i][1]); } resid /= A.length; }
 
+  const vf = Hfin ? verifyLayout(grayObj, Hfin, layout) : { modPx: 0, orbitMatch: 0.5, orbitContrast: 0 };
   return { ok: true, method: 'conic', core: coreImg, corners: cornersImg,
            northStar: rres.northStar, Hmod2img: Hfin, residPx: +resid.toFixed(2),
-           conicCenterErr: null, ringRatio: +rec.ringRatio.toFixed(2) };
+           conicCenterErr: null, ringRatio: +rec.ringRatio.toFixed(2),
+           modPx: vf.modPx, orbitMatch: vf.orbitMatch, orbitContrast: vf.orbitContrast };
 }
 
-module.exports = { locate, locateRobust, homographyLS, pickCoreSeed };
+module.exports = { locate, locateRobust, homographyLS, pickCoreSeed, verifyLayout };
 
 });
 
@@ -1592,6 +1721,43 @@ function encodeToCells(text, nCells, bpc, ecc) {
   return { cells: symbols, cellGray: cellGray, plan: plan, usedBytes: frame.length, capBytes: plan.totalK, bitsPerCell: bpc };
 }
 
+// 원시 바이트 왕복(텍스트 아님) — encodeToCells/decodeFromCells과 완전히 동일한 파이프라인이지만
+// toBytes(text)/fromBytes(payload)의 UTF-8 변환을 건너뛴다(임의 바이너리는 유효한 UTF-8이 아닐 수
+// 있어 TextEncoder/Decoder를 거치면 손실·팽창됨 — 이미지 등 순수 바이트 페이로드 데모용, 2026-08-10 추가).
+function encodeBytesToCells(bytes, nCells, bpc, ecc) {
+  bpc = bpc || 1;
+  const frame = frameEncode(bytes);
+  const rawBytes = Math.floor(nCells * bpc / 8);
+  const plan = I.planBlocks(rawBytes, ecc || PAL_ECC[bpc] || '25%');
+  if (frame.length > plan.totalK) throw new Error('용량초과: ' + frame.length + 'B > ' + plan.totalK + 'B');
+  const dataIn = new Uint8Array(plan.totalK); dataIn.set(frame, 0);
+  const cw = scramble(I.interleaveBytes(I.rsEncodeAll(dataIn, plan), plan));
+  const totalBits = cw.length * 8, getBit = (i) => i < totalBits ? (cw[i >> 3] >>> (7 - (i & 7))) & 1 : 0;
+  const nlev = nlevOf(bpc), symbols = new Uint8Array(nCells), cellGray = new Uint8ClampedArray(nCells);
+  const pos = buildPerm(nCells);
+  let bit = 0;
+  for (let k = 0; k < nCells; k++) {
+    let v = 0; for (let b = 0; b < bpc; b++) v = (v << 1) | getBit(bit++);
+    const p = pos[k]; symbols[p] = v; cellGray[p] = levelGray(grayEnc(v), nlev);
+  }
+  return { cells: symbols, cellGray: cellGray, plan: plan, usedBytes: frame.length, capBytes: plan.totalK, bitsPerCell: bpc };
+}
+function decodeBytesFromCells(symbols, nCells, bpc, ecc) {
+  const plan = I.planBlocks(Math.floor(nCells * bpc / 8), ecc || PAL_ECC[bpc] || '25%');
+  const totalN = plan.totalN, cw = new Uint8Array(totalN), nb = totalN * 8;
+  const pos = buildPerm(nCells);
+  let bit = 0;
+  for (let k = 0; k < nCells && bit < nb; k++) {
+    const v = symbols[pos[k]];
+    for (let b = bpc - 1; b >= 0 && bit < nb; b--) { if ((v >> b) & 1) cw[bit >> 3] |= (1 << (7 - (bit & 7))); bit++; }
+  }
+  const seq = I.deinterleaveBytes(scramble(cw), plan);
+  let res; try { res = I.rsDecodeAll(seq, plan); } catch (e) { return { ok: false, reason: 'rs-uncorrectable' }; }
+  const payload = frameDecode(res.data);
+  if (!payload) return { ok: false, reason: 'bad-frame/crc', errors: res.errors };
+  return { ok: true, bytes: payload, errors: res.errors };
+}
+
 // 알려진 앵커로 흑점/백점 캘리브레이션(전역 M1). 반환 {b0,w0}.
 function calibPointsOf(layout) {
   if (layout.calibPoints) return layout.calibPoints;       // 모양이 명시(주로 round)
@@ -1725,9 +1891,67 @@ function encodeColor(lumaText, hueText, nCells, bpc, hueBits) {
   return { cellGray: lu.cellGray, cellChroma: cellChroma, bitsPerCell: bpc, hueBits: hueBits,
            eligible: elig.length, lumaCapBytes: lu.capBytes - 6, hueCapBytes: hu.capBytes - 6 };
 }
+// 원시 바이트 버전(이미지 데모용) — 루마 채널에 lumaBytes, 색 채널에 hueBytes를 각자 독립된
+// 바이트 스트림으로 싣는다(같은 이미지의 앞/뒷부분을 나눠 담는 방식 — 픽셀 단위 색변환 아님).
+function encodeColorBytes(lumaBytes, hueBytes, nCells, bpc, hueBits) {
+  const lu = encodeBytesToCells(lumaBytes, nCells, bpc);
+  const elig = eligibleFromLuma(lu.cells, bpc);
+  const hu = encodeBytesToCells(hueBytes, elig.length, hueBits, HUE_ECC);
+  const cellChroma = new Array(nCells).fill(null);
+  for (let e = 0; e < elig.length; e++) cellChroma[elig[e]] = hueChroma(hu.cells[e], hueBits);
+  return { cellGray: lu.cellGray, cellChroma: cellChroma, bitsPerCell: bpc, hueBits: hueBits,
+           eligible: elig.length, lumaCapBytes: lu.capBytes - 6, hueCapBytes: hu.capBytes - 6 };
+}
 
 // 종합: grayObj + locate 결과(res.Hmod2img) → 디코드. 앵커 캘리브레이션 + bpc trial-decode.
 //   opts.bpcTry: 시도할 bpc 목록(기본 [1,2,3]). opts.hue=true + rgbaImg → hue 평면도 디코드.
+// ── PSF-ISI 디코더 (블러 강건, Fable5 설계) ────────────────────────────────
+//   블러는 랜덤이 아니라 결정적 선형채널(저역통과)이다. 셀 독립판독은 이웃 도트 번짐
+//   (ISI=심볼간간섭)을 노이즈로 취급해 블러 2px부터 죽는다. 여기선 전체 모듈 그리드를
+//   샘플해 가우시안 PSF로 역합성곱(Landweber 최소자승)한 뒤 기존 classify+decode 재사용.
+//   PSF σ 는 코어피팅 대신 스윕 + CRC 게이트(trial-decode 철학) — 통과하는 σ 만 채택.
+function sampleModuleGrid(grayObj, H, N) {
+  const grid = new Float32Array(N * N);
+  for (let my = 0; my < N; my++) for (let mx = 0; mx < N; mx++) {
+    const p = applyH(H, mx + 0.5, my + 0.5); grid[my * N + mx] = grayAt(grayObj, p[0], p[1]);
+  }
+  return grid;
+}
+function gaussKernel1D(sigma) {
+  const rad = Math.max(1, Math.ceil(3 * sigma)), k = new Float64Array(2 * rad + 1); let s = 0;
+  for (let d = -rad; d <= rad; d++) { const v = Math.exp(-d * d / (2 * sigma * sigma)); k[d + rad] = v; s += v; }
+  for (let i = 0; i < k.length; i++) k[i] /= s; return { k, rad };
+}
+function blurSep(src, N, K) {                       // 분리형 대칭 가우시안(경계 반사) — K=Kᵀ
+  const k = K.k, rad = K.rad, tmp = new Float64Array(N * N), out = new Float64Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { let s = 0; for (let d = -rad; d <= rad; d++) { let xx = x + d; if (xx < 0) xx = -xx; if (xx >= N) xx = 2 * N - 2 - xx; s += src[y * N + xx] * k[d + rad]; } tmp[y * N + x] = s; }
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { let s = 0; for (let d = -rad; d <= rad; d++) { let yy = y + d; if (yy < 0) yy = -yy; if (yy >= N) yy = 2 * N - 2 - yy; s += tmp[yy * N + x] * k[d + rad]; } out[y * N + x] = s; }
+  return out;
+}
+function deconvGauss(obs, N, sigma, iters) {        // Landweber: T ← clamp(T + Kᵀ(O − K T))
+  const K = gaussKernel1D(sigma), T = Float64Array.from(obs);
+  for (let it = 0; it < iters; it++) {
+    const KT = blurSep(T, N, K), resid = new Float64Array(N * N);
+    for (let i = 0; i < N * N; i++) resid[i] = obs[i] - KT[i];
+    const KtR = blurSep(resid, N, K);
+    for (let i = 0; i < N * N; i++) { let v = T[i] + KtR[i]; T[i] = v < 0 ? 0 : v > 255 ? 255 : v; }
+  }
+  return T;
+}
+// 표준 셀판독이 블러로 실패했을 때 재시도(1비트). 통과 σ 반환, 실패 시 null.
+function decodePSF(grayObj, H, layout, cells) {
+  const N = layout.N, obs = sampleModuleGrid(grayObj, H, N), dc = new Float32Array(cells.length);
+  for (const sig of [0.5, 0.75]) {
+    const dec = deconvGauss(obs, N, sig, 45);
+    for (let i = 0; i < cells.length; i++) dc[i] = dec[cells[i][1] * N + cells[i][0]];
+    const cl = classifyCells(dc, cells, 1, layout);
+    if (cl.hi - cl.lo < 25) continue;
+    const out = decodeFromCells(cl.sym, cells.length, 1);
+    if (out.ok) { out.psfSigma = sig; return out; }
+  }
+  return null;
+}
+
 function readCode(grayObj, res, layout, cellPx, opts) {
   if (!res || !res.ok || !res.Hmod2img) return { ok: false, reason: 'no-lock' };
   const s = sampleCellGrays(grayObj, res.Hmod2img, layout, cellPx);
@@ -1754,6 +1978,11 @@ function readCode(grayObj, res, layout, cellPx, opts) {
       return out;
     }
   }
+  // 표준 셀판독 실패(주로 블러) → PSF-ISI 재시도(1비트). 우아한 열화: 안 되면 원래대로 실패.
+  if (!(opts && opts.psf === false)) {
+    const p = decodePSF(grayObj, res.Hmod2img, layout, s.cells);
+    if (p && p.ok) { p.bitsPerCell = 1; return p; }
+  }
   return { ok: false, reason: 'all-modes-failed' };
 }
 
@@ -1761,6 +1990,7 @@ module.exports = {
   ECC, encodeToBits, decodeFromBits, frameEncode, frameDecode, planFor, sampleCellGrays, otsu, readCode,
   encodeToCells, decodeFromCells, calibrate, classifyCells, levelGray, grayEnc, grayDec, PAL_ECC,
   encodeColor, eligibleFromLuma, sampleCellColor, calibrateColor, classifyHue, hueChroma, HUE_ECC, HUE_RHO,
+  encodeBytesToCells, decodeBytesFromCells, encodeColorBytes,
 };
 
 });
@@ -1774,7 +2004,7 @@ var toGray = FR.toGray, frst = FR.frst, peaks = FR.peaks;
 function _denoiseGray(imageData){ var b = DEG.boxBlur({ data:imageData.data, width:imageData.width, height:imageData.height }, 1, 1); return toGray(b.img); }
 var layout = GEO.layout, SPEC = GEO.SPEC, render = GEO.render;
 var pickCoreSeed = LOC.pickCoreSeed, locateRobust = LOC.locateRobust;
-var extractCoreRings = CN.extractCoreRings;
+var extractCoreRings = CN.extractCoreRings, estimateCoreScale = CN.estimateCoreScale;
 var CODEC = require('codec'), dataCells = GEO.dataCells;
 function _now(){ return (typeof performance!=='undefined'&&performance.now)?performance.now():Date.now(); }
 
@@ -1785,8 +2015,10 @@ function _now(){ return (typeof performance!=='undefined'&&performance.now)?perf
  *   2) 코어 링에지 추출(스케일 불변) → 바깥원 반경/5.5 = cellPx
  *   3) 추정 cellPx 로 정식 FRST → locateRobust(orbit+conic 폴백) → 격자 3종 시도, 최소 잔차 채택
  */
-function detectAuto(imageData){
+function detectAuto(imageData, dopts){
   var t0 = _now();
+  var usePsf = !(dopts && dopts.psf === false);   // 라이브 스캐너는 프레임별로 끄고 주기적으로만 켬
+  var deep = !(dopts && dopts.deep === false);    // 극단블러 배율추정 폴백(실패 프레임만 비용 발생)
   var W = imageData.width, H = imageData.height, mn = Math.min(W,H);
   var gray = toGray(imageData);
   var grayD = _denoiseGray(imageData);         // 배율추정 전용(경량 디노이즈)
@@ -1798,44 +2030,125 @@ function detectAuto(imageData){
   if (!pkC.length) return { ok:false, reason:'no-core', ms:Math.round(_now()-t0) };
   var seed = pickCoreSeed(grayD, pkC, 0.05*mn);
   if (!seed) return { ok:false, reason:'no-core-seed', ms:Math.round(_now()-t0) };
-  // 2) 코어 링에지 → cellPx (디노이즈 그레이)
+  // 2) 배율추정 — 시도목록(seed,cellPx) 구성.
+  //   2a) 빠른 경로: 코어 링에지(각도별 상승에지 2개) 중앙값. 정상~중블러에서 최선(무변경).
+  //   2b) deep 폴백: 각도평균 프로파일의 마지막 반값교차(estimateCoreScale). 링에지가
+  //       죽는 극단블러(box r6+)에서도 코어 바깥경계가 남아 배율을 준다. 동시에
+  //       블롭반경(코어 5.5모듈 vs 위성 2.5모듈)이 "어느 피크가 코어인가"를 가려
+  //       pickCoreSeed 가 위성을 고르는 r7+ 도 함께 복구한다.
+  var attempts = [], failReason = null;
   var rings = extractCoreRings(grayD, seed.x, seed.y, 0.18*mn, 180);
-  if (rings.outer.length < 20) return { ok:false, reason:'weak-core', ms:Math.round(_now()-t0) };
-  var ro = rings.outer.map(function(p){ return Math.hypot(p[0]-seed.x, p[1]-seed.y); }).sort(function(a,b){ return a-b; });
-  var outerMed = ro[ro.length>>1];
-  var cellPx = outerMed / 5.5;                 // 코어 바깥원 = 5.5 모듈
-  if (!(cellPx > 1.2 && cellPx < 60)) return { ok:false, reason:'bad-scale', cellPx:cellPx, ms:Math.round(_now()-t0) };
-  // 3) 정식 검출 + 격자 시도
-  var radii = [1.5,2.5,3.5,4.5,5.5].map(function(r){ return r*cellPx; });
-  var fo = { gradFrac:0.10, alpha:2 }, po = { win: Math.max(4, Math.round(1.6*cellPx)), topK:30, thrFrac:0.03 };
-  var S2 = frst(gray, radii, fo);
-  var pk2 = peaks(S2, po);
-  var redetect = function(im){ var g = toGray(im); var s = frst(g, radii, fo); return { gray:g, peaks:peaks(s, po) }; };
-  // 격자 S/M/L × 앵커모양(사각-코너 / 링) 위치확정 → 후보(잔차 오름차순).
-  //   round·heart 는 앵커가 동일(링) → locate 는 'round'로 1번, readCode 는 모양별.
-  var cands = [];
-  ['S','M','L'].forEach(function(grid){
-    ['square','round'].forEach(function(sh){
-      var lay = layout(grid, SPEC, sh);
-      var res = locateRobust(imageData, gray, pk2, lay, { cellPx:cellPx, redetect:redetect });
-      if (res.ok) cands.push({ grid:grid, anchorShape:sh, lay:lay, res:res });
-    });
-  });
-  if (!cands.length) return { ok:false, reason:'no-lock', cellPx:+cellPx.toFixed(2), ms:Math.round(_now()-t0) };
-  cands.sort(function(a,b){ return a.res.residPx - b.res.residPx; });
-  // 격자·모양 확정 = "실제로 CRC 디코드되는" 조합. 링 앵커면 round·heart 둘 다 시도.
-  var best = cands[0], decoded = null, decShape = 'square';
-  for (var i = 0; i < cands.length && !decoded; i++) {
-    var shapes = cands[i].anchorShape === 'square' ? ['square'] : ['round', 'heart'];
-    for (var j = 0; j < shapes.length; j++) {
-      var lay = shapes[j] === cands[i].anchorShape ? cands[i].lay : layout(cands[i].grid, SPEC, shapes[j]);
-      var dec = CODEC.readCode(gray, cands[i].res, lay, cellPx, { hue: true, hueBits: 1, rgbaImg: imageData });
-      if (dec && dec.ok) { decoded = dec; best = cands[i]; decShape = shapes[j]; break; }
+  if (rings.outer.length >= 20) {
+    var ro = rings.outer.map(function(p){ return Math.hypot(p[0]-seed.x, p[1]-seed.y); }).sort(function(a,b){ return a-b; });
+    var c0 = ro[ro.length>>1] / 5.5;           // 코어 바깥원 = 5.5 모듈
+    if (c0 > 1.2 && c0 < 60) attempts.push({ x:seed.x, y:seed.y, cellPx:c0, src:'rings' });
+    else failReason = 'bad-scale';
+  } else failReason = 'weak-core';
+  if (deep) {
+    var pool = [seed], pi;
+    for (pi = 0; pi < pkC.length && pool.length < 9; pi++) {
+      var pk = pkC[pi], dup = false;
+      for (var pj = 0; pj < pool.length; pj++) if (Math.hypot(pool[pj].x-pk.x, pool[pj].y-pk.y) < 3) { dup = true; break; }
+      if (!dup) pool.push(pk);
+    }
+    var ests = [], maxCt = 0;
+    for (pi = 0; pi < pool.length; pi++) {
+      var e = estimateCoreScale(grayD, pool[pi].x, pool[pi].y, 0.18*mn);
+      if (!e.ok) continue;
+      if (e.contrast > maxCt) maxCt = e.contrast;
+      ests.push({ x:pool[pi].x, y:pool[pi].y, cellPx:e.cellPx, rOuter:e.rOuter, contrast:e.contrast, src:'profile' });
+    }
+    // 저대비 유령블롭 제거 후, 블롭반경 큰 순(코어가 위성보다 2배 이상 크다) 상위 3개.
+    ests = ests.filter(function(a){ return a.contrast >= Math.max(12, 0.25*maxCt); })
+               .sort(function(a,b){ return b.rOuter - a.rOuter; }).slice(0,3);
+    for (pi = 0; pi < ests.length; pi++) {
+      var dup2 = false;
+      for (var aj = 0; aj < attempts.length; aj++) {
+        var A = attempts[aj];
+        if (Math.hypot(A.x-ests[pi].x, A.y-ests[pi].y) < 3 && Math.abs(A.cellPx-ests[pi].cellPx)/A.cellPx < 0.08) { dup2 = true; break; }
+      }
+      if (!dup2) attempts.push(ests[pi]);
     }
   }
+  if (!attempts.length) return { ok:false, reason: failReason || 'weak-core', ms:Math.round(_now()-t0) };
+  // 3) 정식 검출 + 격자 시도 (시도목록 순서대로).
+  //   "잠금 인정" 기준 = ① CRC 해독 성공(=증명) 또는 ② 기하 잔차가 타이트(resid ≤ TIGHT·cellPx).
+  //   실측(20시드×블러/노이즈/원근/저해상도): 진짜 잠금 resid/cellPx ≤0.17, 가짜 잠금 ≥0.71 로
+  //   깨끗이 갈린다 → 0.5 게이트. 느슨한 잠금은 버리고 다음 배율후보로 계속(오검출 억제).
+  var TIGHT = 0.5;
+  var chosen = null, cands = [], cellPx = attempts[0].cellPx, tried = 0;
+  var best = null, decoded = null, decShape = 'square';
+  for (var ai = 0; ai < attempts.length && !decoded; ai++) {
+    cellPx = attempts[ai].cellPx; tried++;
+    var radii = [1.5,2.5,3.5,4.5,5.5].map(function(r){ return r*cellPx; });
+    var fo = { gradFrac:0.10, alpha:2 }, po = { win: Math.max(4, Math.round(1.6*cellPx)), topK:30, thrFrac:0.03 };
+    var S2 = frst(gray, radii, fo);
+    var pk2 = peaks(S2, po);
+    var redetect = (function(radii, fo, po){ return function(im){ var g = toGray(im); var s = frst(g, radii, fo); return { gray:g, peaks:peaks(s, po) }; }; })(radii, fo, po);
+    // 격자 S/M/L × 앵커모양(사각-코너 / 링) 위치확정 → 후보(잔차 오름차순).
+    //   round·heart 는 앵커가 동일(링) → locate 는 'round'로 1번, readCode 는 모양별.
+    cands = [];
+    ['S','M','L'].forEach(function(grid){
+      ['square','round'].forEach(function(sh){
+        var lay = layout(grid, SPEC, sh);
+        var res = locateRobust(imageData, gray, pk2, lay, { cellPx:cellPx, redetect:redetect });
+        if (res.ok) cands.push({ grid:grid, anchorShape:sh, lay:lay, res:res });
+      });
+    });
+    if (!cands.length) continue;
+    // ★격자/모양 판별 (2026-08-10 수정): residPx 는 판별력이 0 이다 — S/M/L(사각↔링)
+    //   앵커 배치가 전부 닮음꼴이라 호모그래피가 스케일·회전을 흡수, 오답 layout 도
+    //   같은 물리 4점에 잔차 0.0x 로 들어맞는다(클린 합성서도 동일, 실측 확인).
+    //   → 앵커 밖 독립 증거로 순위 결정:
+    //   · orbitMatch(궤도 24도트 패턴 일치율): 정답 1.0 / 오답 0.33~0.63 — 주신호.
+    //   · scaleErr = |ln(modPx/cellPx)|: H-함의 모듈px vs 코어링 실측 cellPx —
+    //     오답 grid 는 ≥0.31, 근사합동 쌍(M-square↔L-round)만 못 가름(궤도가 가름).
+    //   · residPx 는 미세 타이브레이커로만.
+    cands.forEach(function(c){
+      c.scaleErr = c.res.modPx ? Math.abs(Math.log(c.res.modPx / cellPx)) : 1;
+      var om = (typeof c.res.orbitMatch === 'number') ? c.res.orbitMatch : 0.5;
+      c.score = (1 - om) * 2 + Math.min(c.scaleErr, 1) + c.res.residPx / (10 * cellPx);
+    });
+    cands.sort(function(a,b){ return a.score - b.score; });
+    // Pass 1: 빠른 표준 셀판독(PSF 끔) — 모든 후보. 정상/약열화는 여기서 끝(빠름).
+    for (var i = 0; i < cands.length && !decoded; i++) {
+      var shapes = cands[i].anchorShape === 'square' ? ['square'] : ['round', 'heart'];
+      for (var j = 0; j < shapes.length; j++) {
+        var lay = shapes[j] === cands[i].anchorShape ? cands[i].lay : layout(cands[i].grid, SPEC, shapes[j]);
+        var dec = CODEC.readCode(gray, cands[i].res, lay, cellPx, { hue: true, hueBits: 1, rgbaImg: imageData, psf: false });
+        if (dec && dec.ok) { decoded = dec; best = cands[i]; decShape = shapes[j]; chosen = { cands:cands, cellPx:cellPx }; break; }
+      }
+    }
+    if (decoded) break;
+    if (!chosen) chosen = { cands:cands, cellPx:cellPx };       // 첫 잠금(느슨할 수 있음) 보관
+    // 조기종료는 "스케일도 맞는" 타이트 잠금만: residPx 는 오답 cellPx 가정에도 0.0x
+    //   로 나와(자기잔차) 잘못된 배율후보에서 탐색을 끊던 구멍을 scaleErr 로 막음.
+    if (cands[0].res.residPx <= TIGHT * cellPx && cands[0].scaleErr <= 0.25) { chosen = { cands:cands, cellPx:cellPx }; break; }
+  }
+  if (!chosen) return { ok:false, reason:'no-lock', cellPx:+cellPx.toFixed(2), tried:tried, ms:Math.round(_now()-t0) };
+  cands = chosen.cands; cellPx = chosen.cellPx;
+  // Pass 2: 전부 실패(주로 블러) → PSF-ISI 폴백. 잔차 최소가 정답격자가 아닐 수 있어
+  //   (블러 하 오답격자가 spurious 저잔차) → CRC가 격자를 판별하도록 후보 순회, 성공시 조기종료.
+  if (!decoded && usePsf) {
+    for (var i2 = 0; i2 < cands.length && !decoded; i2++) {
+      var sh2 = cands[i2].anchorShape === 'square' ? ['square'] : ['round', 'heart'];
+      for (var j2 = 0; j2 < sh2.length; j2++) {
+        var lay2 = sh2[j2] === cands[i2].anchorShape ? cands[i2].lay : layout(cands[i2].grid, SPEC, sh2[j2]);
+        var dec2 = CODEC.readCode(gray, cands[i2].res, lay2, cellPx, { hue: true, hueBits: 1, rgbaImg: imageData, psf: true });
+        if (dec2 && dec2.ok) { decoded = dec2; best = cands[i2]; decShape = sh2[j2]; break; }
+      }
+    }
+  }
+  if (!best) best = cands[0];
+  // 해독으로 증명되지 않은 느슨한 잠금은 거절(오검출 차단).
+  //   스케일 불일치(>0.5 ≈ 65% 어긋남)도 미해독 상태에선 유령 잠금으로 취급.
+  if (!decoded && (best.res.residPx > TIGHT * cellPx || best.scaleErr > 0.5))
+    return { ok:false, reason:'loose-lock', residPx:+best.res.residPx.toFixed(2), scaleErr:+(best.scaleErr||0).toFixed(3), cellPx:+cellPx.toFixed(2), tried:tried, ms:Math.round(_now()-t0) };
   var r = best.res;
   return { ok:true, method:r.method, core:r.core, corners:r.corners,
            northStar:r.northStar||'TL', residPx:+(r.residPx||0).toFixed(2),
+           modPx: r.modPx || null, orbitMatch: (typeof r.orbitMatch === 'number') ? r.orbitMatch : null,
+           scaleErr: +(best.scaleErr || 0).toFixed(3),
            cellPx:+cellPx.toFixed(2), grid:best.grid, shape: decoded ? decShape : null,
            decoded: !!decoded, text: decoded ? decoded.text : null, errors: decoded ? decoded.errors : null,
            bitsPerCell: decoded ? decoded.bitsPerCell : null,

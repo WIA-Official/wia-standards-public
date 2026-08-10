@@ -171,10 +171,45 @@ function locate(grayObj, peaksList, layout) {
   for (let i = 0; i < A2.length; i++) { const [px, py] = applyH(H, A2[i][0], A2[i][1]); resid += Math.hypot(px - B2[i][0], py - B2[i][1]); }
   resid /= A2.length;
 
+  const vf = verifyLayout(grayObj, H, layout);   // residPx 는 grid 판별불가 → 독립 검증신호 동봉
   return { ok: true, core: coreF,
            corners: { TL: cornF.TL, TR: cornF.TR, BR: cornF.BR, BL: cornF.BL },
            northStar: 'TL', donutGray: +brightest.toFixed(0),
-           Hmod2img: H, residPx: +resid.toFixed(2), dCen: +bestDCen.toFixed(3) };
+           Hmod2img: H, residPx: +resid.toFixed(2), dCen: +bestDCen.toFixed(3),
+           modPx: vf.modPx, orbitMatch: vf.orbitMatch, orbitContrast: vf.orbitContrast };
+}
+
+/*
+ * verifyLayout — 잠금(H)의 grid/cellPx 검증 신호 2종 (2026-08-10).
+ *   residPx(5점 자기잔차)는 grid 판별력이 0 이다: S/M/L(및 사각↔링) 앵커 배치가
+ *   전부 "중심+대칭4점" 닮음꼴이라, 8자유도 호모그래피가 스케일·회전을 통째로
+ *   흡수해 어떤 layout 가정에도 같은 물리 4점에 거의 정확히 들어맞는다(실측:
+ *   클린 합성서도 오답 grid residPx 0.00~0.25). → 앵커 밖의 독립 증거로 판별:
+ *   · modPx      : H가 함의하는 코어 국소 모듈크기(px). 코어 링 실측 cellPx와
+ *                  대조하면 스케일 흡수를 잡는다(오답 grid는 ≥36% 어긋남).
+ *   · orbitMatch : 포맷 궤도 24도트 on/off 패턴의 재투영 일치율(0~1). 스케일이
+ *                  거의 같은 근사합동 쌍(M-square↔L-round, 45° 회전 차)까지 판별.
+ *                  실측: 정답 1.000, 오답 0.33~0.63 (실사진·노이즈σ45·블러r2·
+ *                  0.5축소·yaw30 전부). 대비<30 이면 정보없음 → 0.5 반환.
+ */
+function verifyLayout(grayObj, H, layout) {
+  const mx = layout.coreCenter.mx, my = layout.coreCenter.my;
+  const a = applyH(H, mx, my), b = applyH(H, mx + 1, my), c = applyH(H, mx, my + 1);
+  const modPx = (Math.hypot(b[0] - a[0], b[1] - a[1]) + Math.hypot(c[0] - a[0], c[1] - a[1])) / 2;
+  let orbitMatch = 0.5, orbitContrast = 0;
+  if (layout.orbit && layout.orbit.length) {
+    const vals = layout.orbit.map(d => { const p = applyH(H, d.mx, d.my); return grayAt(grayObj, p[0], p[1]); });
+    let mn = Infinity, mxv = -Infinity;
+    for (const v of vals) { if (v < mn) mn = v; if (v > mxv) mxv = v; }
+    orbitContrast = mxv - mn;
+    if (orbitContrast >= 30) {
+      const t = (mn + mxv) / 2;
+      let m = 0;
+      for (let i = 0; i < vals.length; i++) if ((vals[i] < t) === layout.orbit[i].on) m++;
+      orbitMatch = m / vals.length;
+    }
+  }
+  return { modPx: +modPx.toFixed(2), orbitMatch: +orbitMatch.toFixed(3), orbitContrast: Math.round(orbitContrast) };
 }
 
 // 최소자승 호모그래피 (n≥4 대응, DLT 정규방정식). A[i]→B[i].
@@ -295,9 +330,11 @@ function locateRobust(img, grayObj, peaksList, layout, opts) {
   const Hfin = homographyLS(A, B);
   let resid = 0; if (Hfin) { for (let i = 0; i < A.length; i++) { const [px, py] = applyH(Hfin, A[i][0], A[i][1]); resid += Math.hypot(px - B[i][0], py - B[i][1]); } resid /= A.length; }
 
+  const vf = Hfin ? verifyLayout(grayObj, Hfin, layout) : { modPx: 0, orbitMatch: 0.5, orbitContrast: 0 };
   return { ok: true, method: 'conic', core: coreImg, corners: cornersImg,
            northStar: rres.northStar, Hmod2img: Hfin, residPx: +resid.toFixed(2),
-           conicCenterErr: null, ringRatio: +rec.ringRatio.toFixed(2) };
+           conicCenterErr: null, ringRatio: +rec.ringRatio.toFixed(2),
+           modPx: vf.modPx, orbitMatch: vf.orbitMatch, orbitContrast: vf.orbitContrast };
 }
 
-module.exports = { locate, locateRobust, homographyLS, pickCoreSeed };
+module.exports = { locate, locateRobust, homographyLS, pickCoreSeed, verifyLayout };

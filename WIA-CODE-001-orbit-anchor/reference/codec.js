@@ -177,6 +177,43 @@ function encodeToCells(text, nCells, bpc, ecc) {
   return { cells: symbols, cellGray: cellGray, plan: plan, usedBytes: frame.length, capBytes: plan.totalK, bitsPerCell: bpc };
 }
 
+// 원시 바이트 왕복(텍스트 아님) — encodeToCells/decodeFromCells과 완전히 동일한 파이프라인이지만
+// toBytes(text)/fromBytes(payload)의 UTF-8 변환을 건너뛴다(임의 바이너리는 유효한 UTF-8이 아닐 수
+// 있어 TextEncoder/Decoder를 거치면 손실·팽창됨 — 이미지 등 순수 바이트 페이로드 데모용, 2026-08-10 추가).
+function encodeBytesToCells(bytes, nCells, bpc, ecc) {
+  bpc = bpc || 1;
+  const frame = frameEncode(bytes);
+  const rawBytes = Math.floor(nCells * bpc / 8);
+  const plan = I.planBlocks(rawBytes, ecc || PAL_ECC[bpc] || '25%');
+  if (frame.length > plan.totalK) throw new Error('용량초과: ' + frame.length + 'B > ' + plan.totalK + 'B');
+  const dataIn = new Uint8Array(plan.totalK); dataIn.set(frame, 0);
+  const cw = scramble(I.interleaveBytes(I.rsEncodeAll(dataIn, plan), plan));
+  const totalBits = cw.length * 8, getBit = (i) => i < totalBits ? (cw[i >> 3] >>> (7 - (i & 7))) & 1 : 0;
+  const nlev = nlevOf(bpc), symbols = new Uint8Array(nCells), cellGray = new Uint8ClampedArray(nCells);
+  const pos = buildPerm(nCells);
+  let bit = 0;
+  for (let k = 0; k < nCells; k++) {
+    let v = 0; for (let b = 0; b < bpc; b++) v = (v << 1) | getBit(bit++);
+    const p = pos[k]; symbols[p] = v; cellGray[p] = levelGray(grayEnc(v), nlev);
+  }
+  return { cells: symbols, cellGray: cellGray, plan: plan, usedBytes: frame.length, capBytes: plan.totalK, bitsPerCell: bpc };
+}
+function decodeBytesFromCells(symbols, nCells, bpc, ecc) {
+  const plan = I.planBlocks(Math.floor(nCells * bpc / 8), ecc || PAL_ECC[bpc] || '25%');
+  const totalN = plan.totalN, cw = new Uint8Array(totalN), nb = totalN * 8;
+  const pos = buildPerm(nCells);
+  let bit = 0;
+  for (let k = 0; k < nCells && bit < nb; k++) {
+    const v = symbols[pos[k]];
+    for (let b = bpc - 1; b >= 0 && bit < nb; b--) { if ((v >> b) & 1) cw[bit >> 3] |= (1 << (7 - (bit & 7))); bit++; }
+  }
+  const seq = I.deinterleaveBytes(scramble(cw), plan);
+  let res; try { res = I.rsDecodeAll(seq, plan); } catch (e) { return { ok: false, reason: 'rs-uncorrectable' }; }
+  const payload = frameDecode(res.data);
+  if (!payload) return { ok: false, reason: 'bad-frame/crc', errors: res.errors };
+  return { ok: true, bytes: payload, errors: res.errors };
+}
+
 // 알려진 앵커로 흑점/백점 캘리브레이션(전역 M1). 반환 {b0,w0}.
 function calibPointsOf(layout) {
   if (layout.calibPoints) return layout.calibPoints;       // 모양이 명시(주로 round)
@@ -310,9 +347,67 @@ function encodeColor(lumaText, hueText, nCells, bpc, hueBits) {
   return { cellGray: lu.cellGray, cellChroma: cellChroma, bitsPerCell: bpc, hueBits: hueBits,
            eligible: elig.length, lumaCapBytes: lu.capBytes - 6, hueCapBytes: hu.capBytes - 6 };
 }
+// 원시 바이트 버전(이미지 데모용) — 루마 채널에 lumaBytes, 색 채널에 hueBytes를 각자 독립된
+// 바이트 스트림으로 싣는다(같은 이미지의 앞/뒷부분을 나눠 담는 방식 — 픽셀 단위 색변환 아님).
+function encodeColorBytes(lumaBytes, hueBytes, nCells, bpc, hueBits) {
+  const lu = encodeBytesToCells(lumaBytes, nCells, bpc);
+  const elig = eligibleFromLuma(lu.cells, bpc);
+  const hu = encodeBytesToCells(hueBytes, elig.length, hueBits, HUE_ECC);
+  const cellChroma = new Array(nCells).fill(null);
+  for (let e = 0; e < elig.length; e++) cellChroma[elig[e]] = hueChroma(hu.cells[e], hueBits);
+  return { cellGray: lu.cellGray, cellChroma: cellChroma, bitsPerCell: bpc, hueBits: hueBits,
+           eligible: elig.length, lumaCapBytes: lu.capBytes - 6, hueCapBytes: hu.capBytes - 6 };
+}
 
 // 종합: grayObj + locate 결과(res.Hmod2img) → 디코드. 앵커 캘리브레이션 + bpc trial-decode.
 //   opts.bpcTry: 시도할 bpc 목록(기본 [1,2,3]). opts.hue=true + rgbaImg → hue 평면도 디코드.
+// ── PSF-ISI 디코더 (블러 강건, Fable5 설계) ────────────────────────────────
+//   블러는 랜덤이 아니라 결정적 선형채널(저역통과)이다. 셀 독립판독은 이웃 도트 번짐
+//   (ISI=심볼간간섭)을 노이즈로 취급해 블러 2px부터 죽는다. 여기선 전체 모듈 그리드를
+//   샘플해 가우시안 PSF로 역합성곱(Landweber 최소자승)한 뒤 기존 classify+decode 재사용.
+//   PSF σ 는 코어피팅 대신 스윕 + CRC 게이트(trial-decode 철학) — 통과하는 σ 만 채택.
+function sampleModuleGrid(grayObj, H, N) {
+  const grid = new Float32Array(N * N);
+  for (let my = 0; my < N; my++) for (let mx = 0; mx < N; mx++) {
+    const p = applyH(H, mx + 0.5, my + 0.5); grid[my * N + mx] = grayAt(grayObj, p[0], p[1]);
+  }
+  return grid;
+}
+function gaussKernel1D(sigma) {
+  const rad = Math.max(1, Math.ceil(3 * sigma)), k = new Float64Array(2 * rad + 1); let s = 0;
+  for (let d = -rad; d <= rad; d++) { const v = Math.exp(-d * d / (2 * sigma * sigma)); k[d + rad] = v; s += v; }
+  for (let i = 0; i < k.length; i++) k[i] /= s; return { k, rad };
+}
+function blurSep(src, N, K) {                       // 분리형 대칭 가우시안(경계 반사) — K=Kᵀ
+  const k = K.k, rad = K.rad, tmp = new Float64Array(N * N), out = new Float64Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { let s = 0; for (let d = -rad; d <= rad; d++) { let xx = x + d; if (xx < 0) xx = -xx; if (xx >= N) xx = 2 * N - 2 - xx; s += src[y * N + xx] * k[d + rad]; } tmp[y * N + x] = s; }
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { let s = 0; for (let d = -rad; d <= rad; d++) { let yy = y + d; if (yy < 0) yy = -yy; if (yy >= N) yy = 2 * N - 2 - yy; s += tmp[yy * N + x] * k[d + rad]; } out[y * N + x] = s; }
+  return out;
+}
+function deconvGauss(obs, N, sigma, iters) {        // Landweber: T ← clamp(T + Kᵀ(O − K T))
+  const K = gaussKernel1D(sigma), T = Float64Array.from(obs);
+  for (let it = 0; it < iters; it++) {
+    const KT = blurSep(T, N, K), resid = new Float64Array(N * N);
+    for (let i = 0; i < N * N; i++) resid[i] = obs[i] - KT[i];
+    const KtR = blurSep(resid, N, K);
+    for (let i = 0; i < N * N; i++) { let v = T[i] + KtR[i]; T[i] = v < 0 ? 0 : v > 255 ? 255 : v; }
+  }
+  return T;
+}
+// 표준 셀판독이 블러로 실패했을 때 재시도(1비트). 통과 σ 반환, 실패 시 null.
+function decodePSF(grayObj, H, layout, cells) {
+  const N = layout.N, obs = sampleModuleGrid(grayObj, H, N), dc = new Float32Array(cells.length);
+  for (const sig of [0.5, 0.75]) {
+    const dec = deconvGauss(obs, N, sig, 45);
+    for (let i = 0; i < cells.length; i++) dc[i] = dec[cells[i][1] * N + cells[i][0]];
+    const cl = classifyCells(dc, cells, 1, layout);
+    if (cl.hi - cl.lo < 25) continue;
+    const out = decodeFromCells(cl.sym, cells.length, 1);
+    if (out.ok) { out.psfSigma = sig; return out; }
+  }
+  return null;
+}
+
 function readCode(grayObj, res, layout, cellPx, opts) {
   if (!res || !res.ok || !res.Hmod2img) return { ok: false, reason: 'no-lock' };
   const s = sampleCellGrays(grayObj, res.Hmod2img, layout, cellPx);
@@ -339,6 +434,11 @@ function readCode(grayObj, res, layout, cellPx, opts) {
       return out;
     }
   }
+  // 표준 셀판독 실패(주로 블러) → PSF-ISI 재시도(1비트). 우아한 열화: 안 되면 원래대로 실패.
+  if (!(opts && opts.psf === false)) {
+    const p = decodePSF(grayObj, res.Hmod2img, layout, s.cells);
+    if (p && p.ok) { p.bitsPerCell = 1; return p; }
+  }
   return { ok: false, reason: 'all-modes-failed' };
 }
 
@@ -346,4 +446,5 @@ module.exports = {
   ECC, encodeToBits, decodeFromBits, frameEncode, frameDecode, planFor, sampleCellGrays, otsu, readCode,
   encodeToCells, decodeFromCells, calibrate, classifyCells, levelGray, grayEnc, grayDec, PAL_ECC,
   encodeColor, eligibleFromLuma, sampleCellColor, calibrateColor, classifyHue, hueChroma, HUE_ECC, HUE_RHO,
+  encodeBytesToCells, decodeBytesFromCells, encodeColorBytes,
 };

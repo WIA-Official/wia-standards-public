@@ -96,18 +96,39 @@ function layout(grid, spec, shape) {
   return L;
 }
 
+// ── 하트 실루엣: 고전 매끈한 파라메트릭 곡선(원+쐐기 이어붙이기 아님) ─────────
+//   x=sin³t, y=13cos t−5cos2t−2cos3t−cos4t (전 구간 C∞ 매끈, 이음매 없음).
+//   이전 원(로브)+선형쐐기 결합은 두 곡선이 만나는 지점에서 값은 같아도 기울기가
+//   달라(원 쪽 기울기 -1.4대 쐐기 쪽 -0.5) 옆구리에 살짝 꺾인 자국(홀쭉한 자국)이 남았음 —
+//   단일 매끈 곡선으로 바꿔 그 이음매 자체를 없앰. 720점 샘플 폴리곤 + point-in-polygon.
+//   앵커 위치엔 무관(검출 원리와 분리, insideShape는 데이터 셀 마스크에만 관여).
+var HEART_POLY = (function () {
+  var N = 720, pts = [];
+  for (var i = 0; i < N; i++) {
+    var t = (i / N) * 2 * Math.PI;
+    var x = Math.pow(Math.sin(t), 3);
+    var yRaw = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+    var y = -0.205 - 0.07088 * yRaw; // yRaw∈[-17,11.92] → ny∈[1.0,-1.05] (뾰족점 아래, 로브 위)
+    pts.push([x, y]);
+  }
+  return pts;
+})();
+function pointInHeart(nx, ny) {
+  var inside = false;
+  for (var i = 0, j = HEART_POLY.length - 1; i < HEART_POLY.length; j = i++) {
+    var xi = HEART_POLY[i][0], yi = HEART_POLY[i][1], xj = HEART_POLY[j][0], yj = HEART_POLY[j][1];
+    if (((yi > ny) !== (yj > ny)) && (nx < (xj - xi) * (ny - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
 // ── 모양 마스크: 데이터 판의 실루엣 (검출 원리와 무관 — 앵커는 그대로) ────────
 //   'round'=원판, 'heart'=하트, 그 외=전부(사각). 정규화 좌표(중심0, 반경 Rdata=1).
 function insideShape(mx, my, L) {
   const c = L.coreCenter.mx, R = L.Rdata || (L.N / 2 - 0.8);
   const nx = (mx - c) / R, ny = (my - c) / R;
   if (L.shape === 'round') return nx * nx + ny * ny <= 1;
-  if (L.shape === 'heart') {
-    // 고전 하트 곡선 (x²+y²-1)³ - x²y³ ≤ 0. 이미지 y는 아래로 증가 → 뒤집고 스케일.
-    const x = nx / 0.95, y = -ny / 0.95 + 0.35;
-    const t = x * x + y * y - 1;
-    return t * t * t - x * x * y * y * y <= 0;
-  }
+  if (L.shape === 'heart') return pointInHeart(nx, ny);
   return true;
 }
 

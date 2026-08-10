@@ -96,9 +96,10 @@ function sub3(A, B) { return A.map((r, i) => r.map((v, j) => v - B[i][j])); }
 // 중심(cx,cy) 주위로 방사 스캔. 각 각도에서 바깥으로 나가며 그레이가
 //   disk(검)→흰링→검링→흰 세퍼레이터. 두 개의 dark→light 상승에지(r≈1.5, ≈5.5
 //   모듈)를 서브픽셀로 잡는다. 스케일 무지 상태에서 "첫 두 상승에지"라는 순서로 견고.
-function extractCoreRings(grayObj, cx, cy, rMaxPx, nAng) {
+function extractCoreRings(grayObj, cx, cy, rMaxPx, nAng, gradFrac) {
   const { g, w, h } = grayObj;
   nAng = nAng || 180;
+  gradFrac = gradFrac != null ? gradFrac : 0.10;   // 대비-상대 에지임계(과거 절대 40 대체)
   const sampAt = (x, y) => {
     if (x < 0 || y < 0 || x >= w - 1 || y >= h - 1) return null;
     const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, i = y0 * w + x0;
@@ -112,6 +113,11 @@ function extractCoreRings(grayObj, cx, cy, rMaxPx, nAng) {
     const rs = [], vs = [];
     for (let r = 1; r <= rMaxPx; r += step) { const v = sampAt(cx + r * ct, cy + r * st); if (v == null) break; rs.push(r); vs.push(v); }
     if (vs.length < 8) continue;
+    // 대비-상대 임계: 블러로 절대 그래디언트가 낮아져도 이 프로파일 자신의 대비 대비로 판정.
+    //   (과거 절대 40 은 블러 2px에서 코어 링을 20개 못 찾아 weak-core 로 컷 → 배율추정 실패)
+    let vmin = Infinity, vmax = -Infinity;
+    for (let i = 0; i < vs.length; i++) { if (vs[i] < vmin) vmin = vs[i]; if (vs[i] > vmax) vmax = vs[i]; }
+    const gThr = Math.max(6, gradFrac * (vmax - vmin));
     // 상승에지 후보: dGray/dr 국소최대(+). 중심이 어두운지 확인(disk).
     const rises = [];                       // {r, mag}
     for (let k = 2; k < vs.length - 2; k++) {
@@ -119,7 +125,7 @@ function extractCoreRings(grayObj, cx, cy, rMaxPx, nAng) {
       if (gm1 <= 0) continue;
       // 국소최대
       const gprev = vs[k] - vs[k - 2], gnext = vs[k + 2] - vs[k];
-      if (gm1 >= gprev && gm1 >= gnext && gm1 > 40) {
+      if (gm1 >= gprev && gm1 >= gnext && gm1 > gThr) {
         // 서브픽셀: 그레이디언트 3점 포물선 정점
         const gm = vs[k] - vs[k - 2], gp = vs[k + 2] - vs[k], gc = gm1;
         const den = (gm - 2 * gc + gp);
@@ -134,6 +140,71 @@ function extractCoreRings(grayObj, cx, cy, rMaxPx, nAng) {
     outer.push([cx + rises[1].r * ct, cy + rises[1].r * st]);
   }
   return { inner, outer };
+}
+
+// ── 각도평균 방사 프로파일 (극단블러용 배율추정 기반) ──────────────────────
+// extractCoreRings 는 "각 각도마다 상승에지 2개"를 요구한다. 블러 σ가 링 폭(2모듈)에
+// 근접하면 안쪽 흰 링이 먼저 소멸(MTF≈0) → 각도별로 에지가 1개만 남아 링 수집이
+// 0개로 붕괴한다(실측: box r6·3pass 에서 180각 중 0~1개). 그러나 코어 전체(반경 5.5모듈
+// 암부 블롭)의 바깥 경계는 훨씬 저주파라 훨씬 오래 산다. 각도평균(180각)은 SNR을 √180배
+// 올려 그 경계를 블러 r10 까지 안정적으로 남긴다 — 각도별 국소 그래디언트 판정이 죽는
+// 지점에서도. 그래서 "에지 개수 세기" 대신 "평균 프로파일의 마지막 상승 반값교차".
+function meanRadialProfile(grayObj, cx, cy, rMaxPx, step) {
+  const { g, w, h } = grayObj;
+  step = step || 0.5;
+  const sampAt = (x, y) => {
+    if (x < 0 || y < 0 || x >= w - 1 || y >= h - 1) return null;
+    const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, i = y0 * w + x0;
+    return (g[i] * (1 - fx) + g[i + 1] * fx) * (1 - fy) + (g[i + w] * (1 - fx) + g[i + w + 1] * fx) * fy;
+  };
+  const nR = Math.max(2, Math.floor(rMaxPx / step) + 1);
+  const P = new Float64Array(nR);
+  let used = 0;
+  for (let k = 0; k < nR; k++) {
+    const r = k * step;
+    const nA = Math.max(16, Math.min(240, Math.round(2 * Math.PI * r)));
+    let s = 0, n = 0;
+    for (let a = 0; a < nA; a++) {
+      const th = 2 * Math.PI * a / nA;
+      const v = sampAt(cx + r * Math.cos(th), cy + r * Math.sin(th));
+      if (v != null) { s += v; n++; }
+    }
+    if (n < nA * 0.6) break;                 // 화면 밖으로 절반 이상 나가면 절단
+    P[k] = s / n; used = k + 1;
+  }
+  return { P: P.subarray(0, used), step, n: used };
+}
+
+/*
+ * estimateCoreScale — 사전지식 없이 코어 불스아이 바깥경계(5.5모듈)를 각도평균
+ *   프로파일에서 찾아 cellPx 를 역산. extractCoreRings(각도별 에지수집)가 극단블러에서
+ *   붕괴한 뒤의 폴백 겸, 코어/위성 판별자(위성 블롭반경 2.5모듈 vs 코어 5.5모듈).
+ *   반환 { ok, cellPx, rOuter, contrast, centerDark }.
+ */
+function estimateCoreScale(grayObj, cx, cy, rMaxPx, opts) {
+  opts = opts || {};
+  const prof = meanRadialProfile(grayObj, cx, cy, rMaxPx, opts.step || 0.5);
+  const P = prof.P, n = prof.n, step = prof.step;
+  if (n < 8) return { ok: false, reason: 'short-profile' };
+  const srt = Array.from(P).sort((a, b) => a - b);
+  const vmin = srt[0], vhi = srt[Math.floor(0.9 * (srt.length - 1))];
+  const contrast = vhi - vmin;
+  if (contrast < (opts.minContrast != null ? opts.minContrast : 12)) return { ok: false, reason: 'flat', contrast };
+  const thr = vmin + 0.5 * contrast;
+  // 마지막(가장 바깥) 상승 반값교차 = 코어 암부 블롭의 바깥 경계.
+  //   블러가 안쪽 흰 링을 지워도 이 교차는 남는다. 서브샘플 선형보간.
+  let rOuter = NaN;
+  for (let k = 1; k < n; k++) {
+    if (P[k - 1] < thr && P[k] >= thr) {
+      const t = (thr - P[k - 1]) / ((P[k] - P[k - 1]) || 1);
+      rOuter = (k - 1 + t) * step;
+    }
+  }
+  if (!isFinite(rOuter) || rOuter < step * 2) return { ok: false, reason: 'no-crossing', contrast };
+  const cellPx = rOuter / 5.5;                    // 코어 바깥 링 = 5.5 모듈
+  // 중심이 실제로 어두운가(밝은 blob 오검출 배제)
+  const centerDark = (P[0] < thr);
+  return { ok: centerDark && cellPx > 1.2 && cellPx < 60, cellPx, rOuter, contrast, centerDark, profile: P };
 }
 
 // ── 대수적 타원(원뿔) 적합 (Hartley 정규화 + 최소SV) ───────────────────────
@@ -309,5 +380,5 @@ function rectifyHomography(l, C, O, targetR, targetC) {
 
 module.exports = {
   jacobiEig, inv3, adj3, mul3, matVec3, transpose3, frob, scale3, sub3, det3, solveCubic,
-  extractCoreRings, fitConic, recoverFromConcentric, rectifyHomography,
+  extractCoreRings, meanRadialProfile, estimateCoreScale, fitConic, recoverFromConcentric, rectifyHomography,
 };
