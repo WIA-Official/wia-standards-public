@@ -553,9 +553,15 @@
       window.navigator.standalone === true;
   }
 
+  // ★2026-08-11 버그 수정: beforeinstallprompt는 페이지 로드 후 언제든(자주 첫 해독보다 늦게) 뜬다.
+  // maybeShowInstallBanner()는 "첫 해독 성공" 시점에 딱 한 번만 불렸는데, 그 시점에 아직 이 이벤트가
+  // 안 왔으면(deferredInstallPrompt 없음·iOS도 아님) 조용히 아무것도 안 뜨고 끝 — 이후 이 이벤트가
+  // 뒤늦게 와도 다시 불러주는 코드가 없어서 배너가 영영 안 떴다. 실사용자가 "설치가 안 되는 것 같다"고
+  // 느낀 원인이 바로 이 타이밍 경합으로 추정됨. 첫 해독이 이미 끝난 뒤라면 이벤트가 오는 즉시 다시 시도.
   window.addEventListener('beforeinstallprompt', function (e) {
     e.preventDefault();
     deferredInstallPrompt = e;
+    if (firstDecodeDone) maybeShowInstallBanner();
   });
 
   window.addEventListener('appinstalled', function () {
