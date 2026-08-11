@@ -361,9 +361,38 @@
     if (!text) return null;
     if (/^https?:\/\//i.test(text)) return { kind: 'nav', url: text };
     if (/^BEGIN:VCARD/i.test(text)) return { kind: 'download', label: '📇 연락처 저장', filename: 'wia-contact.vcf', mime: 'text/vcard', payload: text };
-    if (/^BEGIN:VCALENDAR/i.test(text)) return { kind: 'download', label: '📅 일정 저장', filename: 'wia-event.ics', mime: 'text/calendar', payload: text };
+    if (/^BEGIN:VCALENDAR/i.test(text)) {
+      // 같은 VCALENDAR 껍데기 안에 일정(VEVENT)과 할 일(VTODO)이 둘 다 올 수 있다 — 안을 보고 가른다.
+      var todo = /BEGIN:VTODO/i.test(text);
+      return { kind: 'download', label: todo ? '✅ 할 일 저장' : '📅 일정 저장',
+        filename: todo ? 'wia-todo.ics' : 'wia-event.ics', mime: 'text/calendar', payload: text };
+    }
+    if (/^-----BEGIN PGP PUBLIC KEY BLOCK-----/i.test(text)) {
+      // .asc 파일로 내려주면 gpg --import 로 바로 먹는다(복사는 줄바꿈이 깨질 위험이 있음).
+      return { kind: 'download', label: '🔏 공개키 저장(.asc)', filename: 'wia-pubkey.asc', mime: 'application/pgp-keys', payload: text };
+    }
+    if (/^(ssh-(rsa|dss|ed25519|ed448)|ecdsa-sha2-\S+|sk-(ssh-ed25519|ecdsa-sha2-\S+)@openssh\.com)\s+\S/i.test(text)) {
+      // authorized_keys 한 줄 — 받는 쪽은 서버에 붙여넣는 게 전부라 '복사'가 맞다.
+      return { kind: 'copy', label: '🗝️ SSH 공개키 복사', payload: text };
+    }
+    if (/^BCD\r?\n\d{3}\r?\n/.test(text) && /\r?\nSCT\r?\n/.test(text)) {
+      // EPC069-12(GiroCode). 열 수 있는 URI가 없는 고정 텍스트 포맷 — 은행 앱에 붙여넣도록 복사.
+      return { kind: 'copy', label: '🏦 이체정보 복사', payload: text };
+    }
     if (/^WIFI:/i.test(text)) return { kind: 'copy', label: '📋 WiFi 정보 복사', payload: text };
     if (/^(mailto|tel|sms|geo):/i.test(text)) return { kind: 'open', url: text, label: '▶ 열기' };
+    // 지갑/인증 앱이 OS에 등록해 두는 커스텀 스킴 — 그대로 넘기면 폰이 알아서 해당 앱을 띄운다.
+    // ★otpauth를 'copy'가 아니라 'open'으로 둔 이유: 이 URI의 존재 이유 자체가 "인증 앱에 등록"이고,
+    // 비밀키를 클립보드에 남기는 쪽이 오히려 더 오래 노출된다(붙여넣기 이력·다른 앱의 클립보드 접근).
+    // 셋 다 'nav'가 아니라 'open'인 것도 의도 — 자동이동 없이 반드시 탭해야 넘어간다(돈·계정열쇠라 더더욱).
+    if (/^(bitcoin|litecoin|dogecoin|ethereum|otpauth):/i.test(text)) {
+      return { kind: 'open', url: text,
+        label: /^otpauth:/i.test(text) ? '🔐 인증 앱에 추가' : '💰 지갑에서 열기' };
+    }
+    // FaceTime(Apple 등록 스킴) · XMPP(RFC 5122) · SIP/SIPS(RFC 3261) — 전부 해당 앱이 받아간다.
+    if (/^facetime(-audio)?:/i.test(text)) return { kind: 'open', url: text, label: '🎥 FaceTime 걸기' };
+    if (/^xmpp:/i.test(text)) return { kind: 'open', url: text, label: '🗨️ 메신저에서 열기' };
+    if (/^sips?:/i.test(text)) return { kind: 'open', url: text, label: '☎️ 전화 걸기' };
     if (text.charAt(0) === '{') {
       try {
         var o = JSON.parse(text);
