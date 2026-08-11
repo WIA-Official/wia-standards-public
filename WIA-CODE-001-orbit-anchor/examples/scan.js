@@ -348,19 +348,76 @@
   // 매 프레임 반복 판정에도 실제 네비게이션은 정확히 한 번만 실행된다(navigatedAway 가드는
   // 이동 시작~언로드 사이의 짧은 틈에 대비한 이중 안전장치). 새 탭 방식(window.open)은 이
   // 탭이 안 죽어 스캔이 계속 돌아 여러 탭이 반복해서 열릴 위험이 있어 폐기.
+  // ★2026-08-11: URL 외 타입(WiFi·연락처·일정·이메일·전화·SMS·위치·SSH/API/MCP)도 같은 버튼
+  // 하나로 처리하도록 일반화. URL만 자동이동(위 이유 그대로 유지) — 그 외는 전부 "탭해야만"
+  // 동작하게 일부러 자동화 안 함(전화 걸기·문자 앱 열기는 URL 이동보다 더 침해적인 행동이라
+  // 자동 트리거는 사고 위험 — 이 파일의 다른 자동화들과 일부러 결을 다르게 둠).
   var navigatedAway = false;
+  var pendingAction = null; // { kind:'nav'|'open'|'copy'|'download', ... }
+
+  // generate.js buildPayload()가 실제로 만드는 포맷들과 1:1 대응 — 새 타입을 늘리면 저쪽
+  // buildPayload()에도 case를 추가해야 왕복이 맞는다.
+  function classifyDecoded(text) {
+    if (!text) return null;
+    if (/^https?:\/\//i.test(text)) return { kind: 'nav', url: text };
+    if (/^BEGIN:VCARD/i.test(text)) return { kind: 'download', label: '📇 연락처 저장', filename: 'wia-contact.vcf', mime: 'text/vcard', payload: text };
+    if (/^BEGIN:VCALENDAR/i.test(text)) return { kind: 'download', label: '📅 일정 저장', filename: 'wia-event.ics', mime: 'text/calendar', payload: text };
+    if (/^WIFI:/i.test(text)) return { kind: 'copy', label: '📋 WiFi 정보 복사', payload: text };
+    if (/^(mailto|tel|sms|geo):/i.test(text)) return { kind: 'open', url: text, label: '▶ 열기' };
+    if (text.charAt(0) === '{') {
+      try {
+        var o = JSON.parse(text);
+        if (o && o.t === 'ssh') {
+          if (o.host) return { kind: 'open', url: 'ssh://' + (o.user ? o.user + '@' : '') + o.host + (o.port ? ':' + o.port : ''), label: '🔌 SSH 열기' };
+          return { kind: 'copy', label: '📋 접속정보 복사', payload: text };
+        }
+        if (o && (o.t === 'api' || o.t === 'mcp')) return { kind: 'copy', label: '📋 설정 복사', payload: text };
+      } catch (e) { /* JSON 아님 — 그냥 텍스트로 폴백 */ }
+    }
+    return { kind: 'copy', label: '📋 복사', payload: text };
+  }
+
   function updateUrlButton(result) {
-    var isUrl = !!(result && result.decoded && result.text && /^https?:\/\//i.test(result.text));
-    if (!isUrl || navigatedAway) return;
-    pendingOpenUrl = result.text;
-    els.openUrlBtn.textContent = '🔗 이동 중… ' + pendingOpenUrl;
-    els.openUrlBtn.classList.remove('hidden'); // 이동 직전 짧은 순간 목적지를 보여줌(깜빡 이동 방지)
-    navigatedAway = true;
-    setTimeout(function () { location.href = pendingOpenUrl; }, 400);
+    if (navigatedAway) return;
+    if (!(result && result.decoded && result.text)) return;
+    var action = classifyDecoded(result.text);
+    if (!action) return;
+    pendingAction = action;
+    if (action.kind === 'nav') {
+      pendingOpenUrl = action.url;
+      els.openUrlBtn.textContent = '🔗 이동 중… ' + pendingOpenUrl;
+      els.openUrlBtn.classList.remove('hidden'); // 이동 직전 짧은 순간 목적지를 보여줌(깜빡 이동 방지)
+      navigatedAway = true;
+      setTimeout(function () { location.href = pendingOpenUrl; }, 400);
+      return;
+    }
+    els.openUrlBtn.textContent = action.label;
+    els.openUrlBtn.classList.remove('hidden');
   }
 
   els.openUrlBtn.addEventListener('click', function () {
-    if (pendingOpenUrl) location.href = pendingOpenUrl; // 지연 400ms 기다리지 않고 바로 이동
+    if (!pendingAction) return;
+    if (pendingAction.kind === 'nav') { if (pendingOpenUrl) location.href = pendingOpenUrl; return; } // 지연 400ms 기다리지 않고 바로 이동
+    if (pendingAction.kind === 'open') { location.href = pendingAction.url; return; } // 탭했을 때만(자동 아님)
+    if (pendingAction.kind === 'copy') {
+      var txt = pendingAction.payload;
+      var flash = function () {
+        var old = els.openUrlBtn.textContent;
+        els.openUrlBtn.textContent = '✅ 복사됨';
+        setTimeout(function () { if (pendingAction && pendingAction.payload === txt) els.openUrlBtn.textContent = old; }, 1400);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(flash, flash);
+      else flash();
+      return;
+    }
+    if (pendingAction.kind === 'download') {
+      var blob = new Blob([pendingAction.payload], { type: pendingAction.mime });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = pendingAction.filename;
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+      return;
+    }
   });
 
   function renderOverlay(result) {
