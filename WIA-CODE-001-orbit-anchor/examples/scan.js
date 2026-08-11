@@ -28,7 +28,10 @@
     installBannerText: document.getElementById('installBannerText'),
     installBtn: document.getElementById('installBtn'),
     installDismissBtn: document.getElementById('installDismissBtn'),
-    openUrlBtn: document.getElementById('openUrlBtn')
+    openUrlBtn: document.getElementById('openUrlBtn'),
+    permBlocked: document.getElementById('permBlocked'),
+    permBlockedText: document.getElementById('permBlockedText'),
+    permRecheckBtn: document.getElementById('permRecheckBtn')
   };
 
   // 480 was too aggressive a downscale: locate still succeeds well below this, but per-cell
@@ -120,6 +123,28 @@
       });
   }
 
+  // 브라우저마다 "카메라 권한을 다시 허용하는 법" 메뉴 위치가 전혀 달라서, 그냥 "설정에서 허용해주세요"
+  // 한 줄로는 사람들이 실제로 못 찾는다(특히 iOS는 사이트 자체가 아니라 설정 앱까지 나가야 함). UA로
+  // 대충 갈래만 나눠서 실제로 찾아갈 수 있는 경로를 알려준다 — 오탐이어도 "설정에서 찾아보세요" 수준의
+  // 손해라 UA 스니핑의 흔한 위험(오탐)을 감수할 가치가 있다고 판단.
+  function cameraBlockInstructions() {
+    var ua = navigator.userAgent || '';
+    var isIOS = /iphone|ipad|ipod/i.test(ua) && !window.MSStream;
+    var isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(ua);
+    var isFirefox = /firefox/i.test(ua);
+    if (isIOS && isSafari) {
+      return '설정 앱 → Safari(또는 이 앱) → 카메라에서 wiacode.com을 "허용"으로 바꿔주세요.\n' +
+        '(그래도 안 되면 설정 → 개인정보 보호 및 보안 → 카메라에서 Safari가 켜져 있는지도 확인)';
+    }
+    if (isSafari) {
+      return 'Safari 메뉴 → "wiacode.com에 대한 설정"(또는 환경설정 → 웹 사이트 → 카메라)에서\n"허용"으로 바꿔주세요.';
+    }
+    if (isFirefox) {
+      return '주소창 왼쪽의 카메라 차단 아이콘을 눌러 권한을 "허용"으로 바꾼 뒤 새로고침해주세요.';
+    }
+    return '주소창 왼쪽의 자물쇠(또는 카메라) 아이콘을 눌러 카메라 권한을 "허용"으로 바꿔주세요.';
+  }
+
   // ---------------------------------------------------------------------
   // Camera lifecycle
   // ---------------------------------------------------------------------
@@ -159,7 +184,7 @@
     }).catch(function (err) {
       var name = err && err.name;
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-        showError('카메라 접근 권한이 필요합니다. 브라우저 설정에서 카메라 권한을 허용해주세요.');
+        showError('카메라 접근 권한이 필요합니다.\n' + cameraBlockInstructions());
       } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
         showError('사용 가능한 카메라를 찾을 수 없습니다.');
       } else if (name === 'NotReadableError') {
@@ -678,14 +703,34 @@
 
   // 재방문 자동 시작: 카메라 권한이 이미 'granted'면(= 전에 스캔해본 사람) "카메라 시작"
   // 탭을 건너뛰고 곧바로 카메라를 켠다. 처음 온 사람은 'prompt'라 버튼이 그대로 뜬다.
-  // (iOS Safari는 Permissions API 카메라 미지원 → 안전하게 버튼 유지)
+  // 'denied'(전에 거부한 사람)는 탭해봤자 브라우저가 재프롬프트 없이 바로 또 실패하는 경우가 대부분이라,
+  // 실패를 기다리지 않고 미리 "차단돼 있다"는 걸 알려주고 브라우저별로 실제로 찾아갈 수 있는 경로를
+  // 안내한다(그냥 탭 → 실패 → 에러화면보다 한 단계 앞서 알려주는 게 목표).
+  // (iOS Safari는 Permissions API 카메라 미지원 → 이 프로액티브 경로는 안 타고, 탭했을 때의 반응형
+  // 에러 메시지에서만 안내됨 — 위 cameraBlockInstructions()가 그쪽에도 똑같이 쓰임)
+  function updatePermUI(state) {
+    var onStartScreen = !els.startScreen.classList.contains('hidden');
+    if (state === 'denied') {
+      els.permBlockedText.textContent = cameraBlockInstructions();
+      els.permBlocked.classList.remove('hidden');
+    } else {
+      els.permBlocked.classList.add('hidden');
+      if (state === 'granted' && onStartScreen) startCamera();
+    }
+  }
+
   function maybeAutoStart() {
     if (!window.isSecureContext) return;
     if (!(navigator.permissions && navigator.permissions.query)) return;
     navigator.permissions.query({ name: 'camera' }).then(function (st) {
-      if (st.state === 'granted') startCamera();
-    }).catch(function () { /* 미지원 → 버튼 유지 */ });
+      updatePermUI(st.state);
+      // 탭이 열려있는 동안 브라우저 설정에서 권한을 바로 바꾸면(예: 주소창 아이콘으로 즉시 허용) 새로고침
+      // 없이도 알아서 복구되게 — 'denied'였다가 'granted'로 바뀌면 그 즉시 카메라 자동 시작.
+      st.onchange = function () { updatePermUI(st.state); };
+    }).catch(function () { /* 미지원 → 버튼 유지, 배너 안 뜸 */ });
   }
+
+  els.permRecheckBtn.addEventListener('click', maybeAutoStart);
 
   document.addEventListener('DOMContentLoaded', function () {
     els.startBtn.disabled = true;
