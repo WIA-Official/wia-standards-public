@@ -50,7 +50,7 @@
   var GITHUB_URL = 'https://github.com/WIA-Official/wia-standards-public/tree/main/WIA-CODE-001-orbit-anchor';
 
   var USER_CFG = window.WIA_SITEKIT_CONFIG || {};
-  // basePath: /v2-orbit/web/ 페이지들에선 상대경로("generate.html")로 충분하지만, 다른 경로(루트
+  // basePath: /orbit/web/ 페이지들에선 상대경로("generate.html")로 충분하지만, 다른 경로(루트
   // wiacode.com/ 등)에 이 스크립트를 붙일 땐 목적지가 어긋난다 — 그럴 땐 config로 접두사를 지정.
   var BASE = USER_CFG.basePath || '';
 
@@ -242,7 +242,7 @@
     });
     var resourceLinks = [
       { href: GITHUB_URL, label: 'GitHub ↗', ext: true },
-      { href: '/v2-orbit/BENCHMARK.md', label: '벤치마크', ext: true }
+      { href: '/orbit/BENCHMARK.md', label: '벤치마크', ext: true }
     ];
     var legalLinks = [
       { href: '/privacy.html', label: '개인정보처리방침' },
