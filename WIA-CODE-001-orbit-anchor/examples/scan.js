@@ -31,7 +31,8 @@
     openUrlBtn: document.getElementById('openUrlBtn'),
     permBlocked: document.getElementById('permBlocked'),
     permBlockedText: document.getElementById('permBlockedText'),
-    permRecheckBtn: document.getElementById('permRecheckBtn')
+    permRecheckBtn: document.getElementById('permRecheckBtn'),
+    copyLinkBtn: document.getElementById('copyLinkBtn')
   };
 
   // 480 was too aggressive a downscale: locate still succeeds well below this, but per-cell
@@ -149,7 +150,7 @@
   // Camera lifecycle
   // ---------------------------------------------------------------------
   function startCamera() {
-    els.startMsg.textContent = '';
+    els.startMsg.textContent = '카메라 권한을 확인하는 중…';
 
     if (!window.isSecureContext) {
       showError('보안 연결(HTTPS)이 필요합니다. https 주소로 다시 접속해주세요.');
@@ -160,10 +161,28 @@
       return;
     }
 
+    // ★2026-08-14: getUserMedia()가 settle(resolve/reject) 자체를 안 하는 경우가 있다 — 카톡/네이버
+    // 등 앱 내장 브라우저(WebView)나 QR스캐너가 띄우는 미니 브라우저 상당수가 카메라 권한 프롬프트
+    // 자체를 띄우지 않고 Promise를 영구 pending 상태로 둔다. 이전엔 이 경우 아무 화면 전환도, 에러도
+    // 없이 "카메라 시작" 버튼을 눌러도 무한히 아무 일도 안 일어나는 것처럼 보였다(실제 버그 리포트로
+    // 확인됨). 타임아웃 레이스를 추가해 최소한 "왜 안 되는지"는 알려준다.
+    var timedOut = false;
+    var timeoutId = setTimeout(function () {
+      timedOut = true;
+      showError(
+        '카메라 권한 요청이 응답하지 않습니다.\n' +
+        '카카오톡·네이버 등 앱 내장 브라우저나 QR스캐너의 미니 브라우저에서는 카메라 권한이 아예 ' +
+        '뜨지 않는 경우가 많습니다.\nChrome, Samsung Internet, Safari 같은 기본 브라우저에서 이 ' +
+        '주소를 직접 열어주세요:\n' + location.href
+      );
+    }, 8000);
+
     navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'environment' },
       audio: false
     }).then(function (s) {
+      if (timedOut) { s.getTracks().forEach(function (t) { t.stop(); }); return Promise.reject(new Error('post-timeout')); }
+      clearTimeout(timeoutId);
       stream = s;
       els.video.srcObject = stream;
       return new Promise(function (resolve) {
@@ -182,6 +201,8 @@
       setupOverlayCanvas();
       startLoop();
     }).catch(function (err) {
+      clearTimeout(timeoutId);
+      if (timedOut || (err && err.message === 'post-timeout')) return; // timeout's own message already shown
       var name = err && err.name;
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
         showError('카메라 접근 권한이 필요합니다.\n' + cameraBlockInstructions());
@@ -731,6 +752,19 @@
   }
 
   els.permRecheckBtn.addEventListener('click', maybeAutoStart);
+
+  els.copyLinkBtn.addEventListener('click', function () {
+    var flash = function (ok) {
+      var old = els.copyLinkBtn.textContent;
+      els.copyLinkBtn.textContent = ok ? '✅ 복사됨 — 브라우저 주소창에 붙여넣기 해주세요' : location.href;
+      setTimeout(function () { els.copyLinkBtn.textContent = old; }, 2200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(location.href).then(function () { flash(true); }, function () { flash(false); });
+    } else {
+      flash(false); // clipboard API unavailable too — fall back to just showing the URL to copy by hand
+    }
+  });
 
   document.addEventListener('DOMContentLoaded', function () {
     els.startBtn.disabled = true;
