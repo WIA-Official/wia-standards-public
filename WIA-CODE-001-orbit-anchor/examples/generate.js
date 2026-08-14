@@ -2,7 +2,7 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var state = { ctype: 'text', shape: 'square', grid: 'M', bpc: 2, mcpT: 'stdio', wifiSec: 'WPA',
-    cryptoCoin: 'btc', ftMode: 'video', sipSec: 'sip' };
+    cryptoCoin: 'btc', ftMode: 'video', sipSec: 'sip', frame: 'none' };
 
   // BIP-21 계열 코인 — 스킴 이름만 다르고 파라미터(amount/label/message)는 전부 동일하다.
   // (Litecoin·Dogecoin 코어 모두 BIP-21을 그대로 채택했음 — dogecoin/doc/bips.md, litecoin.com/learning-center/uri-schemes)
@@ -51,8 +51,19 @@
   seg('ft_mode', 'ftMode', null, regen);
   seg('sip_sec', 'sipSec', null, regen);
   $('colorOn').addEventListener('change', function () { $('hueWrap').classList.toggle('on', this.checked); regen(); });
+  $('bridgeOn').addEventListener('change', regen);
   $('wifi_hidden').addEventListener('change', regen);
-  $('printLabelOn').addEventListener('change', regen);
+  seg('frame', 'frame', null, regen);
+  // 색상 커스텀 — 토글 4개(켜기/그라디언트/눈색상 별도) + 색상피커 4개.
+  $('styleOn').addEventListener('change', function () { $('styleWrap').classList.toggle('on', this.checked); regen(); });
+  $('styleGradOn').addEventListener('change', function () { $('styleFg2Wrap').style.display = this.checked ? 'block' : 'none'; regen(); });
+  $('styleEyeOn').addEventListener('change', function () { $('styleEyeWrap').style.display = this.checked ? 'block' : 'none'; regen(); });
+  var dbc; var debC = function () { clearTimeout(dbc); dbc = setTimeout(regen, 150); };
+  ['styleFg', 'styleBg', 'styleFg2', 'styleEye'].forEach(function (id) { $(id).addEventListener('input', debC); });
+  // 로고 — 파일은 즉시(비동기 로드 후 run이 다시 그림), 크기 슬라이더는 디바운스.
+  $('logoOn').addEventListener('change', function () { $('logoWrap').style.display = this.checked ? 'block' : 'none'; regen(); });
+  $('logoFile').addEventListener('change', function () { loadLogoFile(this.files && this.files[0]); });
+  $('logoSize').addEventListener('input', debC);
   // 텍스트 입력은 디바운스 재생성
   var dbt; var deb = function () { clearTimeout(dbt); dbt = setTimeout(regen, 350); };
   Array.prototype.forEach.call(document.querySelectorAll('#ctype ~ * input[type="text"], textarea'), function (el) { el.addEventListener('input', deb); });
@@ -246,31 +257,92 @@
     else { $('badge').textContent = 'ENGINE 로딩…'; setTimeout(function () { ready(cb); }, 150); }
   }
 
+  // WIA 브랜드 로고 프리로드(QR 중앙 삽입용)
+  var wiaLogo = new Image(); wiaLogo.src = window.WIA_LOGO_URI || 'wia-logo.png';
 
-  // 인쇄용 안내 문구(비동기): 화면에서만 보이는 도움말은 인쇄해서 나눠주면 안 따라간다 —
-  // 그래서 원할 때만 이미지 자체 아래에 흰 띠+문구를 실제로 그려 넣는다(다운로드 이미지에 포함).
-  function withPrintLabel(dataURL, cb) {
+  // 사용자 업로드 로고(파일 선택 시 비동기 디코드 후 보관, run()이 재호출되며 반영)
+  var userLogo = null;
+  function loadLogoFile(file) {
+    if (!file) { userLogo = null; regen(); return; }
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var img = new Image();
+      img.onload = function () { userLogo = img; regen(); };
+      img.onerror = function () { userLogo = null; };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // 사용자 로고 삽입(비동기): 다리QR과 같은 중앙 자리를 쓰므로 다리QR이 켜져 있으면 건너뜀.
+  function withLogo(dataURL, cb) {
+    var on = $('logoOn') && $('logoOn').checked, bridge = $('bridgeOn') && $('bridgeOn').checked;
+    if (!on || bridge || !userLogo || !userLogo.naturalWidth || !window.WiaLogoFrame) { cb(dataURL); return; }
     var im = new Image();
     im.onload = function () {
-      var bandH = Math.round(im.width * 0.09);
-      var cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height + bandH;
-      var cx = cv.getContext('2d');
-      cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, cv.width, cv.height);
-      cx.drawImage(im, 0, 0);
-      var msg = '📷 WIA Code 스캐너로 스캔하세요 · wiacode.com';
-      cx.fillStyle = '#0b0f14';
-      var fontPx = Math.max(14, Math.round(bandH * 0.34));
-      cx.font = fontPx + 'px -apple-system, system-ui, "Apple SD Gothic Neo", sans-serif';
-      cx.textAlign = 'center'; cx.textBaseline = 'middle';
-      // 캔버스 폭에 안 맞으면 글자 크기를 줄여서 한 줄에 맞춘다(다국어 폭 차이 대응).
-      while (cx.measureText(msg).width > cv.width * 0.94 && fontPx > 10) {
-        fontPx -= 1; cx.font = fontPx + 'px -apple-system, system-ui, "Apple SD Gothic Neo", sans-serif';
-      }
-      cx.fillText(msg, cv.width / 2, im.height + bandH / 2);
+      var cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height;
+      cv.getContext('2d').drawImage(im, 0, 0);
+      window.WiaLogoFrame.embedLogo(cv, userLogo, (parseInt($('logoSize').value, 10) || 15) / 100);
       cb(cv.toDataURL('image/png'));
     };
     im.onerror = function () { cb(dataURL); };
     im.src = dataURL;
+  }
+
+  // 다리 QR 오버레이(비동기): dataURL → canvas → WiaBridge.overlay(브랜드) → 로고 → 새 dataURL
+  function withBridge(dataURL, cb) {
+    if (!window.WiaBridge) { cb(dataURL); return; }
+    var im = new Image();
+    im.onload = function () {
+      var cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height;
+      var cx = cv.getContext('2d'); cx.drawImage(im, 0, 0);
+      var id = cx.getImageData(0, 0, cv.width, cv.height);
+      // qsize 0.08(예전 기본 0.15) — 2026-08-10 실측: 다리QR이 흑백(bpc1, ECC 25%)의 여유를 다 먹어
+      // 해독 실패로 이어졌음(0.15·0.11 실패, 0.08부터 성공). bpc를 억지로 올리는 대신 QR을 줄여서
+      // "다리 켜면 무조건 흑백 포기"를 없앰 — 흑백이 인쇄+카메라 실사용에 더 강건하다는 오늘 결론과 합치.
+      var qpx = Math.max(3, Math.floor(cv.width * 0.08 / window.WiaBridge.SIZE));
+      var pos = window.WiaBridge.overlay(id, { place: 'below-core', qpx: qpx, branded: true, logoFrac: 0.18 });
+      cx.putImageData(id, 0, 0);
+      var finish = function () {
+        if (pos.logoHalf && wiaLogo.naturalWidth) {
+          var side = pos.logoHalf * 2 * 0.94;
+          cx.drawImage(wiaLogo, pos.logoCx - side / 2, pos.logoCy - side / 2, side, side);
+        }
+        cb(cv.toDataURL('image/png'));
+      };
+      if (wiaLogo.complete && wiaLogo.naturalWidth) finish();
+      else { wiaLogo.onload = finish; wiaLogo.onerror = finish; }
+    };
+    im.onerror = function () { cb(dataURL); };
+    im.src = dataURL;
+  }
+
+  // 프레임 템플릿(비동기): 코드 이미지 자체는 안 건드리고 바깥에 액자+안내문구를 둘러 그린다
+  // (2026-08-14, 예전 printLabelOn 토글을 흡수 — "없음"이 그 기본 꺼짐 상태와 동일).
+  function withFrame(dataURL, frameKey, bridge, cb) {
+    if (frameKey === 'none' || !window.WiaLogoFrame) { cb(dataURL); return; }
+    var im = new Image();
+    im.onload = function () {
+      var cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height;
+      cv.getContext('2d').drawImage(im, 0, 0);
+      var label = bridge ? '📷 아무 카메라로 비추세요 · SCAN ME' : '📷 WIA Code 스캐너로 스캔 · wiacode.com';
+      var out = window.WiaLogoFrame.wrapFrame(cv, frameKey, { label: label });
+      cb(out.toDataURL('image/png'));
+    };
+    im.onerror = function () { cb(dataURL); };
+    im.src = dataURL;
+  }
+
+  // 다리QR이 격자를 L로 강제할 때 격자 세그먼트 버튼도 같이 L로 표시(2026-08-10 발견: 이전엔 버튼은
+  // 사용자가 마지막으로 누른 값 그대로인데 실제 생성은 L로 나가 화면-실제가 어긋났었음).
+  var lastSyncedGrid = null;
+  function syncGridUI(actualGrid) {
+    if (actualGrid === lastSyncedGrid) return;
+    lastSyncedGrid = actualGrid;
+    var wrap = $('grid'); if (!wrap) return;
+    Array.prototype.forEach.call(wrap.children, function (c) {
+      c.classList.toggle('on', c.getAttribute('data-v') === actualGrid);
+    });
   }
 
   var BPC_LABEL = { 1: '흑백', 2: '4단계', 3: '8단계' };
@@ -279,14 +351,27 @@
     var out = $('out');
     var text = buildPayload();
     if (!text) { out.innerHTML = '<div class="err">내용을 입력하세요.</div>'; return; }
+    var bridge = $('bridgeOn') && $('bridgeOn').checked;
     var grid = state.grid, bpc = state.bpc;
+    // 다리ON시 격자는 L로(다리QR이 먹는 셀 비율을 낮춤) — bpc는 더 이상 강제 상향 안 함(2026-08-10:
+    // 위 qsize 축소와 짝지어 흑백도 안전하게 버팀, 흑백이 오히려 인쇄+카메라에 더 강건함).
+    if (bridge) grid = 'L';
+    syncGridUI(grid);
     var opts = { text: text, grid: grid, bpc: bpc, shape: state.shape, cellPx: 10 };
     if ($('colorOn').checked) opts.hueText = val('hueText') || ' ';
+    // 색상 커스텀은 색(hue) 데이터 레이어와 같은 채널(크로마)을 써서 동시 사용 불가 — hue가 우선.
+    if ($('styleOn').checked && !$('colorOn').checked) {
+      opts.style = { fg: val('styleFg') || '#000000', bg: val('styleBg') || '#ffffff' };
+      if ($('styleGradOn').checked) opts.style.fg2 = val('styleFg2') || opts.style.fg;
+      if ($('styleEyeOn').checked) opts.style.eye = val('styleEye') || opts.style.fg;
+    }
     var r;
     try { r = window.WiaScan.generate(opts); } catch (e) { r = { error: String(e) }; }
     if (!r || r.error) { out.innerHTML = '<div class="err">생성 실패: ' + (r && r.error ? r.error : '?') + '</div>'; return; }
     if (r.bytes > r.capBytes) { out.innerHTML = '<div class="err">내용이 너무 깁니다 (' + r.bytes + '자 > 용량 ' + r.capBytes + 'B). 격자를 L로 키우거나 색을 켜세요.</div>'; return; }
-    var name = 'wiacode-' + state.ctype + '-' + r.grid + (r.shape !== 'square' ? '-' + r.shape : '') + (r.color ? '-color' : '') + '.png';
+    // wiacode-{타입}-{격자}[-모양][-color][-bridge].png — 예전엔 접두사가 "wia-"라 이 서버의
+    // 다른 잡다한 wia-* 산출물들과 뒤섞였음. 브랜드가 분명하게 드러나도록 정리.
+    var name = 'wiacode-' + state.ctype + '-' + r.grid + (r.shape !== 'square' ? '-' + r.shape : '') + (r.color ? '-color' : '') + (bridge ? '-bridge' : '') + '.png';
     var kind = { text: '텍스트', url: 'URL', wifi: 'WiFi', vcard: '연락처', email: '이메일', phone: '전화',
       sms: 'SMS', event: '일정', geo: '위치',
       crypto: (state.cryptoCoin === 'eth' ? '이더리움 결제' : (COINS[state.cryptoCoin] || COINS.btc).name + ' 결제'),
@@ -296,16 +381,34 @@
     var render = function (dataURL) {
       out.innerHTML =
         '<img alt="WIA Code" src="' + dataURL + '">' +
-        '<div class="meta"><b>' + kind + '</b> · ' + r.width + '×' + r.height + 'px · ' + r.grid + '/' + (r.shape) + ' · ' + (r.color ? '컬러' : (BPC_LABEL[bpc] || bpc + '단계')) +
+        '<div class="meta"><b>' + kind + '</b> · ' + r.width + '×' + r.height + 'px · ' + r.grid + '/' + (r.shape) + ' · ' + (r.color ? '컬러' : (BPC_LABEL[bpc] || bpc + '단계')) + (bridge ? ' · 🔗다리QR' : '') +
         '<br>' + r.bytes + '자 담김 / 용량 약 ' + r.capBytes + '바이트</div>' +
         '<a class="dl" download="' + name + '" href="' + dataURL + '">⬇ PNG 다운로드</a>' +
         '<div class="meta" style="margin-top:12px">' +
-        '화면/인쇄 후 <a class="scan" href="scan.html">스캐너</a>로 읽으면 이 설정이 그대로 나옵니다 (오프라인).' +
+        (bridge
+          ? '기본 카메라로 중앙 QR을 비추면 <a class="scan" href="scan.html">스캐너</a>로 이동합니다. 스캐너로 코드 전체를 읽으면 이 내용이 그대로 나옵니다 (오프라인).'
+          : '화면/인쇄 후 <a class="scan" href="scan.html">스캐너</a>로 읽으면 이 설정이 그대로 나옵니다 (오프라인).') +
         '</div>';
     };
-    var printLabelOn = $('printLabelOn') && $('printLabelOn').checked;
-    if (printLabelOn) withPrintLabel(r.dataURL, render); else render(r.dataURL);
+    // 중앙 오버레이(다리QR 또는 사용자 로고, 상호배타) → 프레임 액자 → 최종 렌더.
+    var afterCenter = function (du) { withFrame(du, state.frame, bridge, render); };
+    if (bridge) withBridge(r.dataURL, afterCenter); else withLogo(r.dataURL, afterCenter);
   }
 
-  ready(function () { $('gen').addEventListener('click', run); run(); });
+  // 쿼리스트링 프리필(2026-08-14) — 다른 WIA 서비스(예: go.wiacode.com 단축링크)에서
+  // "WIA Code로 내보내기"로 딥링크할 때 씀. 지원: ?ctype=<타입>&value=<그 타입의 주 필드값>.
+  // 타입별 "주 필드"만 지원(전부는 아님) — 필요해지면 여기 표에 추가.
+  var PREFILL_FIELD = { url: 'f_url', text: 'f_text', phone: 'ph_num' };
+  function applyPrefillFromQuery() {
+    var qs = new URLSearchParams(window.location.search);
+    var ctype = qs.get('ctype'), value = qs.get('value');
+    if (!ctype || !PREFILL_FIELD[ctype]) return;
+    var typeBtn = document.querySelector('#ctype button[data-v="' + ctype + '"]');
+    if (typeBtn) typeBtn.click(); // 기존 seg() 핸들러가 state.ctype 갱신 + .fields 토글 + run() 까지 처리
+    if (value != null) {
+      var el = $(PREFILL_FIELD[ctype]);
+      if (el) { el.value = value; }
+    }
+  }
+  ready(function () { $('gen').addEventListener('click', run); applyPrefillFromQuery(); run(); });
 })();

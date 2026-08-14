@@ -55,9 +55,9 @@
   var BASE = USER_CFG.basePath || '';
 
   var NAV = [
-    { key: 'generate',     href: BASE + 'generate.html',     label: '생성기',     icon: '⚡' },
-    { key: 'generate-lab', href: BASE + 'generate-lab.html', label: '생성기', icon: '🧪', tag: 'LAB' },
-    { key: 'scan',         href: BASE + 'scan.html',         label: '스캐너',     icon: '📷' }
+    { key: 'generate',     href: BASE + 'generate.html',     label: '생성기',     icon: '⚡', i18n: 'nav.menu' },
+    { key: 'generate-lab', href: BASE + 'generate-lab.html', label: '생성기', icon: '🧪', tag: 'LAB', i18n: 'nav.menu' },
+    { key: 'scan',         href: BASE + 'scan.html',         label: '스캐너',     icon: '📷', i18n: 'nav.scan' }
   ];
 
   // ---- CSS (전부 .wck- 접두사 — 페이지 자체 스타일과 충돌 없음) -------------
@@ -84,6 +84,9 @@
     + '.wck-gh{color:var(--wck-text-dim);text-decoration:none;font-weight:600;font-size:12.5px;'
     +   'padding:7px 9px;border:1px solid var(--wck-border);border-radius:8px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;}'
     + '.wck-gh:hover{color:var(--wck-text);border-color:#3a4451;}'
+    + '.wck-lang{background:none;color:var(--wck-text-dim);border:1px solid var(--wck-border);border-radius:8px;'
+    +   'width:34px;height:34px;font-size:15px;cursor:pointer;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;}'
+    + '.wck-lang:hover{color:var(--wck-text);border-color:#3a4451;}'
     // ---- mode A: in-flow bar (mounted inside #kit etc.) ----
     + '.wck-bar{display:flex;align-items:center;gap:8px;background:var(--wck-panel);'
     +   'border-bottom:1px solid var(--wck-border);padding:8px 12px;position:relative;min-height:40px;}'
@@ -121,12 +124,32 @@
     + '.wck-tl .wck-panel,.wck-tr .wck-panel{top:calc(100% + 8px);}'
     + '.wck-panel .wck-link,.wck-panel .wck-gh{width:100%;}'
     // ---- footer (bar 모드 페이지에만 — scan.html처럼 앱형 단일화면 UX엔 안 어울려서 제외) ----
+    // wiamotion site-kit(.fv2/.foot-top/.foot-cols)의 정보구조(브랜드+컬럼형 링크+하단바)를
+    // wck 자체 색 토큰으로 재현 — 팔레트는 안 베끼고 레이아웃만 이식. 2026-08-14.
+    // ★2026-08-14 폭 버그 수정: 바탕색이 있는 .wck-footer 자체를 max-width로 좁히면 넓은 화면에서
+    // 배경이 가운데 좁은 띠로 잘려 "만들다 만 것"처럼 보인다(형 실측 지적). .wck-footer는 항상
+    // 뷰포트 풀블리드로 두고, 안쪽 콘텐츠(.wck-foot-inner)만 max-width로 가운데 정렬한다.
     + '.wck-footer{background:var(--wck-panel);border-top:1px solid var(--wck-border);'
-    +   'padding:22px 16px calc(22px + env(safe-area-inset-bottom));margin-top:32px;'
-    +   'display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;}'
-    + '.wck-footer-links{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;}'
-    + '.wck-footer-tagline{color:var(--wck-text-dim);font-size:12px;}'
-    + '.wck-footer-copy{color:#5c646d;font-size:11px;}';
+    +   'padding:32px 16px calc(22px + env(safe-area-inset-bottom));margin-top:32px;text-align:left;}'
+    + '.wck-foot-inner{max-width:1400px;margin:0 auto;}'
+    + '.wck-foot-top{display:flex;flex-wrap:wrap;gap:32px;justify-content:space-between;padding-bottom:24px;}'
+    + '.wck-foot-brand{max-width:280px;}'
+    + '.wck-foot-brand .wck-brand{margin-bottom:8px;}'
+    + '.wck-foot-brand p{margin:0;color:var(--wck-text-dim);font-size:12.5px;line-height:1.6;}'
+    + '.wck-foot-cols{display:flex;flex-wrap:wrap;gap:28px;flex:1;justify-content:flex-end;}'
+    + '.wck-foot-col{min-width:140px;}'
+    + '.wck-foot-col h5{margin:0 0 10px;font-size:10.5px;font-weight:800;letter-spacing:.05em;'
+    +   'text-transform:uppercase;color:var(--wck-text-dim);}'
+    + '.wck-foot-col a{display:block;color:var(--wck-text-dim);font-size:12.5px;text-decoration:none;'
+    +   'margin-bottom:9px;transition:.15s;}'
+    + '.wck-foot-col a:hover{color:var(--wck-text);}'
+    + '.wck-foot-bottom{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;'
+    +   'gap:10px;padding-top:20px;border-top:1px solid var(--wck-border);}'
+    + '.wck-footer-copy{color:#5c646d;font-size:11px;}'
+    + '.wck-footer-badge img{display:block;}'
+    + '@media(max-width:640px){.wck-foot-top{flex-direction:column;gap:22px;}'
+    +   '.wck-foot-cols{justify-content:flex-start;gap:20px;}'
+    +   '.wck-foot-bottom{flex-direction:column;align-items:flex-start;}}';
 
   function injectStyle() {
     var s = document.createElement('style');
@@ -146,13 +169,15 @@
     var html = '';
     NAV.forEach(function (item) {
       var tag = item.tag ? ' <span class="wck-tag">' + item.tag + '</span>' : '';
+      var label = '<span data-i18n="' + item.i18n + '">' + item.label + '</span>';
       if (item.key === here) {
-        html += '<span class="wck-link wck-here" aria-current="page">' + item.icon + ' ' + item.label + tag + '</span>';
+        html += '<span class="wck-link wck-here" aria-current="page">' + item.icon + ' ' + label + tag + '</span>';
       } else {
-        html += '<a class="wck-link" href="' + item.href + '">' + item.icon + ' ' + item.label + tag + '</a>';
+        html += '<a class="wck-link" href="' + item.href + '">' + item.icon + ' ' + label + tag + '</a>';
       }
     });
     html += '<a class="wck-gh" href="' + GITHUB_URL + '" target="_blank" rel="noopener noreferrer">GitHub ↗</a>';
+    html += '<button type="button" class="wck-lang" onclick="if(window.openLanguageModal)openLanguageModal()" aria-label="Language / 언어">🌐</button>';
     return html;
   }
 
@@ -195,17 +220,56 @@
     });
   }
 
+  // ---- footer column helper (제품/리소스/법적고지 공용) ----
+  function footerColumnHTML(title, items) {
+    var links = items.map(function (it) {
+      var ext = it.ext ? ' target="_blank" rel="noopener"' : '';
+      return '<a href="' + it.href + '"' + ext + '>' + it.label + '</a>';
+    }).join('');
+    return '<div class="wck-foot-col"><h5>' + title + '</h5>' + links + '</div>';
+  }
+
   // ---- footer — appended to body end on bar-mode (content) pages only ----
   function mountFooter() {
     if (document.getElementById('wck-footer')) return;
-    var here = currentKey();
     var footer = document.createElement('footer');
     footer.id = 'wck-footer';
     footer.className = 'wck-scope wck-footer';
+
+    var productLinks = NAV.map(function (n) {
+      return { href: n.href, label: n.icon + ' ' + n.label + (n.tag ? ' ' + n.tag : '') };
+    });
+    var resourceLinks = [
+      { href: GITHUB_URL, label: 'GitHub ↗', ext: true },
+      { href: '/v2-orbit/BENCHMARK.md', label: '벤치마크', ext: true }
+    ];
+    var legalLinks = [
+      { href: '/privacy.html', label: '개인정보처리방침' },
+      { href: '/terms.html', label: '이용약관' }
+    ];
+    // 2026-08-14: "WIA 패밀리"(퀀텀 DNA 코드·wia.tools QR 생성기·WIA Go) 컬럼 완전 삭제 — 형이
+    // 실사이트를 직접 보고 "이건 전혀 우리 WIA Code에 도움이 안 되는거잖아" 지적. 특히 wia.tools의
+    // "일반 QR 생성기"는 이 사이트의 핵심 메시지("QR 너머, 우리들의 코드")와 정면으로 충돌해서
+    // 푸터 격하로는 부족했음 — 링크 자체를 없앤다(홈 본문에서도 이미 제거된 상태, 어디에도 없음).
+
     footer.innerHTML =
-      '<div class="wck-footer-links">' + linksHTML(here) + '</div>' +
-      '<div class="wck-footer-tagline">인터넷 없는 곳의 사람을 살리는 코드 &middot; 홍익인간</div>' +
-      '<div class="wck-footer-copy">&copy; ' + new Date().getFullYear() + ' WIA Code &middot; MIT License</div>';
+      '<div class="wck-foot-inner">' +
+        '<div class="wck-foot-top">' +
+          '<div class="wck-foot-brand">' +
+            '<a class="wck-brand" href="' + HOME_URL + '"><span class="wck-mark">WC</span><span class="wck-brand-text">WIA Code</span></a>' +
+            '<p>인터넷 없는 곳의 사람을 살리는 코드 &middot; 홍익인간</p>' +
+          '</div>' +
+          '<div class="wck-foot-cols">' +
+            footerColumnHTML('제품', productLinks) +
+            footerColumnHTML('리소스', resourceLinks) +
+            footerColumnHTML('법적고지', legalLinks) +
+          '</div>' +
+        '</div>' +
+        '<div class="wck-foot-bottom">' +
+          '<div class="wck-footer-badge"><a href="https://a11y.wiabook.com/verify/?id=result-1786682008221-5bce4a" target="_blank" rel="noopener noreferrer" title="WIA A11Y accessibility self-audit result — click to verify"><img src="https://a11y.wiabook.com/badges/wia-premium.png" alt="WIA A11Y self-audit — A grade (verify)" width="56" height="56" loading="lazy"></a></div>' +
+          '<div class="wck-footer-copy">&copy; ' + new Date().getFullYear() + ' WIA Code &middot; MIT License</div>' +
+        '</div>' +
+      '</div>';
     // ★body에 직접 붙인다 — #root 안에 넣으면 안 됨(2026-08-10 발견): React 같은 SPA는 #root를
     // 통째로 자기가 소유한다고 가정해서, 다음 렌더(예: hashchange) 때 자기가 안 만든 자식(이 푸터)을
     // 지워버림. body 레벨 배치가 밀리는 원인(#root height:100% 고정이라 실제 콘텐츠가 넘쳐도 박스가
@@ -222,7 +286,7 @@
     wrap.className = 'wck-scope wck-fab-wrap wck-' + corner;
     wrap.innerHTML =
       '<div class="wck-panel" id="wck-panel" role="menu">' +
-        '<a class="wck-link" href="' + HOME_URL + '">🏠 WIA Code 홈</a>' +
+        '<a class="wck-link" href="' + HOME_URL + '">🏠 WIA Code <span data-i18n="nav.home">홈</span></a>' +
         linksHTML(here) +
       '</div>' +
       '<button type="button" class="wck-fab" id="wck-fab" aria-expanded="false" aria-label="WIA Code 메뉴 열기">WC</button>';
@@ -239,6 +303,18 @@
     closeOnOutsideClickAndEsc(wrap, fab, close);
   }
 
+  // ---- language modal — 127개 언어, 네비 라벨(생성기/생성기 LAB/스캐너/홈)만 번역 -----
+  // wia-lang-bridge.js가 이미 감시하는 storageKey('wia-nav-lang')를 그대로 써서, 다른 WIA
+  // 패밀리 사이트에서 고른 언어가 여기서도 그대로 적용되고 그 반대도 성립한다(교차 동기화 무료).
+  function mountLanguageModal() {
+    if (window.openLanguageModal) return; // 이미 로드됨(중복 삽입 방지)
+    window.WIA_MODAL_CONFIG = window.WIA_MODAL_CONFIG ||
+      { i18nBasePath: '/i18n/', languageCount: 127, defaultLang: 'ko', storageKey: 'wia-nav-lang' };
+    var s = document.createElement('script');
+    s.src = BASE + 'language-modal.js';
+    document.body.appendChild(s);
+  }
+
   // ---- init ----------------------------------------------------------------
   function init() {
     injectStyle();
@@ -249,10 +325,16 @@
     var container = document.querySelector(mountSel);
     if (container) {
       mountBar(container);
-      mountFooter(); // bar 모드(콘텐츠 페이지)에만 — scan.html의 FAB 모드는 앱형 UX라 제외
+      // noFooter: 페이지가 이미 자체 <footer>(contentinfo 랜드마크)를 갖고 있을 때(예: wiacode.com
+      // 루트의 React 앱 — App.tsx의 <footer className="app-footer">)만 지정 — 안 지정하면 기존과
+      // 동일하게 bar 모드(콘텐츠 페이지)에 공통 푸터를 붙인다. scan.html의 FAB 모드는 앱형 UX라 제외.
+      // (a11y: 2026-08-14 axe landmark-no-duplicate-contentinfo/landmark-unique 수정 — 루트 페이지가
+      // 이 공통 푸터 + 자체 app-footer 두 개의 contentinfo 랜드마크를 동시에 갖고 있었음)
+      if (!USER_CFG.noFooter) mountFooter();
     } else {
       mountFab();
     }
+    mountLanguageModal();
   }
 
   if (document.readyState === 'loading') {

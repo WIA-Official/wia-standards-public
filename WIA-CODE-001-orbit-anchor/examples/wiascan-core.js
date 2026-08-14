@@ -2180,8 +2180,80 @@ function renderTestCode(grid, cellPx, text, hueText){
   return { dataURL: cv.toDataURL('image/png'), width:r.width, height:r.height, text:text };
 }
 
+// ── 스타일 레이어(2026-08-14) ────────────────────────────────────────────
+//   색상 커스텀(전경/배경/그라디언트/눈 색상)을 순수 "루마 보존 크로마 치환"으로 얹는다.
+//   opts.hueText 데이터 레이어와 완전히 같은 원리(위 ycc2rgb 참고) — Y(밝기)는 절대 안 건드리고
+//   Cb/Cr(색)만 바꾸므로, 그레이스케일 기반 검출기(locate)·디코더는 이 레이어의 존재를 모른다.
+//   즉 "장식"과 "데이터"가 물리적으로 분리된 채널이라 서로 절대 못 깨뜨린다.
+function hexToRgb(hex) {
+  var m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return [0, 0, 0];
+  var n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbToYCbCr(R, G, B) {
+  return [128 - 0.168736 * R - 0.331264 * G + 0.5 * B, 128 + 0.5 * R - 0.418688 * G - 0.081312 * B];
+}
+function applyStyleLayer(img, anchors, cellPx, style) {
+  if (!style || (!style.fg && !style.eye)) return;
+  var W = img.width, H = img.height, D = img.data;
+  var fgRgb = hexToRgb(style.fg || '#000000'), fg2Rgb = hexToRgb(style.fg2 || style.fg || '#000000');
+  var fgCC = rgbToYCbCr.apply(null, fgRgb), fg2CC = rgbToYCbCr.apply(null, fg2Rgb);
+  var hasBg = !!style.bg, bgCC = hasBg ? rgbToYCbCr.apply(null, hexToRgb(style.bg)) : null;
+  var eyeCC = style.eye ? rgbToYCbCr.apply(null, hexToRgb(style.eye)) : null;
+  // 눈(앵커) 픽셀 바운딩 — 코어(불스아이)=coreOuter 모듈 반경, 위성(disk/donut)=satRadius 모듈 반경.
+  var eyeBoxes = eyeCC ? (anchors || []).map(function (a) {
+    var rMod = a.type === 'bullseye' ? (SPEC.coreOuter || 6.5) : (SPEC.satRadius || 2.5);
+    var rPx = rMod * cellPx;
+    return { x: a.x, y: a.y, r2: rPx * rPx };
+  }) : [];
+  function inEye(px, py) {
+    for (var i = 0; i < eyeBoxes.length; i++) {
+      var b = eyeBoxes[i], dx = px - b.x, dy = py - b.y;
+      if (dx * dx + dy * dy <= b.r2) return true;
+    }
+    return false;
+  }
+  var hasGrad = fg2Rgb[0] !== fgRgb[0] || fg2Rgb[1] !== fgRgb[1] || fg2Rgb[2] !== fgRgb[2];
+  // ★2026-08-10 실측 버그(회귀테스트로 발견): Y가 극단(순검정 잉크 Y=0, 순백 배경 Y=255)에 가까우면
+  // 채도 강한 색은 ycc2rgb가 채널을 클램프해버려 "루마 보존"이 깨지고 디코딩이 실패했다(전경=순수
+  // 빨강 #ff0044로 재현). 기존 hue데이터 레이어는 이 문제를 아예 "극단 밝기 셀은 색 배정 안 함"으로
+  // 피해가지만(eligibleFromLuma), 스타일 레이어는 전체 화소를 칠해야 하므로 회피가 아니라 —
+  // 클램프가 안 생기는 최대 채도로 그 자리에서 자동으로 낮춘다(색상은 그대로, 채도만 Y에 따라 스케일).
+  function safeScale(Y, cb0, cr0) {
+    var s = 1;
+    if (cr0 > 0) s = Math.min(s, (255 - Y) / (1.402 * cr0));
+    else if (cr0 < 0) s = Math.min(s, Y / (1.402 * -cr0));
+    if (cb0 > 0) s = Math.min(s, (255 - Y) / (1.772 * cb0));
+    else if (cb0 < 0) s = Math.min(s, Y / (1.772 * -cb0));
+    var g0 = -0.344136 * cb0 - 0.714136 * cr0;
+    if (g0 > 0) s = Math.min(s, (255 - Y) / g0);
+    else if (g0 < 0) s = Math.min(s, Y / -g0);
+    return Math.max(0, Math.min(1, s));
+  }
+  for (var y = 0; y < H; y++) {
+    for (var x = 0; x < W; x++) {
+      var o = (y * W + x) * 4;
+      var Y = D[o]; // 렌더 직후는 항상 무채색(R=G=B=Y) — 그대로 밝기값으로 재사용
+      var cc;
+      if (Y >= 250) { if (!hasBg) continue; cc = bgCC; }
+      else if (inEye(x, y)) { cc = eyeCC; }
+      else if (hasGrad) {
+        var t = x / (W || 1);
+        cc = [fgCC[0] + (fg2CC[0] - fgCC[0]) * t, fgCC[1] + (fg2CC[1] - fgCC[1]) * t];
+      } else { cc = fgCC; }
+      var cb0 = cc[0] - 128, cr0 = cc[1] - 128;
+      var s = safeScale(Y, cb0, cr0), cb = cb0 * s, cr = cr0 * s;
+      D[o] = Math.max(0, Math.min(255, Y + 1.402 * cr));
+      D[o + 1] = Math.max(0, Math.min(255, Y - 0.344136 * cb - 0.714136 * cr));
+      D[o + 2] = Math.max(0, Math.min(255, Y + 1.772 * cb));
+    }
+  }
+}
+
 // generate(opts) — 임의 payload → WIA 코드 PNG. opts:{text, hueText?, grid, cellPx, bpc}.
-//   hueText 있으면 컬러(2luma+1hue), 없으면 흑백/그레이(bpc). 반환 {dataURL,width,height,bytes,...}.
+//   hueText 있으면 컬러(2luma+1hue), 없으면 흑백/그레이(bpc). style?:{fg,fg2?,bg?,eye?}(hex) 있으면
+//   위 루마보존 스타일 레이어 적용. 반환 {dataURL,width,height,bytes,...}.
 function generate(opts){
   opts = opts || {};
   var grid = opts.grid || 'M', cellPx = opts.cellPx || 8, text = opts.text || '', bpc = opts.bpc || 2, shape = opts.shape || 'square';
@@ -2193,10 +2265,12 @@ function generate(opts){
     else { var e = CODEC.encodeToCells(text, nC, bpc); ropts.cellGray = e.cellGray; bytes = text.length; capBytes = e.capBytes - 6; }
   } catch (err) { return { error: String((err && err.message) || err) }; }
   var r = render(ropts);
+  // 스타일 레이어는 hueText(실데이터가 이미 크로마 채널을 씀)와 동시 사용 불가 — 무시하고 진행.
+  if (opts.style && !opts.hueText) applyStyleLayer(r.img, r.anchors, r.cellPx, opts.style);
   if (typeof document === 'undefined') return { dataURL:null, width:r.width, height:r.height, bytes:bytes, capBytes:capBytes };
   var cv = document.createElement('canvas'); cv.width = r.width; cv.height = r.height;
   var ctx = cv.getContext('2d'); var id = ctx.createImageData(r.width, r.height); id.data.set(r.img.data); ctx.putImageData(id, 0, 0);
-  return { dataURL: cv.toDataURL('image/png'), width:r.width, height:r.height, grid:grid, shape:shape, bpc:bpc, color:!!opts.hueText, bytes:bytes, capBytes:capBytes };
+  return { dataURL: cv.toDataURL('image/png'), width:r.width, height:r.height, grid:grid, shape:shape, bpc:bpc, color:!!opts.hueText, bytes:bytes, capBytes:capBytes, anchors:r.anchors, cellPx:r.cellPx };
 }
 
 var G = (typeof window!=='undefined') ? window : globalThis;

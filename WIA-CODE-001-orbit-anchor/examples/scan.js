@@ -36,7 +36,7 @@
 
   // 480 was too aggressive a downscale: locate still succeeds well below this, but per-cell
   // decode needs materially more effective resolution than locate does. Real-world capture
-  // (heart/round shapes at a normal scanning distance)
+  // (heart/round shapes, or any code with a bridge QR overlaid, at a normal scanning distance)
   // was landing right below the decode floor — lock found, payload never read. Verified with
   // degrade.js resample sweeps: effective cellPx~2.2px locks but never decodes; ~2.8px decodes
   // reliably. 720 buys back that margin for a typical "doesn't quite fill the frame" photo.
