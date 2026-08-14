@@ -31,8 +31,8 @@
   GROUPS.forEach(function (g) { g.types.forEach(function (t) { TYPE_ICON[t[0]] = t[1]; TYPE_LABEL[t[0]] = t[2]; }); });
   // crypto/geo 는 하위 선택(코인)에 따라 더 구체적인 라벨을 run()에서 별도로 씀 — 목록용 기본 라벨은 위 표.
 
-  var SHAPES = [['heart', '하트', ''], ['round', '원형', ''], ['clover', '네잎클로버', 'NEW'], ['star', '별', 'NEW'], ['hex', '육각', 'NEW'], ['square', '사각', '']];
-  var SHAPE_KO = { square: '사각', round: '원형', heart: '하트', clover: '네잎클로버', star: '별', hex: '육각' };
+  var SHAPES = [['heart', '하트', ''], ['round', '원형', ''], ['clover', '네잎클로버', 'NEW'], ['star', '별', 'NEW'], ['boomerang', '부메랑', 'NEW'], ['hex', '육각', 'NEW'], ['square', '사각', '']];
+  var SHAPE_KO = { square: '사각', round: '원형', heart: '하트', clover: '네잎클로버', star: '별', boomerang: '부메랑', hex: '육각' };
 
   function seg(id, key, cast, after) {
     var wrap = $(id); if (!wrap) return;

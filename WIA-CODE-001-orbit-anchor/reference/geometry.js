@@ -133,7 +133,9 @@ function insideShape(mx, my, L) {
   // 4중 대칭축도 같은 각도에 맞춰(|cos(2θ)|류) 위성이 잎/꼭짓점 자리에 정확히 올라가게 한다.
   if (L.shape === 'clover') {
     // 잎 4개 = 카디널 방향으로 띄운 원 4개의 합집합(둥근 잎 모양) + 중심 허브(연결 보장).
-    const lobeD = 0.55, lobeR = 0.50, hubR = 0.30;
+    // lobeR=0.50(잎이 서로 붙어 하나의 사각 꽃봉오리처럼 보임, 실사용자 지적)에서 0.33으로 줄여
+    // 잎 사이에 뚜렷한 잘록함을 만듦 — 허브가 여전히 4개 잎을 중앙에서 이어준다.
+    const lobeD = 0.55, lobeR = 0.33, hubR = 0.30;
     if ((nx * nx + ny * ny) <= hubR * hubR) return true;
     const centers = [[0, -lobeD], [lobeD, 0], [0, lobeD], [-lobeD, 0]];
     for (const [cx, cy] of centers) {
@@ -142,14 +144,30 @@ function insideShape(mx, my, L) {
     }
     return false;
   }
-  if (L.shape === 'star') {
-    // 4개 꼭짓점(위성 자리) + 4개 안쪽 오목점 — 꼭짓점/오목점을 직선으로 잇는 실제 별 폴리곤.
-    const Ro = 1.0, Ri = 0.24; // Ri=0.42은 오목점이 너무 얕아 별이 아니라 마름모로 보였음(실사용자 지적) — 0.24로 깊게
+  if (L.shape === 'boomerang') {
+    // 옛 'star'(4꼭짓점) — 진짜 5각별을 새로 넣으면서 이 모양은 이름 그대로 부메랑으로 개명.
+    // 4개 꼭짓점(위성 자리) + 4개 안쪽 오목점을 잇는 실제 폴리곤(대칭은 유지, 이름만 정정).
+    const Ro = 1.0, Ri = 0.24;
     const th = Math.atan2(ny, nx);
     const sect = Math.PI / 2, half = sect / 2;
-    let a = ((th + half) % sect + sect) % sect - half; // -half..+half, 0=꼭짓점 방향
+    let a = ((th + half) % sect + sect) % sect - half;
     const phi = Math.abs(a);
-    // 꼭짓점(phi=0, r=Ro) → 오목점(phi=half, r=Ri)을 잇는 직선과 각도 phi 광선의 교점 반지름.
+    const x1 = Ro, y1 = 0, x2 = Ri * Math.cos(half), y2 = Ri * Math.sin(half);
+    const dx = x2 - x1, dy = y2 - y1;
+    const rr = (x1 * dy - y1 * dx) / (Math.cos(phi) * dy - Math.sin(phi) * dx);
+    return (nx * nx + ny * ny) <= rr * rr;
+  }
+  if (L.shape === 'star') {
+    // 진짜 5각별(꼭짓점 5개, 오각 대칭) — 위성 4개는 4중 대칭이라 별의 5개 꼭짓점과는 애초에
+    // 안 맞는다(5와 4는 공약수가 1). 그래도 안전한 이유: 위성은 오목점(반경 Ri=0.42) 근방에
+    // 걸려도 이 반경이 위성 예약반경(Rs, 대략 0.14)보다 훨씬 커서 어느 회전에서도 위성이
+    // 별 몸통 밖으로 삐져나오지 않는다(reservedAt이 앵커존을 모양과 무관하게 먼저 예약).
+    // rot=90°: 꼭짓점 하나가 정확히 하단 위성과 정렬 — 육안으로 "위가 넓고 아래가 뾰족한" 표준
+    // 별 실루엣이 나오도록 고른 값(실측 비교 후 결정, Ri 0.24/0.5도 시험했으나 0.42가 가장 또렷).
+    const Ro = 1.0, Ri = 0.42, m = 5, sect = 2 * Math.PI / m, half = sect / 2, rot = Math.PI / 2;
+    const th = Math.atan2(ny, nx) - rot;
+    let a = ((th + half) % sect + sect) % sect - half;
+    const phi = Math.abs(a);
     const x1 = Ro, y1 = 0, x2 = Ri * Math.cos(half), y2 = Ri * Math.sin(half);
     const dx = x2 - x1, dy = y2 - y1;
     const rr = (x1 * dy - y1 * dx) / (Math.cos(phi) * dy - Math.sin(phi) * dx);
