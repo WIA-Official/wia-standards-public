@@ -54,9 +54,10 @@
   // wiacode.com/ 등)에 이 스크립트를 붙일 땐 목적지가 어긋난다 — 그럴 땐 config로 접두사를 지정.
   var BASE = USER_CFG.basePath || '';
 
+  // generate-lab.html(다리 QR 실험용 내부 개발 도구, 라이브 기능 아님)은 의도적으로 여기서 뺐다 —
+  // 방문자용 공개 네비게이션에 실험실 페이지가 노출될 이유가 없다. 필요하면 URL로 직접 접근.
   var NAV = [
     { key: 'generate',     href: BASE + 'generate.html',     label: '생성기',     icon: '⚡', i18n: 'nav.menu' },
-    { key: 'generate-lab', href: BASE + 'generate-lab.html', label: '생성기', icon: '🧪', tag: 'LAB', i18n: 'nav.menu' },
     { key: 'scan',         href: BASE + 'scan.html',         label: '스캐너',     icon: '📷', i18n: 'nav.scan' }
   ];
 
