@@ -301,7 +301,7 @@
       // 해독 실패로 이어졌음(0.15·0.11 실패, 0.08부터 성공). bpc를 억지로 올리는 대신 QR을 줄여서
       // "다리 켜면 무조건 흑백 포기"를 없앰 — 흑백이 인쇄+카메라 실사용에 더 강건하다는 오늘 결론과 합치.
       var qpx = Math.max(3, Math.floor(cv.width * 0.08 / window.WiaBridge.SIZE));
-      var pos = window.WiaBridge.overlay(id, { place: 'below-core', qpx: qpx, branded: true, logoFrac: 0.18 });
+      var pos = window.WiaBridge.overlay(id, { place: 'below-core', qpx: qpx });
       cx.putImageData(id, 0, 0);
       var finish = function () {
         if (pos.logoHalf && wiaLogo.naturalWidth) {
