@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var state = { cat: 'daily', ctype: 'text', shape: 'square', grid: 'M', bpc: 2, mcpT: 'stdio', wifiSec: 'WPA',
+  var state = { cat: 'daily', ctype: 'text', shape: 'heart', grid: 'M', bpc: 2, mcpT: 'stdio', wifiSec: 'WPA',
     cryptoCoin: 'btc', ftMode: 'video', sipSec: 'sip', frame: 'none',
     morphOn: false, morphSel: [] };
 
@@ -31,7 +31,7 @@
   GROUPS.forEach(function (g) { g.types.forEach(function (t) { TYPE_ICON[t[0]] = t[1]; TYPE_LABEL[t[0]] = t[2]; }); });
   // crypto/geo 는 하위 선택(코인)에 따라 더 구체적인 라벨을 run()에서 별도로 씀 — 목록용 기본 라벨은 위 표.
 
-  var SHAPES = [['square', '사각', ''], ['round', '원형', ''], ['heart', '하트', ''], ['clover', '네잎클로버', 'NEW'], ['star', '별', 'NEW'], ['hex', '육각', 'NEW']];
+  var SHAPES = [['heart', '하트', ''], ['round', '원형', ''], ['clover', '네잎클로버', 'NEW'], ['star', '별', 'NEW'], ['hex', '육각', 'NEW'], ['square', '사각', '']];
   var SHAPE_KO = { square: '사각', round: '원형', heart: '하트', clover: '네잎클로버', star: '별', hex: '육각' };
 
   function seg(id, key, cast, after) {
@@ -790,7 +790,7 @@
       $('dlRow').style.display = 'flex';
       var dl = $('dlPng'); dl.href = dataURL; dl.setAttribute('download', name);
       $('metaBox').innerHTML =
-        '<b>포맷</b> v2-orbit · <b>격자</b> ' + r.grid + ' · <b>실루엣</b> ' + (SHAPE_KO[r.shape] || r.shape) + '<br>' +
+        '<b>포맷</b> orbit · <b>격자</b> ' + r.grid + ' · <b>실루엣</b> ' + (SHAPE_KO[r.shape] || r.shape) + '<br>' +
         '<b>밝기</b> ' + (r.color ? '컬러(hue)' : (BPC_LABEL[bpc] || bpc + '단계')) + ' · <b>용량</b> ' + r.bytes + ' / ' + r.capBytes + ' bytes' + (bridge ? ' · 🔗다리QR' : '');
       $('scanNote').innerHTML = bridge
         ? '기본 카메라로 중앙 QR을 비추면 <a class="scan" href="scan.html">스캐너</a>로 이동합니다. 스캐너로 코드 전체를 읽으면 이 내용이 그대로 나옵니다 (오프라인).'

@@ -930,7 +930,7 @@ function insideShape(mx, my, L) {
   }
   if (L.shape === 'star') {
     // 4개 꼭짓점(위성 자리) + 4개 안쪽 오목점 — 꼭짓점/오목점을 직선으로 잇는 실제 별 폴리곤.
-    const Ro = 1.0, Ri = 0.42;
+    const Ro = 1.0, Ri = 0.24; // Ri=0.42은 오목점이 너무 얕아 별이 아니라 마름모로 보였음(실사용자 지적) — 0.24로 깊게
     const th = Math.atan2(ny, nx);
     const sect = Math.PI / 2, half = sect / 2;
     let a = ((th + half) % sect + sect) % sect - half; // -half..+half, 0=꼭짓점 방향
