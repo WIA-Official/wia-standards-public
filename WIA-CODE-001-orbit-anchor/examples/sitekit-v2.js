@@ -58,7 +58,11 @@
   // 방문자용 공개 네비게이션에 실험실 페이지가 노출될 이유가 없다. 필요하면 URL로 직접 접근.
   var NAV = [
     { key: 'generate',     href: BASE + 'generate.html',     label: '생성기',     icon: '⚡', i18n: 'nav.menu' },
-    { key: 'scan',         href: BASE + 'scan.html',         label: '스캐너',     icon: '📷', i18n: 'nav.scan' }
+    { key: 'scan',         href: BASE + 'scan.html',         label: '스캐너',     icon: '📷', i18n: 'nav.scan' },
+    // go.wiacode.com(단축+바이오, Kutt 기반 자체 제품, 2026-08-14 신설) — 홈의 단축 위젯이
+    // 이미 이 API를 실사용하는데 정작 제품 자체로 가는 접점이 어디에도 없었다(형 지적).
+    // 다른 서브도메인이라 절대경로 — currentKey()의 "here" 판정과는 자연히 무관(교차 출처).
+    { key: 'go',           href: 'https://go.wiacode.com/', label: '바이오',     icon: '🔗', ext: true }
   ];
 
   // ---- CSS (전부 .wck- 접두사 — 페이지 자체 스타일과 충돌 없음) -------------
@@ -171,10 +175,11 @@
     NAV.forEach(function (item) {
       var tag = item.tag ? ' <span class="wck-tag">' + item.tag + '</span>' : '';
       var label = '<span data-i18n="' + item.i18n + '">' + item.label + '</span>';
+      var extAttr = item.ext ? ' target="_blank" rel="noopener noreferrer"' : '';
       if (item.key === here) {
         html += '<span class="wck-link wck-here" aria-current="page">' + item.icon + ' ' + label + tag + '</span>';
       } else {
-        html += '<a class="wck-link" href="' + item.href + '">' + item.icon + ' ' + label + tag + '</a>';
+        html += '<a class="wck-link" href="' + item.href + '"' + extAttr + '>' + item.icon + ' ' + label + tag + '</a>';
       }
     });
     html += '<a class="wck-gh" href="' + GITHUB_URL + '" target="_blank" rel="noopener noreferrer">GitHub ↗</a>';
