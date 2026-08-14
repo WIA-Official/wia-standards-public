@@ -129,6 +129,39 @@ function insideShape(mx, my, L) {
   const nx = (mx - c) / R, ny = (my - c) / R;
   if (L.shape === 'round') return nx * nx + ny * ny <= 1;
   if (L.shape === 'heart') return pointInHeart(nx, ny);
+  // clover/star/hex: 4개 위성이 항상 상/우/하/좌(0°,90°,180°,270°) 고정이므로, 이 세 모양의
+  // 4중 대칭축도 같은 각도에 맞춰(|cos(2θ)|류) 위성이 잎/꼭짓점 자리에 정확히 올라가게 한다.
+  if (L.shape === 'clover') {
+    // 잎 4개 = 카디널 방향으로 띄운 원 4개의 합집합(둥근 잎 모양) + 중심 허브(연결 보장).
+    const lobeD = 0.55, lobeR = 0.50, hubR = 0.30;
+    if ((nx * nx + ny * ny) <= hubR * hubR) return true;
+    const centers = [[0, -lobeD], [lobeD, 0], [0, lobeD], [-lobeD, 0]];
+    for (const [cx, cy] of centers) {
+      const dx = nx - cx, dy = ny - cy;
+      if (dx * dx + dy * dy <= lobeR * lobeR) return true;
+    }
+    return false;
+  }
+  if (L.shape === 'star') {
+    // 4개 꼭짓점(위성 자리) + 4개 안쪽 오목점 — 꼭짓점/오목점을 직선으로 잇는 실제 별 폴리곤.
+    const Ro = 1.0, Ri = 0.42;
+    const th = Math.atan2(ny, nx);
+    const sect = Math.PI / 2, half = sect / 2;
+    let a = ((th + half) % sect + sect) % sect - half; // -half..+half, 0=꼭짓점 방향
+    const phi = Math.abs(a);
+    // 꼭짓점(phi=0, r=Ro) → 오목점(phi=half, r=Ri)을 잇는 직선과 각도 phi 광선의 교점 반지름.
+    const x1 = Ro, y1 = 0, x2 = Ri * Math.cos(half), y2 = Ri * Math.sin(half);
+    const dx = x2 - x1, dy = y2 - y1;
+    const rr = (x1 * dy - y1 * dx) / (Math.cos(phi) * dy - Math.sin(phi) * dx);
+    return (nx * nx + ny * ny) <= rr * rr;
+  }
+  if (L.shape === 'hex') {
+    const th = Math.atan2(ny, nx), m = 6, ro = 0.98;
+    const sect = 2 * Math.PI / m;
+    const a = ((th % sect) + sect) % sect;
+    const rr = ro * Math.cos(Math.PI / m) / Math.cos(a - Math.PI / m);
+    return (nx * nx + ny * ny) <= rr * rr;
+  }
   return true;
 }
 
