@@ -138,7 +138,16 @@ function otsu(grays) {
 //   ·그레이코드: 인접 밝기단계 오독 = 1비트 오류(RS 정정) → symbol=grayEnc, 역=grayDec.
 //   ·캘리브레이션: 코드의 알려진 앵커(코어·위성=검, 도넛구멍·흰링·콰이엇=흰)로 매프레임
 //     흑점/백점 역산 → 조명 무관. ·모드판별: RS/CRC 가 통과하는 bpc 를 trial-decode.
-const PAL_ECC = { 1: '25%', 2: '50%', 3: '50%' };     // 단계 많을수록 노이즈↑ → ECC 상향(원근 far쪽 강건)
+const PAL_ECC = { 1: '25%', 2: '35%', 3: '50%' };     // 단계 많을수록 노이즈↑ → ECC 상향(원근 far쪽 강건)
+// ★bpc2 는 2026-08-16 에 50%→35% (다리QR 존 예약으로 예산 낭비가 사라진 뒤). 순용량 +30~31%.
+//   열화 스윕 실측(하트/사각/원형, 다리 on·off): 노이즈·블러 파단점은 50%와 완전 동일 —
+//   그 구간의 실패는 예비분 고갈이 아니라 흑백 대비붕괴라 ECC 를 올려도 못 살린다. 유일한 손실은
+//   극단 원근(50°→48°, 2°). 반대로 50% 는 정정능력 절반을 놀리고 용량만 30% 깎고 있었다.
+// 구형 호환: 그 이전 bpc2 코드는 50% 로 인코딩됐다 → 디코더는 두 비율을 모두 시도한다.
+//   ★"먼저 성공한 쪽"이 아니라 "errors 가 적은 쪽"을 채택해야 한다. payload 가 짧으면 셀 대부분이
+//   패딩이라 틀린 비율로도 RS 가 억지로 복원해내는데(실측 76 errors 소모), 그대로 채택하면
+//   정정예산을 태운 채 성공한 것이라 실제 노이즈가 얹히면 그때 터진다.
+const ECC_TRY = { 1: ['25%'], 2: ['35%', '50%'], 3: ['50%'] };
 function nlevOf(bpc) { return 1 << bpc; }
 function gcd(a, b) { while (b) { const t = a % b; a = b; b = t; } return a; }
 // 셀 위치 산포 permutation. 바이트=인접 4셀이라 원근 far쪽 오류가 바이트로 뭉쳐(5%셀→20%바이트)
@@ -415,14 +424,20 @@ function readCode(grayObj, res, layout, cellPx, opts) {
   for (const bpc of tries) {
     const cl = classifyCells(s.grays, s.cells, bpc, layout);
     if (cl.hi - cl.lo < 25) continue;                    // 대비붕괴 → 이 모드 스킵
-    const out = decodeFromCells(cl.sym, s.cells.length, bpc);
-    if (out.ok) {
-      out.bitsPerCell = bpc; out.range = { lo: Math.round(cl.lo), hi: Math.round(cl.hi) };
+    // ECC 비율 trial(신형35%/구형50%) — 오류가 적은 쪽 채택. 추가비용 실측 3.2ms.
+    let out = null, outEcc = null;
+    for (const ecc of (ECC_TRY[bpc] || [PAL_ECC[bpc]])) {
+      const r = decodeFromCells(cl.sym, s.cells.length, bpc, ecc);
+      if (r.ok && (!out || r.errors < out.errors)) { out = r; outEcc = ecc; }
+    }
+    if (out) {
+      out.bitsPerCell = bpc; out.ecc = outEcc; out.range = { lo: Math.round(cl.lo), hi: Math.round(cl.hi) };
       // ── hue 평면(있으면) — 루마 성공 후에만. 실패해도 루마 결과는 그대로 반환(우아한 열화). ──
       if (opts && opts.hue && opts.rgbaImg) {
         try {
           const hueBits = opts.hueBits || 1;
-          const canon = encodeToCells(out.text, s.cells.length, bpc);   // 오류정정된 정규 루마심볼
+          // ★루마와 반드시 같은 ECC 로 재인코딩해야 한다(outEcc 누락 시 컬러 코드만 조용히 깨짐).
+          const canon = encodeToCells(out.text, s.cells.length, bpc, outEcc);   // 오류정정된 정규 루마심볼
           const elig = eligibleFromLuma(canon.cells, bpc);
           const col = sampleCellColor(opts.rgbaImg, res.Hmod2img, layout);
           const cc = calibrateColor(opts.rgbaImg, res.Hmod2img, layout);
@@ -444,7 +459,7 @@ function readCode(grayObj, res, layout, cellPx, opts) {
 
 module.exports = {
   ECC, encodeToBits, decodeFromBits, frameEncode, frameDecode, planFor, sampleCellGrays, otsu, readCode,
-  encodeToCells, decodeFromCells, calibrate, classifyCells, levelGray, grayEnc, grayDec, PAL_ECC,
+  encodeToCells, decodeFromCells, calibrate, classifyCells, levelGray, grayEnc, grayDec, PAL_ECC, ECC_TRY,
   encodeColor, eligibleFromLuma, sampleCellColor, calibrateColor, classifyHue, hueChroma, HUE_ECC, HUE_RHO,
   encodeBytesToCells, decodeBytesFromCells, encodeColorBytes,
 };

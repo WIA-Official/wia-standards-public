@@ -102,9 +102,12 @@ grayscale-only decode yields a complete payload (graceful degradation, colorblin
 
 1. **Frame**: `[0x57 'W', 0x01 version, lenHi, lenLo]` + payload (UTF-8) + **CRC-16** (2 bytes).
 2. **Capacity plan**: `rawBytes = floor(cells · bitsPerCell / 8)`; Reed–Solomon block plan over
-   `rawBytes` at an ECC ratio of **25% (1-bit) / 50% (2-bit, robust) / 50% (3-bit)** — more levels
-   are noisier, so more parity. A 35% 2-bit tier trades robustness for ×1.7 capacity. Frame must
-   fit the plan's data capacity.
+   `rawBytes` at an ECC ratio of **25% (1-bit) / 35% (2-bit) / 50% (3-bit)** — more levels are
+   noisier, so more parity. The 2-bit tier moved from 50%→35% after measurement showed the extra
+   parity bought no real robustness (degradation failures come from contrast collapse, not from
+   exhausting the error budget), for roughly +30% capacity at that tier. Decoders SHOULD try both
+   35% and 50% for 2-bit content and keep whichever parse reports fewer corrected errors, to stay
+   compatible with codes encoded before this change. Frame must fit the plan's data capacity.
 3. **RS + interleave**: systematic Reed–Solomon (GF(256)) with block interleaving.
 4. **Whitening**: XOR the codeword stream with a deterministic LCG mask (`scramble`). Required —
    without it, RS zero-padding leaves most cells at one level and breaks level calibration.
