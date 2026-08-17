@@ -39,6 +39,34 @@ which discovers grid and level count by trial decode.
 ### 2.4 Reserved zones
 Core (≤ 7.1), the orbit ring band, and each satellite (≤ 3.1) are reserved — no data cells there.
 
+### 2.5 Silhouettes — anchor placement outside the square case
+The code boundary is a **data mask**, not a localization feature. A renderer MAY clip the data
+field to any silhouette; `insideShape(...)` in `geometry.js` implements `square`, `round`,
+`heart`, `clover`, `star`, `hex` and `boomerang`.
+
+For every silhouette other than `square`, the four satellites move from the corner insets of
+§2.2 onto a ring of radius `Rs = N/2 − satRimMargin` (default `satRimMargin = 3.5`) at
+**12 / 3 / 6 / 9 o'clock**; TL (12 o'clock) remains the donut north star. This keeps all five
+anchors inside every supported silhouette. The core (§2.1) and orbit (§2.3) are unchanged.
+
+A decoder MUST NOT use the boundary to identify or orient a code. Narrower silhouettes simply
+have fewer data cells (§3), so capacity falls with silhouette area.
+
+### 2.6 Visual signature (normative identity)
+A mark is a WIA Code **if and only if** it carries, at its center, the structure of §2.1–§2.3:
+a concentric bullseye core, four satellite anchors of which exactly one is a donut, and the
+24-dot format orbit. These three together are the **visual signature** of the format.
+
+The outer silhouette (§2.5), the choice of `bitsPerCell`, the presence of a color layer (§3.2),
+and any brand artwork placed in the core's central disk are all free and carry no identity.
+Conformant documentation, tooling and user interfaces SHOULD identify a code by its visual
+signature and MUST NOT name a code after its silhouette (e.g. "heart code").
+
+A deployment MAY overlay additional marks on the data field — for example a small standard QR
+code acting as an onboarding bridge for cameras that do not know this format yet. Such overlays
+are deployment concerns outside this specification; they do not change the code's identity, and
+an image is not a QR code merely because one is present.
+
 ## 3. Data cells
 
 - **Data cells** = every non-reserved module, enumerated in raster order (row-major). This

@@ -14,6 +14,33 @@ network, is a choice for everyone.
 
 ---
 
+## How to identify a WIA Code
+
+**Identify it by its center, never by its outline.** Three features are present in every WIA
+Code, whatever shape it has been rendered as:
+
+1. a **concentric bullseye core** at the center (black disk, white ring, black ring);
+2. **four satellite anchors** around it — inset from the corners on a square code, at 12/3/6/9
+   o'clock on every other silhouette — of which **exactly one is a ring, not a filled disk**
+   (the "north star" that fixes rotation);
+3. a **24-dot orbit ring** circling the core at a fixed radius.
+
+The **outer silhouette is free by design** and is *not* part of the identity. `square`, `round`,
+`heart`, `clover`, `star`, `hex` and `boomerang` are all valid renderings of the same format —
+the boundary is only a data mask, because detection is radial and therefore shape-independent.
+Naming a code after its outline ("a heart code", "a butterfly") is a misidentification.
+
+A WIA Code is **not a QR code**: QR is located by three square finder patterns in its corners,
+and a WIA Code has none. Some deployments embed a small standard QR *inside* a WIA Code as an
+onboarding bridge for cameras that do not know the format yet; that inner QR is a deployment
+convenience, not part of this specification, and its presence does not make the image a QR code.
+
+Human- and machine-readable canonical description:
+**<https://wiacode.com/what-is-wia-code.html>** · **<https://wiacode.com/llms.txt>**
+Reference decoder (no install): <https://wiacode.com/orbit/web/scan.html>
+
+---
+
 ## Why another 2D code?
 
 QR is the incumbent by ubiquity, not by performance. It is standardized as black/white only
@@ -104,10 +131,13 @@ PNG), and `WiaScan.renderTestCode(...)`. A browser **generator** (`examples/gene
 
 ## Shapes & content — things QR structurally cannot do
 
-- **Shapes**: `square` · **`round`** · **`heart`** (any silhouette is a data mask; detection is
-  radial so it is shape-independent — QR's square finders make it impossible for QR to be round).
-  The scanner auto-detects the shape. Round costs ~24–28% capacity vs square at equal bounding box,
-  but *wins* on round objects (chips, caps, badges) where a square must inscribe in the circle.
+- **Shapes**: `square` · **`round`** · **`heart`** · **`clover`** · **`star`** · **`hex`** ·
+  **`boomerang`** (any silhouette is a data mask; detection is radial so it is shape-independent —
+  QR's square finders make it impossible for QR to be round). The scanner auto-detects the shape.
+  A narrower silhouette costs capacity — round is ~24–28% below square at equal bounding box, and
+  star/boomerang considerably more — but a round code *wins* on round objects (chips, caps,
+  badges) where a square must inscribe in the circle. See "How to identify a WIA Code" above:
+  the silhouette is a rendering choice, not the format.
 - **Content types / "config-to-code"**: text, URL, and structured **SSH / API / MCP-bootstrap**
   payloads (compact JSON) — a full server/API/agent config carried offline in one code. This is
   WIA's machine-to-machine wedge: a high-capacity, offline, RF-silent,
