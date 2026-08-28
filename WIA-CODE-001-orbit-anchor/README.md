@@ -2,6 +2,10 @@
 
 **[English](README.md) · [日本語](README.ja.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md)**
 
+<sub>This specification is published in 4 languages. The **product** — the scanner and generator at
+[wiacode.com](https://wiacode.com) — speaks **127**, because the people this code is built for do not
+read English. Spec readers are implementers; code readers are everyone.</sub>
+
 > An open, perspective-robust, high-capacity 2D machine-readable code — a QR alternative
 > designed for the AI-camera / AR-glasses era and for **offline** use where it matters most:
 > books for children without internet, and disaster-relief information readable in bad conditions.
