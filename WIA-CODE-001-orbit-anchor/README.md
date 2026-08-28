@@ -58,15 +58,22 @@ perspective recovery from a single bullseye, and integral (noise-averaging) dete
   recovery** from the core alone when satellites are compressed by steep viewing angles.
 - **Data layer** — payload → frame(header+CRC16) → Reed–Solomon error correction → data cells.
   A standalone Reed–Solomon/CRC codec (`rs.js`) — no external engine.
-- **Multi-level capacity** — data cells carry 1, 2, or 3 bits each (2/4/8 grayscale levels),
-  multiplying capacity. QR is frozen to 1 bit (black/white); this is WIA-CODE's structural
-  capacity lead. Multi-level is only readable because localization is sub-pixel accurate.
+- **Multi-level cells — defined by the format, but DO NOT USE.** Data cells can carry 1, 2, or 3
+  bits (2/4/8 grayscale levels). **Only `bpc:1` (black/white) is usable.** Grayscale modes are not
+  camera-decodable: the level-classification error floor (~14.7%) exceeds the ECC budget (~6.7%),
+  so the code locks on cleanly and then *never* decodes. Conforming encoders MUST emit `bpc:1`;
+  wiacode.com's own API/MCP/CLI do not expose `bpc` at all — it is hardcoded to 1 and cannot be
+  overridden by a caller.
 
 ## Measured results (reproducible — run `examples/benchmark.js`)
 
-All numbers below are produced by the reference code in this folder; they are not cited claims.
+The WIA numbers below are produced by the reference code in this folder. **The QR side is not
+reproducible from this kit** — no QR encoder is bundled, so `examples/benchmark.js` measures WIA
+alone and says so when it runs. The QR head-to-head lives in `BENCHMARK.md`; to re-run it yourself
+you need your own QR encoder plus a QR decoder (we used jsQR, cross-checked against ZBar).
 
-**Capacity is a dial** — more grayscale levels = more bytes, fewer levels = more robustness.
+**Use the 1-bit column.** The 2/3-bit columns are documented only to describe the format; they are
+**not camera-decodable** (see above) and must not be used for printed or displayed codes.
 Net payload bytes per code (default ECC per tier):
 
 | grid | 1-bit (25% ECC) | 2-bit robust (50% ECC) | 2-bit max-cap (35% ECC) | 3-bit (50% ECC) |
@@ -79,18 +86,28 @@ QR is frozen to 1 bit (black/white) by ISO/IEC 18004 and cannot follow.
 
 **Robustness vs QR** (same payload, same physical size ~440px, identical degradations; QR
 decoded by jsQR, WIA by the reference engine — see `BENCHMARK.md`). Overall decode-rate
-(excl. no-degradation): **QR 75% · WIA-1bit 85% · WIA-2bit 80%**.
+(excl. no-degradation): **QR 75% · WIA-1bit 95%**. (A 2-bit row is omitted on purpose: it is not
+camera-decodable, so its robustness score is not a usable figure.)
 
 - **WIA wins perspective outright** — yaw 0–50° all decode; QR fails past 40°. This is the AR-
   glasses / held-at-an-angle regime.
 - **WIA wins noise** (σ 30–60 where QR fails) — the low-light / disaster-field regime.
-- **WIA-2bit beats QR on both axes at once**: ×1.3 capacity *and* 80% vs 75% robustness.
-- Honest losses: both WIA modes lose **blur** (WIA-S has smaller modules at matched size), and
-  WIA-2bit loses **extreme low-resolution (0.28× downscale)** — grayscale levels need pixels, so
-  a shrunk/faraway code should use 1-bit. This 1-bit↔multi-level split is the capacity/robustness
-  dial, chosen per code by conditions (books & screens → 2–3 bit; disaster & distance → 1-bit).
+- **Capacity at 1-bit**: on a square footprint WIA carries **1.80×** what QR does at matched ECC
+  (25% both), and up to **12.06×** on a silhouette QR cannot fill. See `BENCHMARK.md` section A-2.
+- Honest losses: at matched *physical size* WIA loses **blur** and **extreme low-resolution**,
+  because at matched physical size our modules are **2× smaller** (≈4.9× more data modules in the
+  same area) — we spend that area on payload. That is a
+  capacity choice, not a format defect: at matched *data density* (~350 B each) WIA tolerates 3px
+  blur where QR tolerates 1px. Measured limits: QR decodes down to 1.44 px/module, WIA to
+  1.68 px/module — a 17% gap on QR's best axis.
 
 ### Color (hue) layer — additive capacity, luma stays intact
+
+> **DO NOT USE for camera-scanned codes.** The hue layer requires `bpc≥2`, which is not
+> camera-decodable (see above). At `bpc:1` there are **zero** eligible cells for hue *by
+> construction* (`eligibleFromLuma` returns an empty set), so the layer cannot be applied to a
+> conforming code at all. It is documented here to describe the format, and for possible future
+> file-to-file (non-camera) channels — the production generator does not expose it.
 
 A second, independent payload rides in **color** on top of the grayscale one. The trick (YCbCr):
 the dot's luminance Y equals the grayscale level, so `toGray` recovers the exact same luma symbol

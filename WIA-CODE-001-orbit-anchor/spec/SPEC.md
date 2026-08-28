@@ -157,5 +157,8 @@ Decoding reverses exactly: sample → classify to symbols → unpack bits → un
 - This draft carries no data-codec innovation of its own beyond layout; the RS/CRC math is the
   reused, proven `wiacode-v1-codec.js`. The novel contribution is §5 (orbit-anchor localization +
   conic perspective recovery) and §6 (anchor-calibrated multi-level classification).
-- Multi-level capacity is conditional on scan quality (pixels-per-module); use 1-bit high-ECC for
-  harsh/disaster conditions and 2–3 bit for close, high-contrast scans (books, screens).
+- **Only 1-bit (`bpc:1`) is usable in practice; conforming encoders MUST emit `bpc:1`.**
+  Multi-level (2–3 bit) is defined by this specification but is **not camera-decodable**: the
+  level-classification error floor (~14.7%) exceeds the ECC budget (~6.7%), so such a code locks
+  on cleanly and then never decodes. The multi-level clauses remain in this document to define
+  the format, not to recommend it. The same applies to the hue layer, which presupposes `bpc≥2`.

@@ -19,7 +19,7 @@ const DEG = require('../reference/degrade.js');
 const COD = require('../reference/codec.js');
 // QR 인코더(head-to-head 비교용, 선택적). 없으면 WIA 단독 실행. (QR 결과는 BENCHMARK.md 에 보존)
 let V1 = null; try { V1 = null; try{}catch(e){}; } catch (e) { try { V1 = require('./wiacode-v1-codec.js'); } catch (e2) { V1 = null; } }
-require('./web/wiascan-core.js');
+require('./wiascan-core.js');
 const WS = globalThis.WiaScan;
 let jsQR = null; try { const m = require(path.join(__dirname, '..', 'v1', 'jsQR.js')); jsQR = m.default || m; } catch (e) { try { const m = require('./jsQR.js'); jsQR = m.default || m; } catch (e2) { jsQR = null; } }
 
@@ -102,7 +102,8 @@ for (const sw of SWEEPS) {
 }
 P('\n' + bar);
 P('  종합 해독률(무열화 제외): ' + NAMES.map(nm => nm + ' ' + (100 * score[nm].ok / score[nm].tot).toFixed(0) + '%').join('  ·  '));
-P('  → WIA-2bit 는 QR 대비 ' + (capRows[0].x2) + '배 용량이면서 강건성 대조 위와 같음(정직).');
+P('  → ★bpc≥2(2·3비트)는 쓰지 말 것 — 카메라로 원리적 해독 불가(오라클 상한 14.7% > ECC 예산 6.7%).');
+P('     위 2비트 행은 형식을 설명하려고 남겨둔 것이지 운용 권장이 아니다. 공개 수치는 1비트만 쓴다.');
 P(bar + '\n');
 
 if (MD) {
