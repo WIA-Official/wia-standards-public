@@ -9,6 +9,7 @@
  *  싣고 읽는다.
  *
  *  프레임: [0x57 'W', 0x01 ver, lenHi, lenLo] + payload(UTF-8) + crc16(2)
+ *          VER=2 는 payload 자리에 **세그먼트 비트열**(숫자·URL·한글 압축) — 아래 P3 절.
  *  이후 RS(ECC) + 인터리브 → 데이터셀 비트(MSB-first) → geometry.render(opts.bits)
  * ============================================================================
  */
@@ -50,22 +51,283 @@ function frameEncode(payload) {
   return out;
 }
 function frameDecode(bytes) {
-  if (bytes.length < 6 || bytes[0] !== MAGIC || bytes[1] !== VER) return null;
+  if (bytes.length < 6 || bytes[0] !== MAGIC) return null;
+  const ver = bytes[1];
+  if (ver !== VER && ver !== VER2) return null;      // 모르는 버전 → 깨끗이 실패(오염 아님)
   const len = (bytes[2] << 8) | bytes[3];
   if (4 + len + 2 > bytes.length) return null;
   const body = bytes.subarray(0, 4 + len);
   const crc = I.crc16(body) & 0xffff;
   const got = (bytes[4 + len] << 8) | bytes[4 + len + 1];
   if (crc !== got) return null;
-  return body.subarray(4, 4 + len);
+  if (ver === VER) return body.subarray(4, 4 + len);
+  // VER=2 — 세그먼트 비트열을 풀어 UTF-8 바이트로 돌려준다(호출부 인터페이스 무변경).
+  const text = segDecode(body.subarray(4, 4 + len));
+  if (text === null) return null;
+  return toBytes(text);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  세그먼트 모드 코덱 (프레임 VER=2) — P3 / MASTER LINE F7
+ * ══════════════════════════════════════════════════════════════════════════
+ *  VER=1 은 payload 를 UTF-8 바이트열로만 싣는다. 숫자·URL·한글은 그 표현이
+ *  낭비다(숫자 1자리 8비트, 한글 1음절 24비트). VER=2 는 Han Xin/QR 식으로
+ *  **내용물 종류별 비트폭**을 쓰고, 어떤 종류로 자를지는 DP 로 최적 분할한다.
+ *
+ *  프레임: [0x57 'W', 0x02 ver, lenHi, lenLo] + 세그먼트비트열(len 바이트) + crc16(2)
+ *          — 껍데기는 VER=1 과 완전히 같다(RS·인터리브·산포·CRC 무변경).
+ *
+ *  세그먼트 비트열(MSB-first):
+ *      flags   2b   예약(0 고정). ★P8 마스크 시드 2비트의 자리 — 지금 디코더는 무시한다.
+ *      [ mode 3b + count 12b + body ] * n
+ *      mode 0(END) 로 끝내고 바이트 경계까지 0 으로 채운다.
+ *
+ *  모드:
+ *    0 END   종결
+ *    1 N     숫자 '0'-'9'          3자리→10b, 나머지 1자리→4b / 2자리→7b
+ *    2 A     소문자 URL 45자표      2자→11b, 홀수 끝 1자→6b
+ *    3 H     한글음절 11172 + ASCII 128 = 11300  2자→27b(13.5b/자), 홀수 끝→14b
+ *    4 B     UTF-8 바이트          8b/바이트 (count 는 **바이트 수**)
+ *    5 C7    ASCII 0x00-0x7F       7b/자
+ *    6 S64   base64url 64자표      6b/자
+ *    7 —     예약(만나면 해독 실패)
+ *
+ *  ★설계가 원안(PROPOSALS_FABLE §P3)에서 벗어난 곳은 이 파일 하단 주석과
+ *    `test-codec-seg.js` 의 측정표에 근거와 함께 적혀 있다. 요약:
+ *    ① count 는 전 모드 **12비트 통일**(원안의 A:11b·H:10b 는 최대용량에서 넘친다)
+ *    ② N 은 count 가 있으므로 Han Xin 종결자를 쓰지 않는다(중복) — QR 식 4/7b 잔여
+ *    ③ H 는 14b 단일 대신 **27b/2자(13.5b)** + 알파벳에 ASCII 포함
+ *       (ASCII 를 빼면 띄어쓰기마다 모드가 끊겨 한글 산문에서 이득이 1.05배로 죽는다)
+ *    ④ C7·S64 는 원안에 없던 추가 모드(자격증 페이로드 1.05→1.19배)
+ * ══════════════════════════════════════════════════════════════════════════ */
+const VER2 = 0x02;
+const SEG_END = 0, SEG_N = 1, SEG_A = 2, SEG_H = 3, SEG_B = 4, SEG_C7 = 5, SEG_S64 = 6;
+const SEG_MODE_BITS = 3, SEG_CNT_BITS = 12, SEG_MAX_COUNT = (1 << SEG_CNT_BITS) - 1;
+const SEG_HDR_BITS = SEG_MODE_BITS + SEG_CNT_BITS;          // 15
+const SEG_FLAG_BITS = 2;
+// A 표 45자 = a-z(26) + 0-9(10) + 구두점 9. 45² = 2025 ≤ 2048 이라 2자가 11비트에 든다.
+//   ★구두점 9칸의 선정은 실측(test-codec-seg.js §A): URL 필수 8개(- . _ : / ? & =) +
+//     9번째는 **공백**. 공백은 URL 에 안 나오므로 URL 이득을 1도 깎지 않으면서
+//     소문자 산문을 0.99배(손해)에서 1.44배로 바꾼다. 탈락: ~ # % (우리 페이로드 빈도 낮음).
+const A_TABLE = 'abcdefghijklmnopqrstuvwxyz0123456789-._:/?&= ';
+const S64_TABLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+const HAN_BASE = 0xAC00, HAN_CNT = 11172, H_ASCII = 128, H_CNT = HAN_CNT + H_ASCII;  // 11300
+// 11300² = 127,689,999 < 2²⁷ — 두 자가 27비트에 든다(13.5b/자). 14b 단일보다 3.6% 낫다.
+const _A_IDX = (() => { const m = new Map(); for (let i = 0; i < A_TABLE.length; i++) m.set(A_TABLE.codePointAt(i), i); return m; })();
+const _S_IDX = (() => { const m = new Map(); for (let i = 0; i < S64_TABLE.length; i++) m.set(S64_TABLE.codePointAt(i), i); return m; })();
+
+function _bitWriter() {
+  const out = []; let acc = 0, n = 0;
+  return {
+    put(v, nb) { for (let i = nb - 1; i >= 0; i--) { acc = ((acc << 1) | ((v >>> i) & 1)) & 255; if (++n === 8) { out.push(acc); acc = 0; n = 0; } } },
+    bits() { return out.length * 8 + n; },
+    finish() { if (n) { out.push((acc << (8 - n)) & 255); acc = 0; n = 0; } return Uint8Array.from(out); },
+  };
+}
+function _bitReader(u8) {
+  let p = 0; const total = u8.length * 8;
+  return {
+    left() { return total - p; },
+    get(nb) { let v = 0; for (let i = 0; i < nb; i++) { v = v * 2 + ((u8[p >> 3] >>> (7 - (p & 7))) & 1); p++; } return v; },
+    restZero() { while (p < total) { if ((u8[p >> 3] >>> (7 - (p & 7))) & 1) return false; p++; } return true; },
+  };
+}
+function _u8len(cp) { return cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4; }
+function _hIdx(cp) { return (cp >= HAN_BASE && cp < HAN_BASE + HAN_CNT) ? cp - HAN_BASE : (cp < 0x80 ? HAN_CNT + cp : -1); }
+function _hCp(ix) { return ix < HAN_CNT ? HAN_BASE + ix : ix - HAN_CNT; }
+
+// 모드 서술자. six = 문자당 비용(1/6비트 단위) — 3·2 자 묶음의 최소공배수가 6이라 정수화된다.
+const SEG_MODES = [
+  { id: SEG_N,   six: 20,   ok: cp => cp >= 48 && cp <= 57 },                       // 10b/3자
+  { id: SEG_A,   six: 33,   ok: cp => _A_IDX.has(cp) },                             // 11b/2자
+  { id: SEG_H,   six: 81,   ok: cp => _hIdx(cp) >= 0 },                             // 27b/2자
+  { id: SEG_S64, six: 36,   ok: cp => _S_IDX.has(cp) },                             // 6b/자
+  { id: SEG_C7,  six: 42,   ok: cp => cp < 0x80 },                                  // 7b/자
+  { id: SEG_B,   six: null, ok: () => true },                                       // 8b/바이트
+];
+const _SEG_HDR_SIX = SEG_HDR_BITS * 6;
+
+/* 문자열 → 세그먼트 목록. Han Xin `hx_define_modes` 와 같은 DP(비용 1/6비트).
+ *   묶음 경계(3자·2자)의 반올림은 무시한다 — QR/Han Xin 도 같다. 오차 상한은
+ *   세그먼트당 N 6b · A 5b · H 13b 이고, 그 대가로 O(L·6) 로 끝난다. */
+function segPlan(text) {
+  const cp = [];
+  for (const ch of text) cp.push(ch.codePointAt(0));
+  const L = cp.length;
+  if (!L) return [];
+  const K = SEG_MODES.length, INF = Infinity;
+  const w = (m, c) => m.six === null ? 48 * _u8len(c) : m.six;
+  let prev = new Array(K).fill(_SEG_HDR_SIX);
+  const from = new Int8Array(L * K);
+  for (let i = 0; i < L; i++) {
+    let bi = -1, bv = INF;
+    for (let k = 0; k < K; k++) if (prev[k] < bv) { bv = prev[k]; bi = k; }
+    const cur = new Array(K).fill(INF);
+    for (let k = 0; k < K; k++) {
+      const M = SEG_MODES[k];
+      if (!M.ok(cp[i])) continue;
+      const stay = prev[k], sw = bv + _SEG_HDR_SIX;
+      if (stay <= sw) { cur[k] = stay + w(M, cp[i]); from[i * K + k] = k; }
+      else { cur[k] = sw + w(M, cp[i]); from[i * K + k] = bi; }
+    }
+    prev = cur;
+  }
+  let bi = -1, bv = INF;
+  for (let k = 0; k < K; k++) if (prev[k] < bv) { bv = prev[k]; bi = k; }
+  const pick = new Int8Array(L);
+  for (let i = L - 1; i >= 0; i--) { pick[i] = bi; bi = from[i * K + bi]; }
+  // 같은 모드 연속을 하나의 세그먼트로 묶고, count 상한(4095)에서 자른다.
+  const segs = [];
+  let s = 0;
+  for (let i = 1; i <= L; i++) {
+    if (i === L || pick[i] !== pick[s]) { segs.push({ mode: SEG_MODES[pick[s]].id, from: s, to: i, cps: cp.slice(s, i) }); s = i; }
+  }
+  const out = [];
+  for (const g of segs) {
+    if (g.mode === SEG_B) {                       // count 가 바이트 수라 바이트로 자른다
+      let acc = 0, st = 0;
+      for (let i = 0; i < g.cps.length; i++) {
+        const n = _u8len(g.cps[i]);
+        if (acc + n > SEG_MAX_COUNT) { out.push({ mode: SEG_B, cps: g.cps.slice(st, i) }); st = i; acc = 0; }
+        acc += n;
+      }
+      out.push({ mode: SEG_B, cps: g.cps.slice(st) });
+    } else {
+      const step = g.mode === SEG_N ? 4095 - (4095 % 3) : SEG_MAX_COUNT - (SEG_MAX_COUNT % 2);  // 묶음 경계에서 자른다
+      for (let i = 0; i < g.cps.length; i += step) out.push({ mode: g.mode, cps: g.cps.slice(i, i + step) });
+    }
+  }
+  return out;
+}
+
+/* 세그먼트 목록 → 비트열 바이트. */
+function segEncode(text) {
+  const segs = segPlan(text), bw = _bitWriter();
+  bw.put(0, SEG_FLAG_BITS);                       // flags 예약 = 0
+  for (const g of segs) {
+    const c = g.cps, n = c.length;
+    if (g.mode === SEG_B) {
+      const by = toBytes(String.fromCodePoint.apply(String, c));
+      bw.put(SEG_B, SEG_MODE_BITS); bw.put(by.length, SEG_CNT_BITS);
+      for (let i = 0; i < by.length; i++) bw.put(by[i], 8);
+      continue;
+    }
+    bw.put(g.mode, SEG_MODE_BITS); bw.put(n, SEG_CNT_BITS);
+    if (g.mode === SEG_N) {
+      let i = 0;
+      for (; i + 3 <= n; i += 3) bw.put((c[i] - 48) * 100 + (c[i + 1] - 48) * 10 + (c[i + 2] - 48), 10);
+      const r = n - i;
+      if (r === 1) bw.put(c[i] - 48, 4);
+      else if (r === 2) bw.put((c[i] - 48) * 10 + (c[i + 1] - 48), 7);
+    } else if (g.mode === SEG_A) {
+      let i = 0;
+      for (; i + 2 <= n; i += 2) bw.put(_A_IDX.get(c[i]) * 45 + _A_IDX.get(c[i + 1]), 11);
+      if (i < n) bw.put(_A_IDX.get(c[i]), 6);
+    } else if (g.mode === SEG_H) {
+      let i = 0;
+      for (; i + 2 <= n; i += 2) bw.put(_hIdx(c[i]) * H_CNT + _hIdx(c[i + 1]), 27);
+      if (i < n) bw.put(_hIdx(c[i]), 14);
+    } else if (g.mode === SEG_C7) {
+      for (let i = 0; i < n; i++) bw.put(c[i], 7);
+    } else if (g.mode === SEG_S64) {
+      for (let i = 0; i < n; i++) bw.put(_S_IDX.get(c[i]), 6);
+    } else throw new Error('세그먼트 모드 미상: ' + g.mode);
+  }
+  bw.put(SEG_END, SEG_MODE_BITS);
+  return bw.finish();
+}
+
+/* 비트열 바이트 → 문자열. 규격 위반이면 **null**(엉뚱한 문자열을 내지 않는다). */
+function segDecode(u8) {
+  const br = _bitReader(u8);
+  if (br.left() < SEG_FLAG_BITS) return null;
+  br.get(SEG_FLAG_BITS);                          // flags — 예약, 지금은 무시(전방호환)
+  const parts = [];
+  for (;;) {
+    if (br.left() < SEG_MODE_BITS) return br.restZero() ? parts.join('') : null;
+    const mode = br.get(SEG_MODE_BITS);
+    if (mode === SEG_END) return br.restZero() ? parts.join('') : null;
+    if (mode > SEG_S64) return null;              // 예약 모드 → 깨끗이 실패
+    if (br.left() < SEG_CNT_BITS) return null;
+    const n = br.get(SEG_CNT_BITS);
+    let need;
+    if (mode === SEG_N) { const f = Math.floor(n / 3), r = n % 3; need = f * 10 + (r === 1 ? 4 : r === 2 ? 7 : 0); }
+    else if (mode === SEG_A) need = (n >> 1) * 11 + (n & 1 ? 6 : 0);
+    else if (mode === SEG_H) need = (n >> 1) * 27 + (n & 1 ? 14 : 0);
+    else if (mode === SEG_B) need = n * 8;
+    else if (mode === SEG_C7) need = n * 7;
+    else need = n * 6;
+    if (br.left() < need) return null;
+    if (mode === SEG_N) {
+      let i = 0, s = '';
+      for (; i + 3 <= n; i += 3) { const v = br.get(10); if (v > 999) return null; s += String(v).padStart(3, '0'); }
+      const r = n - i;
+      if (r === 1) { const v = br.get(4); if (v > 9) return null; s += String(v); }
+      else if (r === 2) { const v = br.get(7); if (v > 99) return null; s += String(v).padStart(2, '0'); }
+      parts.push(s);
+    } else if (mode === SEG_A) {
+      let i = 0, s = '';
+      for (; i + 2 <= n; i += 2) { const v = br.get(11); if (v >= 45 * 45) return null; s += A_TABLE[(v / 45) | 0] + A_TABLE[v % 45]; }
+      if (i < n) { const v = br.get(6); if (v >= 45) return null; s += A_TABLE[v]; }
+      parts.push(s);
+    } else if (mode === SEG_H) {
+      let i = 0, s = '';
+      for (; i + 2 <= n; i += 2) { const v = br.get(27); if (v >= H_CNT * H_CNT) return null; s += String.fromCodePoint(_hCp(Math.floor(v / H_CNT)), _hCp(v % H_CNT)); }
+      if (i < n) { const v = br.get(14); if (v >= H_CNT) return null; s += String.fromCodePoint(_hCp(v)); }
+      parts.push(s);
+    } else if (mode === SEG_B) {
+      const by = new Uint8Array(n);
+      for (let i = 0; i < n; i++) by[i] = br.get(8);
+      parts.push(fromBytes(by));
+    } else if (mode === SEG_C7) {
+      let s = '';
+      for (let i = 0; i < n; i++) s += String.fromCharCode(br.get(7));
+      parts.push(s);
+    } else {
+      let s = '';
+      for (let i = 0; i < n; i++) s += S64_TABLE[br.get(6)];
+      parts.push(s);
+    }
+  }
+}
+
+/* 세그먼트 프레임(VER=2). 껍데기·CRC 는 VER=1 과 동일. */
+function frameEncodeSeg(text) {
+  const seg = segEncode(text);
+  if (seg.length > 0xffff) throw new Error('세그먼트 길이초과: ' + seg.length + 'B');
+  const body = new Uint8Array(4 + seg.length);
+  body[0] = MAGIC; body[1] = VER2; body[2] = (seg.length >>> 8) & 255; body[3] = seg.length & 255;
+  body.set(seg, 4);
+  const crc = I.crc16(body) & 0xffff;
+  const out = new Uint8Array(body.length + 2);
+  out.set(body, 0); out[body.length] = (crc >>> 8) & 255; out[body.length + 1] = crc & 255;
+  return out;
+}
+
+/* 인코더가 쓸 프레임을 고른다.
+ *   ver=1(기본)  : 현행 그대로 — **옛 스캐너가 읽는다**
+ *   ver=2        : 무조건 세그먼트
+ *   ver='auto'   : 더 짧은 쪽(동률이면 1) — 바이트 콘텐츠는 자동으로 VER=1 이라 불변
+ *   ★기본값을 'auto' 로 넘기는 것이 곧 "표준 채택" 이다. 스캐너 배포가 끝난 뒤
+ *     한 줄로 바꾼다(그전에 바꾸면 옛 스캐너가 숫자·한글 코드를 못 읽는다). */
+function pickFrame(text, opts) {
+  // ★2026-09-05 P3 ON(오너 결정): 기본 'auto' — v2 가 더 짧을 때만 v2, 아니면 v1 바이트동일.
+  //   v1 로 고정하려면 opts.ver=1. 스캐너·킷 엔진·API 는 같은 codec 을 쓰므로 함께 바뀐다.
+  const ver = (opts && opts.ver) || 'auto';
+  if (ver === 2) return frameEncodeSeg(text);
+  if (ver !== 'auto') return frameEncode(toBytes(text));
+  const f1 = frameEncode(toBytes(text));
+  let f2 = null;
+  try { f2 = frameEncodeSeg(text); } catch (e) { f2 = null; }
+  return (f2 && f2.length < f1.length) ? f2 : f1;
 }
 
 // nCells(데이터셀 수) → RS 계획(인코드/디코드 공용, 결정적)
 function planFor(nCells) { return I.planBlocks(Math.floor(nCells / 8), ECC); }
 
 // payload 문자열 → 데이터셀 비트배열(길이 nCells). capacity 초과 시 예외.
-function encodeToBits(text, nCells) {
-  const frame = frameEncode(toBytes(text));
+function encodeToBits(text, nCells, opts) {
+  const frame = pickFrame(text, opts);
   const plan = planFor(nCells);
   if (frame.length > plan.totalK) throw new Error('용량초과: ' + frame.length + 'B > ' + plan.totalK + 'B');
   const dataIn = new Uint8Array(plan.totalK); dataIn.set(frame, 0);   // 나머지 0패딩
@@ -74,7 +336,46 @@ function encodeToBits(text, nCells) {
   const bits = new Uint8Array(nCells);
   const nb = Math.min(cw.length * 8, nCells), pos = buildPerm(nCells);
   for (let k = 0; k < nb; k++) bits[pos[k]] = (cw[k >> 3] >>> (7 - (k & 7))) & 1;   // 위치 산포
-  return { bits: bits, plan: plan, usedBytes: frame.length, capBytes: plan.totalK };
+  return { bits: bits, plan: plan, usedBytes: frame.length, capBytes: plan.totalK, ver: frame[1] };
+}
+
+/* ★2026-08-30 B단계 — 오염이 **확실한 셀**들을 RS 소거 위치로 옮긴다.
+ *   RS 는 위치를 모르면 예산의 절반을 찾는 데 쓴다(오류 nsym/2 vs 소거 nsym).
+ *   위성 하나가 가려진 것을 locateSim3 가 이미 알므로, 그 주변 셀을 여기로 넘기면
+ *   같은 패리티로 **2배**를 복구한다(실측: 블록당 27 → 55 바이트).
+ *   ★buildPerm 이 인접 셀을 비트스트림에서 흩어 놓으므로 **그 산포를 그대로 따라가야** 한다 —
+ *     셀 번호를 바이트 번호로 그냥 쓰면 엉뚱한 자리를 소거로 표시한다.
+ *   반환: 블록 인덱스별 소거 바이트 위치 배열. */
+function cellsToErasures(badCells, nCells, plan, bpc) {
+  bpc = bpc || 1;
+  if (!badCells || !badCells.length) return null;
+  const bad = new Uint8Array(nCells);
+  for (const c of badCells) if (c >= 0 && c < nCells) bad[c] = 1;
+  const pos = buildPerm(nCells);
+  const totalN = plan.totalN, nb = totalN * 8;
+  // 셀 → 비트 → 코드워드 바이트. **decodeFromCells 와 완전히 같은 순서**로 돈다
+  //   (bpc 가 1이 아니면 셀 하나가 여러 비트를 낸다).
+  const cwBad = new Uint8Array(totalN);
+  let bit = 0;
+  for (let k = 0; k < nCells && bit < nb; k++) {
+    const dirty = bad[pos[k]];
+    for (let b = bpc - 1; b >= 0 && bit < nb; b--) { if (dirty) cwBad[bit >> 3] = 1; bit++; }
+  }
+  // scramble 은 값만 XOR 하므로 위치가 안 바뀐다. deinterleave 는 위치를 바꾼다.
+  const seqBad = I.deinterleaveBytes(cwBad, plan);
+  // 블록별로 나눈다 — rsDecodeAll 과 **같은 순서**(데이터 전부 → 패리티 전부)
+  const out = [];
+  let off = 0;
+  const dOff = [], pOff = [];
+  for (const b of plan.blocks) { dOff.push(off); off += b.k; }
+  for (const b of plan.blocks) { pOff.push(off); off += b.nsym; }
+  for (let i = 0; i < plan.blocks.length; i++) {
+    const b = plan.blocks[i], e = [];
+    for (let j = 0; j < b.k; j++) if (seqBad[dOff[i] + j]) e.push(j);
+    for (let j = 0; j < b.nsym; j++) if (seqBad[pOff[i] + j]) e.push(b.k + j);
+    out.push(e);
+  }
+  return out;
 }
 
 // 데이터셀 비트배열 → payload 문자열(오류정정 포함). 실패 시 {ok:false}.
@@ -167,9 +468,9 @@ function grayEnc(v) { return v ^ (v >> 1); }          // symbol → 밝기 rank 
 function grayDec(r) { let v = 0; for (; r > 0; r >>= 1) v ^= r; return v; }
 
 // payload → 데이터셀 심볼(0..2^bpc-1) + 렌더용 그레이(cellGray). bpc=1 은 기존 흑백과 동일.
-function encodeToCells(text, nCells, bpc, ecc) {
+function encodeToCells(text, nCells, bpc, ecc, opts) {
   bpc = bpc || 1;
-  const frame = frameEncode(toBytes(text));
+  const frame = pickFrame(text, opts);
   const rawBytes = Math.floor(nCells * bpc / 8);
   const plan = I.planBlocks(rawBytes, ecc || PAL_ECC[bpc] || '25%');
   if (frame.length > plan.totalK) throw new Error('용량초과: ' + frame.length + 'B > ' + plan.totalK + 'B');
@@ -183,7 +484,7 @@ function encodeToCells(text, nCells, bpc, ecc) {
     let v = 0; for (let b = 0; b < bpc; b++) v = (v << 1) | getBit(bit++);
     const p = pos[k]; symbols[p] = v; cellGray[p] = levelGray(grayEnc(v), nlev);
   }
-  return { cells: symbols, cellGray: cellGray, plan: plan, usedBytes: frame.length, capBytes: plan.totalK, bitsPerCell: bpc };
+  return { cells: symbols, cellGray: cellGray, plan: plan, usedBytes: frame.length, capBytes: plan.totalK, bitsPerCell: bpc, ver: frame[1] };
 }
 
 // 원시 바이트 왕복(텍스트 아님) — encodeToCells/decodeFromCells과 완전히 동일한 파이프라인이지만
@@ -263,7 +564,7 @@ function classifyCells(grays, cells, bpc, layout) {
 }
 
 // 심볼(bpc비트/셀) → 바이트 → RS 디코드 → payload.
-function decodeFromCells(symbols, nCells, bpc, ecc) {
+function decodeFromCells(symbols, nCells, bpc, ecc, badCells) {
   const plan = I.planBlocks(Math.floor(nCells * bpc / 8), ecc || PAL_ECC[bpc] || '25%');
   const totalN = plan.totalN, cw = new Uint8Array(totalN), nb = totalN * 8;
   const pos = buildPerm(nCells);                 // 위치 산포 역변환: 데이터유닛 k = symbols[pos[k]]
@@ -273,10 +574,31 @@ function decodeFromCells(symbols, nCells, bpc, ecc) {
     for (let b = bpc - 1; b >= 0 && bit < nb; b--) { if ((v >> b) & 1) cw[bit >> 3] |= (1 << (7 - (bit & 7))); bit++; }
   }
   const seq = I.deinterleaveBytes(scramble(cw), plan);
-  let res; try { res = I.rsDecodeAll(seq, plan); } catch (e) { return { ok: false, reason: 'rs-uncorrectable' }; }
+  let res = null;
+  // ★소거 우선 — 오염이 확실한 셀을 알면 예산이 2배가 된다(블록당 nsym/2 → nsym).
+  //   실패하면 조용히 옛 경로로 떨어진다(소거 위치가 틀렸을 수도 있으므로).
+  const eras = badCells && badCells.length ? cellsToErasures(badCells, nCells, plan, bpc) : null;
+  if (eras) { try { res = rsDecodeAllErased(seq, plan, eras); } catch (e) { res = null; } }
+  if (!res) { try { res = I.rsDecodeAll(seq, plan); } catch (e) { return { ok: false, reason: 'rs-uncorrectable' }; } }
   const payload = frameDecode(res.data);
   if (!payload) return { ok: false, reason: 'bad-frame/crc', errors: res.errors };
-  return { ok: true, text: fromBytes(payload), errors: res.errors };
+  return { ok: true, text: fromBytes(payload), errors: res.errors, erased: res.erasures || 0 };
+}
+
+/* 블록별 소거 위치를 받아 복호한다. rsDecodeAll 과 **같은 블록 순서**를 쓴다. */
+function rsDecodeAllErased(cw, plan, erasByBlock) {
+  const dp = [], pp = []; let off = 0;
+  for (const b of plan.blocks) { dp.push(cw.subarray(off, off + b.k)); off += b.k; }
+  for (const b of plan.blocks) { pp.push(cw.subarray(off, off + b.nsym)); off += b.nsym; }
+  const out = new Uint8Array(plan.totalK);
+  let oo = 0, errs = 0, ers = 0;
+  for (let i = 0; i < plan.blocks.length; i++) {
+    const b = plan.blocks[i], blk = new Uint8Array(b.k + b.nsym);
+    blk.set(dp[i], 0); blk.set(pp[i], b.k);
+    const r = I.decodeBlock(blk, b.nsym, erasByBlock[i]);
+    out.set(r.data, oo); oo += b.k; errs += r.errors; ers += (r.erasures || 0);
+  }
+  return { data: out, errors: errs, erasures: ers };
 }
 
 // ── 컬러(hue) 레이어 (Fable5 설계, luma×hue 곱코드) ────────────────────────
@@ -403,11 +725,36 @@ function deconvGauss(obs, N, sigma, iters) {        // Landweber: T ← clamp(T 
   }
   return T;
 }
+/* ★2026-08-30 Q1-C — 역합성곱 결과 재사용 캐시.
+ *   프로파일러 실측: 실패 프레임 22초 중 **14.4초(66%)가 deconvGauss** 였다.
+ *   원인은 알고리즘이 아니라 **같은 계산의 반복**이다 — decodePSF 의 `obs` 와 `dec` 는
+ *   (grayObj, H, N, sigma) 로만 정해지고 **모양과 무관**한데, detectAuto 의 pass2 는
+ *   같은 후보로 26모양 × 2변형을 순회하며 매번 처음부터 다시 계산했다(최대 104회).
+ *   모양은 `dec[cells[i]]` 로 **어느 셀을 읽을지**만 정한다.
+ *   호출이 연속이라 **크기 1 캐시**로 충분하다(같은 후보의 52회가 연달아 온다). */
+var _psfCache = null;   // { gray, H, N, obs, decs:{sigma: Float64Array} }
+function _sameH(a, b) {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+function _psfGet(grayObj, H, N, sigma) {
+  if (_psfCache && _psfCache.gray === grayObj && _psfCache.N === N && _sameH(_psfCache.H, H)) {
+    if (_psfCache.decs[sigma]) return _psfCache.decs[sigma];
+  } else {
+    _psfCache = { gray: grayObj, H: H, N: N, obs: sampleModuleGrid(grayObj, H, N), decs: {} };
+  }
+  var d = deconvGauss(_psfCache.obs, N, sigma, 45);
+  _psfCache.decs[sigma] = d;
+  return d;
+}
+
 // 표준 셀판독이 블러로 실패했을 때 재시도(1비트). 통과 σ 반환, 실패 시 null.
 function decodePSF(grayObj, H, layout, cells) {
-  const N = layout.N, obs = sampleModuleGrid(grayObj, H, N), dc = new Float32Array(cells.length);
+  const N = layout.N, dc = new Float32Array(cells.length);
   for (const sig of [0.5, 0.75]) {
-    const dec = deconvGauss(obs, N, sig, 45);
+    const dec = _psfGet(grayObj, H, N, sig);
     for (let i = 0; i < cells.length; i++) dc[i] = dec[cells[i][1] * N + cells[i][0]];
     const cl = classifyCells(dc, cells, 1, layout);
     if (cl.hi - cl.lo < 25) continue;
@@ -416,6 +763,16 @@ function decodePSF(grayObj, H, layout, cells) {
   }
   return null;
 }
+
+/* ★2026-08-30 — RS 소거(erasure) 배관은 **남겨 두되, 부르는 곳은 없다.**
+ *   `rs.js decodeBlock(cw,nsym,erasures)` + `cellsToErasures` + `decodeFromCells(...,badCells)`
+ *   까지는 검증돼 있고(합성 시험: 오류만 250셀 벽 → 소거 350셀, 약 1.4배), 소거를 안 주면
+ *   동작이 한 글자도 안 바뀐다. 그러나 **오염 자리를 짚는 층은 전부 걷어냈다** —
+ *   회색지대 추정·앵커 근처 원판·구역 대비붕괴 셋 다 실측에서 경계를 한 칸도 못 옮겼다.
+ *   왜 안 되는지는 `~/wiacode-perf/SCANNER_AIM_FINDINGS_2026-08-29.md` §I 에 있다.
+ *   요약: 실제 광학 손상은 소거가 이기는 구간(오염 250~350셀)에 **거의 안 떨어진다** —
+ *   작으면 평범한 RS 가 이미 살리고, 크면 소거 예산(513셀)도 넘긴다(실측 786셀).
+ *   다시 쓰려면 `decodeFromCells(sym, n, bpc, ecc, badCells)` 에 **확실한** 자리를 주면 된다. */
 
 function readCode(grayObj, res, layout, cellPx, opts) {
   if (!res || !res.ok || !res.Hmod2img) return { ok: false, reason: 'no-lock' };
@@ -462,4 +819,8 @@ module.exports = {
   encodeToCells, decodeFromCells, calibrate, classifyCells, levelGray, grayEnc, grayDec, PAL_ECC, ECC_TRY,
   encodeColor, eligibleFromLuma, sampleCellColor, calibrateColor, classifyHue, hueChroma, HUE_ECC, HUE_RHO,
   encodeBytesToCells, decodeBytesFromCells, encodeColorBytes,
+  // ── P3 세그먼트 모드(VER=2) ──
+  VER, VER2, MAGIC, frameEncodeSeg, pickFrame, segEncode, segDecode, segPlan,
+  A_TABLE, S64_TABLE, SEG_MODES, SEG_END, SEG_N, SEG_A, SEG_H, SEG_B, SEG_C7, SEG_S64,
+  SEG_CNT_BITS, SEG_MAX_COUNT, SEG_HDR_BITS, H_CNT, HAN_CNT,
 };

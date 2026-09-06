@@ -1,6 +1,6 @@
 # WIA-CODE-001 — Orbit Anchor 2D Code · Specification (draft)
 
-Version 0.2 · reference implementation lives in `../reference/`. All constants below are the
+Version 0.4 · reference implementation lives in `../reference/`. All constants below are the
 values used by that code; the spec and code are kept in sync.
 
 ## 1. Coordinate system & grids
@@ -72,7 +72,16 @@ an image is not a QR code merely because one is present.
 - **Data cells** = every non-reserved module, enumerated in raster order (row-major). This
   ordering is the encode/decode contract (`dataCells(layout)` in `geometry.js`).
 - Each data cell carries a symbol of **`bitsPerCell` bits** (1, 2, or 3), rendered as a round
-  dot (radius 0.42 modules) whose **gray level** encodes the symbol.
+  dot whose **gray level** encodes the symbol. Recommended dot radius: **0.50 modules**
+  (SHOULD; moved from 0.42 in v0.2). Rationale: raising fill ratio 55% → 79% pushed the
+  low-resolution decode breakpoint from 1.50 to 1.25 px/module with no change in lock success
+  (measured across grid L, 10 silhouettes × 3 payloads — see reference implementation history).
+  This is a recommendation, not a decode-contract requirement: the decoder samples each cell by
+  its **center** (±0.22 modules) and never measures dot radius, so it is radius-agnostic by
+  construction. A code rendered at 0.42 (or any other radius in a similar range) remains fully
+  conformant and decodes identically; encoders SHOULD use 0.50 for new output to get the
+  low-resolution benefit, but existing 0.42 output and any renderer that has not yet updated
+  are unaffected and require no re-issue.
 - Cell counts (reference): S = 3728, M = 8848, L = 16016.
 
 ### 3.1 Grayscale levels & Gray coding
@@ -121,6 +130,41 @@ grayscale-only decode yields a complete payload (graceful degradation, colorblin
 Decoding reverses exactly: sample → classify to symbols → unpack bits → un-whiten → de-interleave
 → RS decode → CRC-check the frame → payload.
 
+### 4.1 Frame version 2 — segment-mode payload (doc v0.4, 2026-09-05)
+
+Version 1 frames carry raw UTF-8. Version 2 keeps the **same envelope, RS plan, whitening and
+permutation** and only changes what sits between the header and the CRC:
+
+```
+[0x57 'W', 0x02, lenHi, lenLo] + segment bitstream (len bytes, MSB-first) + CRC-16
+bitstream = flags(2b, reserved = 0)
+          + { mode(3b) + count(12b) + body }*   ← one or more segments
+          + END(mode 0) + zero padding to a byte boundary
+```
+
+| mode | name | body | count means |
+|---|---|---|---|
+| 0 | END | — | — |
+| 1 | N numeric `0-9` | 10 bits per 3 digits; remainder 1 digit → 4 bits, 2 digits → 7 bits | digits |
+| 2 | A url45 | 11 bits per 2 chars; odd tail → 6 bits. Table (45): `a-z 0-9 - . _ : / ? & =` and space | chars |
+| 3 | H Hangul | alphabet = 11,172 syllables U+AC00–D7A3 followed by ASCII 0–127 (11,300 symbols); 27 bits per 2 symbols; odd tail → 14 bits | symbols |
+| 4 | B bytes | 8 bits per byte (UTF-8) | **bytes** |
+| 5 | C7 ASCII | 7 bits per char (0–127) | chars |
+| 6 | S64 base64url | 6 bits per char, table `A-Z a-z 0-9 - _` | chars |
+| 7 | reserved | — | decoders MUST reject the frame |
+
+- `count` is 12 bits (max 4,095) for every mode; a longer run is split into consecutive segments.
+- Encoders choose segmentation freely (the reference encoder uses a cost-based dynamic program
+  and emits version 1 when that is not longer). **Encoders MAY still emit version 1.**
+- Decoders MUST accept both versions. A version-1-only decoder sees `version ≠ 1` and fails
+  cleanly (no payload is produced) — no misdecode is possible because the CRC still covers the
+  segment bitstream.
+- Capacity (grid L, square, booster on, 1,450 B plan): digits 1,450 → **3,474**
+  (ISO/IEC 18004 v27-Q: 1,933 → 1.80×), url45 text → 2,106, Hangul syllables 483 → 857,
+  arbitrary UTF-8 bytes unchanged.
+- Test vectors: `conformance-vectors/clean_square_{num,alnum,hangul}.png` and their `blur_r2`
+  variants are version-2 frames; `verify.js` must decode all of them.
+
 ## 5. Localization (decode front-end)
 
 1. **Detect** the core and satellites with a Fast Radial Symmetry Transform (dark radial-symmetry
@@ -149,7 +193,7 @@ Decoding reverses exactly: sample → classify to symbols → unpack bits → un
 
 - A conformant encoder MUST reproduce the frame format (§4.1), RS/whitening/mapping (§4.2–4.5),
   and the fixed structure (§2). A conformant decoder MUST localize per §5 and decode per §6.
-- Format version byte = `0x01`. Future versions may add the format orbit payload (§2.3), a color
+- Format version byte = `0x01` (raw UTF-8) or `0x02` (segment modes, §4.1). Future versions may add the format orbit payload (§2.3), a color
   layer, and additional grids; decoders should trial-decode and reject on CRC failure.
 
 ## 8. Non-goals / honesty

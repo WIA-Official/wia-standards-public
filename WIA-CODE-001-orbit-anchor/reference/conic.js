@@ -109,35 +109,42 @@ function extractCoreRings(grayObj, cx, cy, rMaxPx, nAng, gradFrac) {
   const inner = [], outer = [];
   for (let a = 0; a < nAng; a++) {
     const th = 2 * Math.PI * a / nAng, ct = Math.cos(th), st = Math.sin(th);
-    // 프로파일 샘플
+    // 프로파일 샘플. r=0.5 부터 — 과거 r=1 시작 + 국소최대 조건(k±2)이 만든
+    //   "r<2.25px 검출 사각지대"가 yaw≥44° 압축방향에서 디스크 에지(1.5모듈≈2px)를
+    //   통째로 놓쳐 첫 에지가 5.5링으로 밀리던 원인이었다(2026-08-28 실측).
     const rs = [], vs = [];
-    for (let r = 1; r <= rMaxPx; r += step) { const v = sampAt(cx + r * ct, cy + r * st); if (v == null) break; rs.push(r); vs.push(v); }
+    for (let r = 0.5; r <= rMaxPx; r += step) { const v = sampAt(cx + r * ct, cy + r * st); if (v == null) break; rs.push(r); vs.push(v); }
     if (vs.length < 8) continue;
-    // 대비-상대 임계: 블러로 절대 그래디언트가 낮아져도 이 프로파일 자신의 대비 대비로 판정.
-    //   (과거 절대 40 은 블러 2px에서 코어 링을 20개 못 찾아 weak-core 로 컷 → 배율추정 실패)
     let vmin = Infinity, vmax = -Infinity;
     for (let i = 0; i < vs.length; i++) { if (vs[i] < vmin) vmin = vs[i]; if (vs[i] > vmax) vmax = vs[i]; }
-    const gThr = Math.max(6, gradFrac * (vmax - vmin));
-    // 상승에지 후보: dGray/dr 국소최대(+). 중심이 어두운지 확인(disk).
-    const rises = [];                       // {r, mag}
-    for (let k = 2; k < vs.length - 2; k++) {
-      const gm1 = vs[k + 1] - vs[k - 1];    // 중심차분(상승=+)
-      if (gm1 <= 0) continue;
-      // 국소최대
-      const gprev = vs[k] - vs[k - 2], gnext = vs[k + 2] - vs[k];
-      if (gm1 >= gprev && gm1 >= gnext && gm1 > gThr) {
-        // 서브픽셀: 그레이디언트 3점 포물선 정점
-        const gm = vs[k] - vs[k - 2], gp = vs[k + 2] - vs[k], gc = gm1;
-        const den = (gm - 2 * gc + gp);
-        let off = Math.abs(den) > 1e-9 ? 0.5 * (gm - gp) / den : 0;
-        off = Math.max(-1, Math.min(1, off));
-        rises.push({ r: rs[k] + off * step, mag: gc });
-      }
+    const contrast = vmax - vmin;
+    if (contrast < 12) continue;               // 평탄 프로파일 스킵
+    // ── 슈미트 트리거(히스테리시스) 상승 반값교차 ─────────────────────────
+    //   과거 "그래디언트 국소최대 + 첫 두 개" 방식의 두 파괴 모드를 원리적으로 봉쇄:
+    //   ① 스미어된 에지 하나가 국소최대 2개로 쪼개져 (inner,outer)가 같은 에지에
+    //      찍히던 이중검출 — 교차 사이에 lo 이하 하강이 필수라 불가능.
+    //   ② 위 사각지대 누락 — 교차는 r=0.5부터 판정된다.
+    //   대비-상대 임계(gradFrac 도입 취지)는 lo/hi 가 프로파일 자기 대비로 정해져 유지.
+    const lo = vmin + 0.30 * contrast, hi = vmin + 0.70 * contrast, mid = vmin + 0.5 * contrast;
+    // 시작점이 암부가 아니면 이 ray 는 코어 디스크 밖에서 출발한 것 —
+    //   "첫 두 상승" 의미가 깨져 5.5링을 1.5링으로 오인한다. 버리는 게 정답.
+    //   (시드가 코어 중심에서 1모듈 이상 벗어난 고yaw 에서 실제로 발생)
+    if (vs[0] > mid) continue;
+    let state = 0;                          // 0=암부, 1=명부
+    const crossings = [];
+    for (let k = 1; k < vs.length && crossings.length < 2; k++) {
+      if (state === 0 && vs[k] >= hi) {
+        // 직전 mid 상향교차를 서브픽셀(선형보간)로
+        let j = k - 1; while (j > 0 && vs[j] >= mid) j--;
+        const t = (mid - vs[j]) / ((vs[j + 1] - vs[j]) || 1);
+        crossings.push(rs[j] + Math.max(0, Math.min(1, t)) * step);
+        state = 1;
+      } else if (state === 1 && vs[k] <= lo) state = 0;
     }
-    if (rises.length < 2) continue;
-    // 첫 두 상승에지 = 원판경계(1.5), 검은링 바깥경계(5.5).
-    inner.push([cx + rises[0].r * ct, cy + rises[0].r * st]);
-    outer.push([cx + rises[1].r * ct, cy + rises[1].r * st]);
+    if (crossings.length < 2) continue;
+    // 첫 두 상승교차 = 원판경계(1.5모듈), 검은링 바깥경계(5.5모듈).
+    inner.push([cx + crossings[0] * ct, cy + crossings[0] * st]);
+    outer.push([cx + crossings[1] * ct, cy + crossings[1] * st]);
   }
   return { inner, outer };
 }

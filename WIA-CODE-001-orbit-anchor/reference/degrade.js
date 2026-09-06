@@ -109,7 +109,16 @@ function rotate(img, deg) {
 }
 
 // ── 블러 (분리형 박스 × passes, 가우시안 근사) — 기하 불변 ────────────────
+/* ★2026-08-30 — **정수 반경만 유효하다.** 소수를 넣으면 조용히 엉뚱한 화소를 읽는다.
+ *   `for (let k = -radius; k <= radius; k++)` 에서 k 가 소수가 되고,
+ *   세로 패스의 `o = (yy*w + x)*4` 에서 yy 가 소수면 오프셋이 **반 줄**이 된다 —
+ *   w=640 이면 k=-0.5 가 "0.5줄 위"가 아니라 **같은 줄에서 320화소 왼쪽**을 읽는다.
+ *   실측 피해: 내가 blur 1.5 로 시험하고 "전 실루엣이 blur1.5 에서 실패한다"는
+ *   **없는 절벽을 보고했다**(제대로 된 가우시안으로 재니 시그마 0.58 모듈까지 해독된다).
+ *   조용히 망가지는 게 가장 나쁘므로 반올림해서 **정의된 동작**으로 만든다.
+ *   ★소수 시그마가 필요하면 boxBlur 가 아니라 진짜 가우시안을 쓸 것. */
 function boxBlur(img, radius, passes) {
+  radius = Math.round(radius);
   if (radius <= 0) return { img: clone(img), fwd: IDENTITY, width: img.width, height: img.height };
   let cur = clone(img); const w = img.width, h = img.height;
   for (let p = 0; p < (passes || 3); p++) {

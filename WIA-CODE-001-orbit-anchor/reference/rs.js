@@ -81,13 +81,60 @@ function correctErrata(msg, synd, pos) {                   // Forney (reedsolo �
     msg[pos[i]] ^= div(y, prime);
   }
 }
-function decodeBlock(cw, nsym) {
+/* 소거 위치를 알 때 쓰는 다항식 — Π(1 − X·α^i). 신드롬을 이걸로 먼저 나눠
+ * "이미 아는 오염"을 걷어내면, 남은 예산 전부를 **모르는 오류**에 쓸 수 있다. */
+function erasureLocator(erasePos, n) {
+  let e = [1];
+  for (const p of erasePos) e = pMul(e, pAdd([1], [pw(2, n - 1 - p), 0]));
+  return e;
+}
+/* 소거를 반영한 수정 신드롬(Forney syndromes). */
+function forneySyndromes(synd, erasePos, n) {
+  const fs = synd.slice().reverse();
+  for (const p of erasePos) {
+    const x = pw(2, n - 1 - p);
+    for (let i = 0; i < fs.length - 1; i++) fs[i] = mul(fs[i], x) ^ fs[i + 1];
+    fs.pop();
+  }
+  return fs;
+}
+
+/* ★2026-08-30 B단계 — 소거(erasure) 판정.
+ *   `erasures` 는 **오염이 확실한 바이트 위치** 배열이다(없으면 옛 경로 그대로).
+ *   RS 는 위치를 모르면 예산의 절반을 찾는 데 쓴다: 오류 nsym/2, 소거 nsym.
+ *   위성 하나가 가려진 것을 `locateSim3` 가 이미 알므로, 그 주변을 소거로 넘기면
+ *   같은 패리티로 **2배**를 복구한다(실측: 27 → 55 바이트/블록).
+ *   상한: 2*errors + erasures ≤ nsym. */
+function decodeBlock(cw, nsym, erasures) {
   const msg = new Uint8Array(cw), s = syndromes(msg, nsym);
   if (!anyNZ(s)) return { data: msg.subarray(0, msg.length - nsym), errors: 0 };
-  const eloc = errLocator(s, nsym), pos = findErrors(eloc, msg.length);
+
+  const erasePos = [];
+  if (erasures && erasures.length) {
+    for (const p of erasures) if (p >= 0 && p < msg.length && erasePos.indexOf(p) < 0) erasePos.push(p);
+    if (erasePos.length > nsym) throw new Error('rs: too many erasures');
+  }
+  if (!erasePos.length) {                       // ── 옛 경로(한 글자도 안 바뀐다) ──
+    const eloc = errLocator(s, nsym), pos = findErrors(eloc, msg.length);
+    correctErrata(msg, s, pos);
+    if (anyNZ(syndromes(msg, nsym))) throw new Error('rs: uncorrectable');
+    return { data: msg.subarray(0, msg.length - nsym), errors: pos.length };
+  }
+
+  // ── 소거 경로 ──
+  const fs = forneySyndromes(s, erasePos, msg.length);
+  const room = nsym - erasePos.length;          // 남은 예산으로 찾을 수 있는 오류 수 × 2
+  let pos = erasePos.slice();
+  if (room >= 2 && anyNZ(fs)) {
+    const eloc = errLocator(fs.slice().reverse(), room);
+    let extra = [];
+    try { extra = findErrors(eloc, msg.length); } catch (e) { extra = []; }
+    for (const p of extra) if (pos.indexOf(p) < 0) pos.push(p);
+  }
+  if (2 * (pos.length - erasePos.length) + erasePos.length > nsym) throw new Error('rs: uncorrectable');
   correctErrata(msg, s, pos);
   if (anyNZ(syndromes(msg, nsym))) throw new Error('rs: uncorrectable');
-  return { data: msg.subarray(0, msg.length - nsym), errors: pos.length };
+  return { data: msg.subarray(0, msg.length - nsym), errors: pos.length, erasures: erasePos.length };
 }
 
 // ── 블록 플랜 + 전체 + 인터리브 (codec 인터페이스) ──────────────────────────
@@ -127,4 +174,4 @@ function interleaveBytes(seq, plan) { const o = ilOrder(plan), out = new Uint8Ar
 function deinterleaveBytes(raw, plan) { const o = ilOrder(plan), out = new Uint8Array(raw.length); for (let j = 0; j < o.length; j++) out[o[j]] = raw[j]; return out; }
 function crc16(buf) { let c = 0xffff; for (let i = 0; i < buf.length; i++) { c ^= buf[i] << 8; for (let k = 0; k < 8; k++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xffff : (c << 1) & 0xffff; } return c & 0xffff; }
 
-module.exports = { crc16, planBlocks, rsEncodeAll, rsDecodeAll, interleaveBytes, deinterleaveBytes, encodeBlock, decodeBlock };
+module.exports = { crc16, planBlocks, rsEncodeAll, rsDecodeAll, interleaveBytes, deinterleaveBytes, encodeBlock, decodeBlock, erasureLocator };
