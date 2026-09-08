@@ -1,7 +1,11 @@
 # WIA-CODE-001 — Orbit Anchor 2D Code · Specification (draft)
 
-Version 0.4 · reference implementation lives in `../reference/`. All constants below are the
+Version 0.5 · reference implementation lives in `../reference/`. All constants below are the
 values used by that code; the spec and code are kept in sync.
+
+**Changes in 0.5 (2026-09-08)** — editorial only, no change to the format, the encoding, or the
+decoding procedure. §2.6 *"Visual signature"* is renamed to *"Visual identity"*; see the note in
+that section. Implementations conforming to 0.4 conform to 0.5 unchanged.
 
 ## 1. Coordinate system & grids
 
@@ -52,15 +56,21 @@ anchors inside every supported silhouette. The core (§2.1) and orbit (§2.3) ar
 A decoder MUST NOT use the boundary to identify or orient a code. Narrower silhouettes simply
 have fewer data cells (§3), so capacity falls with silhouette area.
 
-### 2.6 Visual signature (normative identity)
+### 2.6 Visual identity (normative identity)
+> Renamed in 2026-09. Through v0.4 this section was titled *"Visual signature"*. The word
+> "signature" now denotes only the cryptographic signature that applications may place in the
+> payload, so the structural term was renamed to avoid collision. **This specification does not
+> define, require, or validate any cryptographic signature** — the payload is an opaque byte
+> string to this document.
+
 A mark is a WIA Code **if and only if** it carries, at its center, the structure of §2.1–§2.3:
 a concentric bullseye core, four satellite anchors of which exactly one is a donut, and the
-24-dot format orbit. These three together are the **visual signature** of the format.
+24-dot format orbit. These three together are the **visual identity** of the format.
 
 The outer silhouette (§2.5), the choice of `bitsPerCell`, the presence of a color layer (§3.2),
 and any brand artwork placed in the core's central disk are all free and carry no identity.
 Conformant documentation, tooling and user interfaces SHOULD identify a code by its visual
-signature and MUST NOT name a code after its silhouette (e.g. "heart code").
+identity and MUST NOT name a code after its silhouette (e.g. "heart code").
 
 A deployment MAY overlay additional marks on the data field — for example a small standard QR
 code acting as an onboarding bridge for cameras that do not know this format yet. Such overlays
